@@ -209,7 +209,7 @@ namespace SkyrimMCP::PlayerQueries {
             seen.insert(item->GetFormID());
             json e;
             e["slot"] = slotName;
-            e["slotMask"] = static_cast<uint32_t>(item->GetSlotMask());
+            e["slotMask"] = item->GetSlotMask().underlying();
             e["formId"] = std::format("{:08X}", item->GetFormID());
             e["name"] = item->GetName();
             equipped.push_back(e);

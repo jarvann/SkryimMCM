@@ -189,15 +189,17 @@ namespace SkyrimMCP::Helpers {
     // Console command execution approach adapted from ConsoleUtilSSE by VersuchDrei
     // (https://github.com/VersuchDrei/ConsoleUtilSSE, MIT License)
     //
-    // Key insight: CommonLibSSE-NG's Script::CompileAndRun() uses a relocation that
-    // crashes on game versions >= 1.6.1130. ConsoleUtilSSE uses a version-conditional
-    // relocation (441582 for patch >= 1130) that works correctly.
+    // Key insight: the function moved to a new Address Library ID in 1.6.1130, so the
+    // relocation has to be chosen by runtime version (441582 from 1.6.1130 onward).
+    //
+    // The whole version is compared, not the patch number alone: Skyrim 1.7.104 has
+    // patch 104, which a "patch < 1130" test would send to the pre-1130 ID.
 
     inline void CompileAndRunImpl(RE::Script* script, RE::ScriptCompiler* compiler,
         RE::COMPILER_NAME name, RE::TESObjectREFR* targetRef) {
         using func_t = decltype(CompileAndRunImpl);
         REL::Relocation<func_t> func{
-            RELOCATION_ID(21416, REL::Module::get().version().patch() < 1130 ? 21890 : 441582)
+            RELOCATION_ID(21416, AE_CHECK(SKSE::RUNTIME_SSE_1_6_1130, 21890, 441582))
         };
         return func(script, compiler, name, targetRef);
     }

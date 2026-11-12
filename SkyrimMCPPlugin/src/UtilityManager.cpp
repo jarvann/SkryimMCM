@@ -13,7 +13,7 @@ namespace SkyrimMCP::UtilityManager {
     using json = nlohmann::json;
 
     json ShowNotification(const std::string& message) {
-        RE::DebugNotification(message.c_str());
+        RE::SendHUDMessage::ShowHUDMessage(message.c_str());
         return {{"shown", true}, {"message", message}};
     }
 
@@ -347,7 +347,7 @@ namespace SkyrimMCP::UtilityManager {
         }
 
         saveLoadManager->Save(saveName.c_str());
-        RE::DebugNotification("Game Saved");
+        RE::SendHUDMessage::ShowHUDMessage("Game Saved");
         return {{"saved", true}, {"saveName", saveName}};
     }
 

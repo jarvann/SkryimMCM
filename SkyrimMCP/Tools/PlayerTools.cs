@@ -17,10 +17,22 @@ public class PlayerTools : ToolBase
     [Description("Check if Skyrim is running and the SKSE MCP plugin is connected")]
     public async Task<object> CheckConnection()
     {
-        bool connected = await _pipe.PingAsync();
-        return connected
-            ? new { connected = true, message = "Connected to Skyrim via SKSE plugin" }
-            : new { connected = false, message = "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded." };
+        try
+        {
+            // Plugin 1.1.0+ reports its own version and the game runtime in the ping reply.
+            var info = await _pipe.SendRequestAsync("ping");
+            return new
+            {
+                connected = true,
+                message = "Connected to Skyrim via SKSE plugin",
+                pluginVersion = info?["pluginVersion"]?.GetValue<string>(),
+                gameVersion = info?["gameVersion"]?.GetValue<string>()
+            };
+        }
+        catch (Exception ex)
+        {
+            return new { connected = false, message = ex.Message };
+        }
     }
 
     [McpServerTool]

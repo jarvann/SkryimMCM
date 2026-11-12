@@ -1,11 +1,14 @@
 # SkyLink AI — Release Build Script
-# Run from Developer PowerShell for VS 2022
+# Run from PowerShell with VS 2022 (or Build Tools) C++ workload installed
 # Produces a ready-to-zip release folder
 
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.1.0",
     [string]$OutputDir = "release",
-    [string]$VcpkgRoot = "C:\vcpkg"
+    [string]$VcpkgRoot = "C:\vcpkg",
+    # Keep the C++ build tree on a local Windows disk. MSBuild cannot track
+    # file timestamps when the repo lives on a WSL share.
+    [string]$BuildDir = "C:\build\skylink"
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,15 +25,18 @@ New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Serve
 # Build C++ plugin
 Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
 Push-Location SkyrimMCPPlugin
-if (-not (Test-Path "build")) {
-    cmake --preset default
+if (-not (Test-Path $BuildDir)) {
+    cmake --preset default -B $BuildDir
+    if ($LASTEXITCODE -ne 0) { Pop-Location; throw "CMake configure failed" }
 }
-cmake --build build --config Release
+cmake --build $BuildDir --config Release
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Plugin build failed" }
 Pop-Location
 
 # Build C# MCP Server
 Write-Host "`n--- Building MCP Server (C#) ---" -ForegroundColor Yellow
 dotnet publish SkyrimMCP -c Release -o "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server" --no-self-contained
+if ($LASTEXITCODE -ne 0) { throw "MCP server build failed" }
 
 # Copy SKSE plugin DLL
 Write-Host "`n--- Packaging ---" -ForegroundColor Yellow
@@ -55,9 +61,9 @@ An MCP server that lets AI assistants (Claude, etc.) interact directly
 with Skyrim SE/AE's runtime engine via an SKSE plugin.
 
 ## Requirements
-- Skyrim SE or AE
-- SKSE64 (https://skse.silverlock.org/)
-- Address Library for SKSE (https://www.nexusmods.com/skyrimspecialedition/mods/32444)
+- Skyrim SE or AE: Steam 1.7.104, 1.6.1130-1.6.1170, or SE 1.5.97
+- SKSE64 matching your game version (2.3.1 for 1.7.104) (https://skse.silverlock.org/)
+- Address Library for SKSE, current All-in-One for your game version (https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - .NET 10 Runtime (https://dotnet.microsoft.com/download/dotnet/10.0)
 - Claude Desktop (https://claude.ai/desktop)
 
@@ -99,8 +105,13 @@ Replace <SKYRIM_PATH> with your Skyrim installation path.
 
 ## Credits
 - ConsoleUtilSSE approach by VersuchDrei (MIT License)
-- CommonLibSSE-NG by CharmedBaryon
+- CommonLibSSE-NG (alandtse fork; originally by CharmedBaryon and Ryan McKenzie)
 - SKSE by Ian Patterson, Stephen Abel, and Paul Shortman
+
+## License
+- SkyrimMCPPlugin.dll: GPL-3.0-or-later (statically links CommonLibSSE-NG)
+- SkyLinkAI_Server (MCP server): MIT
+- Source: https://github.com/jarvann/SkryimMCM
 "@ | Set-Content "$OutputDir\README.txt"
 
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green

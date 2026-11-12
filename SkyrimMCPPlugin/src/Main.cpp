@@ -49,7 +49,7 @@ namespace {
 }
 
 SKSEPluginInfo(
-    .Version = { 1, 0, 0, 0 },
+    .Version = { 1, 1, 0, 0 },
     .Name = "SkyrimMCPPlugin",
     .Author = "SkyrimMCP",
     .RuntimeCompatibility = SKSE::VersionIndependence::AddressLibrary
@@ -57,9 +57,12 @@ SKSEPluginInfo(
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
     InitializeLogging();
-    SKSE::log::info("SkyrimMCPPlugin v1.0.0 loading...");
+    SKSE::log::info("SkyrimMCPPlugin v1.1.0 loading...");
 
     SKSE::Init(a_skse);
+
+    // Steam, GOG and downgraded installs all report here; first thing to check in a bug report.
+    SKSE::log::info("Skyrim runtime {}", REL::Module::get().version().string("."));
 
     // Console output capture: opens console menu briefly during command execution
 

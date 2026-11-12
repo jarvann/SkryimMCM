@@ -44,7 +44,7 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 ## Requirements
 
 - **Windows 10 or 11**
-- **Skyrim SE or AE** (v1.6.1130+)
+- **Skyrim SE or AE** — Steam 1.7.104 (SKSE64 2.3.1), 1.6.1130–1.6.1170, or SE 1.5.97
 - **SKSE64** ([skse.silverlock.org](https://skse.silverlock.org/))
 - **Address Library for SKSE** ([Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/32444))
 - **.NET 10 Runtime** ([download](https://dotnet.microsoft.com/download/dotnet/10.0))
@@ -103,7 +103,7 @@ See **[USAGE.md](USAGE.md)** for the full tool reference and advanced features.
 $env:VCPKG_ROOT = "C:\vcpkg"
 
 # Clone CommonLibSSE-NG (one-time)
-git clone https://github.com/CharmedBaryon/CommonLibSSE-NG.git SkyrimMCPPlugin/extern/CommonLibSSE-NG --depth 1
+git clone --depth 1 --branch v16.3.0 https://github.com/alandtse/CommonLibVR.git SkyrimMCPPlugin/extern/CommonLibSSE-NG
 
 # Build SKSE plugin
 cd SkyrimMCPPlugin
@@ -115,7 +115,7 @@ dotnet build ..\SkyrimMCP
 
 # Or build release package
 cd ..
-.\build_release.ps1 -Version "1.0.0"
+.\build_release.ps1 -Version "1.1.0"
 ```
 
 ## Project Structure
@@ -166,9 +166,12 @@ cd ..
 ## Credits
 
 - Console command execution approach adapted from [ConsoleUtilSSE](https://github.com/VersuchDrei/ConsoleUtilSSE) by VersuchDrei (MIT License)
-- [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) by CharmedBaryon
+- [CommonLibSSE-NG](https://github.com/alandtse/CommonLibVR/tree/ng) — alandtse fork (Skyrim 1.7 support), originally by CharmedBaryon and Ryan McKenzie
 - SKSE by Ian Patterson, Stephen Abel, and Paul Shortman
 
 ## License
 
-MIT
+- **SKSE plugin** (`SkyrimMCPPlugin/`, distributed as `SkyrimMCPPlugin.dll`): GPL-3.0-or-later. It statically links CommonLibSSE-NG, which is GPL-3.0-or-later with a modding exception, so the compiled plugin carries that licence.
+- **MCP server** (`SkyrimMCP/`): MIT. It is a separate program that talks to the plugin over a named pipe.
+
+Source for both is in this repository.

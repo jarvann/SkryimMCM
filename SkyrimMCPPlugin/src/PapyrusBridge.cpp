@@ -252,7 +252,7 @@ namespace SkyrimMCP::PapyrusBridge {
                               const std::string& functionName,
                               const json& args) {
         auto* vm = RE::SkyrimVM::GetSingleton();
-        if (!vm || !vm->impl) {
+        if (!vm || !vm->GetVMRuntimeData().impl) {
             return {{"error", "Papyrus VM not available"}};
         }
 
@@ -301,7 +301,7 @@ namespace SkyrimMCP::PapyrusBridge {
         auto future = callbackPtr->promise.get_future();
 
         // Dispatch the call
-        bool dispatched = vm->impl->DispatchStaticCall(
+        bool dispatched = vm->GetVMRuntimeData().impl->DispatchStaticCall(
             RE::BSFixedString(className),
             RE::BSFixedString(functionName),
             funcArgs,
