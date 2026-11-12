@@ -174,4 +174,4 @@ cd ..
 - **SKSE plugin** (`SkyrimMCPPlugin/`, distributed as `SkyrimMCPPlugin.dll`): GPL-3.0-or-later. It statically links CommonLibSSE-NG, which is GPL-3.0-or-later with a modding exception, so the compiled plugin carries that licence.
 - **MCP server** (`SkyrimMCP/`): MIT. It is a separate program that talks to the plugin over a named pipe.
 
-Source for both is in this repository.
+Full texts: [`SkyrimMCPPlugin/LICENSE`](SkyrimMCPPlugin/LICENSE) and [`SkyrimMCP/LICENSE`](SkyrimMCP/LICENSE). Source for both is in this repository.
