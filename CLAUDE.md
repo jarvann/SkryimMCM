@@ -29,7 +29,7 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 - **EventSystem.h/cpp** — 17 game event sinks with noise filtering
 - **TaskQueue.h/cpp** — Marshals pipe-thread calls to game thread via SKSE task interface
 
-Uses CommonLibSSE-NG (main branch, local shallow clone in `extern/`), nlohmann-json, spdlog, fmt. Statically linked (x64-windows-static).
+Uses CommonLibSSE-NG (alandtse fork `alandtse/CommonLibVR`, branch `ng`, tag v16.3.0 or newer, local shallow clone in `extern/`; required for Skyrim 1.7.99+ / Address Library format 5), nlohmann-json, spdlog, fmt. Statically linked (x64-windows-static).
 
 ### C# MCP Server (`SkyrimMCP/` — .NET 10)
 - **Program.cs** — MCP server host, registers IPipeClient singleton, auto-discovers tools
@@ -53,20 +53,24 @@ Uses CommonLibSSE-NG (main branch, local shallow clone in `extern/`), nlohmann-j
 $env:VCPKG_ROOT = "C:\vcpkg"
 
 # C++ plugin — only need --preset default when CMakeLists/vcpkg.json/CMakePresets.json change
-cmake --preset default
-cmake --build X:\_work\skyrim_mcp\SkyrimMCPPlugin\build --config Release
+# Repo lives in WSL; map it first (not persistent across reboots):
+#   net use W: \\wsl.localhost\Ubuntu-24.04
+# Build tree stays on a local Windows disk (MSBuild cannot track timestamps on the WSL share).
+cd W:\home\cory\personal\skyrim_mcp\SkyrimMCPPlugin
+cmake --preset default -B C:\build\skylink
+cmake --build C:\build\skylink --config Release
 
 # C# MCP server — close Claude Desktop first (exe is locked while running)
-dotnet build X:\_work\skyrim_mcp\SkyrimMCP
+dotnet build W:\home\cory\personal\skyrim_mcp\SkyrimMCP
 
 # Deploy DLL to Skyrim
-copy X:\_work\skyrim_mcp\SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll "C:\Steam\steamapps\common\Skyrim Special Edition\Data\SKSE\Plugins\" -Force
+copy W:\home\cory\personal\skyrim_mcp\SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll "L:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\SKSE\Plugins\" -Force
 
 # Release build for Nexus
-.\build_release.ps1 -Version "1.0.0"
+.\build_release.ps1 -Version "1.1.0"
 ```
 
-**Requires:** Visual Studio 2022 C++ workload, CMake 3.21+, vcpkg at `C:\vcpkg`, .NET 10 SDK
+**Requires:** Visual Studio 2022 (or Build Tools) C++ workload, CMake 3.21+, vcpkg at `C:\vcpkg`, .NET 10 SDK
 
 ## Protocol
 
@@ -77,7 +81,7 @@ Response: `{"id":"uuid","success":bool,"data":{},"error":"..."}`
 
 ## Key Technical Decisions
 
-- **Console commands:** Use ConsoleUtilSSE-style `CompileAndRunImpl` with `RELOCATION_ID(21416, patch < 1130 ? 21890 : 441582)`. Credit: VersuchDrei/ConsoleUtilSSE (MIT License). CommonLibSSE-NG's built-in CompileAndRun crashes on Skyrim >= 1.6.1130.
+- **Console commands:** Use ConsoleUtilSSE-style `CompileAndRunImpl` with `RELOCATION_ID(21416, AE_CHECK(SKSE::RUNTIME_SSE_1_6_1130, 21890, 441582))` (never test `patch()` alone: 1.7.104 has patch 104). Credit: VersuchDrei/ConsoleUtilSSE (MIT License). CommonLibSSE-NG's built-in CompileAndRun crashes on Skyrim >= 1.6.1130.
 - **NPC targeting:** Use dot-notation `refId.command` (e.g., `FE124B0E.kill`). The `prid` command does NOT persist between separate ExecuteConsoleCommand calls.
 - **Thread safety:** All game API calls go through TaskQueue to run on the game thread. Only `ping`, `poll_events`, and Papyrus catalog operations are handled directly on the pipe thread.
 - **Papyrus VM calls:** DispatchStaticCall must NOT go through TaskQueue (deadlock). Called from pipe thread, callback fires on game thread.
@@ -96,6 +100,10 @@ Response: `{"id":"uuid","success":bool,"data":{},"error":"..."}`
 - Quest aliases: use `GetVMTypeID() == BGSRefAlias::VMTYPEID` with `static_cast`, not `dynamic_cast`
 - Plugin entry: `SKSEPluginInfo()` / `SKSEPluginLoad()` macros, not manual constinit
 - Logging: needs `#include <spdlog/sinks/basic_file_sink.h>`
+- Papyrus VM: `SkyrimVM::GetVMRuntimeData().impl`, not `vm->impl` (layout shifted in 1.7.99)
+- `EnumSet` values: `.underlying()` for the raw integer, not `static_cast`
+- HUD notification: `RE::SendHUDMessage::ShowHUDMessage`, not `RE::DebugNotification`
+- Do not define `SKSE_SUPPORT_XBYAK` at all (the fork tests `defined`, so `=0` turns it on)
 - Always grep actual headers in `extern/CommonLibSSE-NG/include/` when in doubt
 
 ## Project Tracking

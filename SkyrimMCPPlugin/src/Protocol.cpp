@@ -51,7 +51,11 @@ namespace SkyrimMCP::Protocol {
         // === Direct handlers (no game thread) ===
 
         registry["ping"] = [](const std::string& id, const json&) {
-            return MakeResponse(id, true, json::object()).dump() + "\n";
+            // Answered on the pipe thread, so it still works when game-thread calls do not.
+            json info;
+            info["pluginVersion"] = "1.1.0";
+            info["gameVersion"] = REL::Module::get().version().string(".");
+            return MakeResponse(id, true, info).dump() + "\n";
         };
 
         registry["poll_events"] = [](const std::string& id, const json& params) {

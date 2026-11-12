@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     SkyrimMCPPlugin
-    VERSION 1.0.0
+    VERSION 1.1.0
     LANGUAGES CXX
 )
 
@@ -17,7 +17,16 @@ find_package(nlohmann_json CONFIG REQUIRED)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
 
-# CommonLibSSE-NG from local clone
+# Patch-safety checks only guard Trampoline::write_branch, which this plugin never
+# uses. Leaving them on makes CommonLib git-clone MinHook at configure time.
+set(SKSE_SUPPORT_PATCH_SAFETY OFF CACHE BOOL "" FORCE)
+
+# CommonLibSSE-NG from local clone.
+# Must be the alandtse fork at v16.3.0 or newer: Skyrim 1.7.99+ uses Address
+# Library format 5, and SKSE 2.3.x refuses any plugin that does not declare it.
+#   git clone --depth 1 --branch v16.3.0 https://github.com/alandtse/CommonLibVR.git extern/CommonLibSSE-NG
+# Always built from source: the published prebuilt bundles use the /MD runtime
+# and all three runtimes, which does not match our static /MT, SE+AE build.
 add_subdirectory(extern/CommonLibSSE-NG)
 
 # Plugin sources
@@ -69,7 +78,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
-    SKSE_SUPPORT_XBYAK=0
 )
 
 # Set output name without "lib" prefix
