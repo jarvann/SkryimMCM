@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-03-24",
+  "lastUpdated": "2026-11-12",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 113,
+    "totalItems": 128,
     "completed": 80,
     "completedPartial": 3,
     "implementedUntested": 2,
     "inProgress": 0,
-    "planned": 45,
-    "bugs": 10
+    "planned": 60,
+    "bugs": 15
   },
   "phases": [
     {
@@ -311,6 +311,10 @@
             {
               "datetime": "2026-03-23T12:00",
               "note": "Reported: call_papyrus_function fails immediately on StorageUtil.debug_GetIntObjectCount (no args, int return). ConsoleUtil.ReadMessage froze game \u2014 that function blocks on console input, not a VM issue. GetPapyrusCatalog (166 scripts) and GetScriptFunctions both work. DispatchStaticCall or C# return value marshaling is broken."
+            },
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "1.1.0 smoke test on Skyrim 1.7.104: Utility.GetCurrentGameTime dispatched and returned 0.626, and a call with a visible in-game effect was confirmed. Object-returning functions not tested. Duplicate BUG-011 entry (one 'new', one 'complete') still needs reconciling."
             }
           ]
         },
@@ -1293,6 +1297,209 @@
           "description": "Auto-generate MCP tool definitions from scanned Papyrus functions. Each plugin gets its own tool group with proper descriptions derived from function signatures and script comments."
         }
       ]
+    },
+    {
+      "phase": 13,
+      "name": "v1.2 \u2014 Field Feedback from 1.1.0",
+      "priority": "high",
+      "status": "planned",
+      "items": [
+        {
+          "id": "FEAT-205",
+          "type": "feature",
+          "status": "planned",
+          "title": "Equip / unequip MCP tools",
+          "description": "Plugin already handles equip_item and unequip_item (Protocol.cpp) but the C# server exposes no tool for them. Ten items had to be equipped through ten console commands. Add EquipItem/UnequipItem tools, ideally accepting a list.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-206",
+          "type": "feature",
+          "status": "planned",
+          "title": "Portable form IDs in the blueprint",
+          "description": "Store plugin name plus local form ID for every modded form so a blueprint survives a load-order change. Resolve back to a runtime ID on import. Prerequisite for FEAT-121.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-207",
+          "type": "feature",
+          "status": "planned",
+          "title": "One-call apply blueprint with dry run",
+          "description": "Single call that adds items, equips them and restores gold from a blueprint, with a dry-run option that reports what would change. First deliverable slice of FEAT-121 (inventory/equipment/gold sections only).",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-208",
+          "type": "feature",
+          "status": "planned",
+          "title": "Appearance write tools",
+          "description": "Head parts can be read but not changed. Add tools to set or remove head parts (the case that prompted it: fixing horns directly). Relates to FEAT-121 appearance section.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-209",
+          "type": "feature",
+          "status": "planned",
+          "title": "Slider / part index in appearance read",
+          "description": "get_appearance should include the RaceMenu slider or part index for each head part so 'which number was that hair' has an answer.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-210",
+          "type": "feature",
+          "status": "planned",
+          "title": "Wait for Skyrim instead of failing when the game is not running",
+          "description": "Nexus request from kilaya42 (25 Jun 2026). Code review suggests PipeClient connects lazily and Program.cs should not exit; needs a reproduction before any change.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-015",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "poll_events: smaller default page and mute quest start/stop churn",
+          "description": "One poll returned 500 events and about 59,000 characters; 365 were quest start/stop noise, 250 from a single quest ('Quest Alias NPC') cycling. Lower the default page size and mute or collapse repeated start/stop of the same quest.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-016",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "get_load_order: paging, name filter, or file output",
+          "description": "Response was about 365,000 characters on a 4,000+ plugin load order. Add paging, a filter by name, or a write-to-file option like the blueprint export has.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-017",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "Document what get_menu_state lists",
+          "description": "Reports zero menus while HUD overlays are open. Fine if it is meant to list only blocking menus, but the tool description should say so.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-018",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "Reconnect test with a state-changing first call",
+          "description": "The stale-pipe retry (1.1.0) was verified only with a read-only first call after a Skyrim restart. Test with a write (e.g. add_item) as the first call and confirm it runs exactly once.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-012",
+          "type": "bug",
+          "status": "planned",
+          "title": "All data calls fail on GOG Skyrim SE",
+          "description": "Nexus bug report from LennonStage (28 Apr 2026): GOG 1.6.1179, SKSE 2.2.6; ping works, every game-thread call fails. Cause unknown; the earlier 'Steam offsets on GOG' theory does not hold. Waiting on CheckConnection output, exact error text and the log from 'My Games\\Skyrim Special Edition GOG\\SKSE' (requested in the 1.1.0 sticky post). No GOG copy available for testing.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-013",
+          "type": "bug",
+          "status": "planned",
+          "title": "get_mod_formid_prefix: generic error for a plugin that is not loaded",
+          "description": "Should say the plugin is in the load order file but not active, or not installed, instead of a generic failure.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-014",
+          "type": "bug",
+          "status": "planned",
+          "title": "get_weather returns a blank name",
+          "description": "Returned form 0010A237 with an empty name. Fall back to the editor ID when the form has no display name.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-015",
+          "type": "bug",
+          "status": "planned",
+          "title": "Magicka maximum reports the base value",
+          "description": "get_player_info showed magicka 150 of 100 on a Breton. The max should include permanent and temporary modifiers. Check health and stamina for the same problem.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-016",
+          "type": "bug",
+          "status": "planned",
+          "title": "Empty hands reported as form 000001F4 with no name",
+          "description": "get_equipped_items lists the unarmed placeholder form with a blank name and no slotMask. Report it as 'unarmed' or omit it.",
+          "history": [
+            {
+              "datetime": "2026-11-12T22:00",
+              "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        }
+      ]
     }
   ],
   "infrastructure": [
@@ -1978,6 +2185,13 @@
       "capabilities": [
         "Extended form info display"
       ]
+    }
+  ],
+  "releases": [
+    {
+      "version": "1.1.0",
+      "date": "2026-11-12",
+      "notes": "Skyrim 1.7.104 / SKSE64 2.3.1 support (alandtse CommonLibSSE-NG v16.3.0), version reporting in CheckConnection, stale-pipe reconnect fix. Tested on Steam 1.7.104 only."
     }
   ]
 }
