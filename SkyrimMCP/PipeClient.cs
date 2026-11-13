@@ -57,26 +57,41 @@ public class PipeClient : IPipeClient
         await _sendLock.WaitAsync();
         try
         {
-            if (!IsConnected)
-            {
-                bool connected = await TryConnectAsync();
-                if (!connected)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded.");
-                }
-            }
-
             var request = new JsonObject
             {
                 ["id"] = Guid.NewGuid().ToString(),
                 ["action"] = action,
                 ["params"] = parameters ?? new JsonObject()
             };
-
             var requestLine = request.ToJsonString();
-            await _writer!.WriteLineAsync(requestLine);
-            await _writer.FlushAsync();
+
+            // A pipe left over from a previous game session still reports itself as
+            // connected until we write to it. If the write fails, the request never
+            // reached the plugin, so it is safe to reconnect and send it once more.
+            // A failure after the write is not retried: the action may have run.
+            for (int attempt = 0; ; attempt++)
+            {
+                if (!IsConnected)
+                {
+                    bool connected = await TryConnectAsync();
+                    if (!connected)
+                    {
+                        throw new InvalidOperationException(
+                            "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded.");
+                    }
+                }
+
+                try
+                {
+                    await _writer!.WriteLineAsync(requestLine);
+                    await _writer.FlushAsync();
+                    break;
+                }
+                catch (IOException) when (attempt == 0)
+                {
+                    Disconnect();
+                }
+            }
 
             // Read response with timeout
             using var cts = new CancellationTokenSource(ResponseTimeoutMs);
@@ -137,9 +152,11 @@ public class PipeClient : IPipeClient
 
     private void Disconnect()
     {
-        _writer?.Dispose();
-        _reader?.Dispose();
-        _pipe?.Dispose();
+        // Disposing a writer on a broken pipe tries to flush and throws; that must
+        // not replace the error we are already reporting.
+        try { _writer?.Dispose(); } catch (IOException) { } catch (ObjectDisposedException) { }
+        try { _reader?.Dispose(); } catch (IOException) { } catch (ObjectDisposedException) { }
+        try { _pipe?.Dispose(); } catch (IOException) { } catch (ObjectDisposedException) { }
         _writer = null;
         _reader = null;
         _pipe = null;
