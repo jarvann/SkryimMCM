@@ -14,7 +14,9 @@ public class WorldTools : ToolBase
     public WorldTools(IPipeClient pipe) : base(pipe) { }
 
     [McpServerTool]
-    [Description("Get the current weather conditions.")]
+    [Description("Get the current and previous weather and how far the transition has got (weatherPct). " +
+        "Most weathers have no in-game name: 'name' falls back to the editor ID, then to '<category> weather <formId>'. " +
+        "currentWeather and previousWeather add category (clear, cloudy, rain, snow, other) and the mod it comes from.")]
     public async Task<object> GetWeather()
     {
         var data = await _pipe.SendRequestAsync("get_weather");
@@ -22,7 +24,7 @@ public class WorldTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("List all available weather types with FormIDs, editor IDs, categories (clear, snow, rain, storm, fog, cloudy, ash), " +
+    [Description("List all available weather types with FormIDs, editor IDs, categories (clear, cloudy, rain, snow, other), " +
         "and which mod they come from. Use the FormID or editor ID with SetWeather to change the weather.")]
     public async Task<object> ListWeathers(int page = 1, int pageSize = 50)
     {
