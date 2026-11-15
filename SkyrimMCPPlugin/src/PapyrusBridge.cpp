@@ -7,6 +7,7 @@
 #include <fstream>
 #include <mutex>
 #include <regex>
+#include <cstring>
 #include <future>
 
 namespace SkyrimMCP::PapyrusBridge {
@@ -248,18 +249,140 @@ namespace SkyrimMCP::PapyrusBridge {
         void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
     };
 
+    // ==================== Pre-dispatch validation ====================
+    //
+    // DispatchStaticCall does not fail cleanly when the function is missing or the
+    // arguments don't match: a call to a function that the installed version of a
+    // mod doesn't have (e.g. PO3_SKSEFunctions.GetKnownEnchantments) crashed the
+    // game. So every call is checked against the VM's own type info first, and only
+    // a call that names a real global function with matching argument types is sent.
+
+    static std::string TypeName(const RE::BSScript::TypeInfo& a_type) {
+        using RawType = RE::BSScript::TypeInfo::RawType;
+        if (a_type.IsArray()) return "Array";
+        if (a_type.IsObject()) {
+            auto* info = a_type.GetTypeInfo();
+            return info && info->GetName() ? info->GetName() : "Object";
+        }
+        switch (a_type.GetRawType()) {
+        case RawType::kNone:   return "None";
+        case RawType::kString: return "String";
+        case RawType::kInt:    return "Int";
+        case RawType::kFloat:  return "Float";
+        case RawType::kBool:   return "Bool";
+        default:               return "Unknown";
+        }
+    }
+
+    static std::string Signature(const std::string& a_className, RE::BSScript::IFunction* a_func) {
+        std::string sig = TypeName(a_func->GetReturnType()) + " " + a_className + "." +
+                          a_func->GetName().c_str() + "(";
+        for (std::uint32_t i = 0; i < a_func->GetParamCount(); i++) {
+            RE::BSFixedString name;
+            RE::BSScript::TypeInfo type;
+            a_func->GetParam(i, name, type);
+            if (i > 0) sig += ", ";
+            sig += TypeName(type) + " " + name.c_str();
+        }
+        return sig + ")";
+    }
+
+    static bool NameEquals(const RE::BSFixedString& a_name, const std::string& a_wanted) {
+        return a_name.c_str() && _stricmp(a_name.c_str(), a_wanted.c_str()) == 0;
+    }
+
+    static RE::BSScript::IFunction* FindGlobalFunction(RE::BSScript::ObjectTypeInfo* a_type, const std::string& a_fn) {
+        auto* funcs = a_type->GetGlobalFuncIter();
+        for (std::uint32_t i = 0; funcs && i < a_type->GetNumGlobalFuncs(); i++) {
+            auto* func = funcs[i].func.get();
+            if (func && NameEquals(func->GetName(), a_fn)) return func;
+        }
+        return nullptr;
+    }
+
+    static bool HasMemberFunction(RE::BSScript::ObjectTypeInfo* a_type, const std::string& a_fn) {
+        // Walk the parent chain: member functions are inherited.
+        for (auto* type = a_type; type; type = type->GetParent()) {
+            auto* funcs = type->GetMemberFuncIter();
+            for (std::uint32_t i = 0; funcs && i < type->GetNumMemberFuncs(); i++) {
+                auto* func = funcs[i].func.get();
+                if (func && NameEquals(func->GetName(), a_fn)) return true;
+            }
+        }
+        return false;
+    }
+
+    // Converts one JSON argument to a Variable of the parameter's declared type.
+    // Returns an error message, or an empty string on success.
+    static std::string PackArgument(const json& a_arg, const RE::BSScript::TypeInfo& a_type,
+                                    const std::string& a_paramName, RE::BSScript::Variable& a_out) {
+        auto mismatch = [&](const char* a_expected) {
+            return "Argument '" + a_paramName + "' must be " + a_expected + ", got " + a_arg.dump();
+        };
+
+        if (a_type.IsArray() || a_type.IsObject()) {
+            return "Argument '" + a_paramName + "' is " + TypeName(a_type) +
+                   "; call_papyrus_function can only pass String, Int, Float and Bool values";
+        }
+        if (a_type.IsString()) {
+            if (!a_arg.is_string()) return mismatch("a string");
+            a_out.SetString(a_arg.get<std::string>());
+        } else if (a_type.IsInt()) {
+            if (!a_arg.is_number_integer()) return mismatch("an integer");
+            a_out.SetSInt(a_arg.get<std::int32_t>());
+        } else if (a_type.IsFloat()) {
+            if (!a_arg.is_number()) return mismatch("a number");
+            a_out.SetFloat(a_arg.get<float>());
+        } else if (a_type.IsBool()) {
+            if (!a_arg.is_boolean()) return mismatch("true or false");
+            a_out.SetBool(a_arg.get<bool>());
+        } else {
+            return "Argument '" + a_paramName + "' has an unsupported type (" + TypeName(a_type) + ")";
+        }
+        return {};
+    }
+
     json CallPapyrusFunction(const std::string& className,
                               const std::string& functionName,
                               const json& args) {
         auto* vm = RE::SkyrimVM::GetSingleton();
-        if (!vm || !vm->GetVMRuntimeData().impl) {
+        auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;
+        if (!impl) {
             return {{"error", "Papyrus VM not available"}};
         }
 
-        SKSE::log::info("Calling Papyrus: {}.{}({} args)", className, functionName, args.size());
+        if (!args.is_array()) {
+            return {{"error", "args must be a JSON array, e.g. [\"text\", 5, true]"}};
+        }
 
-        // Build function arguments from JSON array
-        // Uses a custom IFunctionArguments that packs Variables at runtime
+        // 1. The script class must exist.
+        RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> typeInfo;
+        if (!impl->GetScriptObjectType(RE::BSFixedString(className), typeInfo) || !typeInfo) {
+            return {{"error", "Script class not found: " + className +
+                              ". Check the spelling, or that the mod providing it is installed."}};
+        }
+
+        // 2. It must declare a global function with that name.
+        auto* func = FindGlobalFunction(typeInfo.get(), functionName);
+        if (!func) {
+            if (HasMemberFunction(typeInfo.get(), functionName)) {
+                return {{"error", functionName + " is a member function of " + className +
+                                  ", not a global one. call_papyrus_function can only call global functions."}};
+            }
+            return {{"error", "Function not found: " + className + "." + functionName +
+                              ". The installed version of this script has no global function with that name. "
+                              "Use get_script_functions to list what it has."}};
+        }
+
+        // 3. The arguments must match the declared parameters.
+        const auto signature = Signature(className, func);
+        const auto paramCount = func->GetParamCount();
+        if (args.size() != paramCount) {
+            return {{"error", std::format("{} expects {} argument(s), got {}. Signature: {}",
+                                          functionName, paramCount, args.size(), signature)}};
+        }
+
+        // Packs Variables at runtime; the VM copies them during DispatchStaticCall.
         class DynamicArgs : public RE::BSScript::IFunctionArguments {
         public:
             std::vector<RE::BSScript::Variable> vars;
@@ -273,26 +396,21 @@ namespace SkyrimMCP::PapyrusBridge {
             }
         };
 
-        auto* dynArgs = new DynamicArgs();
+        auto dynArgs = std::make_unique<DynamicArgs>();
+        for (std::uint32_t i = 0; i < paramCount; i++) {
+            RE::BSFixedString paramName;
+            RE::BSScript::TypeInfo paramType;
+            func->GetParam(i, paramName, paramType);
 
-        if (args.is_array()) {
-            for (auto& arg : args) {
-                RE::BSScript::Variable v;
-                if (arg.is_string()) {
-                    v.SetString(arg.get<std::string>());
-                } else if (arg.is_number_integer()) {
-                    v.Pack(arg.get<std::int32_t>());
-                } else if (arg.is_number_float()) {
-                    v.SetFloat(arg.get<float>());
-                } else if (arg.is_boolean()) {
-                    v.SetBool(arg.get<bool>());
-                }
-                // TODO: Form types would need FormID resolution
-                dynArgs->vars.push_back(v);
+            RE::BSScript::Variable v;
+            auto err = PackArgument(args[i], paramType, paramName.c_str() ? paramName.c_str() : "?", v);
+            if (!err.empty()) {
+                return {{"error", err + ". Signature: " + signature}};
             }
+            dynArgs->vars.push_back(v);
         }
 
-        RE::BSScript::IFunctionArguments* funcArgs = dynArgs;
+        SKSE::log::info("Calling Papyrus: {}", signature);
 
         // Create callback
         auto callback = RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor>(new PapyrusCallback());
@@ -300,27 +418,28 @@ namespace SkyrimMCP::PapyrusBridge {
 
         auto future = callbackPtr->promise.get_future();
 
-        // Dispatch the call
-        bool dispatched = vm->GetVMRuntimeData().impl->DispatchStaticCall(
+        // Dispatch the call (from the pipe thread; see Protocol.cpp for why not TaskQueue)
+        bool dispatched = impl->DispatchStaticCall(
             RE::BSFixedString(className),
             RE::BSFixedString(functionName),
-            funcArgs,
+            dynArgs.get(),
             callback);
 
         if (!dispatched) {
-            return {{"error", "Failed to dispatch Papyrus call: " + className + "." + functionName}};
+            return {{"error", "Failed to dispatch Papyrus call: " + signature}};
         }
 
         // Wait for result with timeout
         auto status = future.wait_for(std::chrono::seconds(5));
         if (status == std::future_status::timeout) {
-            return {{"error", "Papyrus call timed out: " + className + "." + functionName},
+            return {{"error", "Papyrus call timed out: " + signature},
                     {"note", "Function may have completed but result was not received in time"}};
         }
 
         auto result = future.get();
         result["className"] = className;
         result["functionName"] = functionName;
+        result["signature"] = signature;
         return result;
     }
 

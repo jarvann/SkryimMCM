@@ -45,7 +45,11 @@ public class PapyrusTools : ToolBase
     [Description("Call any Papyrus function from any installed mod via the Papyrus VM. " +
         "Pass className (script class), functionName, and args (JSON array of values). " +
         "Supports string, int, float, bool arguments. Returns the function's return value. " +
+        "Only GLOBAL functions can be called. Before sending, the plugin checks the installed script: an unknown class, " +
+        "a missing function, a member function, or a wrong argument count or type is rejected with an error and the " +
+        "function's real signature, so read the error instead of guessing other names. " +
         "WORKFLOW: Use GetScriptFunctions(className) first to see available functions and parameter types. " +
+        "The catalog comes from .psc source files, which can be newer or older than the installed script; the plugin's check is authoritative. " +
         "KEY PLUGINS AVAILABLE: " +
         "ConsoleUtil (6 funcs): ExecuteCommand, ReadMessage, GetVersion, SetSelectedReference. " +
         "PapyrusUtil (21 funcs): MorphManager for face/body morphs, array utilities, file I/O. " +
@@ -62,7 +66,7 @@ public class PapyrusTools : ToolBase
         "Get ConsoleUtil version: className='ConsoleUtil', functionName='GetVersion', args=[] " +
         "Execute console command: className='ConsoleUtil', functionName='ExecuteCommand', args=['tgm'] " +
         "Add experience: className='Experience', functionName='AddExperience', args=[100, true] " +
-        "CAUTION: Functions requiring Actor/Form type arguments need FormID resolution (not yet supported for all types).")]
+        "LIMITATION: Functions taking Form, Actor or array arguments cannot be called yet (they are rejected, not sent).")]
     public async Task<object> CallPapyrusFunction(string className, string functionName, string? args = null)
     {
         var parms = new JsonObject
