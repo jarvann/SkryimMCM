@@ -34,7 +34,7 @@ Estimate: 50-80 human hours; Claude 4-6 hours and 1.5-2.5M tokens.
 | Protocol v2 (breaking) | INFRA-008 push events, INFRA-009 several clients at once |
 | On screen | FEAT-225 live quest tracker, FEAT-223 waypoints, FEAT-112 map markers, FEAT-222 resource alerts |
 | AI acting in the world | FEAT-215 NPC orders, FEAT-216 player autopilot, FEAT-122 spawn NPC from blueprint, FEAT-125 scripted scenes, FEAT-120 quest completion scripts |
-| Plugin framework | INFRA-010 detect SKSE plugins, FEAT-203/204 per-plugin tools (with generic list-and-run tools, since Claude Desktop only shows new tools in a new chat) |
+| Plugin framework | INFRA-010 detect SKSE plugins, FEAT-203/204 per-plugin tools (with generic list-and-run tools, since Claude Desktop only shows new tools after a restart) |
 | Runtime creators | FEAT-126 spells, FEAT-127 enchantments (saves must keep the new forms) |
 
 Estimate: 150-250 human hours; Claude 12-18 hours and 4-6M tokens. Open decision: KringleKiller's fork already has the in-game client, quest tracker, waypoints and notes. Take their code, build our own, or build it with them.

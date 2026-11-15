@@ -14,7 +14,7 @@ Claude Desktop <--stdio--> SkyLinkLauncher <--stdio/MCP--> C# MCP Server <--name
 ```
 
 Both halves hot-reload (1.2.1):
-- **Launcher** (`SkyLinkLauncher/`, run as `dotnet SkyLinkLauncher.dll`): runs a temp copy of the server, restarts it when a new build lands in `SkyLinkAI_Server\`, replays the MCP `initialize` handshake and sends `tools/list_changed`. Claude Desktop stays open. Claude Desktop ignores `list_changed` in an open chat (tested 2026-11-15): behaviour changes apply on the next call, but new tools and changed descriptions need a new chat.
+- **Launcher** (`SkyLinkLauncher/`, run as `dotnet SkyLinkLauncher.dll`): runs a temp copy of the server, restarts it when a new build lands in `SkyLinkAI_Server\`, replays the MCP `initialize` handshake and sends `tools/list_changed`. Claude Desktop stays open. Claude Desktop ignores `list_changed` and reads the tool list once at startup: behaviour changes apply on the next call, but new tools and changed descriptions need Claude Desktop quit (from the tray) and reopened. A new chat is not enough (seen 2026-11-15: a new chat still had build 2's tool list while build 3's server answered).
 - **Plugin** is two DLLs. `SkyrimMCPPlugin.dll` (host) is loaded by SKSE and never unloads. `SkyLinkAI\SkyLinkLogic.dll` (logic: every command handler) is loaded by the host from a temp copy and swapped while the game runs: automatically on the next request after a newer DLL is deployed, or with the `reload_plugin` action / `ReloadPlugin` tool.
 - **No .exe anywhere** (SmartScreen/AV): both C# projects set `UseAppHost=false`; `build_release.ps1` fails if one appears.
 

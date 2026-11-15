@@ -22,7 +22,7 @@ Sections 3 to 6 passed, after two fixes found during the run:
 Other findings:
 - Reloads took 10–12 ms. `reload_plugin`, Papyrus calls and `toggle_collision` all worked after reloads.
 - `check_connection` didn't trigger the automatic reload: the host answered it without the logic DLL. Changed: it now reloads first, and reports `loadingScreen`.
-- **Claude Desktop does not re-read the tool list on `list_changed`** in an open chat. New behaviour applies on the next call; new tools and changed descriptions need a new chat.
+- **Claude Desktop does not re-read the tool list on `list_changed`** New behaviour applies on the next call; new tools and changed descriptions need Claude Desktop restarted (a new chat reuses the list read at startup, seen 2026-11-15).
 - Reload during a loading screen: five `reload_plugin` calls in the middle of a save load all reloaded in 11–21 ms, with no crash or freeze. To make this easier to confirm next time, `reload_plugin` now returns `duringLoadingScreen`, and the plugin log records "Loading screen started/ended".
 - `get_game_safety` timed out during that load instead of reporting `isLoading: true`, because its check runs on the busy game thread. The host now answers it during a loading screen.
 
@@ -85,7 +85,7 @@ The plugin log (`SkyrimMCPPlugin.log`) should show "Logic DLL loaded: v1.2.1".
 1. **Make a visible change:** in a tool description in `SkyrimMCP\Tools\UtilityTools.cs`, add a word, for example to `reload_plugin`. Or just rebuild unchanged.
 2. **Deploy:** run `.\build_plugin.ps1 -ServerOnly` with Claude still running. Expect "Server: …" plus "Launcher not updated (in use by Claude?)". That launcher warning is expected while Claude is running.
 3. **Next call uses the new server:** make the next call. `check_connection` should show a new `serverBuilt` and a new `server-shadow\<pid>-<n>` path.
-4. **Tool list refresh:** Claude Desktop does not show the new description in the open chat (tested 2026-11-15). Open a new chat to see it. Behaviour changes still apply immediately.
+4. **Tool list refresh:** Claude Desktop does not show the new description in the open chat (tested 2026-11-15). A new chat was thought to show it; a later session (2026-11-15) showed it needs Claude Desktop restarted. Behaviour changes still apply immediately.
 
 ## 6. Host change still needs a restart
 
