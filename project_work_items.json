@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 155,
+    "totalItems": 157,
     "completed": 105,
     "completedPartial": 2,
     "implementedUntested": 5,
     "inProgress": 0,
-    "planned": 43,
+    "planned": 45,
     "bugs": 18
   },
   "phases": [
@@ -1640,6 +1640,34 @@
             {
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by AlexiousITA (troubleshooting crashes and slowdowns); Jarvann's reply named crash-log troubleshooting as a main use case."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-219",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Crash recorder: what SkyLink and the game did just before a crash",
+          "description": "The host DLL (never unloaded) keeps a ring buffer of the last few hundred events: AI tool calls, Papyrus calls, game events, current cell, quest stage changes. A vectored exception handler writes it to a file on a fatal exception, then lets Crash Logger SSE write its normal report (chained, never swallowing the crash). On the next launch the AI reads both together (with FEAT-217) to explain the crash. Does not try to recover or to make an emergency save: the game state is already damaged by then.",
+          "history": [
+            {
+              "datetime": "2026-11-15T05:30",
+              "note": "Discussed with Cory 15 Nov 2026 after asking whether SkyLink could catch every plugin's CTD. A catch-all is not safe (skipping a fault turns it into a hang or a corrupt save); recording context is. Estimate with FEAT-220 and FEAT-217: 14-22 human hours; about 1-1.5 h and 350-500k tokens for Claude, plus one deliberate test crash in game."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-220",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Crash protection for every game-thread task SkyLink runs",
+          "description": "Extend the SEH guard that already wraps console commands to every TaskQueue job, so an AI request that hits a bad form or pointer comes back as an error instead of a CTD. Only covers SkyLink's own calls, not other plugins.",
+          "history": [
+            {
+              "datetime": "2026-11-15T05:30",
+              "note": "Part of the crash discussion with Cory, 15 Nov 2026; see FEAT-219."
             }
           ]
         },
