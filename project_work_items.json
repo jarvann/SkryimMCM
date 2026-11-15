@@ -130,9 +130,9 @@
   },
   "summary": {
     "totalItems": 167,
-    "completed": 110,
+    "completed": 120,
     "completedPartial": 2,
-    "implementedUntested": 13,
+    "implementedUntested": 6,
     "inProgress": 0,
     "planned": 42,
     "bugs": 21
@@ -1330,6 +1330,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "EquipItems/UnequipItems tools over a new equip_items action: lists, NPCs (refId), hand for one-handed weapons and spells, shouts, ammo stacks; equips the held copy (keeps enchantments); checks inventory. Unequipping spells/shouts not supported yet. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: unequip/equip torch by FormID, spell to left hand, two items in one call, not-in-inventory error. Weapon hand path still to run."
             }
           ],
           "targetRelease": "1.3"
@@ -1393,7 +1397,7 @@
         {
           "id": "FEAT-210",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Wait for Skyrim instead of failing when the game is not running",
           "description": "Nexus request from kilaya42 (25 Jun 2026). Code review suggests PipeClient connects lazily and Program.cs should not exit; needs a reproduction before any change.",
           "history": [
@@ -1404,6 +1408,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "WaitForSkyrim tool (polls every 2 s, up to 600 s). Connect errors now say whether Skyrim is running, still starting, or another client holds the pipe. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: WaitForSkyrim returns at once when connected."
             }
           ],
           "targetRelease": "1.3"
@@ -1429,7 +1437,7 @@
         {
           "id": "INFRA-016",
           "type": "infrastructure",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "get_load_order: paging, name filter, or file output",
           "description": "Response was about 365,000 characters on a 4,000+ plugin load order. Add paging, a filter by name, or a write-to-file option like the blueprint export has.",
           "history": [
@@ -1440,6 +1448,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "GetLoadOrder: filter, type (esp/esl), page/pageSize (default 100), outputPath writes a JSON file. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: filter Skyrim matched 158; type esl pageSize 5 paged correctly (4088 light plugins)."
             }
           ],
           "targetRelease": "1.3"
@@ -1447,7 +1459,7 @@
         {
           "id": "INFRA-017",
           "type": "infrastructure",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Document what get_menu_state lists",
           "description": "Reports zero menus while HUD overlays are open. Fine if it is meant to list only blocking menus, but the tool description should say so.",
           "history": [
@@ -1458,6 +1470,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "Description lists the vanilla menus openMenus checks; new allOpenMenus lists every open menu from UI::menuMap with pausesGame/usesCursor/modal/alwaysOpen. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: allOpenMenus lists HUD widgets and ContainerMenu."
             }
           ],
           "targetRelease": "1.3"
@@ -1493,7 +1509,7 @@
         {
           "id": "BUG-013",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "get_mod_formid_prefix: generic error for a plugin that is not loaded",
           "description": "Should say the plugin is in the load order file but not active, or not installed, instead of a generic failure.",
           "history": [
@@ -1504,6 +1520,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "get_mod_formid_prefix says whether a plugin is inactive (compile index 0xFF) or not active/installed, and lists up to 10 active plugins with a similar name. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: missing plugin and partial-name messages correct after the wording fix."
             }
           ],
           "targetRelease": "1.3"
@@ -1511,7 +1531,7 @@
         {
           "id": "BUG-014",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "get_weather returns a blank name",
           "description": "Returned form 0010A237 with an empty name. Fall back to the editor ID when the form has no display name.",
           "history": [
@@ -1522,6 +1542,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "Weather name falls back to editor ID, then \"<category> weather <formId>\"; GetWeather adds currentWeather/previousWeather with category and mod. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: current weather SkyrimFogRE (editor ID fallback), category cloudy, mod Skyrim.esm."
             }
           ],
           "targetRelease": "1.3"
@@ -1529,7 +1553,7 @@
         {
           "id": "BUG-015",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Magicka maximum reports the base value",
           "description": "get_player_info showed magicka 150 of 100 on a Breton. The max should include permanent and temporary modifiers. Check health and stamina for the same problem.",
           "history": [
@@ -1540,6 +1564,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "Max values use Actor::GetActorValueMax (permanent + temporary modifiers) in player info, NPC detail, followers and combat targets; player info adds *Base values. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: max values include modifiers (health max below base with a -50 debuff, as the game bar shows)."
             }
           ],
           "targetRelease": "1.3"
@@ -1547,7 +1575,7 @@
         {
           "id": "BUG-016",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Empty hands reported as form 000001F4 with no name",
           "description": "get_equipped_items lists the unarmed placeholder form with a blank name and no slotMask. Report it as 'unarmed' or omit it.",
           "history": [
@@ -1558,6 +1586,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "Hands always listed; an empty hand (Unarmed 000001F4) is empty=true, \"(empty hand)\"; held items get a type; shield not listed twice. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: empty left hand reported as empty=true, \"(empty hand)\"."
             }
           ],
           "targetRelease": "1.3"
@@ -1705,13 +1737,17 @@
         {
           "id": "INFRA-019",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "complete",
           "title": "Scripted in-game test harness",
           "description": "Run a fixed list of tool calls against a known save (for example Save20 'QASmoke') and compare the results with expected values, so each build gets the same smoke test without a manual session. Estimate: 12-20 human hours; about 1 h and 300-450k tokens for Claude.",
           "history": [
             {
               "datetime": "2026-11-15T00:00",
               "note": "Came out of the 1.2.0 test sessions, where every check was run by hand."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: RunSelfTest 24/24."
             }
           ],
           "targetRelease": "1.3"
@@ -1719,13 +1755,17 @@
         {
           "id": "FEAT-217",
           "type": "feature",
-          "status": "planned",
+          "status": "complete",
           "title": "Crash-log reader",
           "description": "Tool that finds and returns the newest crash log (Crash Logger SSE / NetScriptFramework, under My Games\\Skyrim Special Edition\\SKSE) so the AI can troubleshoot crashes in large load orders without the player copying files by hand.",
           "history": [
             {
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by AlexiousITA (troubleshooting crashes and slowdowns); Jarvann's reply named crash-log troubleshooting as a main use case."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: read crash-2026-11-15-15-02-32.log by section (SkyLink not on that crash stack)."
             }
           ],
           "targetRelease": "1.3"
@@ -1784,6 +1824,10 @@
             {
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by Maruzarix (18 May 2026)."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: skyrimPath found from the server install location; ListPluginConfigs finds po3 files."
             }
           ],
           "targetRelease": "1.3"
@@ -1833,13 +1877,17 @@
         {
           "id": "FEAT-224",
           "type": "feature",
-          "status": "planned",
+          "status": "complete",
           "title": "Notes and goals, with progress alerts",
           "description": "The player and the AI keep notes and goals for each character, saved with the save (SKSE co-save or a JSON file per character), and the AI reads them at the start of a session. The AI points out when the player is near a way to make progress on a goal. Tools and storage first; a panel follows with the in-game window (FEAT-213).",
           "history": [
             {
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game: add, list and delete a note."
             }
           ],
           "targetRelease": "1.3"
@@ -1873,6 +1921,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "GetHairAndSkinColor, ListHairColors, SetHairColor (closest existing colour form, persists), SetSkinTone (bodyTintColor + player skin-tone tint masks, optional DoReset3D). To check in game: face refresh, persistence after save/load, RaceMenu overriding. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-15T16:00",
+              "note": "Tested in game 2026-11-15 (Claude Desktop agent): SetHairColor auburn and back, SetSkinTone dark with refresh=false (body changes at once, face keeps old tone) then refresh=true (face updates), restored to #B9B3AA. RaceMenu did not override either change. Still to check: persistence after save and load."
             }
           ],
           "targetRelease": "1.3"
