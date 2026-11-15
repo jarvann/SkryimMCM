@@ -132,9 +132,9 @@
     "totalItems": 167,
     "completed": 110,
     "completedPartial": 2,
-    "implementedUntested": 3,
+    "implementedUntested": 13,
     "inProgress": 0,
-    "planned": 52,
+    "planned": 42,
     "bugs": 21
   },
   "phases": [
@@ -1319,13 +1319,17 @@
         {
           "id": "FEAT-205",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Equip / unequip MCP tools",
           "description": "Plugin already handles equip_item and unequip_item (Protocol.cpp) but the C# server exposes no tool for them. Ten items had to be equipped through ten console commands. Add EquipItem/UnequipItem tools, ideally accepting a list.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "EquipItems/UnequipItems tools over a new equip_items action: lists, NPCs (refId), hand for one-handed weapons and spells, shouts, ammo stacks; equips the held copy (keeps enchantments); checks inventory. Unequipping spells/shouts not supported yet. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1389,13 +1393,17 @@
         {
           "id": "FEAT-210",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Wait for Skyrim instead of failing when the game is not running",
           "description": "Nexus request from kilaya42 (25 Jun 2026). Code review suggests PipeClient connects lazily and Program.cs should not exit; needs a reproduction before any change.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "WaitForSkyrim tool (polls every 2 s, up to 600 s). Connect errors now say whether Skyrim is running, still starting, or another client holds the pipe. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1403,13 +1411,17 @@
         {
           "id": "INFRA-015",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "poll_events: smaller default page and mute quest start/stop churn",
           "description": "One poll returned 500 events and about 59,000 characters; 365 were quest start/stop noise, 250 from a single quest ('Quest Alias NPC') cycling. Lower the default page size and mute or collapse repeated start/stop of the same quest.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "Done in the C# server (no host change): PollEvents returns maxEvents (default 50), keeps the rest for the next poll (remaining), collapses quests with 3+ start/stops into quest_churn. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1417,13 +1429,17 @@
         {
           "id": "INFRA-016",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "get_load_order: paging, name filter, or file output",
           "description": "Response was about 365,000 characters on a 4,000+ plugin load order. Add paging, a filter by name, or a write-to-file option like the blueprint export has.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "GetLoadOrder: filter, type (esp/esl), page/pageSize (default 100), outputPath writes a JSON file. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1431,13 +1447,17 @@
         {
           "id": "INFRA-017",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Document what get_menu_state lists",
           "description": "Reports zero menus while HUD overlays are open. Fine if it is meant to list only blocking menus, but the tool description should say so.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "Description lists the vanilla menus openMenus checks; new allOpenMenus lists every open menu from UI::menuMap with pausesGame/usesCursor/modal/alwaysOpen. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1473,13 +1493,17 @@
         {
           "id": "BUG-013",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "get_mod_formid_prefix: generic error for a plugin that is not loaded",
           "description": "Should say the plugin is in the load order file but not active, or not installed, instead of a generic failure.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "get_mod_formid_prefix says whether a plugin is inactive (compile index 0xFF) or not active/installed, and lists up to 10 active plugins with a similar name. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1487,13 +1511,17 @@
         {
           "id": "BUG-014",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "get_weather returns a blank name",
           "description": "Returned form 0010A237 with an empty name. Fall back to the editor ID when the form has no display name.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "Weather name falls back to editor ID, then \"<category> weather <formId>\"; GetWeather adds currentWeather/previousWeather with category and mod. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1501,13 +1529,17 @@
         {
           "id": "BUG-015",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Magicka maximum reports the base value",
           "description": "get_player_info showed magicka 150 of 100 on a Breton. The max should include permanent and temporary modifiers. Check health and stamina for the same problem.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "Max values use Actor::GetActorValueMax (permanent + temporary modifiers) in player info, NPC detail, followers and combat targets; player info adds *Base values. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1515,13 +1547,17 @@
         {
           "id": "BUG-016",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Empty hands reported as form 000001F4 with no name",
           "description": "get_equipped_items lists the unarmed placeholder form with a blank name and no slotMask. Report it as 'unarmed' or omit it.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "Hands always listed; an empty hand (Unarmed 000001F4) is empty=true, \"(empty hand)\"; held items get a type; shield not listed twice. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
@@ -1825,7 +1861,7 @@
         {
           "id": "FEAT-226",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Hair colour and skin tone (native, no RaceMenu needed)",
           "description": "Tools to set hair colour and skin tone on the player (and later NPCs) with the game's own data, so they work in every load order: TESNPC headRelatedData->hairColor (BGSColorForm), TESNPC::bodyTintColor and the player's skin-tone tint mask, then Actor::UpdateHairColor() / UpdateSkinColor(). Accept a colour by name or RGB and report the old and new values. Logic-DLL only, so it ships as a hot reload. Separate from RaceMenu support (FEAT-227), not a replacement for it: when RaceMenu is installed its own tint and overlay data may override these values, so FEAT-227 decides which path to use. To check in game: whether the face needs a refresh of the tint masks or a 3D update, and NPC faces, whose baked FaceGen textures may not follow a skin-tone change.",
@@ -1833,6 +1869,10 @@
             {
               "datetime": "2026-11-15T12:30",
               "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Estimate: about 3\u20134 human hours; for Claude about 15\u201320 minutes and 60\u201380k tokens."
+            },
+            {
+              "datetime": "2026-11-15T14:30",
+              "note": "GetHairAndSkinColor, ListHairColors, SetHairColor (closest existing colour form, persists), SetSkinTone (bodyTintColor + player skin-tone tint masks, optional DoReset3D). To check in game: face refresh, persistence after save/load, RaceMenu overriding. Branch per item, merged to develop; deployed by hot reload while Cory plays."
             }
           ],
           "targetRelease": "1.3"
