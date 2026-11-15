@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ModelContextProtocol;
 
 namespace SkyrimMCP;
 
@@ -76,7 +77,7 @@ public class PipeClient : IPipeClient
                     bool connected = await TryConnectAsync();
                     if (!connected)
                     {
-                        throw new InvalidOperationException(
+                        throw new McpException(
                             "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded.");
                     }
                 }
@@ -100,20 +101,23 @@ public class PipeClient : IPipeClient
             if (string.IsNullOrEmpty(responseLine))
             {
                 Disconnect();
-                throw new InvalidOperationException("Empty response from SKSE plugin - connection may have been lost");
+                throw new McpException("Empty response from SKSE plugin - connection may have been lost");
             }
 
             var response = JsonNode.Parse(responseLine);
             if (response == null)
             {
-                throw new InvalidOperationException("Failed to parse response from SKSE plugin");
+                throw new McpException("Failed to parse response from SKSE plugin");
             }
 
+            // Errors are thrown as McpException because the MCP SDK passes only that
+            // exception's message back to the caller. Any other exception type
+            // reaches the AI as a bare "An error occurred invoking '<tool>'".
             var success = response["success"]?.GetValue<bool>() ?? false;
             if (!success)
             {
                 var error = response["error"]?.GetValue<string>() ?? "Unknown error from SKSE plugin";
-                throw new InvalidOperationException(error);
+                throw new McpException(error);
             }
 
             return response["data"];
@@ -121,12 +125,12 @@ public class PipeClient : IPipeClient
         catch (OperationCanceledException)
         {
             Disconnect();
-            throw new TimeoutException("Timed out waiting for response from SKSE plugin - game may be loading or paused");
+            throw new McpException("Timed out waiting for response from SKSE plugin - game may be loading or paused");
         }
         catch (IOException)
         {
             Disconnect();
-            throw new InvalidOperationException("Lost connection to Skyrim - the game may have been closed");
+            throw new McpException("Lost connection to Skyrim - the game may have been closed");
         }
         finally
         {

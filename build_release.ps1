@@ -5,10 +5,7 @@
 param(
     [string]$Version = "1.1.0",
     [string]$OutputDir = "release",
-    [string]$VcpkgRoot = "C:\vcpkg",
-    # Keep the C++ build tree on a local Windows disk. MSBuild cannot track
-    # file timestamps when the repo lives on a WSL share.
-    [string]$BuildDir = "C:\build\skylink"
+    [string]$VcpkgRoot = "C:\vcpkg"
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,14 +21,8 @@ New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Serve
 
 # Build C++ plugin
 Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
-Push-Location SkyrimMCPPlugin
-if (-not (Test-Path $BuildDir)) {
-    cmake --preset default -B $BuildDir
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw "CMake configure failed" }
-}
-cmake --build $BuildDir --config Release
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Plugin build failed" }
-Pop-Location
+# Builds from a local mirror of the sources (see build_plugin.ps1 for why)
+& "$PSScriptRoot\build_plugin.ps1" -VcpkgRoot $VcpkgRoot
 
 # Build C# MCP Server
 Write-Host "`n--- Building MCP Server (C#) ---" -ForegroundColor Yellow

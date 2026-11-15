@@ -25,6 +25,7 @@ namespace SkyrimMCP {
         json GetDiseaseStatus();
         json GetSpellDetails(const std::string& formIdHex);
         json GetEnchantmentInfo(const std::string& formIdHex);
+        json GetKnownEnchantments();
         json GetPowers();
         json SetLevel(int level);
         json ToggleGodMode();

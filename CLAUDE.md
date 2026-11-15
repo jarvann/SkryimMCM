@@ -52,19 +52,17 @@ Uses CommonLibSSE-NG (alandtse fork `alandtse/CommonLibVR`, branch `ng`, tag v16
 # IMPORTANT: Set vcpkg root (VS Dev PowerShell uses its own bundled copy otherwise)
 $env:VCPKG_ROOT = "C:\vcpkg"
 
-# C++ plugin — only need --preset default when CMakeLists/vcpkg.json/CMakePresets.json change
-# Repo lives in WSL; map it first (not persistent across reboots):
+# C++ plugin — repo lives in WSL; map it first (not persistent across reboots):
 #   net use W: \\wsl.localhost\Ubuntu-24.04
-# Build tree stays on a local Windows disk (MSBuild cannot track timestamps on the WSL share).
-cd W:\home\cory\personal\skyrim_mcp\SkyrimMCPPlugin
-cmake --preset default -B C:\build\skylink
-cmake --build C:\build\skylink --config Release
+# build_plugin.ps1 mirrors SkyrimMCPPlugin to C:\src\skylink-plugin, builds in C:\build\skylink-plugin,
+# and copies the DLL back to SkyrimMCPPlugin\output. Building straight from W: recompiles all of
+# CommonLib every time: MSBuild's file tracker records no reads from the WSL share.
+cd W:\home\cory\personal\skyrim_mcp
+.\build_plugin.ps1 -Deploy        # add -Configure after CMakeLists/vcpkg.json/CMakePresets.json changes
 
-# C# MCP server — close Claude Desktop first (exe is locked while running)
-dotnet build W:\home\cory\personal\skyrim_mcp\SkyrimMCP
-
-# Deploy DLL to Skyrim
-copy W:\home\cory\personal\skyrim_mcp\SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll "L:\SteamLibrary\steamapps\common\Skyrim Special Edition\Data\SKSE\Plugins\" -Force
+# C# MCP server — close Claude Desktop first (SkyrimMCP.dll is locked while running).
+# Publishes to <Skyrim>\Data\SKSE\Plugins\SkyLinkAI_Server, where Claude Desktop's config points.
+.\build_plugin.ps1 -ServerOnly     # or -Deploy -Server to build and deploy both halves
 
 # Release build for Nexus
 .\build_release.ps1 -Version "1.1.0"

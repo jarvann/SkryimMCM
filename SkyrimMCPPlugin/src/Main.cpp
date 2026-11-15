@@ -3,6 +3,7 @@
 
 #include <spdlog/sinks/basic_file_sink.h>
 
+#include "BuildInfo.h"
 #include "Helpers.h"
 #include "PipeServer.h"
 #include "EventSystem.h"
@@ -49,7 +50,7 @@ namespace {
 }
 
 SKSEPluginInfo(
-    .Version = { 1, 1, 0, 0 },
+    .Version = { SKYLINK_VERSION_MAJOR, SKYLINK_VERSION_MINOR, SKYLINK_VERSION_PATCH, 0 },
     .Name = "SkyrimMCPPlugin",
     .Author = "SkyrimMCP",
     .RuntimeCompatibility = SKSE::VersionIndependence::AddressLibrary
@@ -57,7 +58,8 @@ SKSEPluginInfo(
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
     InitializeLogging();
-    SKSE::log::info("SkyrimMCPPlugin v1.1.0 loading...");
+    SKSE::log::info("SkyrimMCPPlugin v{} (built {}) loading...", SKYLINK_VERSION_STRING,
+        SkyrimMCP::BuildInfo::GetBuildTime());
 
     SKSE::Init(a_skse);
 

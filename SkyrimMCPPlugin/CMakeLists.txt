@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     SkyrimMCPPlugin
-    VERSION 1.1.0
+    VERSION 1.2.0
     LANGUAGES CXX
 )
 
@@ -31,6 +31,7 @@ add_subdirectory(extern/CommonLibSSE-NG)
 
 # Plugin sources
 set(SOURCES
+    src/BuildInfo.cpp
     src/CombatAnalysis.cpp
     src/EventSystem.cpp
     src/InventoryManager.cpp
@@ -48,6 +49,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    src/BuildInfo.h
     src/CombatAnalysis.h
     src/EventSystem.h
     src/GameInterface.h
@@ -65,10 +67,14 @@ set(HEADERS
     src/WorldManager.h
 )
 
-# Create the SKSE plugin as a shared library (DLL)
-add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
+# Version header and Windows version resource, both generated from project(VERSION)
+configure_file(src/Version.h.in "${CMAKE_BINARY_DIR}/generated/Version.h" @ONLY)
+configure_file(src/version.rc.in "${CMAKE_BINARY_DIR}/generated/version.rc" @ONLY)
 
-target_include_directories(${PROJECT_NAME} PRIVATE src)
+# Create the SKSE plugin as a shared library (DLL)
+add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS} "${CMAKE_BINARY_DIR}/generated/version.rc")
+
+target_include_directories(${PROJECT_NAME} PRIVATE src "${CMAKE_BINARY_DIR}/generated")
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     CommonLibSSE::CommonLibSSE
