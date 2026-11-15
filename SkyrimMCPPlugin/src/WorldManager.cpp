@@ -378,13 +378,11 @@ namespace SkyrimMCP::WorldManager {
 
         if (!target) return {{"error", "Target not found"}};
 
-        static std::unordered_map<RE::FormID, bool> collisionState;
+        // Read the current state from the game rather than remembering it here: a
+        // remembered state goes wrong after a console tcl, a reload of this DLL, or a
+        // new game session.
         auto formId = target->GetFormID();
-        bool& enabled = collisionState[formId];
-        if (collisionState.find(formId) == collisionState.end()) {
-            enabled = true; // assume collision starts enabled
-        }
-        enabled = !enabled;
+        bool enabled = !target->HasCollision();
         target->SetCollision(enabled);
 
         return {{"collisionEnabled", enabled},

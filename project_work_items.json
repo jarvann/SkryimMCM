@@ -129,10 +129,10 @@
     ]
   },
   "summary": {
-    "totalItems": 153,
+    "totalItems": 155,
     "completed": 105,
     "completedPartial": 2,
-    "implementedUntested": 3,
+    "implementedUntested": 5,
     "inProgress": 0,
     "planned": 43,
     "bugs": 18
@@ -1666,6 +1666,50 @@
             {
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by Maruzarix (18 May 2026)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 15,
+      "name": "v1.2.1 \u2014 Hot reload",
+      "priority": "high",
+      "status": "in-progress",
+      "items": [
+        {
+          "id": "INFRA-021",
+          "type": "infrastructure",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Server hot reload: SkyLinkLauncher (no Claude restart)",
+          "description": "New SkyLinkLauncher.dll (run with dotnet, no .exe) sits between Claude Desktop and the MCP server. It runs a temp copy of SkyLinkAI_Server\\SkyrimMCP.dll, watches that folder, and on a new build drains in-flight calls (or answers them with a retry error), restarts the server, replays the MCP initialize handshake and sends notifications/tools/list_changed. Crash-loop guard: stops restarting after 3 crashes in 60 s. CheckConnection reports launcherVersion and serverSource.",
+          "history": [
+            {
+              "datetime": "2026-11-15T01:30",
+              "note": "Asked for by Cory 14 Nov 2026 ('build and make changes to the MCP without having to restart'). Estimate: 6-10 human hours; about 30-45 min and 150-250k tokens for Claude. Built on feature/hot-reload; .exe avoided at Cory's request (SmartScreen/AV). Whether Claude Desktop re-reads the tool list on list_changed is untested."
+            },
+            {
+              "datetime": "2026-11-15T05:00",
+              "note": "Tested: 31/31 simulation checks in WSL (real server, fake plugin: handshake replay, list_changed, queued and in-flight requests across a restart, crash-loop guard, clean exit); Windows smoke test as a real process (89 tools, check_connection via launcher, restart on redeploy, clean exit). No .exe in either publish. Untested: Claude Desktop's handling of list_changed."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-022",
+          "type": "infrastructure",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Plugin hot reload: host DLL + reloadable logic DLL (no Skyrim restart)",
+          "description": "Plugin split in two. SkyrimMCPPlugin.dll (host, loaded by SKSE): pipe server, event sinks, game-thread task queue, ping/poll_events/reload_plugin, and LogicLoader. SkyLinkAI\\SkyLinkLogic.dll (logic): every command handler, loaded from a temp copy through a plain C ABI (HostApi.h). Reload on the next request after a newer DLL is deployed, or via the reload_plugin tool. Before unloading, the host waits for game-thread tasks the old build queued and for Papyrus callbacks it is owed; it keeps the old build if the new one fails to load and restores it if the new one fails to initialise. New game_thread_ping action. tests/ReloadHarness.cpp stress-tests load/swap outside Skyrim (build_plugin.ps1 -Test).",
+          "history": [
+            {
+              "datetime": "2026-11-15T01:30",
+              "note": "Asked for by Cory 14 Nov 2026. Estimate: 24-40 human hours; about 2-3 h and 600-900k tokens for Claude. Built on feature/hot-reload."
+            },
+            {
+              "datetime": "2026-11-15T05:00",
+              "note": "Builds clean on MSVC. Reload harness 40/40, four runs: 75 reloads (25 under ~70k concurrent requests), postponed reload with back-off, half-written and broken builds rejected with the old build kept, missing file, temp-copy cleanup. An independent review found a compile error, a Papyrus-callback unload crash (callback moved into the host), a failed auto-reload retried on every request (drain before loading, 2 s / 7 s limits, back-off), a copy-while-writing race (locked read), path exceptions, and a static collision state (now read from the game); all fixed. The harness also exposed a registry initialisation race in Protocol.cpp (fixed). Needs the in-game test: docs/hot-reload-test-plan.md."
             }
           ]
         }
