@@ -1,6 +1,7 @@
 #include "Protocol.h"
 #include "GameInterface.h"
 #include "TaskQueue.h"
+#include "LootManager.h"
 
 #include <SKSE/SKSE.h>
 
@@ -232,6 +233,14 @@ namespace SkyrimMCP::Protocol {
             std::string command = params.value("command", "");
             if (command.empty()) return MakeResponse(id, false, {}, "Missing 'command' parameter").dump() + "\n";
             return GameThread(id, [command]() { return GameInterface::ExecuteConsoleCommand(command); });
+        };
+
+        // FEAT-218: move items by category
+        registry["transfer_items"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return LootManager::TransferItems(params); });
+        };
+        registry["loot_bodies"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return LootManager::LootBodies(params); });
         };
 
         // FEAT-226: hair colour and skin tone with the game's own data (no RaceMenu needed)

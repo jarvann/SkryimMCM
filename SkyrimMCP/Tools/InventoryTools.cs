@@ -117,6 +117,66 @@ public class InventoryTools : ToolBase
         return list;
     }
 
+    private const string CategoryList = "all, weapons, armor, jewelry, ammo, potions, poisons, food, ingredients, books, scrolls, " +
+        "soulgems, gems, smithing (ores, ingots, hides), keys, misc, gold, valuables (worth at least minValue, default 100, each)";
+
+    [McpServerTool]
+    [Description("Move every item of some categories from one container or actor to another in one call. " +
+        "from and to: a refId, 'player', or 'crosshair' (what the player is looking at); defaults from=player, to=crosshair. " +
+        "Example: store smithing materials: categories='smithing', from='player', to='crosshair'. " +
+        "categories (comma-separated): " + CategoryList + ". " +
+        "minValue skips cheaper items. Equipped items, favorites and quest items stay unless includeEquipped / includeFavorites / " +
+        "includeQuestItems is true. Enchanted and tempered items keep their properties. " +
+        "Taking from something another NPC owns, or from a living NPC, is stealing and is refused unless allowStealing=true " +
+        "(ask the player first; the game's normal crime rules apply). dryRun=true lists what would move without moving it.")]
+    public async Task<object> TransferItems(string categories, string from = "player", string to = "crosshair", int minValue = 0,
+        bool includeEquipped = false, bool includeFavorites = false, bool includeQuestItems = false,
+        bool allowStealing = false, bool dryRun = false)
+    {
+        var parms = new JsonObject
+        {
+            ["categories"] = SplitList(categories),
+            ["from"] = from,
+            ["to"] = to,
+            ["minValue"] = minValue,
+            ["includeEquipped"] = includeEquipped,
+            ["includeFavorites"] = includeFavorites,
+            ["includeQuestItems"] = includeQuestItems,
+            ["allowStealing"] = allowStealing,
+            ["dryRun"] = dryRun,
+        };
+        var data = await _pipe.SendRequestAsync("transfer_items", parms);
+        var stacks = data?["stacks"]?.GetValue<int>() ?? 0;
+        if (!dryRun && stacks > 0) await NotifyInGame($"Moved {stacks} item stack{(stacks == 1 ? "" : "s")}");
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
+    [Description("After a fight, take loot from dead bodies near the player in one call. " +
+        "radius in game units (default 2048, about 30 m). categories (comma-separated, default 'valuables'): " + CategoryList + ". " +
+        "Gold is included unless includeGold=false. minValue skips cheaper items. Followers are skipped. " +
+        "dryRun=true lists what would be taken. Reports each body and the total value.")]
+    public async Task<object> LootBodies(float radius = 2048, string categories = "valuables", int minValue = 0,
+        bool includeGold = true, bool dryRun = false)
+    {
+        var parms = new JsonObject
+        {
+            ["radius"] = radius,
+            ["categories"] = SplitList(categories),
+            ["minValue"] = minValue,
+            ["includeGold"] = includeGold,
+            ["dryRun"] = dryRun,
+        };
+        var data = await _pipe.SendRequestAsync("loot_bodies", parms);
+        var value = data?["totalValue"]?.GetValue<int>() ?? 0;
+        if (!dryRun && (data?["stacks"]?.GetValue<int>() ?? 0) > 0) await NotifyInGame($"Looted items worth {value} gold");
+        return DeserializeResponse(data);
+    }
+
+    private static JsonArray SplitList(string text) =>
+        new(text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => (JsonNode)t.ToLowerInvariant()).ToArray());
+
     [McpServerTool]
     [Description("Add an item to player inventory by name or FormID. " +
         "CAUTION: Invalid FormIDs that don't exist in the current load order will crash the game. " +
