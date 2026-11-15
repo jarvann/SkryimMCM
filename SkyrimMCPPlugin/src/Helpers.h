@@ -220,7 +220,11 @@ namespace SkyrimMCP::Helpers {
         }
     }
 
-    inline json ExecuteConsoleCommand(const std::string& command) {
+    // Runs a console command as if `targetRef` were selected in the console. Null means
+    // nothing selected, like typing the command with no reference clicked: some
+    // commands act differently then (`tcl` with nothing selected is the player's
+    // no-clip; with the player selected it only sets the player's reference flag).
+    inline json ExecuteConsoleCommandOn(const std::string& command, RE::TESObjectREFR* targetRef) {
         // Console command execution using the approach from ConsoleUtilSSE
         // by VersuchDrei (https://github.com/VersuchDrei/ConsoleUtilSSE, MIT License)
 
@@ -229,9 +233,6 @@ namespace SkyrimMCP::Helpers {
         if (!safety.safe) {
             SKSE::log::warn("Command '{}' executing in unsafe state: {}", command, safety.warning);
         }
-
-        auto* player = RE::PlayerCharacter::GetSingleton();
-        if (!player) return {{"error", "Player not available"}};
 
         auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::Script>();
         if (!factory) return {{"error", "Script factory not available"}};
@@ -242,7 +243,7 @@ namespace SkyrimMCP::Helpers {
         ClearConsoleOutput();
 
         script->SetCommand(command);
-        bool ok = RunScriptSEH(script, player);
+        bool ok = RunScriptSEH(script, targetRef);
 
         std::string output = CaptureConsoleOutput();
 
@@ -261,6 +262,14 @@ namespace SkyrimMCP::Helpers {
         result["command"] = command;
         if (!output.empty()) result["output"] = output;
         return result;
+    }
+
+    // The execute_command tool's behaviour: the player is the selected reference, so
+    // `additem f 100` gives the player gold without a `player.` prefix.
+    inline json ExecuteConsoleCommand(const std::string& command) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return {{"error", "Player not available"}};
+        return ExecuteConsoleCommandOn(command, player);
     }
 
 }

@@ -32,8 +32,9 @@ extern "C" {
     struct SkyLinkHostApi {
         std::uint32_t abiVersion;
 
-        // const SKSE::LoadInterface*; null when the logic DLL is loaded outside Skyrim
-        // (the reload test harness).
+        // const SKSE::LoadInterface*: the host's copy of SKSE's interface table
+        // (SkseInterfaceProxy.h), never SKSE's own, which crashes the game if
+        // GetPluginHandle is called after plugin load. The test harness passes a fake one.
         const void* skseLoadInterface;
 
         // Writes one line to the plugin log. `level` uses spdlog's level values.

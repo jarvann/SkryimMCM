@@ -40,6 +40,7 @@ set(HOST_SOURCES
     src/LogicLoader.cpp
     src/Main.cpp
     src/PipeServer.cpp
+    src/SkseInterfaceProxy.cpp
 )
 
 set(LOGIC_SOURCES

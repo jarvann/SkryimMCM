@@ -109,6 +109,29 @@ namespace {
     void* HostPapyrusCallbackCreate() { return nullptr; }
     int HostPapyrusCallbackWait(void*, std::uint32_t, SkyLinkWriteFn, void*) { return 1; }
 
+    // Stands in for the host's copy of SKSE's interface table (SkseInterfaceProxy.h),
+    // so the logic DLL's SKSE::Init runs here too. Same layout as SKSE's SKSEInterface.
+    // No SKSE interfaces exist outside the game, so QueryInterface finds none.
+    struct FakeSkseInterface {
+        std::uint32_t skseVersion;
+        std::uint32_t runtimeVersion;
+        std::uint32_t editorVersion;
+        std::uint32_t isEditor;
+        void* (*QueryInterface)(std::uint32_t);
+        std::uint32_t (*GetPluginHandle)();
+        std::uint32_t (*GetReleaseIndex)();
+        const void* (*GetPluginInfo)(const char*);
+    };
+    static_assert(sizeof(FakeSkseInterface) == 48, "must match SKSE's SKSEInterface (see SkseInterfaceProxy.cpp)");
+    std::atomic<int> g_handleCalls{ 0 };
+    FakeSkseInterface g_fakeSkse{
+        0x02006800, 0x01076800, 0, 0,
+        [](std::uint32_t) -> void* { return nullptr; },
+        []() -> std::uint32_t { ++g_handleCalls; return 1; },
+        []() -> std::uint32_t { return 0; },
+        [](const char*) -> const void* { return nullptr; },
+    };
+
     // ---- checks ----
 
     int g_failures = 0;
@@ -185,7 +208,7 @@ int main(int argc, char** argv) {
 
     SkyLinkHostApi api{};
     api.abiVersion = SKYLINK_ABI_VERSION;
-    api.skseLoadInterface = nullptr;
+    api.skseLoadInterface = &g_fakeSkse;
     api.log = &HostLog;
     api.addTask = &HostAddTask;
     api.papyrusCallbackCreate = &HostPapyrusCallbackCreate;
@@ -202,6 +225,7 @@ int main(int argc, char** argv) {
     Check(IsUnknownAction(Send(loader, "no_such_action")), "unknown action answered by the logic DLL");
     Check(IsGameThreadPong(Send(loader, "game_thread_ping")), "game_thread_ping round-trips through the fake game thread");
     Check(!loader.ShouldAutoReload(), "no auto-reload when the file is unchanged");
+    Check(g_handleCalls.load() >= 1, "the logic DLL ran SKSE::Init against the host's interface table");
 
     Print("== 50 forced reloads with requests in between");
     {

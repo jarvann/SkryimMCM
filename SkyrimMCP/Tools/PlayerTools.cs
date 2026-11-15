@@ -44,6 +44,7 @@ public class PlayerTools : ToolBase
                 pluginVersion = info?["pluginVersion"]?.GetValue<string>(),
                 pluginBuilt = info?["pluginBuilt"]?.GetValue<string>(),
                 gameVersion = info?["gameVersion"]?.GetValue<string>(),
+                loadingScreen = info?["loadingScreen"]?.GetValue<bool>(),  // 1.2.1+
                 logic = info?["logic"] is JsonNode logicNode ? DeserializeResponse(logicNode) : null,
                 serverVersion = ServerVersion,
                 serverBuilt = ServerBuilt,

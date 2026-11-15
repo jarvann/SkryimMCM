@@ -118,7 +118,7 @@ public class WorldTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Toggle collision for the player or a specific actor/object. Uses direct engine API. " +
+    [Description("Toggle collision for the player or a specific actor/object, the same as the console's tcl. Returns the new state as the game reports it. " +
         "Pass refId to toggle collision on a specific target, or leave empty for the player. " +
         "CAUTION: Disabling collision can cause the target to fall through the world. " +
         "Remind the user to save before using and to re-enable collision when done.")]
@@ -127,11 +127,24 @@ public class WorldTools : ToolBase
         var parms = new JsonObject();
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         var data = await _pipe.SendRequestAsync("toggle_collision", parms);
-        var enabled = data?["collisionEnabled"]?.GetValue<bool>() ?? true;
+        // The plugin reads the state from the game's own console reply; null means the
+        // reply was missing, so say so rather than guess.
+        bool? enabled = data?["collisionEnabled"]?.GetValueKind() switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null,
+        };
         var target = data?["target"]?.GetValue<string>() ?? "Player";
-        var msg = enabled ? $"Collision On ({target})" : $"No Clip ({target})";
+        var consoleOutput = data?["consoleOutput"]?.GetValue<string>() ?? "";
+        var msg = enabled switch
+        {
+            true => $"Collision On ({target})",
+            false => $"No Clip ({target})",
+            null => $"Collision toggled ({target}); the game did not report the new state",
+        };
         await NotifyInGame(msg);
-        return new { success = true, collisionEnabled = enabled, target, message = msg };
+        return new { success = true, collisionEnabled = enabled, target, consoleOutput, message = msg };
     }
 
     [McpServerTool]

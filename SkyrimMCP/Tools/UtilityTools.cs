@@ -56,6 +56,8 @@ public class UtilityTools : ToolBase
         "Only use this tool if none of the above cover your need. " +
         "TARGETING: Use dot-notation with refId (e.g., 'FE124B0E.kill'), NOT prid — prid does not persist between calls. " +
         "Player commands: use 'player.' prefix (e.g., 'player.additem 0000000F 100'). " +
+        "Commands run with the player selected, as if the player were clicked in the console, so 'tcl' here only " +
+        "sets the player's reference flag and is NOT no-clip: use ToggleCollision for that. " +
         "CAUTION: Invalid FormIDs crash the game. Avoid during loading screens or scripted events. " +
         "Console output may be captured if the command produces text output.")]
     public async Task<object> ExecuteConsoleCommand(string command)

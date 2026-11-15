@@ -7,6 +7,7 @@
 #include "EventSystem.h"
 #include "HostCore.h"
 #include "PipeServer.h"
+#include "SkseInterfaceProxy.h"
 
 namespace {
     std::unique_ptr<SkyrimMCP::PipeServer> g_pipeServer;
@@ -73,7 +74,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
         SkyrimMCP::BuildInfo::GetBuildTime());
 
     SKSE::Init(a_skse);
-    SkyrimMCP::HostCore::SetLoadInterface(a_skse);
+    SkyrimMCP::SkseInterfaceProxy::Capture(a_skse);  // the logic DLL's SKSE::Init uses this later
 
     // Steam, GOG and downgraded installs all report here; first thing to check in a bug report.
     SKSE::log::info("Skyrim runtime {}", REL::Module::get().version().string("."));

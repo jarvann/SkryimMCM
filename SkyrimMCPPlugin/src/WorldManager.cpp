@@ -5,6 +5,7 @@
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <cctype>
 #include <format>
 #include <unordered_map>
 
@@ -378,16 +379,36 @@ namespace SkyrimMCP::WorldManager {
 
         if (!target) return {{"error", "Target not found"}};
 
-        // Read the current state from the game rather than remembering it here: a
-        // remembered state goes wrong after a console tcl, a reload of this DLL, or a
-        // new game session.
-        auto formId = target->GetFormID();
-        bool enabled = !target->HasCollision();
-        target->SetCollision(enabled);
+        // Uses the console's tcl, and reports the state from the game's own reply
+        // ("... -> On" / "... -> Off"), so the tool always agrees with the console.
+        // - Player: tcl with nothing selected, the player's no-clip. The reference flag
+        //   that TESObjectREFR::SetCollision (and `player.tcl`) sets does not stop the
+        //   player's collision, and the game clears it again: tested on 1.7.104, every
+        //   call read "on" and the player still could not pass through walls.
+        // - Anything else: tcl with that reference selected.
+        // No remembered state: it would go wrong after a typed tcl, a reload of this
+        // DLL, or a new game session.
+        const bool isPlayer = target == RE::PlayerCharacter::GetSingleton();
+        auto result = Helpers::ExecuteConsoleCommandOn("tcl", isPlayer ? nullptr : target);
+        if (result.contains("error")) return result;
+
+        const std::string output = result.value("output", "");
+        json enabled = nullptr;  // null: the game's reply was missing or not understood
+        if (auto arrow = output.rfind("->"); arrow != std::string::npos) {
+            std::string state;
+            for (char c : output.substr(arrow + 2)) {
+                if (std::isalpha(static_cast<unsigned char>(c))) {
+                    state += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
+            }
+            if (state == "on") enabled = true;
+            if (state == "off") enabled = false;
+        }
 
         return {{"collisionEnabled", enabled},
+                {"consoleOutput", output},
                 {"target", target->GetName() ? target->GetName() : ""},
-                {"refId", std::format("{:08X}", formId)}};
+                {"refId", std::format("{:08X}", target->GetFormID())}};
     }
 
     // ==================== Economy (Phase 7) ====================

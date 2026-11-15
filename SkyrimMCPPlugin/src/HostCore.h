@@ -6,22 +6,17 @@
 
 #include <string>
 
-namespace SKSE {
-    class LoadInterface;
-}
-
 namespace SkyrimMCP::HostCore {
-
-    // From SKSEPluginLoad. SKSE keeps this interface alive for the whole session.
-    void SetLoadInterface(const SKSE::LoadInterface* skse);
 
     // On kDataLoaded, before the pipe server starts: loads the logic DLL.
     void Start();
 
     // One newline-delimited JSON request from the pipe, one JSON response line back.
-    //   ping           answered here, with the host and logic DLL versions
-    //   poll_events    answered here: the event sinks live in the host
-    //   reload_plugin  swaps in the logic DLL now on disk
+    //   ping             answered here, with the host and logic DLL versions (after
+    //                    loading a newer logic DLL, if one has been deployed)
+    //   poll_events      answered here: the event sinks live in the host
+    //   reload_plugin    swaps in the logic DLL now on disk
+    //   get_game_safety  answered here during a loading screen (the game thread is busy)
     // Anything else goes to the logic DLL, which is first reloaded automatically if a
     // newer build has been deployed.
     std::string HandleRequest(const std::string& requestLine);

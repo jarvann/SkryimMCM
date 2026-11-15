@@ -12,6 +12,7 @@
 #include "EventSystem.h"
 #include "HostApi.h"
 #include "LogicLoader.h"
+#include "SkseInterfaceProxy.h"
 
 #include <nlohmann/json.hpp>
 
@@ -32,7 +33,6 @@ namespace SkyrimMCP::HostCore {
         constexpr std::uint32_t kAutoDrainMs = 2000;
         constexpr std::uint32_t kManualDrainMs = 7000;
 
-        const SKSE::LoadInterface* g_skse = nullptr;
         std::unique_ptr<LogicLoader> g_loader;
         std::atomic<std::uint32_t> g_pendingTasks{ 0 };
         SkyLinkHostApi g_hostApi{};
@@ -204,12 +204,69 @@ namespace SkyrimMCP::HostCore {
             return logic;
         }
 
+        // Tracks the loading screen, so reload results and the log show whether a reload
+        // happened during one. A host object: the game keeps a pointer to every sink.
+        class LoadingScreenWatcher final : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+        public:
+            static LoadingScreenWatcher& Get() {
+                static LoadingScreenWatcher watcher;
+                return watcher;
+            }
+
+            void Register() {
+                if (auto* ui = RE::UI::GetSingleton()) {
+                    ui->AddEventSink<RE::MenuOpenCloseEvent>(this);
+                } else {
+                    SKSE::log::warn("UI not available; loading screens will not be tracked");
+                }
+            }
+
+            bool Active() const { return active_.load(); }
+
+            RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* event,
+                RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override {
+                if (event && event->menuName == RE::LoadingMenu::MENU_NAME) {
+                    active_ = event->opening;
+                    SKSE::log::info("Loading screen {}", event->opening ? "started" : "ended");
+                }
+                return RE::BSEventNotifyControl::kContinue;
+            }
+
+        private:
+            std::atomic<bool> active_{ false };
+        };
+
+        // Before any request that reports on or uses the logic DLL: load a newer build if
+        // one has been deployed, so check_connection never shows a build that is about to
+        // be replaced. On failure the current build keeps serving; the error is logged.
+        void AutoReloadIfNewer(const std::string& action) {
+            if (g_loader && g_loader->ShouldAutoReload()) {
+                SKSE::log::info("A newer logic DLL is on disk; reloading before '{}'{}", action,
+                    LoadingScreenWatcher::Get().Active() ? " (during a loading screen)" : "");
+                g_loader->Reload(true, kAutoDrainMs);
+            }
+        }
+
+        // get_game_safety during a loading screen. The logic DLL's check runs on the game
+        // thread, which is busy loading, so it would time out instead of answering.
+        std::string LoadingScreenSafety(const std::string& id) {
+            json data;
+            data["safe"] = false;
+            data["isLoading"] = true;
+            data["warning"] = "Game is loading — commands will crash";
+            data["note"] = "Answered by the plugin host: the game thread is busy with the loading screen, so the "
+                           "other checks are skipped. Call again once loading has finished.";
+            return Respond(id, true, data);
+        }
+
         std::string Ping(const std::string& id) {
             // Answered on the pipe thread, so it still works when game-thread calls do not.
+            AutoReloadIfNewer("ping");
             json info;
             info["pluginVersion"] = SKYLINK_VERSION_STRING;
             info["pluginBuilt"] = BuildInfo::GetBuildTime();
             info["gameVersion"] = REL::Module::get().version().string(".");
+            info["loadingScreen"] = LoadingScreenWatcher::Get().Active();
             info["logic"] = LogicStatusJson();
             return Respond(id, true, info);
         }
@@ -247,10 +304,13 @@ namespace SkyrimMCP::HostCore {
 
         std::string Reload(const std::string& id) {
             if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
+            const bool duringLoadingScreen = LoadingScreenWatcher::Get().Active();
+            if (duringLoadingScreen) SKSE::log::info("Manual reload requested during a loading screen");
             auto result = g_loader->Reload(false, kManualDrainMs);
             if (!result.ok) return Respond(id, false, {}, result.error);
             json data;
             data["reloaded"] = true;
+            data["duringLoadingScreen"] = duringLoadingScreen;
             data["previousBuilt"] = result.previousBuilt;
             data["built"] = result.built;
             data["reloads"] = result.reloads;
@@ -259,15 +319,13 @@ namespace SkyrimMCP::HostCore {
         }
     }
 
-    void SetLoadInterface(const SKSE::LoadInterface* skse) {
-        g_skse = skse;
-    }
-
     void Start() {
         if (g_loader) return;
 
+        LoadingScreenWatcher::Get().Register();
+
         g_hostApi.abiVersion = SKYLINK_ABI_VERSION;
-        g_hostApi.skseLoadInterface = g_skse;
+        g_hostApi.skseLoadInterface = SkseInterfaceProxy::Get();
         g_hostApi.log = &HostLog;
         g_hostApi.addTask = &HostAddTask;
         g_hostApi.papyrusCallbackCreate = &HostPapyrusCallbackCreate;
@@ -302,13 +360,11 @@ namespace SkyrimMCP::HostCore {
             if (action == "ping") return Ping(id);
             if (action == "poll_events") return PollEvents(id, request.value("params", json::object()));
             if (action == "reload_plugin") return Reload(id);
+            if (action == "get_game_safety" && LoadingScreenWatcher::Get().Active()) return LoadingScreenSafety(id);
 
             if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
 
-            if (g_loader->ShouldAutoReload()) {
-                SKSE::log::info("A newer logic DLL is on disk; reloading before '{}'", action);
-                g_loader->Reload(true, kAutoDrainMs);  // on failure the current build keeps serving; the error is logged
-            }
+            AutoReloadIfNewer(action);
 
             std::string response;
             if (!g_loader->Handle(requestLine, response)) {

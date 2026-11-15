@@ -74,7 +74,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 Replace `<SKYRIM_PATH>` with your Skyrim installation path.
 
-The launcher runs the MCP server (`SkyLinkAI_Server\SkyrimMCP.dll`) and restarts it when a new version is installed, so updating SkyLink doesn't need a Claude restart. Pointing `args` straight at `SkyLinkAI_Server\SkyrimMCP.dll` also works, as it did before 1.2.1.
+The launcher runs the MCP server (`SkyLinkAI_Server\SkyrimMCP.dll`) and restarts it when a new version is installed, so updating SkyLink doesn't need a Claude restart. Changed behaviour applies on the next call. Claude Desktop doesn't re-read the tool list while a chat is open, though, so new tools and changed tool descriptions appear in a new chat (restart Claude if they still don't). Pointing `args` straight at `SkyLinkAI_Server\SkyrimMCP.dll` also works, as it did before 1.2.1.
 
 **Updating with the game running:** the plugin's command handlers live in `SKSE\Plugins\SkyLinkAI\SkyLinkLogic.dll`, which SkyLink reloads on the next call after a new version is installed (or ask Claude to run `reload_plugin`). Only a new `SkyrimMCPPlugin.dll` needs a game restart.
 
