@@ -64,9 +64,9 @@ public class AppearanceTools : ToolBase
 
     [McpServerTool]
     [Description("List the head parts the character menu offers for one type (hair, eyes, eyebrows, facialHair, scar, face, misc) " +
-        "for this race and sex, in a given order: editorId (case-sensitive editor ID, default), editorIdNoCase, name or loadOrder. " +
-        "start and count (default 21, max 200) page through it; aroundFormId centres the page on one part. " +
-        "Use it to find which order matches RaceMenu's slider: compare the names at a few slider numbers.")]
+        "for this race and sex. The default order (editorId: case-sensitive editor ID) is RaceMenu's slider order, so index = slider number; " +
+        "editorIdNoCase, name and loadOrder are also available. start and count (default 21, max 200) page through it; " +
+        "aroundFormId centres the page on one part. Use it to answer 'which hair is number N' or to pick a part to apply.")]
     public async Task<object> ListHeadPartChoices(string type = "hair", string? order = null, int start = 0, int count = 21,
         string? aroundFormId = null, string? refId = null)
     {

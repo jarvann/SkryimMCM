@@ -33,8 +33,8 @@ namespace SkyrimMCP {
 
         // FEAT-209: the head parts a character menu offers for one type (playable, this sex,
         // valid for this race, not an extra part), in one of the candidate orders:
-        // "editorId" (byte order, case-sensitive), "editorIdNoCase", "name", "loadOrder".
-        // RaceMenu's slider order isn't confirmed yet, so tools report the index in each.
+        // "editorId" (byte order, case-sensitive: RaceMenu's slider order, confirmed in game),
+        // "editorIdNoCase", "name", "loadOrder".
         inline constexpr const char* kHeadPartOrders[] = { "editorId", "editorIdNoCase", "name", "loadOrder" };
         inline constexpr std::size_t kHeadPartOrderCount = 4;
         std::vector<RE::BGSHeadPart*> HeadPartChoices(RE::TESNPC* npc, int type, const std::string& order);
