@@ -254,7 +254,8 @@
           "type": "feature",
           "status": "planned",
           "title": "Teleport via direct API",
-          "description": "Currently works via coc console command. No clean direct API found yet."
+          "description": "Currently works via coc console command. No clean direct API found yet.",
+          "targetRelease": "parked"
         },
         {
           "id": "FEAT-014",
@@ -278,7 +279,8 @@
           "type": "feature",
           "status": "planned",
           "title": "Force new game via MCP",
-          "description": "Trigger new game initialization directly, bypassing main menu."
+          "description": "Trigger new game initialization directly, bypassing main menu.",
+          "targetRelease": "parked"
         },
         {
           "id": "BUG-007",
@@ -1057,14 +1059,16 @@
           "type": "feature",
           "status": "planned",
           "title": "Map marker management",
-          "description": "Add/remove custom map markers."
+          "description": "Add/remove custom map markers.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-113",
           "type": "feature",
           "status": "planned",
           "title": "Journal integration",
-          "description": "Read journal entries, add custom notes."
+          "description": "Read journal entries, add custom notes.",
+          "targetRelease": "parked"
         }
       ]
     },
@@ -1079,21 +1083,24 @@
           "type": "feature",
           "status": "planned",
           "title": "Quest completion scripts",
-          "description": "Multi-step quest resolution."
+          "description": "Multi-step quest resolution.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-121",
           "type": "feature",
           "status": "designed",
           "title": "Apply character blueprint",
-          "description": "Import blueprint JSON selectively \u2014 AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API \u2014 bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first \u2014 only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower)."
+          "description": "Import blueprint JSON selectively \u2014 AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API \u2014 bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first \u2014 only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower).",
+          "targetRelease": "1.3-stretch"
         },
         {
           "id": "FEAT-122",
           "type": "feature",
           "status": "designed",
           "title": "Spawn NPC from blueprint",
-          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face \u2014 RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy."
+          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face \u2014 RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-123",
@@ -1134,7 +1141,8 @@
           "type": "feature",
           "status": "planned",
           "title": "Scripted scenes",
-          "description": "Move NPCs, set relationships, trigger events."
+          "description": "Move NPCs, set relationships, trigger events.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-126",
@@ -1147,7 +1155,8 @@
               "datetime": "2026-03-22T18:04",
               "note": "Requested by user during gameplay. Claude Desktop confirmed feasibility via SKSE C++ but noted it needs EffectSetting + SpellItem form creation and data handler registration."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-127",
@@ -1160,7 +1169,8 @@
               "datetime": "2026-03-22T18:04",
               "note": "Natural extension of spell creator \u2014 same form creation pattern."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         }
       ]
     },
@@ -1188,7 +1198,8 @@
               "datetime": "2026-03-24T18:05",
               "note": "Implemented, pending test on next restart."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-132",
@@ -1214,7 +1225,8 @@
               "datetime": "2026-03-24T18:05",
               "note": "Implemented, pending test on next restart."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-134",
@@ -1270,14 +1282,16 @@
           "type": "feature",
           "status": "planned",
           "title": "Intent-based plugin routing",
-          "description": "AI reads capability catalog and composes correct plugin function calls based on user intent. Tool descriptions guide the AI to match requests like \"change my body\" to OBody functions or \"switch camera\" to SmoothCam presets."
+          "description": "AI reads capability catalog and composes correct plugin function calls based on user intent. Tool descriptions guide the AI to match requests like \"change my body\" to OBody functions or \"switch camera\" to SmoothCam presets.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-204",
           "type": "feature",
           "status": "planned",
           "title": "Per-plugin MCP tool generation",
-          "description": "Auto-generate MCP tool definitions from scanned Papyrus functions. Each plugin gets its own tool group with proper descriptions derived from function signatures and script comments."
+          "description": "Auto-generate MCP tool definitions from scanned Papyrus functions. Each plugin gets its own tool group with proper descriptions derived from function signatures and script comments.",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-227",
@@ -1291,7 +1305,8 @@
               "datetime": "2026-11-15T12:30",
               "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Jarvann replied (15 Nov) that working with other SKSE plugins is on the feature list and RaceMenu is a good first one."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         }
       ]
     },
@@ -1312,7 +1327,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-206",
@@ -1325,7 +1341,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-207",
@@ -1338,7 +1355,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-208",
@@ -1351,7 +1369,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-209",
@@ -1364,7 +1383,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-210",
@@ -1377,7 +1397,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "INFRA-015",
@@ -1390,7 +1411,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "INFRA-016",
@@ -1403,7 +1425,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "INFRA-017",
@@ -1416,7 +1439,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "INFRA-018",
@@ -1429,7 +1453,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-012",
@@ -1442,7 +1467,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-013",
@@ -1455,7 +1481,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-014",
@@ -1468,7 +1495,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-015",
@@ -1481,7 +1509,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-016",
@@ -1494,7 +1523,8 @@
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "BUG-017",
@@ -1577,7 +1607,8 @@
               "note": "Requested on Nexus: a window inside Skyrim (ShiroFozy), alt-tab minimises the game (Akatsuki2534), other providers, a free client or Ollama (snowolf33, Adminoir, skaterman888). Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
             }
           ],
-          "priority": "high"
+          "priority": "high",
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-213",
@@ -1590,7 +1621,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Follows FEAT-212. Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-214",
@@ -1603,7 +1635,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Follows FEAT-213. Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-215",
@@ -1616,7 +1649,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Requested on Nexus: AI control of NPCs (AzurasGuardian, nesslowland, HatchetTazz)."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-216",
@@ -1629,7 +1663,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Requested on Nexus: let the AI play the game."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "INFRA-019",
@@ -1642,7 +1677,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Came out of the 1.2.0 test sessions, where every check was run by hand."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-217",
@@ -1655,7 +1691,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by AlexiousITA (troubleshooting crashes and slowdowns); Jarvann's reply named crash-log troubleshooting as a main use case."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-219",
@@ -1669,7 +1706,8 @@
               "datetime": "2026-11-15T05:30",
               "note": "Discussed with Cory 15 Nov 2026 after asking whether SkyLink could catch every plugin's CTD. A catch-all is not safe (skipping a fault turns it into a hang or a corrupt save); recording context is. Estimate with FEAT-220 and FEAT-217: 14-22 human hours; about 1-1.5 h and 350-500k tokens for Claude, plus one deliberate test crash in game."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-220",
@@ -1683,7 +1721,8 @@
               "datetime": "2026-11-15T05:30",
               "note": "Part of the crash discussion with Cory, 15 Nov 2026; see FEAT-219."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-218",
@@ -1696,7 +1735,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "From Jarvann's Nexus reply listing examples ('Move all the smithing materials to the chest...', 'Collect only the interesting loot and gold from the fight')."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "INFRA-020",
@@ -1709,7 +1749,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by Maruzarix (18 May 2026)."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-221",
@@ -1722,7 +1763,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-222",
@@ -1735,7 +1777,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-223",
@@ -1748,7 +1791,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-224",
@@ -1761,7 +1805,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-225",
@@ -1774,7 +1819,8 @@
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
-          ]
+          ],
+          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-226",
@@ -1788,7 +1834,8 @@
               "datetime": "2026-11-15T12:30",
               "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Estimate: about 3\u20134 human hours; for Claude about 15\u201320 minutes and 60\u201380k tokens."
             }
-          ]
+          ],
+          "targetRelease": "1.3"
         }
       ]
     },
@@ -1942,42 +1989,48 @@
       "type": "infrastructure",
       "status": "planned",
       "title": "VPrint hook",
-      "description": "Full console output capture for multi-line command results."
+      "description": "Full console output capture for multi-line command results.",
+      "targetRelease": "parked"
     },
     {
       "id": "INFRA-006",
       "type": "infrastructure",
       "status": "planned",
       "title": "Config file",
-      "description": ".ini or .toml for pipe name, log level, feature toggles."
+      "description": ".ini or .toml for pipe name, log level, feature toggles.",
+      "targetRelease": "1.3"
     },
     {
       "id": "INFRA-007",
       "type": "infrastructure",
       "status": "planned",
       "title": "Performance caching",
-      "description": "Cache frequently queried data to reduce game thread blocking."
+      "description": "Cache frequently queried data to reduce game thread blocking.",
+      "targetRelease": "parked"
     },
     {
       "id": "INFRA-008",
       "type": "infrastructure",
       "status": "planned",
       "title": "Push events via pipe",
-      "description": "Pipe Protocol v2 \u2014 unsolicited event messages from plugin to client."
+      "description": "Pipe Protocol v2 \u2014 unsolicited event messages from plugin to client.",
+      "targetRelease": "2.0"
     },
     {
       "id": "INFRA-009",
       "type": "infrastructure",
       "status": "planned",
       "title": "Multi-client support",
-      "description": "Support multiple MCP clients simultaneously."
+      "description": "Support multiple MCP clients simultaneously.",
+      "targetRelease": "2.0"
     },
     {
       "id": "INFRA-010",
       "type": "infrastructure",
       "status": "planned",
       "title": "Plugin DI system",
-      "description": "Dynamic integration with detected SKSE plugins."
+      "description": "Dynamic integration with detected SKSE plugins.",
+      "targetRelease": "2.0"
     },
     {
       "id": "BUG-006",
@@ -2021,7 +2074,8 @@
       "type": "feature",
       "status": "planned",
       "title": "GetScriptStats \u2014 Papyrus VM diagnostics",
-      "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods."
+      "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods.",
+      "targetRelease": "1.3"
     },
     {
       "id": "BUG-011",
@@ -2101,7 +2155,8 @@
           "datetime": "2026-03-23T20:01",
           "note": "Implemented. Needs game restart to test."
         }
-      ]
+      ],
+      "targetRelease": "1.3"
     }
   ],
   "confirmedWorking": [
@@ -2586,5 +2641,23 @@
         "nexus": "https://www.nexusmods.com/skyrimspecialedition/mods/175682"
       }
     }
-  ]
+  ],
+  "releasePlan": {
+    "decided": "2026-11-15",
+    "rule": "1.3 adds to SkyLink as it is: Claude Desktop, one pipe client, same config, nothing forks or players rely on changes. 2.0 is the in-game AI: new processes, pipe protocol v2 (push events, multi-client) and a much larger tool set, which breaks forks and configs.",
+    "1.3": {
+      "theme": "Fixes, appearance, safety",
+      "estimate": "50-80 human hours; Claude 4-6 h, 1.5-2.5M tokens",
+      "stretch": [
+        "FEAT-121"
+      ]
+    },
+    "2.0": {
+      "theme": "The AI inside Skyrim",
+      "estimate": "150-250 human hours; Claude 12-18 h, 4-6M tokens",
+      "openDecision": "KringleKiller's fork already has the in-game client, quest tracker, waypoints and notes: take their code, build our own, or build it with them"
+    },
+    "1.4": "Takes whatever slips out of 1.3",
+    "parked": "No release yet: FEAT-013, FEAT-015, FEAT-113, INFRA-005, INFRA-007"
+  }
 }
