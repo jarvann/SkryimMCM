@@ -30,11 +30,14 @@ namespace SkyrimMCP::PlayerQueries {
 
         if (avo) {
             result["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-            result["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+            result["healthMax"] = Helpers::ActorValueMax(player, RE::ActorValue::kHealth);
             result["magicka"] = avo->GetActorValue(RE::ActorValue::kMagicka);
-            result["magickaMax"] = avo->GetBaseActorValue(RE::ActorValue::kMagicka);
+            result["magickaMax"] = Helpers::ActorValueMax(player, RE::ActorValue::kMagicka);
             result["stamina"] = avo->GetActorValue(RE::ActorValue::kStamina);
-            result["staminaMax"] = avo->GetBaseActorValue(RE::ActorValue::kStamina);
+            result["staminaMax"] = Helpers::ActorValueMax(player, RE::ActorValue::kStamina);
+            result["healthBase"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+            result["magickaBase"] = avo->GetBaseActorValue(RE::ActorValue::kMagicka);
+            result["staminaBase"] = avo->GetBaseActorValue(RE::ActorValue::kStamina);
         }
 
         result["posX"] = pos.x;

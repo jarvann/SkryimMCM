@@ -81,7 +81,7 @@ namespace SkyrimMCP::NPCManager {
 
             if (avo) {
                 result["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-                result["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+                result["healthMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kHealth);
             }
 
             auto* cell = actor->GetParentCell();
@@ -141,9 +141,11 @@ namespace SkyrimMCP::NPCManager {
             // Stats
             if (avo) {
                 result["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-                result["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+                result["healthMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kHealth);
                 result["magicka"] = avo->GetActorValue(RE::ActorValue::kMagicka);
+                result["magickaMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kMagicka);
                 result["stamina"] = avo->GetActorValue(RE::ActorValue::kStamina);
+                result["staminaMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kStamina);
             }
 
             // State flags
@@ -232,7 +234,7 @@ namespace SkyrimMCP::NPCManager {
 
                 if (avo) {
                     f["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-                    f["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+                    f["healthMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kHealth);
                 }
 
                 // Class

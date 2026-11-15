@@ -42,6 +42,15 @@ namespace SkyrimMCP::Helpers {
         return std::nullopt;
     }
 
+    // ==================== Actor Values ====================
+
+    // The maximum the game's own bars use: base value plus permanent modifiers (perks, gear,
+    // racial bonuses) plus temporary ones (potions, spells). GetBaseActorValue alone gave
+    // "magicka 150 of 100" on a Breton (BUG-015).
+    inline float ActorValueMax(RE::Actor* actor, RE::ActorValue av) {
+        return actor ? actor->GetActorValueMax(av) : 0.0f;
+    }
+
     // ==================== Actor Resolution ====================
 
     inline RE::Actor* ResolveActor(const std::string& refId = "") {
