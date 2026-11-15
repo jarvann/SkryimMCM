@@ -25,8 +25,13 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Check which menus are currently open and whether the game is paused. " +
-        "Shows open menus like InventoryMenu, MapMenu, DialogueMenu, Console, etc.")]
+    [Description("Check which menus are open and whether the game is paused. " +
+        "openMenus and menuCount cover only these vanilla menus: Console, InventoryMenu, MagicMenu, MapMenu, StatsMenu, " +
+        "ContainerMenu, DialogueMenu, BarterMenu, FavoritesMenu, Journal Menu, Book Menu, LockpickingMenu, Loading Menu, " +
+        "MessageBoxMenu, TweenMenu, Sleep/Wait Menu, Crafting Menu, Training Menu, RaceSex Menu. " +
+        "So menuCount 0 means none of those is open, not that the screen is clear. " +
+        "allOpenMenus lists every open menu, including the HUD and mod menus, with pausesGame, usesCursor, modal and " +
+        "alwaysOpen (true for overlays such as the HUD that are always present).")]
     public async Task<object> GetMenuState()
     {
         var data = await _pipe.SendRequestAsync("get_menu_state");
