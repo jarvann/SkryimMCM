@@ -5,8 +5,11 @@
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <format>
+#include <string_view>
+#include <vector>
 
 namespace SkyrimMCP::UtilityManager {
 
@@ -390,6 +393,50 @@ namespace SkyrimMCP::UtilityManager {
         return {{"mods", mods}, {"regularCount", loadedModCount}, {"lightCount", lightModCount}};
     }
 
+    namespace {
+        std::string ToLower(std::string_view text) {
+            std::string out(text);
+            std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return out;
+        }
+
+        // BUG-013: say why a plugin has no prefix instead of a generic "not found", and
+        // suggest active plugins with a similar name.
+        std::string DescribeMissingMod(RE::TESDataHandler* dataHandler, const std::string& modName) {
+            // Whether inactive plugins appear in TESDataHandler::files is not confirmed on every
+            // runtime, so only claim "inactive" when the game says so (compile index 0xFF).
+            const auto* known = dataHandler->LookupModByName(modName);
+            if (known && known->GetCompileIndex() == 0xFF) {
+                return std::format("{} is installed but not active, so it has no load-order prefix. "
+                                   "Enable it in your mod manager (or plugins.txt) and restart Skyrim.",
+                                   known->GetFilename());
+            }
+
+            // Close matches among the active plugins: same name with another extension, or
+            // a name that contains what was asked for.
+            const auto wanted = ToLower(modName);
+            const auto dot = wanted.rfind('.');
+            const auto stem = dot == std::string::npos ? wanted : wanted.substr(0, dot);
+            std::vector<std::string> matches;
+            std::size_t total = 0;
+            for (auto* file : dataHandler->files) {
+                if (!file || file->GetCompileIndex() == 0xFF) continue;
+                const auto name = ToLower(file->GetFilename());
+                if (stem.empty() || name.find(stem) == std::string::npos) continue;
+                if (++total <= 10) matches.emplace_back(file->GetFilename());
+            }
+
+            std::string message = std::format("{} is not an active plugin: it is not installed, or your mod manager has it disabled.", modName);
+            if (!matches.empty()) {
+                message += " Active plugins with a similar name: ";
+                for (std::size_t i = 0; i < matches.size(); ++i) message += (i ? ", " : "") + matches[i];
+                if (total > matches.size()) message += std::format(" (and {} more)", total - matches.size());
+                message += ".";
+            }
+            return message;
+        }
+    }
+
     json GetModFormIdPrefix(const std::string& modName) {
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
         if (!dataHandler) return {{"error", "Data handler not available"}};
@@ -418,7 +465,7 @@ namespace SkyrimMCP::UtilityManager {
             };
         }
 
-        return {{"error", "Mod not found in load order: " + modName}};
+        return {{"error", DescribeMissingMod(dataHandler, modName)}};
     }
 
     json LoadSave(const std::string& saveName) {
