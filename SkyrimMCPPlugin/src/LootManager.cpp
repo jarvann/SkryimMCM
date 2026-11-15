@@ -71,7 +71,14 @@ namespace SkyrimMCP::LootManager {
 
         RE::TESObjectREFR* ResolveRef(const std::string& id, std::string& error) {
             if (id.empty() || id == "player") return RE::PlayerCharacter::GetSingleton();
-            if (id == "crosshair") {
+            // With a container open (looting, a chest, a follower's inventory), "crosshair" and
+            // "container" mean that container: the menu hides the crosshair target.
+            if (id == "crosshair" || id == "container") {
+                auto* ui = RE::UI::GetSingleton();
+                if (ui && ui->IsMenuOpen(RE::ContainerMenu::MENU_NAME)) {
+                    if (auto open = RE::TESObjectREFR::LookupByHandle(RE::ContainerMenu::GetTargetRefHandle())) return open.get();
+                }
+                if (id == "container") { error = "No container menu is open"; return nullptr; }
                 auto* pick = RE::CrosshairPickData::GetSingleton();
                 auto target = pick ? pick->GetActiveTarget().get() : RE::NiPointer<RE::TESObjectREFR>();
                 if (!target) { error = "Nothing is under the crosshair"; return nullptr; }
