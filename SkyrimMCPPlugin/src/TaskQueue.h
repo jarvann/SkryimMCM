@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <cstdint>
 #include <future>
 
 #include <nlohmann/json.hpp>
@@ -20,6 +21,9 @@ namespace SkyrimMCP {
         // Submit work to the game thread. Blocks the calling thread until complete.
         // Throws on timeout (default 5 seconds).
         static json RunOnGameThread(std::function<json()> work, int timeoutMs = 5000);
+
+        // Game-thread jobs stopped by the fault guard since this DLL loaded (FEAT-220).
+        static std::uint32_t FaultCount();
     };
 
 }
