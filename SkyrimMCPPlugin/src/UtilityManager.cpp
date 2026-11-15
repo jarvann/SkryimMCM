@@ -417,16 +417,28 @@ namespace SkyrimMCP::UtilityManager {
             const auto wanted = ToLower(modName);
             const auto dot = wanted.rfind('.');
             const auto stem = dot == std::string::npos ? wanted : wanted.substr(0, dot);
-            std::vector<std::string> matches;
-            std::size_t total = 0;
+            // Same base name first (Skyrim -> Skyrim.esm), then the rest in load order.
+            std::vector<std::string> exact, partial;
             for (auto* file : dataHandler->files) {
                 if (!file || file->GetCompileIndex() == 0xFF) continue;
                 const auto name = ToLower(file->GetFilename());
                 if (stem.empty() || name.find(stem) == std::string::npos) continue;
-                if (++total <= 10) matches.emplace_back(file->GetFilename());
+                const auto nameDot = name.rfind('.');
+                const auto nameStem = nameDot == std::string::npos ? name : name.substr(0, nameDot);
+                (nameStem == stem ? exact : partial).emplace_back(file->GetFilename());
+            }
+            const std::size_t total = exact.size() + partial.size();
+            std::vector<std::string> matches = exact;
+            for (const auto& m : partial) {
+                if (matches.size() >= 10) break;
+                matches.push_back(m);
             }
 
-            std::string message = std::format("{} is not an active plugin: it is not installed, or your mod manager has it disabled.", modName);
+            // A name with no extension is a search, not a file name: don't claim it isn't installed.
+            const bool looksLikeFile = dot != std::string::npos;
+            std::string message = looksLikeFile
+                ? std::format("{} is not an active plugin: it is not installed, or your mod manager has it disabled.", modName)
+                : std::format("No active plugin is named exactly \"{}\" (include the extension, e.g. .esp, .esm or .esl).", modName);
             if (!matches.empty()) {
                 message += " Active plugins with a similar name: ";
                 for (std::size_t i = 0; i < matches.size(); ++i) message += (i ? ", " : "") + matches[i];
