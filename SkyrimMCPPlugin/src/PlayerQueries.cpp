@@ -6,7 +6,11 @@
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
+#include <algorithm>
 #include <format>
+#include <iterator>
+#include <utility>
+#include <vector>
 #include <unordered_set>
 
 namespace SkyrimMCP::PlayerQueries {
@@ -497,7 +501,25 @@ namespace SkyrimMCP::PlayerQueries {
             result["facePresets"] = parts;
         }
 
-        // Head parts
+        // Head parts. FEAT-209: menuIndex is the part's position (1-based) among the playable
+        // parts of the same type for this race and sex, in load order: the number the
+        // character menu's slider shows. RaceMenu usually matches; a mod that re-sorts the
+        // list can differ.
+        static const char* typeNames[] = { "misc", "face", "eyes", "hair", "facialHair", "scar", "eyebrows" };
+        auto* race = base->GetRace();
+        const bool female = base->GetSex() == RE::SEX::kFemale;
+        std::vector<RE::BGSHeadPart*> choices[std::to_underlying(RE::BGSHeadPart::HeadPartType::kTotal)];
+        if (auto* dataHandler = RE::TESDataHandler::GetSingleton()) {
+            for (auto* candidate : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
+                if (!candidate || candidate->IsExtraPart()) continue;
+                if (!candidate->flags.all(RE::BGSHeadPart::Flag::kPlayable)) continue;
+                if (!candidate->flags.all(female ? RE::BGSHeadPart::Flag::kFemale : RE::BGSHeadPart::Flag::kMale)) continue;
+                if (race && candidate->validRaces && !candidate->validRaces->HasForm(race)) continue;
+                const auto t = std::to_underlying(candidate->type.get());
+                if (t >= 0 && t < static_cast<int>(std::size(choices))) choices[t].push_back(candidate);
+            }
+        }
+
         json headParts = json::array();
         if (base->headParts && base->numHeadParts > 0) {
             for (int i = 0; i < base->numHeadParts; i++) {
@@ -506,7 +528,17 @@ namespace SkyrimMCP::PlayerQueries {
                 json hp;
                 hp["formId"] = std::format("{:08X}", part->GetFormID());
                 hp["name"] = part->GetName() ? part->GetName() : "";
-                hp["type"] = static_cast<int>(part->type.get());
+                const auto t = std::to_underlying(part->type.get());
+                hp["type"] = t;
+                if (t >= 0 && t < static_cast<int>(std::size(typeNames))) hp["typeName"] = typeNames[t];
+                if (const char* editorId = part->GetFormEditorID(); editorId && editorId[0]) hp["editorId"] = editorId;
+                if (auto* file = part->GetFile(0)) hp["mod"] = file->fileName;
+                if (t >= 0 && t < static_cast<int>(std::size(choices))) {
+                    auto& list = choices[t];
+                    auto it = std::find(list.begin(), list.end(), part);
+                    if (it != list.end()) hp["menuIndex"] = static_cast<int>(it - list.begin()) + 1;
+                    hp["menuChoices"] = list.size();
+                }
                 headParts.push_back(hp);
             }
         }
