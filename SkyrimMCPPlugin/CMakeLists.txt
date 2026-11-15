@@ -51,6 +51,7 @@ set(LOGIC_SOURCES
     src/NPCManager.cpp
     src/PapyrusBridge.cpp
     src/PlayerQueries.cpp
+    src/AppearanceManager.cpp
     src/Protocol.cpp
     src/QuestManager.cpp
     src/TaskQueue.cpp

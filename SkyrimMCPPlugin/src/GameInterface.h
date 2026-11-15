@@ -15,6 +15,7 @@
 #include "PapyrusBridge.h"
 #include "UIManager.h"
 #include "UtilityManager.h"
+#include "AppearanceManager.h"
 
 #include <nlohmann/json.hpp>
 #include <string>
@@ -65,6 +66,12 @@ namespace SkyrimMCP {
         inline json EquipItem(const std::string& formIdHex) { return InventoryManager::EquipItem(formIdHex); }
         inline json UnequipItem(const std::string& formIdHex) { return InventoryManager::UnequipItem(formIdHex); }
         inline json EquipItems(const json& items, const std::string& refId, bool unequip) { return InventoryManager::EquipItems(items, refId, unequip); }
+
+        // === Appearance (AppearanceManager) ===
+        inline json GetColors(const std::string& refId) { return AppearanceManager::GetColors(refId); }
+        inline json ListHairColors(bool includeNonPlayable) { return AppearanceManager::ListHairColors(includeNonPlayable); }
+        inline json SetHairColor(const std::string& refId, const std::string& color) { return AppearanceManager::SetHairColor(refId, color); }
+        inline json SetSkinTone(const std::string& refId, const std::string& color, bool refresh) { return AppearanceManager::SetSkinTone(refId, color, refresh); }
 
         // === Quests (QuestManager) ===
         inline json GetQuestInfo() { return QuestManager::GetQuestInfo(); }
