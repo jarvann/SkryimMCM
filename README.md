@@ -52,7 +52,7 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 
 ## Installation
 
-1. Extract the `Data` folder into your Skyrim directory (or install via MO2/Vortex)
+1. Install with MO2 or Vortex, or extract the zip into your Skyrim `Data` folder (the zip starts at `SKSE\`)
 2. Install .NET 10 Runtime if not already installed
 3. Configure Claude Desktop (see below)
 4. Launch Skyrim via SKSE, then open Claude Desktop
@@ -73,6 +73,8 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 ```
 
 Replace `<SKYRIM_PATH>` with your Skyrim installation path.
+
+**Mod Organizer 2:** Claude Desktop runs outside MO2, so it can't see MO2's virtual Data folder. Point `args` at the mod's own folder instead, for example `<MO2_PATH>\mods\SkyLinkAI\SKSE\Plugins\SkyLinkAI_Launcher\SkyLinkLauncher.dll`.
 
 The launcher runs the MCP server (`SkyLinkAI_Server\SkyrimMCP.dll`) and restarts it when a new version is installed, so updating SkyLink doesn't need a Claude restart. Changed behaviour applies on the next call. Claude Desktop doesn't re-read the tool list while a chat is open, though, so new tools and changed tool descriptions appear in a new chat (restart Claude if they still don't). Pointing `args` straight at `SkyLinkAI_Server\SkyrimMCP.dll` also works, as it did before 1.2.1.
 

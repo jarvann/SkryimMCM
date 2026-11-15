@@ -2533,6 +2533,16 @@
       "version": "1.1.0",
       "date": "2026-11-12",
       "notes": "Skyrim 1.7.104 / SKSE64 2.3.1 support (alandtse CommonLibSSE-NG v16.3.0), version reporting in CheckConnection, stale-pipe reconnect fix. Tested on Steam 1.7.104 only."
+    },
+    {
+      "version": "1.2.1",
+      "date": "2026-11-15",
+      "commit": "993bb9f",
+      "notes": "Hot reload: plugin split into host + SkyLinkAI\\SkyLinkLogic.dll (reloads with the game running, ReloadPlugin tool), launcher restarts the MCP server without a Claude Desktop restart. New GetKnownEnchantments; Papyrus missing-function crash fixed; real plugin errors reach the AI; ToggleCollision fixed (BUG-020); startup CTD in the logic DLL fixed (BUG-019); GetGameSafety answers during loading screens. No .exe files. 89 tools. Includes the unreleased 1.2.0 changes. Tested on Steam 1.7.104 only. GitHub release v1.2.1 and Nexus file (1.1.0 moved to Old files); Nexus description updated. Zip repackaged the same day (SKSE\\ at the top, README in SKSE\\Plugins\\SkyLinkAI\\) so MO2/Vortex install it without prompting (DutchiesCanadian); same binaries, replaced on GitHub and as the Nexus 1.2.1 file (first upload archived). Sticky post rewritten for 1.2.1.",
+      "links": {
+        "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.2.1",
+        "nexus": "https://www.nexusmods.com/skyrimspecialedition/mods/175682"
+      }
     }
   ]
 }

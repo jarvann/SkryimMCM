@@ -1,6 +1,10 @@
 # SkyLink AI — Release Build Script
 # Run from PowerShell with VS 2022 (or Build Tools) C++ workload installed
-# Produces a ready-to-zip release folder
+# Produces the release folder and SkyLinkAI-v<Version>.zip
+#
+# The zip's top level is SKSE\ (what goes inside Data), with no loose files beside it,
+# so MO2 and Vortex install it without asking where the files go. Docs go in
+# SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
     [string]$Version = "1.2.1",
@@ -17,9 +21,11 @@ $env:VCPKG_ROOT = $VcpkgRoot
 
 # Clean output
 if (Test-Path $OutputDir) { Remove-Item -Recurse -Force $OutputDir }
-New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server" -Force | Out-Null
-New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher" -Force | Out-Null
-New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI" -Force | Out-Null
+$Plugins = "$OutputDir\SKSE\Plugins"
+$Docs = "$Plugins\SkyLinkAI"
+New-Item -ItemType Directory -Path "$Plugins\SkyLinkAI_Server" -Force | Out-Null
+New-Item -ItemType Directory -Path "$Plugins\SkyLinkAI_Launcher" -Force | Out-Null
+New-Item -ItemType Directory -Path "$Plugins\SkyLinkAI" -Force | Out-Null
 
 # Build C++ plugin
 Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
@@ -28,15 +34,15 @@ Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
 
 # Build C# MCP Server
 Write-Host "`n--- Building MCP Server (C#) ---" -ForegroundColor Yellow
-dotnet publish SkyrimMCP -c Release -o "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server" --no-self-contained
+dotnet publish SkyrimMCP -c Release -o "$Plugins\SkyLinkAI_Server" --no-self-contained
 if ($LASTEXITCODE -ne 0) { throw "MCP server build failed" }
-dotnet publish SkyLinkLauncher -c Release -o "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher" --no-self-contained
+dotnet publish SkyLinkLauncher -c Release -o "$Plugins\SkyLinkAI_Launcher" --no-self-contained
 if ($LASTEXITCODE -ne 0) { throw "Launcher build failed" }
 
 # Copy SKSE plugin DLL
 Write-Host "`n--- Packaging ---" -ForegroundColor Yellow
-Copy-Item "SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll" "$OutputDir\Data\SKSE\Plugins\" -Force
-Copy-Item "SkyrimMCPPlugin\output\SkyLinkAI\SkyLinkLogic.dll" "$OutputDir\Data\SKSE\Plugins\SkyLinkAI\" -Force
+Copy-Item "SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll" "$Plugins\" -Force
+Copy-Item "SkyrimMCPPlugin\output\SkyLinkAI\SkyLinkLogic.dll" "$Plugins\SkyLinkAI\" -Force
 
 # No .exe in the package: the server and launcher are run with "dotnet <dll>", and
 # SmartScreen and antivirus tools treat unsigned .exe files with more suspicion.
@@ -52,7 +58,7 @@ $config = @{
         }
     }
 }
-$config | ConvertTo-Json -Depth 4 | Set-Content "$OutputDir\claude_desktop_config_example.json"
+$config | ConvertTo-Json -Depth 4 | Set-Content "$Docs\claude_desktop_config_example.json"
 
 # Create README
 @"
@@ -69,8 +75,8 @@ with Skyrim SE/AE's runtime engine via an SKSE plugin.
 - Claude Desktop (https://claude.ai/desktop)
 
 ## Installation
-1. Extract the Data folder into your Skyrim directory
-   (or install via Mod Organizer 2 / Vortex)
+1. Install with Mod Organizer 2 or Vortex, or extract the zip into your
+   Skyrim Data folder (the zip starts at SKSE\)
 2. Install .NET 10 Runtime if not already installed
 3. Configure Claude Desktop (see below)
 
@@ -87,6 +93,10 @@ Edit %APPDATA%\Claude\claude_desktop_config.json:
 }
 
 Replace <SKYRIM_PATH> with your Skyrim installation path.
+
+Mod Organizer 2: Claude Desktop runs outside MO2, so it can't see MO2's virtual
+Data folder. Point "args" at the mod's own folder instead, for example
+<MO2_PATH>\mods\SkyLinkAI\SKSE\Plugins\SkyLinkAI_Launcher\SkyLinkLauncher.dll
 
 The launcher runs the MCP server (SkyLinkAI_Server\SkyrimMCP.dll) and restarts it
 when a new version is installed, so updating SkyLink does not need a Claude restart.
@@ -118,12 +128,25 @@ and earlier.
 - SkyrimMCPPlugin.dll and SkyLinkAI\SkyLinkLogic.dll: GPL-3.0-or-later (statically link CommonLibSSE-NG)
 - SkyLinkAI_Server (MCP server) and SkyLinkAI_Launcher: MIT
 - Source: https://github.com/jarvann/SkryimMCM
-"@ | Set-Content "$OutputDir\README.txt"
+"@ | Set-Content "$Docs\README.txt"
+
+# Nothing may sit beside SKSE\ at the top of the package (MO2 then asks the player
+# where the Data folder is).
+$top = Get-ChildItem $OutputDir | Where-Object { $_.Name -ne "SKSE" }
+if ($top) { throw "Release has files outside SKSE\: $($top.Name -join ', ')" }
+
+# Zip with Windows' tar (bsdtar), which writes "/" separators. Compress-Archive in
+# Windows PowerShell 5.1 writes "\", which some extractors turn into odd file names.
+$zip = Join-Path $PSScriptRoot "SkyLinkAI-v$Version.zip"
+if (Test-Path $zip) { Remove-Item -Force $zip }
+& "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C $OutputDir SKSE
+if ($LASTEXITCODE -ne 0) { throw "Zip failed" }
 
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green
-Write-Host "Release folder: $OutputDir\"
-Write-Host "  SKSE Plugin: $OutputDir\Data\SKSE\Plugins\SkyrimMCPPlugin.dll"
-Write-Host "  Logic DLL:   $OutputDir\Data\SKSE\Plugins\SkyLinkAI\SkyLinkLogic.dll"
-Write-Host "  MCP Server:  $OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server\"
-Write-Host "  Launcher:    $OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher\"
-Write-Host "`nZip the '$OutputDir' folder for Nexus upload."
+Write-Host "Release folder: $OutputDir\ (top level: SKSE\)"
+Write-Host "  SKSE Plugin: $Plugins\SkyrimMCPPlugin.dll"
+Write-Host "  Logic DLL:   $Plugins\SkyLinkAI\SkyLinkLogic.dll"
+Write-Host "  MCP Server:  $Plugins\SkyLinkAI_Server\"
+Write-Host "  Launcher:    $Plugins\SkyLinkAI_Launcher\"
+Write-Host "  Docs:        $Docs\README.txt, claude_desktop_config_example.json"
+Write-Host "Zip for Nexus and GitHub: $zip"
