@@ -100,12 +100,61 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Get the full load order of all active plugins (ESP, ESM, ESL) with their FormID prefixes. " +
-        "Use this to determine the correct FormID prefix for items from a specific mod.")]
-    public async Task<object> GetLoadOrder()
+    [Description("Get the load order of active plugins (ESP, ESM, ESL) with their FormID prefixes, a page at a time. " +
+        "filter: only plugins whose file name contains this text (case-insensitive). type: 'esp' (regular, 2-digit prefix) or 'esl' (light, FExxx). " +
+        "page (default 1) and pageSize (default 100; 0 = summary only). Large lists have thousands of plugins, so filter when you can; " +
+        "for a single plugin, GetModFormIdPrefix is cheaper. outputPath writes the whole (filtered) list to a JSON file instead and returns only the counts.")]
+    public async Task<object> GetLoadOrder(string? filter = null, string? type = null, int page = 1, int pageSize = 100,
+        string? outputPath = null)
     {
         var data = await _pipe.SendRequestAsync("get_load_order");
-        return DeserializeResponse(data);
+        var all = data?["mods"]?.AsArray();
+        if (all == null) return DeserializeResponse(data);
+
+        var matches = all.Where(m =>
+        {
+            var name = m?["name"]?.GetValue<string>() ?? "";
+            var modType = m?["type"]?.GetValue<string>() ?? "";
+            if (!string.IsNullOrEmpty(filter) && !name.Contains(filter, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.IsNullOrEmpty(type) && !modType.Equals(type, StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }).Select(m => m!.DeepClone()).ToList();
+
+        var regularCount = data?["regularCount"]?.GetValue<int>() ?? 0;
+        var lightCount = data?["lightCount"]?.GetValue<int>() ?? 0;
+
+        if (!string.IsNullOrEmpty(outputPath))
+        {
+            try
+            {
+                var full = Path.GetFullPath(outputPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+                await File.WriteAllTextAsync(full, new JsonArray(matches.ToArray()).ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                return new { written = full, matched = matches.Count, regularCount, lightCount };
+            }
+            catch (Exception ex)
+            {
+                return new { error = $"Could not write {outputPath}: {ex.Message}" };
+            }
+        }
+
+        int totalPages = pageSize > 0 ? (int)Math.Ceiling(matches.Count / (double)pageSize) : 0;
+        if (page < 1) page = 1;
+        var items = pageSize > 0
+            ? matches.Skip((page - 1) * pageSize).Take(pageSize).Select(m => JsonSerializer.Deserialize<JsonElement>(m.ToJsonString())).ToArray()
+            : Array.Empty<JsonElement>();
+
+        return new
+        {
+            mods = items,
+            page,
+            pageSize,
+            matched = matches.Count,
+            totalPages,
+            hasMore = page < totalPages,
+            regularCount,
+            lightCount,
+        };
     }
 
     [McpServerTool]
