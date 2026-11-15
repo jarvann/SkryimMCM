@@ -347,38 +347,30 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Read a plugin config file (JSON or INI) from Data/SKSE/Plugins/. " +
-        "Pass the filename relative to the plugins directory (e.g., 'SmoothCam.json', 'po3_Tweaks.ini'). " +
-        "Returns the file contents parsed as JSON. Use this to inspect mod settings. " +
-        "For SmoothCam: 'SmoothCam.json' (active config), 'SmoothCamPreset0.json' through 'SmoothCamPreset5.json' (presets).")]
+    [Description("Read a plugin config file (JSON, INI, TXT or TOML) from SKSE\\Plugins, e.g. 'SmoothCam.json' or 'po3_Tweaks.ini'. " +
+        "Finds it in the game's Data\\SKSE\\Plugins or, for MO2 and Wabbajack setups, in MO2's overwrite folder and enabled mods " +
+        "(set mo2Path with SetSkyLinkSetting). Returns the copy the game uses, its path, and any other copies. " +
+        "JSON is returned parsed; other formats as text.")]
     public async Task<object> ReadPluginConfig(string filename)
     {
+        if (!IsPlainFileName(filename)) return new { error = "Pass a file name only, with no folders or '..'" };
+        var copies = SkyLinkSettings.FindConfigFile(filename);
+        if (copies.Count == 0) return new { error = $"File not found: {filename}. {SkyLinkSettings.NotFoundHelp()}" };
+
         try
         {
-            // Get Skyrim path from pipe — ask plugin for current working dir
-            // For now, use a known path pattern
-            var skyrimPath = Environment.GetEnvironmentVariable("SKYRIM_PATH")
-                ?? @"C:\Steam\steamapps\common\Skyrim Special Edition";
-            var filePath = Path.Combine(skyrimPath, "Data", "SKSE", "Plugins", filename);
-
-            if (!File.Exists(filePath))
-                return new { error = $"File not found: {filename}" };
-
+            var filePath = copies[0];
             var content = await File.ReadAllTextAsync(filePath);
-
-            // Try parsing as JSON
+            var others = copies.Skip(1).ToArray();
             if (filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
-                    var json = JsonNode.Parse(content);
-                    return new { filename, format = "json", data = JsonSerializer.Deserialize<JsonElement>(content) };
+                    return new { filename, path = filePath, otherCopies = others, format = "json", data = JsonSerializer.Deserialize<JsonElement>(content) };
                 }
-                catch { }
+                catch { /* not valid JSON: return it as text */ }
             }
-
-            // Return as raw text for INI and other formats
-            return new { filename, format = "text", content };
+            return new { filename, path = filePath, otherCopies = others, format = "text", content };
         }
         catch (Exception ex)
         {
@@ -387,32 +379,41 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Write a plugin config file (JSON) to Data/SKSE/Plugins/. " +
-        "Pass the filename and the JSON content to write. " +
-        "CAUTION: This overwrites the file. Back up first if needed. " +
-        "Changes take effect on next MCM reload or game restart depending on the plugin. " +
-        "For SmoothCam: write to 'SmoothCam.json' to change active config, or preset files to modify presets.")]
+    [Description("Write a plugin config file (JSON, INI or TXT) in SKSE\\Plugins. Overwrites the copy the game uses (see ReadPluginConfig), " +
+        "after saving the old one as <file>.bak. A new file goes to MO2's overwrite folder when mo2Path is set, otherwise to Data\\SKSE\\Plugins. " +
+        "Changes take effect on the next MCM reload or game restart, depending on the mod.")]
     public async Task<object> WritePluginConfig(string filename, string content)
     {
+        if (!IsPlainFileName(filename)) return new { error = "Invalid filename: no path separators or '..' allowed" };
+        if (!filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+            !filename.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) &&
+            !filename.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            return new { error = "Only .json, .ini, and .txt files can be written" };
+
         try
         {
-            // Security: only allow writing to SKSE/Plugins directory, no path traversal
-            if (filename.Contains("..") || filename.Contains("/") || filename.Contains("\\"))
-                return new { error = "Invalid filename — no path separators or .. allowed" };
-
-            if (!filename.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
-                !filename.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) &&
-                !filename.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-                return new { error = "Only .json, .ini, and .txt files can be written" };
-
-            var skyrimPath = Environment.GetEnvironmentVariable("SKYRIM_PATH")
-                ?? @"C:\Steam\steamapps\common\Skyrim Special Edition";
-            var filePath = Path.Combine(skyrimPath, "Data", "SKSE", "Plugins", filename);
+            var copies = SkyLinkSettings.FindConfigFile(filename);
+            string filePath;
+            string? backup = null;
+            if (copies.Count > 0)
+            {
+                filePath = copies[0];
+                backup = filePath + ".bak";
+                File.Copy(filePath, backup, overwrite: true);
+            }
+            else
+            {
+                var target = SkyLinkSettings.Load()["mo2Path"] is JsonValue v && v.TryGetValue<string>(out var mo2) && mo2.Length > 0
+                    ? Path.Combine(mo2, "overwrite", "SKSE", "Plugins")
+                    : SkyLinkSettings.DataPath() is string data ? Path.Combine(data, "SKSE", "Plugins") : null;
+                if (target == null) return new { error = $"Don't know where SKSE\\Plugins is. {SkyLinkSettings.NotFoundHelp()}" };
+                Directory.CreateDirectory(target);
+                filePath = Path.Combine(target, filename);
+            }
 
             await File.WriteAllTextAsync(filePath, content);
             await NotifyInGame($"Config saved: {filename}");
-
-            return new { success = true, filename, message = $"Written to {filePath}" };
+            return new { success = true, filename, path = filePath, backup };
         }
         catch (Exception ex)
         {
@@ -421,37 +422,115 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("List all config files for a plugin in Data/SKSE/Plugins/. " +
-        "Pass a search pattern like 'SmoothCam' to find all SmoothCam files, or '*' for everything. " +
-        "Returns filenames, sizes, and last modified dates.")]
-    public async Task<object> ListPluginConfigs(string pattern = "*")
+    [Description("List SKSE plugin config files (.json, .ini, .txt, .toml) whose name contains pattern ('*' or empty for all), " +
+        "across Data\\SKSE\\Plugins and, with mo2Path set, MO2's overwrite folder and enabled mods. " +
+        "Returns file names, folders, sizes and dates; when a file exists in several places, the first listed is the one the game uses.")]
+    public Task<object> ListPluginConfigs(string pattern = "*")
     {
         try
         {
-            var skyrimPath = Environment.GetEnvironmentVariable("SKYRIM_PATH")
-                ?? @"C:\Steam\steamapps\common\Skyrim Special Edition";
-            var pluginsDir = Path.Combine(skyrimPath, "Data", "SKSE", "Plugins");
-
-            if (!Directory.Exists(pluginsDir))
-                return new { error = "Plugins directory not found" };
-
-            var files = Directory.GetFiles(pluginsDir, $"*{pattern}*")
-                .Where(f => f.EndsWith(".json") || f.EndsWith(".ini") || f.EndsWith(".txt") || f.EndsWith(".toml"))
-                .Select(f => new FileInfo(f))
-                .Select(fi => new
+            var needle = pattern.Trim('*', ' ');
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var files = new List<object>();
+            foreach (var folder in SkyLinkSettings.ConfigFolders())
+            {
+                if (!Directory.Exists(folder)) continue;
+                foreach (var f in Directory.EnumerateFiles(folder))
                 {
-                    filename = fi.Name,
-                    sizeBytes = fi.Length,
-                    lastModified = fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
-                })
-                .OrderBy(f => f.filename)
-                .ToArray();
-
-            return new { files, count = files.Length, pattern };
+                    var name = Path.GetFileName(f);
+                    var ext = Path.GetExtension(f).ToLowerInvariant();
+                    if (ext is not (".json" or ".ini" or ".txt" or ".toml")) continue;
+                    if (needle.Length > 0 && !name.Contains(needle, StringComparison.OrdinalIgnoreCase)) continue;
+                    var fi = new FileInfo(f);
+                    files.Add(new
+                    {
+                        filename = name,
+                        folder,
+                        used = seen.Add(name),
+                        sizeBytes = fi.Length,
+                        lastModified = fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    });
+                }
+            }
+            if (files.Count == 0 && !SkyLinkSettings.ConfigFolders().Any(Directory.Exists))
+                return Task.FromResult<object>(new { error = $"No SKSE\\Plugins folder found. {SkyLinkSettings.NotFoundHelp()}" });
+            return Task.FromResult<object>(new { files, count = files.Count, pattern });
         }
         catch (Exception ex)
         {
-            return new { error = $"Failed to list configs: {ex.Message}" };
+            return Task.FromResult<object>(new { error = $"Failed to list configs: {ex.Message}" });
         }
     }
+
+    [McpServerTool]
+    [Description("Show SkyLink's settings (Documents\\My Games\\Skyrim Special Edition\\SkyLinkAI\\settings.json), what each one does, " +
+        "the game folder SkyLink found and how, and the folders it searches for mod config files.")]
+    public Task<object> GetSkyLinkSettings()
+    {
+        var (game, source) = SkyLinkSettings.SkyrimPath();
+        string? rawError = null;
+        try { if (File.Exists(SkyLinkSettings.FilePath)) JsonNode.Parse(File.ReadAllText(SkyLinkSettings.FilePath)); }
+        catch (Exception ex) { rawError = ex.Message; }
+        return Task.FromResult<object>(new
+        {
+            file = SkyLinkSettings.FilePath,
+            settings = DeserializeResponse(SkyLinkSettings.Load()),
+            fileError = rawError,
+            available = SkyLinkSettings.Known,
+            skyrimPath = game,
+            skyrimPathFrom = source,
+            dataPath = SkyLinkSettings.DataPath(),
+            configFolders = SkyLinkSettings.ConfigFolders(),
+        });
+    }
+
+    [McpServerTool]
+    [Description("Set one SkyLink setting (see GetSkyLinkSettings for the list): skyrimPath, dataPath, mo2Path, mo2Profile, " +
+        "or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
+        "Use this for MO2 or Wabbajack setups where config files aren't in the game's own Data folder.")]
+    public Task<object> SetSkyLinkSetting(string key, string? value = null)
+    {
+        if (!SkyLinkSettings.Known.ContainsKey(key))
+            return Task.FromResult<object>(new { error = $"Unknown setting '{key}'. Known: {string.Join(", ", SkyLinkSettings.Known.Keys)}" });
+
+        var settings = SkyLinkSettings.Load();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            settings.Remove(key);
+        }
+        else if (key == "extraConfigFolders")
+        {
+            var folders = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var missing = folders.Where(f => !Directory.Exists(f)).ToArray();
+            if (missing.Length > 0) return Task.FromResult<object>(new { error = $"Folder not found: {string.Join("; ", missing)}" });
+            settings[key] = new JsonArray(folders.Select(f => (JsonNode)f).ToArray());
+        }
+        else if (key == "mo2Profile")
+        {
+            settings[key] = value.Trim();
+        }
+        else
+        {
+            var folder = value.Trim().TrimEnd('\\', '/');
+            if (!Directory.Exists(folder)) return Task.FromResult<object>(new { error = $"Folder not found: {folder}" });
+            if (key == "mo2Path" && !Directory.Exists(Path.Combine(folder, "mods")))
+                return Task.FromResult<object>(new { error = $"{folder} has no 'mods' folder; pass the MO2 instance folder" });
+            if (key == "skyrimPath" && !File.Exists(Path.Combine(folder, "SkyrimSE.exe")) && !File.Exists(Path.Combine(folder, "SkyrimVR.exe")))
+                return Task.FromResult<object>(new { error = $"{folder} has no SkyrimSE.exe; pass the game folder" });
+            settings[key] = folder;
+        }
+
+        try
+        {
+            SkyLinkSettings.Save(settings);
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult<object>(new { error = $"Could not save settings: {ex.Message}" });
+        }
+        return GetSkyLinkSettings();
+    }
+
+    private static bool IsPlainFileName(string filename) =>
+        !string.IsNullOrWhiteSpace(filename) && !filename.Contains("..") && filename.IndexOfAny(new[] { '/', '\\', ':' }) < 0;
 }
