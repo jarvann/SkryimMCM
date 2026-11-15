@@ -34,7 +34,7 @@ namespace SkyrimMCP::CombatAnalysis {
                     auto* avo = actor->AsActorValueOwner();
                     if (avo) {
                         t["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-                        t["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+                        t["healthMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kHealth);
                     }
                     targets.push_back(t);
                 } catch (...) { continue; }
@@ -137,7 +137,7 @@ namespace SkyrimMCP::CombatAnalysis {
 
                 if (avo) {
                     t["health"] = avo->GetActorValue(RE::ActorValue::kHealth);
-                    t["healthMax"] = avo->GetBaseActorValue(RE::ActorValue::kHealth);
+                    t["healthMax"] = Helpers::ActorValueMax(actor, RE::ActorValue::kHealth);
                 }
 
                 auto* equippedRight = actor->GetEquippedObject(false);
