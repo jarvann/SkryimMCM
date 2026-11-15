@@ -503,13 +503,12 @@ namespace SkyrimMCP::PlayerQueries {
             result["facePresets"] = parts;
         }
 
-        // Head parts. FEAT-209: menuIndexes gives the part's 0-based position among the
-        // choices for its type (AppearanceManager::HeadPartChoices) in each candidate order,
-        // because RaceMenu's slider order isn't confirmed yet. ListHeadPartChoices shows the
-        // neighbours in any order, to compare with RaceMenu.
+        // Head parts. FEAT-209: menuIndex is the part's 0-based position among the choices for
+        // its type, sorted by editor ID in byte order (case-sensitive): RaceMenu's slider
+        // number. Confirmed in game 2026-11-15 (hair 1160); the other orders were wrong.
         static const char* typeNames[] = { "misc", "face", "eyes", "hair", "facialHair", "scar", "eyebrows" };
         constexpr int kTypes = static_cast<int>(std::to_underlying(RE::BGSHeadPart::HeadPartType::kTotal));
-        std::vector<RE::BGSHeadPart*> choices[kTypes][AppearanceManager::kHeadPartOrderCount];
+        std::vector<RE::BGSHeadPart*> choices[kTypes];
 
         json headParts = json::array();
         if (base->headParts && base->numHeadParts > 0) {
@@ -527,17 +526,11 @@ namespace SkyrimMCP::PlayerQueries {
                 if (const char* editorId = part->GetFormEditorID(); editorId && editorId[0]) hp["editorId"] = editorId;
                 if (auto* file = part->GetFile(0)) hp["mod"] = file->fileName;
                 if (t >= 0 && t < kTypes) {
-                    json indexes;
-                    std::size_t total = 0;
-                    for (std::size_t o = 0; o < AppearanceManager::kHeadPartOrderCount; ++o) {
-                        auto& list = choices[t][o];
-                        if (list.empty()) list = AppearanceManager::HeadPartChoices(base, t, AppearanceManager::kHeadPartOrders[o]);
-                        total = list.size();
-                        auto it = std::find(list.begin(), list.end(), part);
-                        if (it != list.end()) indexes[AppearanceManager::kHeadPartOrders[o]] = static_cast<int>(it - list.begin());
-                    }
-                    if (!indexes.empty()) hp["menuIndexes"] = indexes;
-                    hp["menuChoices"] = total;
+                    auto& list = choices[t];
+                    if (list.empty()) list = AppearanceManager::HeadPartChoices(base, t, "editorId");
+                    auto it = std::find(list.begin(), list.end(), part);
+                    if (it != list.end()) hp["menuIndex"] = static_cast<int>(it - list.begin());
+                    hp["menuChoices"] = list.size();
                 }
                 headParts.push_back(hp);
             }
