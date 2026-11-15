@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyTitle>SkyLink AI Launcher</AssemblyTitle>
+    <Product>SkyLink AI</Product>
+    <Description>Stdio launcher for the SkyLink AI MCP server: runs it from a shadow copy and restarts it when a new build is deployed, so Claude Desktop does not have to be restarted</Description>
+    <Version>1.2.1</Version>
+    <!-- Run as "dotnet SkyLinkLauncher.dll"; no .exe apphost (SmartScreen and antivirus flag unsigned .exe files). -->
+    <UseAppHost>false</UseAppHost>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

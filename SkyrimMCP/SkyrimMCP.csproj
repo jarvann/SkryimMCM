@@ -9,8 +9,10 @@
     <AssemblyOriginatorKeyFile>SkyrimMCP.snk</AssemblyOriginatorKeyFile>
     <AssemblyTitle>SkyLink AI</AssemblyTitle>
     <Product>SkyLink AI</Product>
-    <Description>MCP server connecting AI assistants to Skyrim SE/AE — 74 tools for real-time game interaction</Description>
-    <Version>1.2.0</Version>
+    <Description>MCP server connecting AI assistants to Skyrim SE/AE — 89 tools for real-time game interaction</Description>
+    <Version>1.2.1</Version>
+    <!-- Run as "dotnet SkyrimMCP.dll"; no SkyrimMCP.exe apphost (SmartScreen and antivirus flag unsigned .exe files). -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyrimMCP", "SkyrimMCP\SkyrimMCP.csproj", "{3FE33179-3E2E-C167-67DB-03D2ED5FA258}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkyLinkLauncher", "SkyLinkLauncher\SkyLinkLauncher.csproj", "{CFA1A8EB-89E5-40A0-ADA2-D8A95E5C3A88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{3FE33179-3E2E-C167-67DB-03D2ED5FA258}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3FE33179-3E2E-C167-67DB-03D2ED5FA258}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3FE33179-3E2E-C167-67DB-03D2ED5FA258}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFA1A8EB-89E5-40A0-ADA2-D8A95E5C3A88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFA1A8EB-89E5-40A0-ADA2-D8A95E5C3A88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFA1A8EB-89E5-40A0-ADA2-D8A95E5C3A88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFA1A8EB-89E5-40A0-ADA2-D8A95E5C3A88}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

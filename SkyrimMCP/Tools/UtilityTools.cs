@@ -34,6 +34,17 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Reload the SKSE plugin's logic DLL (Data\\SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll) from disk without restarting Skyrim. " +
+        "The plugin also reloads automatically on the next call after a newer DLL is deployed, so this is mainly for forcing a reload " +
+        "or confirming one. Use after build_plugin.ps1 -Deploy. Returns reloaded, previousBuilt, built, reloads and elapsedMs; " +
+        "fails (and keeps the old version) if a game-thread task or Papyrus call is still pending.")]
+    public async Task<object> ReloadPlugin()
+    {
+        var data = await _pipe.SendRequestAsync("reload_plugin");
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("FALLBACK ONLY — Execute a raw Skyrim console command when NO dedicated tool exists. " +
         "ALWAYS check dedicated tools first: " +
         "Player: GetPlayerInfo, GetSkillLevels, GetPerks, GetKnownSpells, GetKnownShouts, GetKnownEnchantments, GetAppearance, GetFavorites, GetFactions. " +
