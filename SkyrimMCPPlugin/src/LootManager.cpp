@@ -69,6 +69,24 @@ namespace SkyrimMCP::LootManager {
             return c;
         }
 
+        // Hidden items the player can't take: skins, AI tokens, non-playable armor and weapons.
+        // They have no name and a gold value of -1, and the game's own loot menu never shows them.
+        bool Lootable(RE::TESBoundObject* object) {
+            if (object->GetFormID() == kGold) return true;
+            const char* name = object->GetName();
+            if (!name || !name[0]) return false;
+            if (object->GetGoldValue() < 0) return false;
+            switch (object->GetFormType()) {
+                case RE::FormType::Armor:
+                    return (object->GetFormFlags() & RE::TESObjectARMO::RecordFlags::kNonPlayable) == 0;
+                case RE::FormType::Weapon:
+                case RE::FormType::Ammo:
+                    return object->GetPlayable();
+                default:
+                    return true;
+            }
+        }
+
         RE::TESObjectREFR* ResolveRef(const std::string& id, std::string& error) {
             if (id.empty() || id == "player") return RE::PlayerCharacter::GetSingleton();
             // With a container open (looting, a chest, a follower's inventory), "crosshair" and
@@ -148,6 +166,7 @@ namespace SkyrimMCP::LootManager {
             for (auto& [object, data] : inventory) {
                 auto& [count, entry] = data;
                 if (!object || count <= 0 || !entry) continue;
+                if (!Lootable(object)) continue;
                 if (!Matches(f, object)) continue;
                 if (f.minValue > 0 && object->GetFormID() != kGold && object->GetGoldValue() < f.minValue) continue;
                 if (!f.includeQuestItems && entry->IsQuestObject()) continue;
@@ -158,9 +177,11 @@ namespace SkyrimMCP::LootManager {
                 json m;
                 m["formId"] = std::format("{:08X}", object->GetFormID());
                 m["name"] = (name && name[0]) ? name : m["formId"].get<std::string>();
+                const int itemValue = std::max(0, object->GetGoldValue()) * count;
                 m["count"] = count;
-                m["value"] = object->GetGoldValue() * count;
-                movedValue += object->GetGoldValue() * count;
+                m["value"] = itemValue;
+                if (entry->IsWorn()) m["equipped"] = true;
+                movedValue += itemValue;
                 ++movedStacks;
                 moved.push_back(m);
                 if (dryRun) continue;
@@ -235,12 +256,15 @@ namespace SkyrimMCP::LootManager {
         std::string error;
         if (!ReadFilter(filterParams, f, error)) return {{"error", error}};
         if (params.value("includeGold", true)) f.categories.insert("gold");
+        // A body's worn armor, jewelry and weapons are normal loot (the game's own loot menu
+        // shows them), so they are offered unless the caller says otherwise.
+        f.includeEquipped = params.value("includeEquipped", true);
         const float radius = params.value("radius", 2048.0f);
         const bool dryRun = params.value("dryRun", false);
         const auto playerPos = player->GetPosition();
 
         json bodies = json::array();
-        int stacks = 0, value = 0;
+        int stacks = 0, value = 0, inRange = 0;
         for (auto& handle : processLists->highActorHandles) {
             auto actorPtr = handle.get();
             auto* actor = actorPtr.get();
@@ -248,6 +272,7 @@ namespace SkyrimMCP::LootManager {
             if (actor->GetPosition().GetDistance(playerPos) > radius) continue;
             // Followers and essential NPCs who are only "dead" for a moment are left alone.
             if (actor->IsPlayerTeammate()) continue;
+            ++inRange;
 
             int bodyStacks = 0, bodyValue = 0;
             auto moved = MoveMatching(actor, player, f, RE::ITEM_REMOVE_REASON::kStoreInContainer, dryRun, bodyStacks, bodyValue);
@@ -257,11 +282,20 @@ namespace SkyrimMCP::LootManager {
             bodies.push_back({{"body", RefLabel(actor)}, {"items", moved}, {"value", bodyValue}});
         }
 
-        return {
-            {"dryRun", dryRun}, {"radius", radius}, {"bodiesLooted", bodies.size()},
+        json reply = {
+            {"dryRun", dryRun}, {"radius", radius},
+            {"bodiesInRange", inRange},                        // dead, loaded, not a follower
+            {"bodiesWithLoot", bodies.size()},                 // of those, bodies with something matching
+            {"bodiesLooted", dryRun ? 0 : static_cast<int>(bodies.size())},
             {"stacks", stacks}, {"totalValue", value}, {"bodies", bodies},
-            {"note", "Only bodies the game has fully loaded nearby are searched."},
         };
+        if (inRange == 0) {
+            reply["message"] = std::format("No dead bodies within {:.0f} units. Only bodies in loaded cells near the player are searched.", radius);
+        } else if (bodies.empty()) {
+            reply["message"] = std::format("{} bod{} in range, but nothing on {} matches the filter.", inRange, inRange == 1 ? "y" : "ies",
+                                           inRange == 1 ? "it" : "them");
+        }
+        return reply;
     }
 
 }

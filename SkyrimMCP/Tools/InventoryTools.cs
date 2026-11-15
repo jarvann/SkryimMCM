@@ -156,9 +156,12 @@ public class InventoryTools : ToolBase
     [Description("After a fight, take loot from dead bodies near the player in one call. " +
         "radius in game units (default 2048, about 30 m). categories (comma-separated, default 'valuables'): " + CategoryList + ". " +
         "Gold is included unless includeGold=false. minValue skips cheaper items. Followers are skipped. " +
-        "dryRun=true lists what would be taken. Reports each body and the total value.")]
+        "What the bodies wear and wield is included (marked equipped) unless includeEquipped=false. " +
+        "Hidden items the game's loot menu doesn't show are never taken. " +
+        "dryRun=true lists what would be taken. Reports bodiesInRange, bodiesWithLoot, bodiesLooted (0 on a dry run), " +
+        "each body's items and the total value.")]
     public async Task<object> LootBodies(float radius = 2048, string categories = "valuables", int minValue = 0,
-        bool includeGold = true, bool dryRun = false)
+        bool includeGold = true, bool includeEquipped = true, bool dryRun = false)
     {
         var parms = new JsonObject
         {
@@ -166,6 +169,7 @@ public class InventoryTools : ToolBase
             ["categories"] = SplitList(categories),
             ["minValue"] = minValue,
             ["includeGold"] = includeGold,
+            ["includeEquipped"] = includeEquipped,
             ["dryRun"] = dryRun,
         };
         var data = await _pipe.SendRequestAsync("loot_bodies", parms);

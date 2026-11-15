@@ -1803,13 +1803,17 @@
         {
           "id": "FEAT-218",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Loot and item transfer by category",
           "description": "Bulk item moves the AI can do in one call: move all items of a category (for example smithing materials) to the container under the crosshair, or collect only valuable loot and gold from nearby bodies after a fight. Builds on ScanLoot and the container tools.",
           "history": [
             {
               "datetime": "2026-11-15T00:00",
               "note": "From Jarvann's Nexus reply listing examples ('Move all the smithing materials to the chest...', 'Collect only the interesting loot and gold from the fight')."
+            },
+            {
+              "datetime": "2026-11-15T18:00",
+              "note": "In-game test of LootBodies (3 Thalmor bodies): dry run and real run matched, unloaded cells skipped. Defects fixed in fix/FEAT-218-lootbodies: worn gear on bodies is now offered (includeEquipped, default true for bodies); hidden items (no name, value -1, non-playable armor/weapons/ammo) are never offered; values clamped at 0; dry run reports bodiesLooted 0, plus bodiesInRange/bodiesWithLoot and a message when no bodies are in range or nothing matched."
             }
           ],
           "targetRelease": "1.3"
