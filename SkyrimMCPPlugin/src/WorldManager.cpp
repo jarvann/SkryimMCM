@@ -13,6 +13,39 @@ namespace SkyrimMCP::WorldManager {
 
     using json = nlohmann::json;
 
+    namespace {
+        const char* WeatherCategory(const RE::TESWeather* weather) {
+            const auto flags = weather->data.flags;
+            if (flags.all(RE::TESWeather::WeatherDataFlag::kSnow)) return "snow";
+            if (flags.all(RE::TESWeather::WeatherDataFlag::kRainy)) return "rain";
+            if (flags.all(RE::TESWeather::WeatherDataFlag::kCloudy)) return "cloudy";
+            if (flags.all(RE::TESWeather::WeatherDataFlag::kPleasant)) return "clear";
+            return "other";
+        }
+
+        // Most weathers have no display name, and editor IDs are only kept in memory when a
+        // mod such as powerofthree's Tweaks loads them. "name" is never blank: display name,
+        // then editor ID, then "<category> weather <formId>".
+        json DescribeWeather(RE::TESWeather* weather) {
+            json w;
+            const auto formId = std::format("{:08X}", weather->GetFormID());
+            const char* displayName = weather->GetName();
+            const char* editorId = weather->GetFormEditorID();
+            const char* category = WeatherCategory(weather);
+
+            w["formId"] = formId;
+            w["category"] = category;
+            if (displayName && displayName[0]) w["displayName"] = displayName;
+            if (editorId && editorId[0]) w["editorId"] = editorId;
+            if (auto* file = weather->GetFile(0)) w["mod"] = file->fileName;
+
+            if (displayName && displayName[0]) w["name"] = displayName;
+            else if (editorId && editorId[0]) w["name"] = editorId;
+            else w["name"] = std::format("{} weather {}", category, formId);
+            return w;
+        }
+    }
+
     json Teleport(const std::string& cellId) {
         // coc is kept as console command — MoveTo_Impl is private, and coc handles
         // all cell loading/transition logic (loading screens, cell attach, navmesh)
@@ -28,11 +61,15 @@ namespace SkyrimMCP::WorldManager {
 
         json result;
         if (sky->currentWeather) {
-            result["current"] = sky->currentWeather->GetName();
-            result["currentFormId"] = std::format("{:08X}", sky->currentWeather->GetFormID());
+            auto current = DescribeWeather(sky->currentWeather);
+            result["current"] = current["name"];
+            result["currentFormId"] = current["formId"];
+            result["currentWeather"] = current;
         }
         if (sky->lastWeather) {
-            result["previous"] = sky->lastWeather->GetName();
+            auto previous = DescribeWeather(sky->lastWeather);
+            result["previous"] = previous["name"];
+            result["previousWeather"] = previous;
         }
         result["weatherPct"] = sky->currentWeatherPct;
 
@@ -100,8 +137,9 @@ namespace SkyrimMCP::WorldManager {
         if (!weather) return {{"error", "Weather not found: " + weatherFormIdOrName}};
 
         sky->ForceWeather(weather, true);
-        return {{"set", true}, {"weather", weather->GetName()},
-                {"formId", std::format("{:08X}", weather->GetFormID())}};
+        auto described = DescribeWeather(weather);
+        return {{"set", true}, {"weather", described["name"]}, {"formId", described["formId"]},
+                {"category", described["category"]}};
     }
 
     json ListWeathers() {
@@ -113,26 +151,8 @@ namespace SkyrimMCP::WorldManager {
         for (auto* form : dataHandler->GetFormArray<RE::TESWeather>()) {
             if (!form) continue;
             try {
-                std::string name = form->GetName() ? form->GetName() : "";
-                std::string editorId = form->GetFormEditorID() ? form->GetFormEditorID() : "";
-
-                json w;
-                w["formId"] = std::format("{:08X}", form->GetFormID());
-                if (!name.empty()) w["name"] = name;
-                if (!editorId.empty()) w["editorId"] = editorId;
-
-                // Classify from actual weather data flags (not editor IDs)
-                auto flags = form->data.flags;
-                if (flags.all(RE::TESWeather::WeatherDataFlag::kSnow)) w["category"] = "snow";
-                else if (flags.all(RE::TESWeather::WeatherDataFlag::kRainy)) w["category"] = "rain";
-                else if (flags.all(RE::TESWeather::WeatherDataFlag::kCloudy)) w["category"] = "cloudy";
-                else if (flags.all(RE::TESWeather::WeatherDataFlag::kPleasant)) w["category"] = "clear";
-                else w["category"] = "other";
-
+                json w = DescribeWeather(form);  // category comes from the weather's data flags
                 w["windSpeed"] = form->data.windSpeed;
-
-                auto* file = form->GetFile(0);
-                if (file) w["mod"] = file->fileName;
 
                 weathers.push_back(w);
             } catch (...) {
