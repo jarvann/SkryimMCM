@@ -171,15 +171,19 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Poll for recent game events. Returns all events since last poll. " +
+    [Description("Poll for recent game events, oldest first. " +
         "Events: combat, death, quest_stage, quest_start_stop, location_change, cell_loaded, " +
         "inventory_change, equip, hit, spell_cast, activate, open_close, sleep_ended, wait_ended, " +
-        "fast_travel, lock_changed, stat_change. " +
-        "Framework quest noise is auto-muted (not dropped). Response includes 'muted' summary showing " +
-        "suppressed event counts — check mutedTotal to know if framework quests are cycling. " +
+        "fast_travel, lock_changed, stat_change, and quest_churn. " +
+        "Returns at most maxEvents (default 50; 0 = all). Events that don't fit are kept for the next poll: " +
+        "'remaining' says how many are waiting. " +
+        "A quest that starts and stops 3 or more times in one batch is collapsed into one quest_churn event " +
+        "(starts, stops, runningNow); set collapseQuestChurn=false to see each one. " +
+        "Known framework quests are muted (counted, not listed): see 'muted' and mutedTotal. " +
         "For focused polling, pass eventTypes (comma-separated types to include) " +
-        "or excludeTypes (comma-separated types to exclude).")]
-    public async Task<object> PollEvents(string? eventTypes = null, string? excludeTypes = null)
+        "or excludeTypes (comma-separated types to exclude); these filter events as the game hands them over.")]
+    public async Task<object> PollEvents(string? eventTypes = null, string? excludeTypes = null,
+        int maxEvents = 50, bool collapseQuestChurn = true)
     {
         var parms = new JsonObject();
         if (!string.IsNullOrEmpty(eventTypes))
@@ -197,7 +201,21 @@ public class UtilityTools : ToolBase
             parms["excludeTypes"] = types;
         }
         var data = await _pipe.SendRequestAsync("poll_events", parms);
-        return DeserializeResponse(data);
+
+        var (events, remaining, collapsed, dropped) =
+            EventShaper.Shared.Take(data?["events"]?.AsArray(), maxEvents, collapseQuestChurn);
+
+        var result = new JsonObject
+        {
+            ["events"] = events,
+            ["count"] = events.Count,
+            ["remaining"] = remaining,
+            ["mutedTotal"] = data?["mutedTotal"]?.DeepClone() ?? 0,
+        };
+        if (data?["muted"] is JsonNode muted) result["muted"] = muted.DeepClone();
+        if (collapsed.Count > 0) result["collapsedQuests"] = collapsed;
+        if (dropped > 0) result["droppedOldest"] = dropped;
+        return DeserializeResponse(result);
     }
 
     [McpServerTool]
