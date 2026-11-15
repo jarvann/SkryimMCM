@@ -43,6 +43,7 @@ public sealed class EventShaper
             if (collapseQuestChurn)
             {
                 CollapseChurn(_backlog, collapsed);
+                CollapseStageChurn(_backlog, collapsed);
                 CollapseBursts(_backlog, "lock_changed", collapsed);
             }
 
@@ -117,6 +118,60 @@ public sealed class EventShaper
         if (remove.Count == 0) return;
 
         var result = new List<JsonNode>(events.Count - remove.Count + replaceAt.Count);
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (replaceAt.TryGetValue(i, out var summary)) result.Add(summary);
+            else if (!remove.Contains(i)) result.Add(events[i]);
+        }
+        events.Clear();
+        events.AddRange(result);
+    }
+
+    /// <summary>
+    /// A quest whose stage changes 3 or more times in one batch (a framework quest flapping
+    /// between stages) becomes one quest_stage_churn event with the stages it went through.
+    /// </summary>
+    internal static void CollapseStageChurn(List<JsonNode> events, JsonArray collapsedSummary)
+    {
+        var byQuest = new Dictionary<string, List<int>>();
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (EventName(events[i]) != "quest_stage") continue;
+            var quest = events[i]["data"]?["questFormId"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(quest)) continue;
+            if (!byQuest.TryGetValue(quest, out var list)) byQuest[quest] = list = new List<int>();
+            list.Add(i);
+        }
+
+        var remove = new HashSet<int>();
+        var replaceAt = new Dictionary<int, JsonNode>();
+        foreach (var (quest, indexes) in byQuest)
+        {
+            if (indexes.Count < ChurnThreshold) continue;
+            var stages = new SortedSet<int>();
+            foreach (var i in indexes)
+                if (events[i]["data"]?["stage"] is JsonValue v && v.TryGetValue<int>(out var st)) stages.Add(st);
+            var last = events[indexes[^1]];
+            var name = last["data"]?["questName"]?.GetValue<string>() ?? quest;
+            replaceAt[indexes[^1]] = new JsonObject
+            {
+                ["type"] = "event",
+                ["event"] = "quest_stage_churn",
+                ["data"] = new JsonObject
+                {
+                    ["questFormId"] = quest,
+                    ["questName"] = name,
+                    ["changes"] = indexes.Count,
+                    ["stagesSeen"] = new JsonArray(stages.Select(x => (JsonNode)x).ToArray()),
+                    ["lastStage"] = last["data"]?["stage"]?.DeepClone(),
+                },
+            };
+            foreach (var i in indexes) remove.Add(i);
+            collapsedSummary.Add(new JsonObject { ["questFormId"] = quest, ["questName"] = name, ["stageEvents"] = indexes.Count });
+        }
+        if (remove.Count == 0) return;
+
+        var result = new List<JsonNode>(events.Count);
         for (var i = 0; i < events.Count; i++)
         {
             if (replaceAt.TryGetValue(i, out var summary)) result.Add(summary);

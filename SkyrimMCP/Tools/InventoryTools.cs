@@ -122,7 +122,8 @@ public class InventoryTools : ToolBase
 
     [McpServerTool]
     [Description("Move every item of some categories from one container or actor to another in one call. " +
-        "from and to: a refId, 'player', or 'crosshair' (what the player is looking at); defaults from=player, to=crosshair. " +
+        "from and to: a refId, 'player', 'crosshair' (what the player is looking at, or the open container while a container menu is up), " +
+        "or 'container' (the open container only); defaults from=player, to=crosshair. " +
         "Example: store smithing materials: categories='smithing', from='player', to='crosshair'. " +
         "categories (comma-separated): " + CategoryList + ". " +
         "minValue skips cheaper items. Equipped items, favorites and quest items stay unless includeEquipped / includeFavorites / " +
