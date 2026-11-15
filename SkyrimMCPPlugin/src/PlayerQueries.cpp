@@ -530,7 +530,9 @@ namespace SkyrimMCP::PlayerQueries {
                 hp["name"] = part->GetName() ? part->GetName() : "";
                 const auto t = std::to_underlying(part->type.get());
                 hp["type"] = t;
-                if (t >= 0 && t < static_cast<int>(std::size(typeNames))) hp["typeName"] = typeNames[t];
+                // Types above 6 come from mods (extra head part slots); label them rather than drop the field.
+                hp["typeName"] = (t >= 0 && t < static_cast<int>(std::size(typeNames))) ? std::string(typeNames[t])
+                                                                                          : std::format("other ({})", t);
                 if (const char* editorId = part->GetFormEditorID(); editorId && editorId[0]) hp["editorId"] = editorId;
                 if (auto* file = part->GetFile(0)) hp["mod"] = file->fileName;
                 if (t >= 0 && t < static_cast<int>(std::size(choices))) {

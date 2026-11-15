@@ -232,7 +232,8 @@ public class UtilityTools : ToolBase
         "Returns at most maxEvents (default 50; 0 = all). Events that don't fit are kept for the next poll: " +
         "'remaining' says how many are waiting. " +
         "A quest that starts and stops 3 or more times in one batch is collapsed into one quest_churn event " +
-        "(starts, stops, runningNow); set collapseQuestChurn=false to see each one. " +
+        "(starts, stops, runningNow), and 10 or more lock_changed events (doors as a cell loads) into one lock_changed_burst " +
+        "(count and the first 5); set collapseQuestChurn=false to see each one. " +
         "Known framework quests are muted (counted, not listed): see 'muted' and mutedTotal. " +
         "For focused polling, pass eventTypes (comma-separated types to include) " +
         "or excludeTypes (comma-separated types to exclude); these filter events as the game hands them over.")]
