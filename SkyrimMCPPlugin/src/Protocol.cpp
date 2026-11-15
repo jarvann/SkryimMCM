@@ -234,6 +234,29 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [command]() { return GameInterface::ExecuteConsoleCommand(command); });
         };
 
+        // FEAT-226: hair colour and skin tone with the game's own data (no RaceMenu needed)
+        registry["get_colors"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            return GameThread(id, [refId]() { return GameInterface::GetColors(refId); });
+        };
+        registry["list_hair_colors"] = [](const std::string& id, const json& params) {
+            bool all = params.value("includeNonPlayable", false);
+            return GameThread(id, [all]() { return GameInterface::ListHairColors(all); });
+        };
+        registry["set_hair_color"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::string color = params.value("color", "");
+            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump() + "\n";
+            return GameThread(id, [refId, color]() { return GameInterface::SetHairColor(refId, color); });
+        };
+        registry["set_skin_tone"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::string color = params.value("color", "");
+            bool refresh = params.value("refresh", false);
+            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump() + "\n";
+            return GameThread(id, [refId, color, refresh]() { return GameInterface::SetSkinTone(refId, color, refresh); });
+        };
+
         // FEAT-205: {"items": ["0001397E", {"formId": "...", "hand": "left"}], "refId": "", "unequip": false}
         registry["equip_items"] = [](const std::string& id, const json& params) {
             json items = params.value("items", json::array());
