@@ -2,6 +2,49 @@
 
 Based on a comprehensive analysis of CommonLibSSE-NG's API surface (~200+ classes, 50+ singletons).
 
+## Release plan (decided 2026-11-15)
+
+Each open item in `project_work_items.json` has a `targetRelease` field: `1.3`, `1.3-stretch`, `2.0` or `parked`.
+
+- **1.3** improves SkyLink as it is: Claude Desktop, one connection to the game, the same Claude Desktop config. Nothing players or fork authors rely on changes.
+- **2.0** puts the AI inside the game: new background processes, pipe protocol v2 (push events, several clients at once) and many more tools. That breaks fork add-ons and Claude Desktop configs, so it gets a major version.
+- **1.4** takes whatever slips out of 1.3.
+
+### 1.3: fixes, appearance, safety
+
+| Area | Items |
+|------|-------|
+| Player-reported bugs | BUG-013 plugin-not-loaded error, BUG-014 blank weather name, BUG-015 magicka maximum, BUG-016 "unarmed" as an item, BUG-012 GOG (waiting on details) |
+| Usability | FEAT-205 equip/unequip tools, FEAT-210 wait for Skyrim instead of failing |
+| Responses | INFRA-015 smaller event pages, INFRA-016 load-order paging, INFRA-017 menu-state wording, INFRA-018 reconnect test |
+| Appearance | FEAT-226 hair and skin colour (no RaceMenu), FEAT-227 RaceMenu integration, FEAT-208 appearance writes, FEAT-209 slider and part indexes |
+| Blueprint, first half | FEAT-206 portable form IDs, FEAT-207 one-call apply with dry run; FEAT-121 full apply as a stretch |
+| Crash safety | FEAT-220 SEH around every game-thread task, FEAT-219 crash recorder, FEAT-217 crash-log reader |
+| Setup | INFRA-020 configurable paths (MO2, Wabbajack), INFRA-006 config file |
+| Small additions | FEAT-218 loot by category, FEAT-221 guidebook, FEAT-224 notes and goals, FEAT-150 Papyrus stats |
+| Housekeeping | INFRA-019 scripted smoke test (build early); test FEAT-131 volume, FEAT-133 screenshots, INFRA-014 form search |
+
+Estimate: 50-80 human hours; Claude 4-6 hours and 1.5-2.5M tokens.
+
+### 2.0: the AI inside Skyrim
+
+| Area | Items |
+|------|-------|
+| In-game AI | FEAT-212 text chat, FEAT-213 chat window, FEAT-214 voice; other providers including Ollama |
+| Protocol v2 (breaking) | INFRA-008 push events, INFRA-009 several clients at once |
+| On screen | FEAT-225 live quest tracker, FEAT-223 waypoints, FEAT-112 map markers, FEAT-222 resource alerts |
+| AI acting in the world | FEAT-215 NPC orders, FEAT-216 player autopilot, FEAT-122 spawn NPC from blueprint, FEAT-125 scripted scenes, FEAT-120 quest completion scripts |
+| Plugin framework | INFRA-010 detect SKSE plugins, FEAT-203/204 per-plugin tools (with generic list-and-run tools, since Claude Desktop only shows new tools in a new chat) |
+| Runtime creators | FEAT-126 spells, FEAT-127 enchantments (saves must keep the new forms) |
+
+Estimate: 150-250 human hours; Claude 12-18 hours and 4-6M tokens. Open decision: KringleKiller's fork already has the in-game client, quest tracker, waypoints and notes. Take their code, build our own, or build it with them.
+
+### Parked
+
+FEAT-013 teleport without console commands, FEAT-015 force a new game, FEAT-113 journal, INFRA-005 VPrint hook, INFRA-007 caching.
+
+---
+
 ## Current State (v0.2)
 
 ### Working (Direct Engine API)
