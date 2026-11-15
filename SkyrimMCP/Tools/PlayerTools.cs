@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -13,25 +14,38 @@ public class PlayerTools : ToolBase
 {
     public PlayerTools(IPipeClient pipe) : base(pipe) { }
 
+    // Which server build is answering: its version, when its DLL was written, and where it runs from.
+    private static readonly string ServerPath = typeof(PlayerTools).Assembly.Location;
+    private static readonly string? ServerVersion = typeof(PlayerTools).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0];
+    private static readonly string? ServerBuilt = File.Exists(ServerPath)
+        ? File.GetLastWriteTimeUtc(ServerPath).ToString("yyyy-MM-dd HH:mm:ss") + " UTC"
+        : null;
+
     [McpServerTool]
-    [Description("Check if Skyrim is running and the SKSE MCP plugin is connected")]
+    [Description("Check if Skyrim is running and the SKSE MCP plugin is connected. Also reports which plugin and server builds " +
+        "are loaded (version, build time, server path), so a stale build is easy to spot.")]
     public async Task<object> CheckConnection()
     {
         try
         {
-            // Plugin 1.1.0+ reports its own version and the game runtime in the ping reply.
+            // Plugin 1.1.0+ reports its version and the game runtime; 1.2.0+ also its link time.
             var info = await _pipe.SendRequestAsync("ping");
             return new
             {
                 connected = true,
                 message = "Connected to Skyrim via SKSE plugin",
                 pluginVersion = info?["pluginVersion"]?.GetValue<string>(),
-                gameVersion = info?["gameVersion"]?.GetValue<string>()
+                pluginBuilt = info?["pluginBuilt"]?.GetValue<string>(),
+                gameVersion = info?["gameVersion"]?.GetValue<string>(),
+                serverVersion = ServerVersion,
+                serverBuilt = ServerBuilt,
+                serverPath = ServerPath
             };
         }
         catch (Exception ex)
         {
-            return new { connected = false, message = ex.Message };
+            return new { connected = false, message = ex.Message, serverVersion = ServerVersion, serverBuilt = ServerBuilt, serverPath = ServerPath };
         }
     }
 

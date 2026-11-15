@@ -1,4 +1,5 @@
 #include "Protocol.h"
+#include "BuildInfo.h"
 #include "EventSystem.h"
 #include "GameInterface.h"
 #include "TaskQueue.h"
@@ -53,7 +54,8 @@ namespace SkyrimMCP::Protocol {
         registry["ping"] = [](const std::string& id, const json&) {
             // Answered on the pipe thread, so it still works when game-thread calls do not.
             json info;
-            info["pluginVersion"] = "1.1.0";
+            info["pluginVersion"] = SKYLINK_VERSION_STRING;
+            info["pluginBuilt"] = BuildInfo::GetBuildTime();
             info["gameVersion"] = REL::Module::get().version().string(".");
             return MakeResponse(id, true, info).dump() + "\n";
         };

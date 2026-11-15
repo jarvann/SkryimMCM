@@ -32,3 +32,4 @@ Thumbs.db
 *.cer
 *.snk
 papyrus_catalog.json
+.env
