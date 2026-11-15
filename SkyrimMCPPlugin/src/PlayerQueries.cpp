@@ -235,24 +235,33 @@ namespace SkyrimMCP::PlayerQueries {
             }
         }
 
-        // Wielded weapons/spells
-        auto* rightHand = player->GetEquippedObject(false);
-        if (rightHand) {
+        // Wielded weapons/spells. An empty hand holds the game's "Unarmed" weapon (000001F4),
+        // which has no name; report it as empty instead of a blank item (BUG-016).
+        constexpr RE::FormID kUnarmedWeapon = 0x000001F4;
+        auto addHand = [&](const char* slotName, RE::TESForm* form) {
+            if (form && seen.count(form->GetFormID())) return;  // a shield, already listed under "shield"
             json e;
-            e["slot"] = "rightHand";
-            e["formId"] = std::format("{:08X}", rightHand->GetFormID());
-            e["name"] = rightHand->GetName();
+            e["slot"] = slotName;
+            if (!form || form->GetFormID() == kUnarmedWeapon) {
+                e["empty"] = true;
+                e["name"] = "(empty hand)";
+            } else {
+                e["formId"] = std::format("{:08X}", form->GetFormID());
+                const char* name = form->GetName();
+                e["name"] = (name && name[0]) ? name : std::format("{:08X}", form->GetFormID());
+                switch (form->GetFormType()) {
+                    case RE::FormType::Weapon: e["type"] = "weapon"; break;
+                    case RE::FormType::Spell: e["type"] = "spell"; break;
+                    case RE::FormType::Armor: e["type"] = "shield"; break;
+                    case RE::FormType::Light: e["type"] = "torch"; break;
+                    case RE::FormType::Scroll: e["type"] = "scroll"; break;
+                    default: break;
+                }
+            }
             equipped.push_back(e);
-        }
-
-        auto* leftHand = player->GetEquippedObject(true);
-        if (leftHand) {
-            json e;
-            e["slot"] = "leftHand";
-            e["formId"] = std::format("{:08X}", leftHand->GetFormID());
-            e["name"] = leftHand->GetName();
-            equipped.push_back(e);
-        }
+        };
+        addHand("rightHand", player->GetEquippedObject(false));
+        addHand("leftHand", player->GetEquippedObject(true));
 
         return {{"equipped", equipped}};
     }
