@@ -33,3 +33,7 @@ Thumbs.db
 *.snk
 papyrus_catalog.json
 .env
+
+# Local build output and saved Nexus comment threads (other people's posts)
+release/
+nexus_comments_*.md

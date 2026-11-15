@@ -1,0 +1,150 @@
+[size=6]SkyLink AI[/size]
+
+SkyLink AI is an SKSE plugin and MCP server that gives AI assistants direct, real-time access to Skyrim's engine. Ask Claude to check your inventory, change the weather, play an animation, look up a quest, or spawn an enemy — and it just does it, live in your game.
+
+[size=5]What this is NOT... and what it could be[/size]
+
+This is NOT a replacement for in-game AI packages for NPCs or Creatures. This is NOT an AI that plays the game for you. This is NOT something that requires an expensive AI subscription.
+
+Think of SkyLink AI as a [b]Help Desk[/b] for your game. Ask the AI what it can do, how it can help you. Play around with it.
+
+[size=4]FAQ[/size]
+
+[b]Does this cost money / burn tokens?[/b]
+No paid subscription required. Works with free Claude accounts, local models via Ollama, or any MCP-compatible AI client. You can run a lightweight local AI on your own hardware and pay nothing.
+
+[b]Does this control NPCs or replace their AI?[/b]
+No. It doesn't modify NPC AI packages, dialogue, or behavior. It's a utility — it reads and acts on game state through the SKSE engine. You can manage idle animations, move NPCs, check their stats, but you're not replacing Radiant AI.
+
+[b]Can this crash my game?[/b]
+The tool includes a safety checker that detects risky states (loading, kill moves, saves) before executing commands. Teleporting during active combat can occasionally cause crashes from animation mods like OAR — the same thing that happens with fast travel or console coc commands.
+
+[size=5]Best Use Cases[/size]
+
+[list]
+[*]"I'm stuck on quest X, can you figure out why and help me step around the issue without making any game-breaking changes?"[/*]
+[*]"There's an enemy spawned near me but I can't find it — I think two mods are overlapping and the NPC is behind a wall. Can you find it and teleport it in front of me?"[/*]
+[*]"I'm tired of going to 10 different merchants. Can you increase Belethor's gold to 1,000,000 so I can sell everything to him?"[/*]
+[*]"I don't see Lydia anymore, did she die? Can you teleport her corpse to me and resurrect her?"[/*]
+[*]"Kill all the draugr in this room but leave the Dragon Priest for me."[/*]
+[*]"This music is stuck in a loop — is it tied to a quest? Can you fix it or change the song?"[/*]
+[*]"What SKSE plugins do I have installed, and what can you do with them?"[/*]
+[*]"The game CTD when I walked into XYZCell. Here's the crashlog — can you figure out what caused it?"[/*]
+[*]"Move all the smithing materials to the chest I'm looking at."[/*]
+[*]"Collect only the interesting loot and gold from the fight I just had."[/*]
+[/list]
+
+[size=5]What is MCP?[/size]
+
+The [url=https://modelcontextprotocol.io/]Model Context Protocol[/url] is an open standard that lets AI assistants call external tools. SkyLink AI exposes 74 Skyrim tools through MCP, so Claude Desktop (or any MCP-compatible client) can read and modify your game state through natural conversation.
+
+[size=5]What Can It Do? (74 Tools)[/size]
+
+[b]Player[/b]
+[list]
+[*]Stats, skills, level, perks, spells, shouts, active effects[/*]
+[*]Inventory management (view, add, remove, equip)[/*]
+[*]Appearance and faction membership[/*]
+[*]Character blueprint export (full build snapshot to JSON)[/*]
+[*]God mode, immortal mode, collision toggle[/*]
+[/list]
+
+[b]World[/b]
+[list]
+[*]Weather control, time of day[/*]
+[*]Teleportation, cell info, nearby objects[/*]
+[*]Doors, locks, containers, loot scanning[/*]
+[*]Map marker discovery[/*]
+[*]Merchant inventories and bounties[/*]
+[/list]
+
+[b]NPCs[/b]
+[list]
+[*]Nearby NPC detection, detailed info, crosshair targeting[/*]
+[*]Follower management and detection state[/*]
+[*]Play/stop idle animations (native API — works with all mods including ESL-flagged plugins)[/*]
+[*]Move, kill, set relationships[/*]
+[/list]
+
+[b]Quests[/b]
+[list]
+[*]Quest info, stages, objectives, aliases, quest items[/*]
+[*]Set stage, start/stop/complete quests[/*]
+[*]Quest variable reading[/*]
+[/list]
+
+[b]Combat[/b]
+[list]
+[*]Combat state, damage stats, threat assessment[/*]
+[*]Real-time hit events with attacker/target role identification (player, follower, other)[/*]
+[/list]
+
+[b]Utility[/b]
+[list]
+[*]Form search engine (replaces the console help command — searches 30+ form types)[/*]
+[*]Console command execution with output capture[/*]
+[*]Papyrus VM bridge — call any mod's Papyrus functions at runtime[/*]
+[*]Music playback and volume control[/*]
+[*]Screenshot capture, save/load game[/*]
+[*]Event system (17 event types: combat, death, quests, location changes, and more)[/*]
+[*]SKSE plugin config read/write (SmoothCam, po3_Tweaks, etc.)[/*]
+[*]Load order and mod detection[/*]
+[/list]
+
+[size=5]Coming in v2[/size]
+
+[list]
+[*][b]Character Blueprint Import[/b] — Export your Dragonborn's full build (levels, perks, spells, appearance, equipment) and import it into a new save, or as an NPC/Follower[/*]
+[*][b]Dynamic NPC Creation[/b] — Build a follower from a blueprint, with appearance, stats, and equipment, directly from inside the game[/*]
+[*][b]Map Marker Management[/b] — Individual marker discovery and fast travel control[/*]
+[*][b]Plugin Routing[/b] — Detect installed mods and adapt available tools automatically[/*]
+[/list]
+
+[size=5]Requirements[/size]
+
+[list]
+[*]Skyrim SE or AE — Steam 1.7.104 (SKSE64 2.3.1), 1.6.1130–1.6.1170, or SE 1.5.97[/*]
+[*][url=https://skse.silverlock.org/]SKSE64[/url][/*]
+[*][url=https://www.nexusmods.com/skyrimspecialedition/mods/32444]Address Library for SKSE[/url][/*]
+[*][url=https://dotnet.microsoft.com/download/dotnet/10.0].NET 10 Runtime[/url][/*]
+[*][url=https://claude.ai/download]Claude Desktop[/url] (or any MCP-compatible AI client)[/*]
+[/list]
+
+[size=5]Installation[/size]
+
+1. Extract the Data folder into your Skyrim directory (or install via MO2 / Vortex)
+2. Install .NET 10 Runtime if not already installed
+3. Add the following to your Claude Desktop config (%APPDATA%\Claude\claude_desktop_config.json):
+
+[code]{
+  "mcpServers": {
+    "skyrim": {
+      "command": "dotnet",
+      "args": ["<SKYRIM_PATH>\\Data\\SKSE\\Plugins\\SkyLinkAI_Server\\SkyrimMCP.dll"]
+    }
+  }
+}[/code]
+
+4. Launch Skyrim via SKSE, open Claude Desktop, and start talking to your game.
+
+[size=4]How It Works[/size]
+
+[code]Claude Desktop <--MCP/stdio--> .NET MCP Server <--named pipe--> SKSE Plugin (inside Skyrim)[/code]
+
+The SKSE plugin runs inside Skyrim's process and exposes game state over a named pipe. The .NET MCP server translates between Claude's MCP protocol and the plugin. All game interactions use native CommonLibSSE-NG API calls wherever possible — only 3 operations fall back to console commands where no native API exists.
+
+[size=4]Credits & Acknowledgments[/size]
+
+This mod would not be possible without the incredible work of the Skyrim modding community:
+
+[list]
+[*][url=https://skse.silverlock.org/]SKSE[/url] — Ian Patterson (ianpatt), Stephen Abel (behippo), and Paul Shortman (plb) for the Skyrim Script Extender[/*]
+[*][url=https://github.com/alandtse/CommonLibVR/tree/ng]CommonLibSSE-NG[/url] — alandtse fork (Skyrim 1.7 support), originally by CharmedBaryon, the native API library that powers nearly every game interaction in this mod[/*]
+[*][url=https://github.com/VersuchDrei/ConsoleUtilSSE]ConsoleUtilSSE[/url] — by VersuchDrei (MIT License), compile-and-run approach for console command integration[/*]
+[*][url=https://github.com/Ryan-rsm-McKenzie]Ryan McKenzie[/url] — for the original CommonLibSSE that started it all[/*]
+[*][url=https://anthropic.com]Anthropic[/url] — for Claude and the Model Context Protocol specification[/*]
+[/list]
+
+[size=4]Source Code[/size]
+
+This mod is open source: [url=https://github.com/jarvann/SkryimMCM]GitHub Repository[/url]

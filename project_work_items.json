@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-14",
+  "lastUpdated": "2026-11-15",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 131,
-    "completed": 83,
-    "completedPartial": 3,
-    "implementedUntested": 2,
+    "totalItems": 153,
+    "completed": 105,
+    "completedPartial": 2,
+    "implementedUntested": 3,
     "inProgress": 0,
-    "planned": 60,
-    "bugs": 17
+    "planned": 43,
+    "bugs": 18
   },
   "phases": [
     {
@@ -298,23 +298,6 @@
             {
               "datetime": "2026-03-21T17:30",
               "note": "Closed as external \u2014 not our bug. Recommendation: disable po3_SaveUnbaker when switching saves."
-            }
-          ]
-        },
-        {
-          "id": "BUG-011",
-          "type": "bug",
-          "status": "new",
-          "title": "call_papyrus_function \u2014 DispatchStaticCall fails on all functions",
-          "description": "CallPapyrusFunction errors immediately on all tested functions (StorageUtil.debug_GetIntObjectCount \u2014 zero args, returns int). ConsoleUtil.ReadMessage caused a game freeze (that function blocks waiting for console input \u2014 red herring, not a VM crash). The catalog scan and GetScriptFunctions both work correctly, so the issue is in the DispatchStaticCall response path. Either the call returns a non-success code or the C# side isn't deserializing the Papyrus return value correctly. Suggest adding plugin-side logging around the dispatch to capture the error code from SkyrimVM::DispatchStaticCall.",
-          "history": [
-            {
-              "datetime": "2026-03-23T12:00",
-              "note": "Reported: call_papyrus_function fails immediately on StorageUtil.debug_GetIntObjectCount (no args, int return). ConsoleUtil.ReadMessage froze game \u2014 that function blocks on console input, not a VM issue. GetPapyrusCatalog (166 scripts) and GetScriptFunctions both work. DispatchStaticCall or C# return value marshaling is broken."
-            },
-            {
-              "datetime": "2026-11-12T22:00",
-              "note": "1.1.0 smoke test on Skyrim 1.7.104: Utility.GetCurrentGameTime dispatched and returned 0.626, and a call with a visible in-game effect was confirmed. Object-returning functions not tested. Duplicate BUG-011 entry (one 'new', one 'complete') still needs reconciling."
             }
           ]
         },
@@ -1561,6 +1544,132 @@
           ]
         }
       ]
+    },
+    {
+      "phase": 14,
+      "name": "Backlog \u2014 community requests and in-game AI",
+      "priority": "medium",
+      "status": "planned",
+      "items": [
+        {
+          "id": "FEAT-212",
+          "type": "feature",
+          "status": "planned",
+          "title": "In-game AI chat, phase 1: text chat with any provider",
+          "description": "Talk to an AI from inside Skyrim, no second screen or alt-tab. New out-of-process SkyLinkBridge.exe (C#, Microsoft.Extensions.AI) started by the plugin, reached over a new pipe \\\\.\\pipe\\SkyLinkChat, using SkyLink's MCP tools. Providers: one OpenAI-compatible adapter (OpenAI, Gemini, OpenRouter, xAI, Ollama, LM Studio) plus Anthropic native, Claude Code CLI and Codex CLI. MVP UI is a console 'ai' command. Keys entered through 'SkyLinkBridge.exe setup' and stored with DPAPI; MCM Helper page with a Test connection button. Desktop chat apps (Claude Desktop, ChatGPT) cannot receive prompts from another program, so they are not an option. Needs INFRA-009 (multi-client pipe) first. Estimate: 56-80 human hours; about 4-5 h and 1.35-1.8M tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Requested on Nexus: a window inside Skyrim (ShiroFozy), alt-tab minimises the game (Akatsuki2534), other providers, a free client or Ollama (snowolf33, Adminoir, skaterman888). Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
+            }
+          ],
+          "priority": "high"
+        },
+        {
+          "id": "FEAT-213",
+          "type": "feature",
+          "status": "planned",
+          "title": "In-game AI chat, phase 2: chat window",
+          "description": "Replace the console command with an in-game window: ImGui through SKSE Menu Framework, or PrismaUI. Check both support Skyrim 1.7.104 first. Estimate: 16-30 human hours; about 1-1.5 h and 400-600k tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Follows FEAT-212. Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-214",
+          "type": "feature",
+          "status": "planned",
+          "title": "In-game AI chat, phase 3: voice",
+          "description": "Push-to-talk speech input (local Whisper via Whisper.net, or Windows speech recognition) and spoken replies (SAPI, Piper or ElevenLabs), reusing code from claude-talkback-mcp. Estimate: 27-40 human hours; about 1.5 h and 500-700k tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Follows FEAT-213. Scoped in docs/in-game-ai-scope.md (14 Nov 2026)."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-215",
+          "type": "feature",
+          "status": "planned",
+          "title": "NPC director tools",
+          "description": "Let the AI give NPCs orders rather than play them in real time (LLM latency rules that out): package overrides through PapyrusUtil ActorUtil.AddPackageOverride, StartCombat, PathToReference, Say(Topic). Dialogue stays with Mantella or CHIM. Estimate: 10-16 human hours; about 45 min and 250-350k tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Requested on Nexus: AI control of NPCs (AzurasGuardian, nesslowland, HatchetTazz)."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-216",
+          "type": "feature",
+          "status": "planned",
+          "title": "Player autopilot (commander model)",
+          "description": "The AI sets goals and the game's own AI carries them out: Game.SetPlayerAIDriven plus packages (travel, follow, fight, sandbox), checked every few seconds. Not real-time play. Estimate: 20-35 human hours; about 1.5 h and 450-650k tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Requested on Nexus: let the AI play the game."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-019",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "Scripted in-game test harness",
+          "description": "Run a fixed list of tool calls against a known save (for example Save20 'QASmoke') and compare the results with expected values, so each build gets the same smoke test without a manual session. Estimate: 12-20 human hours; about 1 h and 300-450k tokens for Claude.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Came out of the 1.2.0 test sessions, where every check was run by hand."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-217",
+          "type": "feature",
+          "status": "planned",
+          "title": "Crash-log reader",
+          "description": "Tool that finds and returns the newest crash log (Crash Logger SSE / NetScriptFramework, under My Games\\Skyrim Special Edition\\SKSE) so the AI can troubleshoot crashes in large load orders without the player copying files by hand.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Asked on Nexus by AlexiousITA (troubleshooting crashes and slowdowns); Jarvann's reply named crash-log troubleshooting as a main use case."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-218",
+          "type": "feature",
+          "status": "planned",
+          "title": "Loot and item transfer by category",
+          "description": "Bulk item moves the AI can do in one call: move all items of a category (for example smithing materials) to the container under the crosshair, or collect only valuable loot and gold from nearby bodies after a fight. Builds on ScanLoot and the container tools.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "From Jarvann's Nexus reply listing examples ('Move all the smithing materials to the chest...', 'Collect only the interesting loot and gold from the fight')."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-020",
+          "type": "infrastructure",
+          "status": "planned",
+          "title": "Configurable file paths for Wabbajack and MO2 lists",
+          "description": "Let players set the paths SkyLink uses for INI and config files (and the Data folder) when a Wabbajack or MO2 setup uses nonstandard locations, instead of relying on junctions.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Asked on Nexus by Maruzarix (18 May 2026)."
+            }
+          ]
+        }
+      ]
     }
   ],
   "infrastructure": [
@@ -1602,19 +1711,14 @@
         {
           "datetime": "2026-03-22T22:45",
           "note": "Requested after token usage analysis. Sessions consuming 300-400K tokens largely due to get_known_spells (~35K tokens), get_perks (~26K tokens), and get_inventory (~12K tokens) being loaded in full even when only metadata needed."
-        }
-      ]
-    },
-    {
-      "id": "INFRA-012",
-      "type": "infrastructure",
-      "status": "planned",
-      "title": "ReadPluginConfig / WritePluginConfig tools",
-      "description": "Generic tools for reading and writing JSON/INI config files from the SKSE plugins directory and Data folder. Enables integration with pure C++ SKSE plugins that have no Papyrus API (e.g. SmoothCam, ENB, MCM-based plugins). ReadPluginConfig(path) returns parsed JSON or INI as a structured object. WritePluginConfig(path, data) writes changes back. Path is relative to Skyrim Data folder. Changes take effect on next plugin hot-reload or game restart. Also covers: SmoothCam preset switching (SmoothCamPreset0-5.json), ENB parameter tweaks, MCM .ini settings. Discovered during SmoothCam integration exploration 2026-03-23 \u2014 SmoothCam has no console commands or Papyrus API, JSON file R/W is the only integration path.",
-      "history": [
+        },
         {
-          "datetime": "2026-03-23T14:00",
-          "note": "Identified during SmoothCam exploration. SmoothCam stores presets as SmoothCamPreset0-5.json in Data/SKSE/Plugins/. Active config is SmoothCam.json. No console commands or Papyrus exports found. Config file R/W is the correct integration pattern for all no-API C++ SKSE plugins."
+          "datetime": "2026-03-22T19:28",
+          "note": "Implemented and tested. GetKnownSpells page=0 returns 1393 count in ~15 tokens. GetInventory paging confirmed with 325 items across 7 pages."
+        },
+        {
+          "datetime": "2026-11-15T00:00",
+          "note": "Merged a second INFRA-011 entry (the implementation record) into this one."
         }
       ]
     },
@@ -1705,25 +1809,20 @@
       "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods."
     },
     {
-      "id": "INFRA-011",
-      "type": "infrastructure",
-      "status": "complete",
-      "title": "Paged output for large responses",
-      "description": "PageResponse helper in ToolBase \u2014 stateless paging with page/pageSize params. Response envelope: items, page, pageSize, totalItems, totalPages, hasMore. page=0 returns summary only.",
-      "history": [
-        {
-          "datetime": "2026-03-22T19:28",
-          "note": "Implemented and tested. GetKnownSpells page=0 returns 1393 count in ~15 tokens. GetInventory paging confirmed with 325 items across 7 pages."
-        }
-      ]
-    },
-    {
       "id": "BUG-011",
       "type": "bug",
       "status": "complete",
       "title": "CallPapyrusFunction \u2014 DispatchStaticCall freezes or errors",
       "description": "ConsoleUtil.ReadMessage freezes (blocks on console input). StorageUtil.SetIntValue errors instantly. Catalog and function lookup work, but actual VM dispatch is broken.",
       "history": [
+        {
+          "datetime": "2026-03-23T12:00",
+          "note": "Reported: call_papyrus_function fails immediately on StorageUtil.debug_GetIntObjectCount (no args, int return). ConsoleUtil.ReadMessage froze game \u2014 that function blocks on console input, not a VM issue. GetPapyrusCatalog (166 scripts) and GetScriptFunctions both work. DispatchStaticCall or C# return value marshaling is broken."
+        },
+        {
+          "datetime": "2026-11-12T22:00",
+          "note": "1.1.0 smoke test on Skyrim 1.7.104: Utility.GetCurrentGameTime dispatched and returned 0.626, and a call with a visible in-game effect was confirmed. Object-returning functions not tested. Duplicate BUG-011 entry (one 'new', one 'complete') still needs reconciling."
+        },
         {
           "datetime": "2026-03-23T18:24",
           "note": "Reported: ReadMessage caused game freeze. StorageUtil returned error. Catalog (3389 functions) and GetScriptFunctions both work correctly."
@@ -1735,6 +1834,10 @@
         {
           "datetime": "2026-03-23T19:29",
           "note": "FIXED. Root cause was deadlock: DispatchStaticCall called from game thread via TaskQueue, VM callback also needs game thread. Fix: call from pipe thread directly. ConsoleUtil.GetVersion returns 4, ReadMessage returns last console message. Instant response."
+        },
+        {
+          "datetime": "2026-11-15T00:00",
+          "note": "Merged the original report (status 'new', phase 1) into this entry: same bug, fixed. Papyrus calls are verified working in 1.2.0 (see BUG-017)."
         }
       ]
     },
@@ -1765,6 +1868,10 @@
         {
           "datetime": "2026-03-23T20:01",
           "note": "Implemented and tested. All 3 tools passing. 18 po3 configs, 9 SmoothCam configs accessible."
+        },
+        {
+          "datetime": "2026-11-15T00:00",
+          "note": "Absorbs a planned entry that duplicated ID INFRA-012 ('ReadPluginConfig / WritePluginConfig tools'). ReadPluginConfig, WritePluginConfig and ListPluginConfigs ship in UtilityTools; INFRA-012 now means only the OOP refactor."
         }
       ]
     },
