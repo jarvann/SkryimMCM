@@ -744,6 +744,83 @@ namespace SkyrimMCP::PlayerQueries {
         }
     }
 
+    json GetKnownEnchantments() {
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) return {{"error", "Game data not available"}};
+
+        // The enchanting table lists enchantments flagged "known" (TESForm kKnown,
+        // the same flag Papyrus Enchantment.PlayerKnows() reads). Disenchanting sets
+        // the flag on the base enchantment, not on the item enchantment that was
+        // destroyed, so the game keeps no record of which item taught it. Known
+        // entries are still mapped to their base in case a mod flags item
+        // enchantments directly, so each enchantment the player can apply is listed once.
+        std::vector<RE::EnchantmentItem*> bases;
+        std::unordered_set<RE::FormID> seen;
+
+        for (auto* ench : dataHandler->GetFormArray<RE::EnchantmentItem>()) {
+            if (!ench || !ench->GetKnown()) continue;
+            auto* base = ench->data.baseEnchantment ? ench->data.baseEnchantment : ench;
+            if (seen.insert(base->GetFormID()).second) bases.push_back(base);
+        }
+
+        json weapon = json::array();
+        json armor = json::array();
+        json other = json::array();
+
+        std::size_t hiddenEffects = 0;
+
+        for (auto* base : bases) {
+            json e;
+            e["name"] = base->GetName();
+            e["formId"] = std::format("{:08X}", base->GetFormID());
+            if (auto* file = base->GetFile(0)) {
+                e["plugin"] = std::string(file->GetFilename());
+            }
+
+            json effects = json::array();
+            for (auto* effect : base->effects) {
+                if (!effect || !effect->baseEffect) continue;
+                // Effects flagged "hide in UI" are script markers that some mods add
+                // to every enchantment; the enchanting table never shows them.
+                if (effect->baseEffect->data.flags.any(RE::EffectSetting::EffectSettingData::Flag::kHideInUI)) {
+                    ++hiddenEffects;
+                    continue;
+                }
+                effects.push_back({
+                    {"name", effect->baseEffect->GetName()},
+                    {"magnitude", effect->effectItem.magnitude},
+                    {"duration", effect->effectItem.duration}});
+            }
+            e["effects"] = effects;
+
+            // Armor enchantments can be limited to certain armor types (e.g. only
+            // helmets, rings, necklaces) through a keyword list.
+            if (auto* restrictions = base->data.wornRestrictions) {
+                json keywords = json::array();
+                for (auto* form : restrictions->forms) {
+                    auto* keyword = form ? form->As<RE::BGSKeyword>() : nullptr;
+                    const char* editorId = keyword ? keyword->GetFormEditorID() : nullptr;
+                    if (editorId && editorId[0]) keywords.push_back(editorId);
+                }
+                if (!keywords.empty()) e["restrictedTo"] = keywords;
+            }
+
+            switch (base->GetCastingType()) {
+            case RE::MagicSystem::CastingType::kConstantEffect: armor.push_back(e); break;
+            case RE::MagicSystem::CastingType::kFireAndForget:  weapon.push_back(e); break;
+            default:                                            other.push_back(e); break;
+            }
+        }
+
+        json result;
+        result["count"] = bases.size();
+        result["weapon"] = weapon;
+        result["armor"] = armor;
+        if (!other.empty()) result["other"] = other;
+        if (hiddenEffects) result["hiddenEffectsOmitted"] = hiddenEffects;
+        return result;
+    }
+
     json GetPowers() {
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return {{"error", "Player not available"}};

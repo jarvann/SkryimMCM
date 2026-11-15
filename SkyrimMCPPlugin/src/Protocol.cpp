@@ -122,6 +122,7 @@ namespace SkyrimMCP::Protocol {
         noParam("get_equipped_items", []() { return GameInterface::GetEquippedItems(); });
         noParam("get_known_spells", []() { return GameInterface::GetKnownSpells(); });
         noParam("get_known_shouts", []() { return GameInterface::GetKnownShouts(); });
+        noParam("get_known_enchantments", []() { return GameInterface::GetKnownEnchantments(); });
         noParam("get_skill_levels", []() { return GameInterface::GetSkillLevels(); });
         noParam("get_perks", []() { return GameInterface::GetPerks(); });
         noParam("get_appearance", []() { return GameInterface::GetAppearance(); });

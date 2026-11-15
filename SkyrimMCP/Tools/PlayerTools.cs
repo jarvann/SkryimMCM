@@ -201,6 +201,18 @@ public class PlayerTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Get every enchantment the player has learned (by disenchanting), as listed at the enchanting table. " +
+        "Grouped into weapon and armor enchantments, one entry per base enchantment, with effects, the plugin it comes from, " +
+        "and any armor-type restriction (restrictedTo keywords). Hidden script-marker effects that some mods add are left out " +
+        "(hiddenEffectsOmitted counts them). The game does not record which item taught an enchantment. " +
+        "Use this instead of calling Papyrus functions to read learned enchantments.")]
+    public async Task<object> GetKnownEnchantments()
+    {
+        var data = await _pipe.SendRequestAsync("get_known_enchantments");
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("Get the player's magic resistance values — magic, fire, frost, shock, poison, and disease resistance percentages.")]
     public async Task<object> GetMagicResistances()
     {

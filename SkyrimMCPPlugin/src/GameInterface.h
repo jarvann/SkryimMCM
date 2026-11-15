@@ -56,6 +56,7 @@ namespace SkyrimMCP {
         inline json ToggleImmortalMode() { return PlayerQueries::ToggleImmortalMode(); }
         inline json GetDiseaseStatus() { return PlayerQueries::GetDiseaseStatus(); }
         inline json GetEnchantmentInfo(const std::string& formIdHex) { return PlayerQueries::GetEnchantmentInfo(formIdHex); }
+        inline json GetKnownEnchantments() { return PlayerQueries::GetKnownEnchantments(); }
         inline json GetSpellDetails(const std::string& formIdHex) { return PlayerQueries::GetSpellDetails(formIdHex); }
 
         // === Inventory (InventoryManager) ===

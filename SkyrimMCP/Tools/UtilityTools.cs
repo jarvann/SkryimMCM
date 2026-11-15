@@ -36,7 +36,7 @@ public class UtilityTools : ToolBase
     [McpServerTool]
     [Description("FALLBACK ONLY — Execute a raw Skyrim console command when NO dedicated tool exists. " +
         "ALWAYS check dedicated tools first: " +
-        "Player: GetPlayerInfo, GetSkillLevels, GetPerks, GetKnownSpells, GetKnownShouts, GetAppearance, GetFavorites, GetFactions. " +
+        "Player: GetPlayerInfo, GetSkillLevels, GetPerks, GetKnownSpells, GetKnownShouts, GetKnownEnchantments, GetAppearance, GetFavorites, GetFactions. " +
         "Items: GetInventory, GetEquippedItems, AddItem, RemoveItem, BulkAddItems. " +
         "Quests: GetQuestInfo, GetQuestStages, GetQuestAliases, GetQuestItems, SetQuestStage. " +
         "NPCs: GetNearbyNPCs, GetNPCDetailedInfo, GetNPCInventory, GetFollowers, GetDetectionLevel, GetCrosshairRef, KillActor. " +
