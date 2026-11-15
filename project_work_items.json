@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 153,
-    "completed": 105,
+    "totalItems": 164,
+    "completed": 109,
     "completedPartial": 2,
     "implementedUntested": 3,
     "inProgress": 0,
-    "planned": 43,
-    "bugs": 18
+    "planned": 50,
+    "bugs": 20
   },
   "phases": [
     {
@@ -1644,6 +1644,34 @@
           ]
         },
         {
+          "id": "FEAT-219",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Crash recorder: what SkyLink and the game did just before a crash",
+          "description": "The host DLL (never unloaded) keeps a ring buffer of the last few hundred events: AI tool calls, Papyrus calls, game events, current cell, quest stage changes. A vectored exception handler writes it to a file on a fatal exception, then lets Crash Logger SSE write its normal report (chained, never swallowing the crash). On the next launch the AI reads both together (with FEAT-217) to explain the crash. Does not try to recover or to make an emergency save: the game state is already damaged by then.",
+          "history": [
+            {
+              "datetime": "2026-11-15T05:30",
+              "note": "Discussed with Cory 15 Nov 2026 after asking whether SkyLink could catch every plugin's CTD. A catch-all is not safe (skipping a fault turns it into a hang or a corrupt save); recording context is. Estimate with FEAT-220 and FEAT-217: 14-22 human hours; about 1-1.5 h and 350-500k tokens for Claude, plus one deliberate test crash in game."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-220",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Crash protection for every game-thread task SkyLink runs",
+          "description": "Extend the SEH guard that already wraps console commands to every TaskQueue job, so an AI request that hits a bad form or pointer comes back as an error instead of a CTD. Only covers SkyLink's own calls, not other plugins.",
+          "history": [
+            {
+              "datetime": "2026-11-15T05:30",
+              "note": "Part of the crash discussion with Cory, 15 Nov 2026; see FEAT-219."
+            }
+          ]
+        },
+        {
           "id": "FEAT-218",
           "type": "feature",
           "status": "planned",
@@ -1666,6 +1694,151 @@
             {
               "datetime": "2026-11-15T00:00",
               "note": "Asked on Nexus by Maruzarix (18 May 2026)."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-221",
+          "type": "feature",
+          "status": "planned",
+          "title": "Skyrim guidebook the AI checks first",
+          "description": "Give the AI a game reference (quests, locations, skills, crafting, alchemy) and tell it to look there before answering a help question, so answers come from the book rather than memory. Options: an MCP resource or a search tool over a bundled reference. Licence check before bundling anything: UESP text is CC BY-SA 2.5 (attribution and share-alike).",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-222",
+          "type": "feature",
+          "status": "planned",
+          "title": "Resource tracker with in-range alerts",
+          "description": "The player asks to track a resource (iron ore veins, nirnroot, a particular ingredient or item), and SkyLink shows a HUD notification when one comes within range. Builds on get_nearby_objects and ScanLoot. The polling belongs in the C# server or the host DLL: the logic DLL may not run threads of its own.",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-223",
+          "type": "feature",
+          "status": "planned",
+          "title": "Custom waypoints the AI can place",
+          "description": "The AI adds markers for the player's goals as they play. Research first: vanilla allows only one custom map marker, so several markers need quest objective targets (a SkyLink quest with reference aliases) or a UI mod. Works with FEAT-224 goals and the in-game window (FEAT-213).",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-224",
+          "type": "feature",
+          "status": "planned",
+          "title": "Notes and goals, with progress alerts",
+          "description": "The player and the AI keep notes and goals for each character, saved with the save (SKSE co-save or a JSON file per character), and the AI reads them at the start of a session. The AI points out when the player is near a way to make progress on a goal. Tools and storage first; a panel follows with the in-game window (FEAT-213).",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-225",
+          "type": "feature",
+          "status": "planned",
+          "title": "Live quest tracker on screen",
+          "description": "A WoW-style on-screen tracker of active quest objectives that updates as they change. Data comes from QuestManager and the quest stage and objective events; display needs the in-game UI work (FEAT-213).",
+          "history": [
+            {
+              "datetime": "2026-11-15T00:00",
+              "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 15,
+      "name": "v1.2.1 \u2014 Hot reload",
+      "priority": "high",
+      "status": "complete",
+      "items": [
+        {
+          "id": "INFRA-021",
+          "type": "infrastructure",
+          "status": "complete",
+          "priority": "high",
+          "title": "Server hot reload: SkyLinkLauncher (no Claude restart)",
+          "description": "New SkyLinkLauncher.dll (run with dotnet, no .exe) sits between Claude Desktop and the MCP server. It runs a temp copy of SkyLinkAI_Server\\SkyrimMCP.dll, watches that folder, and on a new build drains in-flight calls (or answers them with a retry error), restarts the server, replays the MCP initialize handshake and sends notifications/tools/list_changed. Crash-loop guard: stops restarting after 3 crashes in 60 s. CheckConnection reports launcherVersion and serverSource.",
+          "history": [
+            {
+              "datetime": "2026-11-15T01:30",
+              "note": "Asked for by Cory 14 Nov 2026 ('build and make changes to the MCP without having to restart'). Estimate: 6-10 human hours; about 30-45 min and 150-250k tokens for Claude. Built on feature/hot-reload; .exe avoided at Cory's request (SmartScreen/AV). Whether Claude Desktop re-reads the tool list on list_changed is untested."
+            },
+            {
+              "datetime": "2026-11-15T05:00",
+              "note": "Tested: 31/31 simulation checks in WSL (real server, fake plugin: handshake replay, list_changed, queued and in-flight requests across a restart, crash-loop guard, clean exit); Windows smoke test as a real process (89 tools, check_connection via launcher, restart on redeploy, clean exit). No .exe in either publish. Untested: Claude Desktop's handling of list_changed."
+            },
+            {
+              "datetime": "2026-11-15T08:00",
+              "note": "Tested in game with Claude Desktop: server restarted on a redeploy with Claude open (new serverBuilt and shadow path); new behaviour (consoleOutput in toggle_collision) applied on the next call. Claude Desktop does NOT re-read the tool list on list_changed in an open chat: changed descriptions and new tools need a new chat (whether a new chat is enough is still to be checked). Docs updated."
+            }
+          ]
+        },
+        {
+          "id": "INFRA-022",
+          "type": "infrastructure",
+          "status": "complete",
+          "priority": "high",
+          "title": "Plugin hot reload: host DLL + reloadable logic DLL (no Skyrim restart)",
+          "description": "Plugin split in two. SkyrimMCPPlugin.dll (host, loaded by SKSE): pipe server, event sinks, game-thread task queue, ping/poll_events/reload_plugin, and LogicLoader. SkyLinkAI\\SkyLinkLogic.dll (logic): every command handler, loaded from a temp copy through a plain C ABI (HostApi.h). Reload on the next request after a newer DLL is deployed, or via the reload_plugin tool. Before unloading, the host waits for game-thread tasks the old build queued and for Papyrus callbacks it is owed; it keeps the old build if the new one fails to load and restores it if the new one fails to initialise. New game_thread_ping action. tests/ReloadHarness.cpp stress-tests load/swap outside Skyrim (build_plugin.ps1 -Test).",
+          "history": [
+            {
+              "datetime": "2026-11-15T01:30",
+              "note": "Asked for by Cory 14 Nov 2026. Estimate: 24-40 human hours; about 2-3 h and 600-900k tokens for Claude. Built on feature/hot-reload."
+            },
+            {
+              "datetime": "2026-11-15T05:00",
+              "note": "Builds clean on MSVC. Reload harness 40/40, four runs: 75 reloads (25 under ~70k concurrent requests), postponed reload with back-off, half-written and broken builds rejected with the old build kept, missing file, temp-copy cleanup. An independent review found a compile error, a Papyrus-callback unload crash (callback moved into the host), a failed auto-reload retried on every request (drain before loading, 2 s / 7 s limits, back-off), a copy-while-writing race (locked read), path exceptions, and a static collision state (now read from the game); all fixed. The harness also exposed a registry initialisation race in Protocol.cpp (fixed). Needs the in-game test: docs/hot-reload-test-plan.md."
+            },
+            {
+              "datetime": "2026-11-15T08:00",
+              "note": "Tested in game (Skyrim 1.7.104): logic DLL loaded at the main menu after BUG-019 was fixed; auto-reload after a deploy with the game running (11 ms); reload_plugin (12 ms); Papyrus calls and toggle_collision after reloads; five reloads in the middle of a save load (11-21 ms, no crash or freeze); host DLL change correctly refused while the game ran. Follow-ups in the same change: check_connection now loads a waiting build first; loading screens are logged and reported (duringLoadingScreen, loadingScreen); get_game_safety answered by the host during a loading screen. Those need a game restart to verify."
+            }
+          ]
+        },
+        {
+          "id": "BUG-019",
+          "type": "bug",
+          "status": "complete",
+          "priority": "critical",
+          "title": "1.2.1: crash at the main menu when the logic DLL starts",
+          "description": "SKSE crashed the game on purpose (0xDEADBEEF write; skse64.log: 'A plugin has called SKSEInterface::GetPluginHandle outside of its Query/Load handlers'). The host loads the logic DLL on kDataLoaded, and the logic DLL's SKSE::Init called GetPluginHandle. Fix: new host file SkseInterfaceProxy captures SKSE's interface table during SKSEPluginLoad (plugin handle, release index, the 7 interfaces) and gives the logic DLL that copy, so it works on every reload too. The reload harness now passes a fake table, so SKSE::Init in the logic DLL is exercised outside the game.",
+          "history": [
+            {
+              "datetime": "2026-11-15T08:00",
+              "note": "Found in the first in-game run of 1.2.1 (crash log 2026-11-15 06:48). Fixed and confirmed in game: logic DLL loaded, plugin log shows 'Captured the SKSE interface table ... 7 of 7 interfaces'."
+            }
+          ]
+        },
+        {
+          "id": "BUG-020",
+          "type": "bug",
+          "status": "complete",
+          "priority": "medium",
+          "title": "toggle_collision never disabled the player's collision",
+          "description": "It set the player's reference collision flag (TESObjectREFR::SetCollision), which doesn't stop the player's collision; the game clears it again, so every call read 'on' and reported 'No Clip' while walls stayed solid. execute_console_command 'tcl' had the same problem, because SkyLink runs console commands with the player selected (player.tcl). Fix: toggle_collision runs tcl with nothing selected for the player (real no-clip) or with the target selected otherwise, and reports the state from the game's own reply ('... -> On/Off'); consoleOutput is returned and an unknown state is reported as null. The execute_console_command description now warns that tcl there is not no-clip.",
+          "history": [
+            {
+              "datetime": "2026-11-15T08:00",
+              "note": "Found during the 1.2.1 in-game test. Fixed and confirmed in game: off/on matched what the player saw, both before and after reloads."
             }
           ]
         }

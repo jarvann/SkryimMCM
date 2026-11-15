@@ -3,7 +3,7 @@
 # Produces a ready-to-zip release folder
 
 param(
-    [string]$Version = "1.1.0",
+    [string]$Version = "1.2.1",
     [string]$OutputDir = "release",
     [string]$VcpkgRoot = "C:\vcpkg"
 )
@@ -18,6 +18,8 @@ $env:VCPKG_ROOT = $VcpkgRoot
 # Clean output
 if (Test-Path $OutputDir) { Remove-Item -Recurse -Force $OutputDir }
 New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server" -Force | Out-Null
+New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher" -Force | Out-Null
+New-Item -ItemType Directory -Path "$OutputDir\Data\SKSE\Plugins\SkyLinkAI" -Force | Out-Null
 
 # Build C++ plugin
 Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
@@ -28,17 +30,25 @@ Write-Host "`n--- Building SKSE Plugin (C++) ---" -ForegroundColor Yellow
 Write-Host "`n--- Building MCP Server (C#) ---" -ForegroundColor Yellow
 dotnet publish SkyrimMCP -c Release -o "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server" --no-self-contained
 if ($LASTEXITCODE -ne 0) { throw "MCP server build failed" }
+dotnet publish SkyLinkLauncher -c Release -o "$OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher" --no-self-contained
+if ($LASTEXITCODE -ne 0) { throw "Launcher build failed" }
 
 # Copy SKSE plugin DLL
 Write-Host "`n--- Packaging ---" -ForegroundColor Yellow
 Copy-Item "SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll" "$OutputDir\Data\SKSE\Plugins\" -Force
+Copy-Item "SkyrimMCPPlugin\output\SkyLinkAI\SkyLinkLogic.dll" "$OutputDir\Data\SKSE\Plugins\SkyLinkAI\" -Force
+
+# No .exe in the package: the server and launcher are run with "dotnet <dll>", and
+# SmartScreen and antivirus tools treat unsigned .exe files with more suspicion.
+$exes = Get-ChildItem "$OutputDir" -Recurse -Filter *.exe
+if ($exes) { throw "Release contains .exe files: $($exes.FullName -join ', ')" }
 
 # Create example config
 $config = @{
     mcpServers = @{
         skyrim = @{
             command = "dotnet"
-            args = @("<SKYRIM_PATH>\Data\SKSE\Plugins\SkyLinkAI_Server\SkyrimMCP.dll")
+            args = @("<SKYRIM_PATH>\Data\SKSE\Plugins\SkyLinkAI_Launcher\SkyLinkLauncher.dll")
         }
     }
 }
@@ -71,12 +81,17 @@ Edit %APPDATA%\Claude\claude_desktop_config.json:
   "mcpServers": {
     "skyrim": {
       "command": "dotnet",
-      "args": ["<SKYRIM_PATH>\\Data\\SKSE\\Plugins\\SkyLinkAI_Server\\SkyrimMCP.dll"]
+      "args": ["<SKYRIM_PATH>\\Data\\SKSE\\Plugins\\SkyLinkAI_Launcher\\SkyLinkLauncher.dll"]
     }
   }
 }
 
 Replace <SKYRIM_PATH> with your Skyrim installation path.
+
+The launcher runs the MCP server (SkyLinkAI_Server\SkyrimMCP.dll) and restarts it
+when a new version is installed, so updating SkyLink does not need a Claude restart.
+Pointing "args" straight at SkyLinkAI_Server\SkyrimMCP.dll also works, as in 1.2.0
+and earlier.
 
 ## Usage
 1. Launch Skyrim via SKSE
@@ -84,7 +99,7 @@ Replace <SKYRIM_PATH> with your Skyrim installation path.
 3. Ask Claude to interact with your game!
 
 ## Features
-- 74 MCP tools for reading and modifying game state
+- 89 MCP tools for reading and modifying game state
 - Player stats, inventory, spells, perks, shouts, appearance
 - Quest management, NPC interaction, follower management
 - Weather control, world objects, containers, locks
@@ -100,13 +115,15 @@ Replace <SKYRIM_PATH> with your Skyrim installation path.
 - SKSE by Ian Patterson, Stephen Abel, and Paul Shortman
 
 ## License
-- SkyrimMCPPlugin.dll: GPL-3.0-or-later (statically links CommonLibSSE-NG)
-- SkyLinkAI_Server (MCP server): MIT
+- SkyrimMCPPlugin.dll and SkyLinkAI\SkyLinkLogic.dll: GPL-3.0-or-later (statically link CommonLibSSE-NG)
+- SkyLinkAI_Server (MCP server) and SkyLinkAI_Launcher: MIT
 - Source: https://github.com/jarvann/SkryimMCM
 "@ | Set-Content "$OutputDir\README.txt"
 
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green
 Write-Host "Release folder: $OutputDir\"
 Write-Host "  SKSE Plugin: $OutputDir\Data\SKSE\Plugins\SkyrimMCPPlugin.dll"
+Write-Host "  Logic DLL:   $OutputDir\Data\SKSE\Plugins\SkyLinkAI\SkyLinkLogic.dll"
 Write-Host "  MCP Server:  $OutputDir\Data\SKSE\Plugins\SkyLinkAI_Server\"
+Write-Host "  Launcher:    $OutputDir\Data\SKSE\Plugins\SkyLinkAI_Launcher\"
 Write-Host "`nZip the '$OutputDir' folder for Nexus upload."

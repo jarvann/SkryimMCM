@@ -22,9 +22,15 @@ public class PlayerTools : ToolBase
         ? File.GetLastWriteTimeUtc(ServerPath).ToString("yyyy-MM-dd HH:mm:ss") + " UTC"
         : null;
 
+    // Set by SkyLinkLauncher when it runs this server from a shadow copy (see SkyLinkLauncher/Program.cs).
+    private static readonly string? LauncherVersion = Environment.GetEnvironmentVariable("SKYLINK_LAUNCHER_VERSION");
+    private static readonly string? ServerSource = Environment.GetEnvironmentVariable("SKYLINK_SERVER_SOURCE");
+
     [McpServerTool]
     [Description("Check if Skyrim is running and the SKSE MCP plugin is connected. Also reports which plugin and server builds " +
-        "are loaded (version, build time, server path), so a stale build is easy to spot.")]
+        "are loaded (version, build time, server path), so a stale build is easy to spot. 'logic' describes the plugin's " +
+        "reloadable logic DLL (version, build time, when it was loaded, reload count). When the server runs under " +
+        "SkyLinkLauncher, launcherVersion is set, serverPath is the shadow copy and serverSource is the deployed DLL.")]
     public async Task<object> CheckConnection()
     {
         try
@@ -38,14 +44,27 @@ public class PlayerTools : ToolBase
                 pluginVersion = info?["pluginVersion"]?.GetValue<string>(),
                 pluginBuilt = info?["pluginBuilt"]?.GetValue<string>(),
                 gameVersion = info?["gameVersion"]?.GetValue<string>(),
+                loadingScreen = info?["loadingScreen"]?.GetValue<bool>(),  // 1.2.1+
+                logic = info?["logic"] is JsonNode logicNode ? DeserializeResponse(logicNode) : null,
                 serverVersion = ServerVersion,
                 serverBuilt = ServerBuilt,
-                serverPath = ServerPath
+                serverPath = ServerPath,
+                serverSource = ServerSource,
+                launcherVersion = LauncherVersion
             };
         }
         catch (Exception ex)
         {
-            return new { connected = false, message = ex.Message, serverVersion = ServerVersion, serverBuilt = ServerBuilt, serverPath = ServerPath };
+            return new
+            {
+                connected = false,
+                message = ex.Message,
+                serverVersion = ServerVersion,
+                serverBuilt = ServerBuilt,
+                serverPath = ServerPath,
+                serverSource = ServerSource,
+                launcherVersion = LauncherVersion
+            };
         }
     }
 

@@ -1,4 +1,5 @@
 #include "PapyrusBridge.h"
+#include "LogicHost.h"
 
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
@@ -8,7 +9,6 @@
 #include <mutex>
 #include <regex>
 #include <cstring>
-#include <future>
 
 namespace SkyrimMCP::PapyrusBridge {
 
@@ -214,40 +214,12 @@ namespace SkyrimMCP::PapyrusBridge {
 
     // ==================== VM Call Bridge ====================
 
-    // Custom callback functor that stores the result and signals a promise
-    class PapyrusCallback : public RE::BSScript::IStackCallbackFunctor {
-    public:
-        std::promise<json> promise;
-
-        PapyrusCallback() = default;
-
-        void operator()(RE::BSScript::Variable a_result) override {
-            try {
-                json result;
-                auto rawType = a_result.GetType().GetRawType();
-
-                if (rawType == RE::BSScript::TypeInfo::RawType::kNone) {
-                    result = nullptr;
-                } else if (rawType == RE::BSScript::TypeInfo::RawType::kString) {
-                    result = std::string(a_result.GetString());
-                } else if (rawType == RE::BSScript::TypeInfo::RawType::kInt) {
-                    result = a_result.GetSInt();
-                } else if (rawType == RE::BSScript::TypeInfo::RawType::kFloat) {
-                    result = a_result.GetFloat();
-                } else if (rawType == RE::BSScript::TypeInfo::RawType::kBool) {
-                    result = a_result.GetBool();
-                } else {
-                    result = "complex_type";
-                }
-
-                promise.set_value({{"result", result}});
-            } catch (...) {
-                promise.set_value({{"error", "Failed to unpack result"}});
-            }
-        }
-
-        void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
-    };
+    // The callback object the VM calls when the function returns is created by the host
+    // DLL (HostApi::papyrusCallbackCreate), not here: the VM may still hold it after this
+    // DLL has been reloaded, for example when a call times out on our side.
+    static void AppendToString(void* ctx, const char* data, std::size_t len) {
+        static_cast<std::string*>(ctx)->append(data, len);
+    }
 
     // ==================== Pre-dispatch validation ====================
     //
@@ -412,11 +384,16 @@ namespace SkyrimMCP::PapyrusBridge {
 
         SKSE::log::info("Calling Papyrus: {}", signature);
 
-        // Create callback
-        auto callback = RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor>(new PapyrusCallback());
-        auto* callbackPtr = static_cast<PapyrusCallback*>(callback.get());
-
-        auto future = callbackPtr->promise.get_future();
+        auto* host = LogicHost::Get();
+        if (!host) {
+            return {{"error", "Papyrus calls unavailable: the plugin is reloading"}};
+        }
+        auto* rawCallback = static_cast<RE::BSScript::IStackCallbackFunctor*>(host->papyrusCallbackCreate());
+        if (!rawCallback) {
+            return {{"error", "Could not create a Papyrus callback"}};
+        }
+        // Holding this reference keeps the callback alive while we wait on it.
+        RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback(rawCallback);
 
         // Dispatch the call (from the pipe thread; see Protocol.cpp for why not TaskQueue)
         bool dispatched = impl->DispatchStaticCall(
@@ -430,13 +407,18 @@ namespace SkyrimMCP::PapyrusBridge {
         }
 
         // Wait for result with timeout
-        auto status = future.wait_for(std::chrono::seconds(5));
-        if (status == std::future_status::timeout) {
+        std::string resultText;
+        if (host->papyrusCallbackWait(rawCallback, 5000, &AppendToString, &resultText) != 0) {
             return {{"error", "Papyrus call timed out: " + signature},
                     {"note", "Function may have completed but result was not received in time"}};
         }
 
-        auto result = future.get();
+        json result;
+        try {
+            result = json::parse(resultText);
+        } catch (...) {
+            result = {{"error", "Unreadable Papyrus result"}};
+        }
         result["className"] = className;
         result["functionName"] = functionName;
         result["signature"] = signature;

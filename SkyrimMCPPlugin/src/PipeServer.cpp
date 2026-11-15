@@ -8,7 +8,7 @@
 #include <windows.h>
 
 #include "PipeServer.h"
-#include "Protocol.h"
+#include "HostCore.h"
 
 #include <string>
 #include <vector>
@@ -127,7 +127,7 @@ namespace SkyrimMCP {
 
                 SKSE::log::info("Received request: {}", line);
 
-                std::string response = Protocol::HandleRequest(line);
+                std::string response = HostCore::HandleRequest(line);
 
                 SKSE::log::info("Sending response: {}", response);
 

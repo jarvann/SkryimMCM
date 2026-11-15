@@ -34,6 +34,17 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Reload the SKSE plugin's logic DLL (Data\\SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll) from disk without restarting Skyrim. " +
+        "The plugin also reloads automatically on the next call after a newer DLL is deployed, so this is mainly for forcing a reload " +
+        "or confirming one. Use after build_plugin.ps1 -Deploy. Returns reloaded, previousBuilt, built, reloads and elapsedMs; " +
+        "fails (and keeps the old version) if a game-thread task or Papyrus call is still pending.")]
+    public async Task<object> ReloadPlugin()
+    {
+        var data = await _pipe.SendRequestAsync("reload_plugin");
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("FALLBACK ONLY — Execute a raw Skyrim console command when NO dedicated tool exists. " +
         "ALWAYS check dedicated tools first: " +
         "Player: GetPlayerInfo, GetSkillLevels, GetPerks, GetKnownSpells, GetKnownShouts, GetKnownEnchantments, GetAppearance, GetFavorites, GetFactions. " +
@@ -45,6 +56,8 @@ public class UtilityTools : ToolBase
         "Only use this tool if none of the above cover your need. " +
         "TARGETING: Use dot-notation with refId (e.g., 'FE124B0E.kill'), NOT prid — prid does not persist between calls. " +
         "Player commands: use 'player.' prefix (e.g., 'player.additem 0000000F 100'). " +
+        "Commands run with the player selected, as if the player were clicked in the console, so 'tcl' here only " +
+        "sets the player's reference flag and is NOT no-clip: use ToggleCollision for that. " +
         "CAUTION: Invalid FormIDs crash the game. Avoid during loading screens or scripted events. " +
         "Console output may be captured if the command produces text output.")]
     public async Task<object> ExecuteConsoleCommand(string command)

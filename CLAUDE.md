@@ -9,13 +9,27 @@ Skyrim MCP Server — a Model Context Protocol server that lets AI assistants (C
 ## Architecture
 
 ```
-Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (inside Skyrim)
+Claude Desktop <--stdio--> SkyLinkLauncher <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE plugin host <--C ABI--> logic DLL
+                           (optional)                                                     (inside Skyrim)
 ```
 
+Both halves hot-reload (1.2.1):
+- **Launcher** (`SkyLinkLauncher/`, run as `dotnet SkyLinkLauncher.dll`): runs a temp copy of the server, restarts it when a new build lands in `SkyLinkAI_Server\`, replays the MCP `initialize` handshake and sends `tools/list_changed`. Claude Desktop stays open. Claude Desktop ignores `list_changed` in an open chat (tested 2026-11-15): behaviour changes apply on the next call, but new tools and changed descriptions need a new chat.
+- **Plugin** is two DLLs. `SkyrimMCPPlugin.dll` (host) is loaded by SKSE and never unloads. `SkyLinkAI\SkyLinkLogic.dll` (logic: every command handler) is loaded by the host from a temp copy and swapped while the game runs: automatically on the next request after a newer DLL is deployed, or with the `reload_plugin` action / `ReloadPlugin` tool.
+- **No .exe anywhere** (SmartScreen/AV): both C# projects set `UseAppHost=false`; `build_release.ps1` fails if one appears.
+
 ### SKSE Plugin (`SkyrimMCPPlugin/` — C++)
-- **Main.cpp** — SKSE entry point, starts pipe server + event system on kDataLoaded
+Host DLL (`SkyrimMCPPlugin.dll`; changes here need a game restart):
+- **Main.cpp** — SKSE entry point; on kDataLoaded registers events, loads the logic DLL, starts the pipe
+- **HostCore.h/cpp** — Answers `ping`, `poll_events`, `reload_plugin`; auto-reloads; forwards everything else to the logic DLL; runs logic tasks on the game thread and counts them
+- **LogicLoader.h/cpp** — Loads/swaps the logic DLL (temp copies in `%TEMP%\SkyLinkAI`), drains pending work first, restores the previous build if a new one fails. No CommonLib, so `tests/ReloadHarness.cpp` can drive it outside Skyrim
+- **HostApi.h** — The C ABI between the two DLLs (bump `SKYLINK_ABI_VERSION` on any change)
 - **PipeServer.h/cpp** — Named pipe server (`\\.\pipe\SkyrimMCP`) on background thread
-- **Protocol.h/cpp** — Command registry (std::unordered_map) routing ~50 actions
+- **EventSystem.h/cpp** — 17 game event sinks with noise filtering (sinks must stay in the host: the game holds pointers to them)
+
+Logic DLL (`SkyLinkAI\SkyLinkLogic.dll`; hot-reloadable):
+- **LogicMain.cpp** — Exports `SkyLink_Init/HandleRequest/GetInfo/Shutdown/AbiVersion`; forwards logging to the host
+- **Protocol.h/cpp** — Command registry (std::unordered_map) routing ~90 actions
 - **Helpers.h** — Shared utilities: ParseFormId, ResolveActor, ActorValue resolution, console command execution, game safety checker, console output capture
 - **PlayerQueries.h/cpp** — Player state: info, inventory, skills, perks, spells, shouts, appearance, blueprint, toggles (god mode, immortal), combat status
 - **NPCManager.h/cpp** — NPC operations: nearby NPCs, actor info, followers, detection, factions, move/kill/crosshair targeting
@@ -26,8 +40,9 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 - **UIManager.h/cpp** — Menu state queries
 - **UtilityManager.h/cpp** — Notifications, form search, SKSE plugins, save/load, load order
 - **PapyrusBridge.h/cpp** — Runtime .psc scanner, Papyrus VM call bridge, function catalog
-- **EventSystem.h/cpp** — 17 game event sinks with noise filtering
-- **TaskQueue.h/cpp** — Marshals pipe-thread calls to game thread via SKSE task interface
+- **TaskQueue.h/cpp** — Marshals pipe-thread calls to the game thread through the host (`HostApi::addTask`), never SKSE directly
+
+**Rules for logic-DLL code** (break one and a reload crashes the game): no game event sinks, hooks, trampolines, Papyrus native registrations or SKSE listeners (they leave pointers into the unloaded DLL; put them in the host); no long-lived threads; game-thread work only through `TaskQueue`; any object the game keeps calling back (like `PapyrusCallback`) must be counted so `SkyLink_Shutdown` can wait for it; only plain C types across `HostApi.h`.
 
 Uses CommonLibSSE-NG (alandtse fork `alandtse/CommonLibVR`, branch `ng`, tag v16.3.0 or newer, local shallow clone in `extern/`; required for Skyrim 1.7.99+ / Address Library format 5), nlohmann-json, spdlog, fmt. Statically linked (x64-windows-static).
 
@@ -60,12 +75,16 @@ $env:VCPKG_ROOT = "C:\vcpkg"
 cd W:\home\cory\personal\skyrim_mcp
 .\build_plugin.ps1 -Deploy        # add -Configure after CMakeLists/vcpkg.json/CMakePresets.json changes
 
-# C# MCP server — close Claude Desktop first (SkyrimMCP.dll is locked while running).
-# Publishes to <Skyrim>\Data\SKSE\Plugins\SkyLinkAI_Server, where Claude Desktop's config points.
+# -Deploy works with the game running: the logic DLL hot-reloads on the next call. The host DLL is
+# only copied when it changed (and needs a game restart then).
+.\build_plugin.ps1 -Test           # also build and run tests/ReloadHarness.cpp (load/swap stress test, not shipped)
+
+# C# MCP server + launcher, to <Skyrim>\Data\SKSE\Plugins\SkyLinkAI_Server and SkyLinkAI_Launcher.
+# With Claude Desktop pointed at SkyLinkLauncher.dll, no need to close Claude: the launcher restarts the server.
 .\build_plugin.ps1 -ServerOnly     # or -Deploy -Server to build and deploy both halves
 
 # Release build for Nexus
-.\build_release.ps1 -Version "1.1.0"
+.\build_release.ps1 -Version "1.2.1"
 ```
 
 **Requires:** Visual Studio 2022 (or Build Tools) C++ workload, CMake 3.21+, vcpkg at `C:\vcpkg`, .NET 10 SDK

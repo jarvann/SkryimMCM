@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,8 @@ class Program
                 options.ServerInfo = new()
                 {
                     Name = "SkyLink AI",
-                    Version = "1.1.0"
+                    Version = typeof(Program).Assembly
+                        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown"
                 };
             })
             .WithStdioServerTransport()

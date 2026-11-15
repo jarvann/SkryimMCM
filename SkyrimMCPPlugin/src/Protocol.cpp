@@ -1,11 +1,10 @@
 #include "Protocol.h"
-#include "BuildInfo.h"
-#include "EventSystem.h"
 #include "GameInterface.h"
 #include "TaskQueue.h"
 
 #include <SKSE/SKSE.h>
 
+#include <chrono>
 #include <functional>
 #include <unordered_map>
 
@@ -42,64 +41,28 @@ namespace SkyrimMCP::Protocol {
         return GameThread(id, [fn, val]() { return fn(val); });
     }
 
-    static std::unordered_map<std::string, Handler>& GetRegistry() {
-        static std::unordered_map<std::string, Handler> registry;
-        static bool initialized = false;
-
-        if (initialized) return registry;
-        initialized = true;
+    static std::unordered_map<std::string, Handler> BuildRegistry() {
+        std::unordered_map<std::string, Handler> registry;
 
         // === Direct handlers (no game thread) ===
 
-        registry["ping"] = [](const std::string& id, const json&) {
-            // Answered on the pipe thread, so it still works when game-thread calls do not.
-            json info;
-            info["pluginVersion"] = SKYLINK_VERSION_STRING;
-            info["pluginBuilt"] = BuildInfo::GetBuildTime();
-            info["gameVersion"] = REL::Module::get().version().string(".");
-            return MakeResponse(id, true, info).dump() + "\n";
-        };
+        // ping and poll_events are answered by the host DLL (HostCore.cpp): they must
+        // work while this DLL is being reloaded, and the event sinks live there.
 
-        registry["poll_events"] = [](const std::string& id, const json& params) {
-            auto events = EventSystem::GetSingleton().DrainEvents();
-            auto includeTypes = params.value("eventTypes", json::array());
-            auto excludeTypes = params.value("excludeTypes", json::array());
-
-            json arr = json::array();
-            for (auto& e : events) {
-                std::string eventType = e.value("event", "");
-                if (!includeTypes.empty()) {
-                    bool found = false;
-                    for (auto& t : includeTypes) {
-                        if (t.get<std::string>() == eventType) { found = true; break; }
-                    }
-                    if (!found) continue;
-                }
-                if (!excludeTypes.empty()) {
-                    bool excluded = false;
-                    for (auto& t : excludeTypes) {
-                        if (t.get<std::string>() == eventType) { excluded = true; break; }
-                    }
-                    if (excluded) continue;
-                }
-                arr.push_back(e);
-            }
-
-            // Include muted event summary
-            auto mutedSummary = EventSystem::GetSingleton().GetMutedSummary();
-            json result;
-            result["events"] = arr;
-            result["count"] = arr.size();
-            result["mutedTotal"] = mutedSummary.value("mutedTotal", 0);
-            if (mutedSummary.contains("muted") && !mutedSummary["muted"].empty()) {
-                result["muted"] = mutedSummary["muted"];
-            }
-            return MakeResponse(id, true, result).dump() + "\n";
+        registry["game_thread_ping"] = [](const std::string& id, const json& params) {
+            // Round trip to the game thread and back: shows whether game-thread calls
+            // are being serviced right now (they stall during loading screens).
+            int timeoutMs = params.value("timeoutMs", 5000);
+            auto started = std::chrono::steady_clock::now();
+            TaskQueue::RunOnGameThread([]() { return json::object(); }, timeoutMs);
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started).count();
+            return MakeResponse(id, true, {{"gameThreadMs", ms}}).dump() + "\n";
         };
 
         registry["save_game"] = [](const std::string& id, const json& params) {
             std::string saveName = params.value("saveName", "MCPSave");
-            SKSE::GetTaskInterface()->AddTask([saveName]() {
+            TaskQueue::Post([saveName]() {
                 GameInterface::SaveGame(saveName);
             });
             return MakeResponse(id, true, {{"saving", true}, {"saveName", saveName}}).dump() + "\n";
@@ -365,6 +328,14 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [query, typeFilter, maxResults]() { return GameInterface::SearchForms(query, typeFilter, maxResults); });
         };
 
+        return registry;
+    }
+
+    // Built once, thread-safely (a function-local static). The old "static bool
+    // initialized" version let a second thread see a half-built registry: "Unknown
+    // action" or "bad function call" for the first concurrent requests after a load.
+    static std::unordered_map<std::string, Handler>& GetRegistry() {
+        static std::unordered_map<std::string, Handler> registry = BuildRegistry();
         return registry;
     }
 

@@ -4,9 +4,10 @@
 #include <spdlog/sinks/basic_file_sink.h>
 
 #include "BuildInfo.h"
-#include "Helpers.h"
-#include "PipeServer.h"
 #include "EventSystem.h"
+#include "HostCore.h"
+#include "PipeServer.h"
+#include "SkseInterfaceProxy.h"
 
 namespace {
     std::unique_ptr<SkyrimMCP::PipeServer> g_pipeServer;
@@ -20,6 +21,17 @@ namespace {
 
                 SkyrimMCP::EventSystem::GetSingleton().Register();
                 SKSE::log::info("Event system registered");
+
+                // Command handlers live in SkyLinkAI\SkyLinkLogic.dll, which can be
+                // reloaded while the game runs. Load it before the pipe opens.
+                try {
+                    SkyrimMCP::HostCore::Start();
+                } catch (const std::exception& e) {
+                    SKSE::log::error("Could not start the logic DLL loader: {}", e.what());
+                } catch (...) {
+                    SKSE::log::error("Could not start the logic DLL loader");
+                }
+
                 g_pipeServer = std::make_unique<SkyrimMCP::PipeServer>();
                 g_pipeServer->Start();
                 SKSE::log::info("Pipe server started on \\\\.\\pipe\\SkyrimMCP");
@@ -62,6 +74,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
         SkyrimMCP::BuildInfo::GetBuildTime());
 
     SKSE::Init(a_skse);
+    SkyrimMCP::SkseInterfaceProxy::Capture(a_skse);  // the logic DLL's SKSE::Init uses this later
 
     // Steam, GOG and downgraded installs all report here; first thing to check in a bug report.
     SKSE::log::info("Skyrim runtime {}", REL::Module::get().version().string("."));

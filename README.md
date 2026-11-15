@@ -1,6 +1,6 @@
 # SkyLink AI
 
-A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. 74 tools for reading and modifying game state in real time — player stats, inventory, quests, NPCs, world interaction, combat, and more.
+A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. 89 tools for reading and modifying game state in real time — player stats, inventory, quests, NPCs, world interaction, combat, and more.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 
 **SKSE Plugin** (C++ DLL) — runs inside Skyrim's process via SKSE. Uses CommonLibSSE-NG for native engine access. Exposes 74 game actions over a named pipe (`\\.\pipe\SkyrimMCP`).
 
-**C# MCP Server** (.NET 10) — bridges Claude Desktop (stdio MCP) and the SKSE plugin (named pipe). 74 MCP tools auto-discovered via `[McpServerTool]` attributes.
+**C# MCP Server** (.NET 10) — bridges Claude Desktop (stdio MCP) and the SKSE plugin (named pipe). 89 MCP tools auto-discovered via `[McpServerTool]` attributes.
 
 ## Features
 
@@ -66,13 +66,17 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
   "mcpServers": {
     "skyrim": {
       "command": "dotnet",
-      "args": ["<SKYRIM_PATH>\\Data\\SKSE\\Plugins\\SkyLinkAI_Server\\SkyrimMCP.dll"]
+      "args": ["<SKYRIM_PATH>\\Data\\SKSE\\Plugins\\SkyLinkAI_Launcher\\SkyLinkLauncher.dll"]
     }
   }
 }
 ```
 
 Replace `<SKYRIM_PATH>` with your Skyrim installation path.
+
+The launcher runs the MCP server (`SkyLinkAI_Server\SkyrimMCP.dll`) and restarts it when a new version is installed, so updating SkyLink doesn't need a Claude restart. Changed behaviour applies on the next call. Claude Desktop doesn't re-read the tool list while a chat is open, though, so new tools and changed tool descriptions appear in a new chat (restart Claude if they still don't). Pointing `args` straight at `SkyLinkAI_Server\SkyrimMCP.dll` also works, as it did before 1.2.1.
+
+**Updating with the game running:** the plugin's command handlers live in `SKSE\Plugins\SkyLinkAI\SkyLinkLogic.dll`, which SkyLink reloads on the next call after a new version is installed (or ask Claude to run `reload_plugin`). Only a new `SkyrimMCPPlugin.dll` needs a game restart.
 
 ## Usage
 
@@ -91,7 +95,7 @@ Replace `<SKYRIM_PATH>` with your Skyrim installation path.
 "What Papyrus functions does the Experience mod expose?"
 ```
 
-With 74 tools covering player state, inventory, quests, NPCs, world interaction, combat, economy, magic, events, and a Papyrus VM bridge to 3,000+ mod functions — if Skyrim can do it, Claude can probably help.
+With 89 tools covering player state, inventory, quests, NPCs, world interaction, combat, economy, magic, events, and a Papyrus VM bridge to 3,000+ mod functions — if Skyrim can do it, Claude can probably help.
 
 See **[USAGE.md](USAGE.md)** for the full tool reference and advanced features.
 
@@ -105,17 +109,16 @@ $env:VCPKG_ROOT = "C:\vcpkg"
 # Clone CommonLibSSE-NG (one-time)
 git clone --depth 1 --branch v16.3.0 https://github.com/alandtse/CommonLibVR.git SkyrimMCPPlugin/extern/CommonLibSSE-NG
 
-# Build SKSE plugin
-cd SkyrimMCPPlugin
-cmake --preset default
-cmake --build build --config Release
+# Build both plugin DLLs (SkyrimMCPPlugin.dll + SkyLinkAI\SkyLinkLogic.dll); -Deploy copies them into Skyrim.
+# See build_plugin.ps1 for why it builds from a local mirror of the sources.
+.\build_plugin.ps1
 
-# Build MCP server
-dotnet build ..\SkyrimMCP
+# Build MCP server and launcher (-ServerOnly publishes them into Skyrim)
+dotnet build SkyrimMCP
+dotnet build SkyLinkLauncher
 
 # Or build release package
-cd ..
-.\build_release.ps1 -Version "1.1.0"
+.\build_release.ps1 -Version "1.2.1"
 ```
 
 ## Project Structure
