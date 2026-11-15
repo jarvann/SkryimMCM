@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 164,
-    "completed": 109,
+    "totalItems": 167,
+    "completed": 110,
     "completedPartial": 2,
     "implementedUntested": 3,
     "inProgress": 0,
-    "planned": 50,
-    "bugs": 20
+    "planned": 52,
+    "bugs": 21
   },
   "phases": [
     {
@@ -1278,6 +1278,20 @@
           "status": "planned",
           "title": "Per-plugin MCP tool generation",
           "description": "Auto-generate MCP tool definitions from scanned Papyrus functions. Each plugin gets its own tool group with proper descriptions derived from function signatures and script comments."
+        },
+        {
+          "id": "FEAT-227",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "RaceMenu integration (skee64.dll)",
+          "description": "General RaceMenu support, beyond hair and skin colour: detect skee64.dll (PLUG-004, INFRA-010) and use its Papyrus API through the existing bridge. Scope: read and set RaceMenu sliders and morphs (NiOverride), body morphs (SetBodyMorph + UpdateModelWeight), overlays such as tattoos and warpaint, hair and skin tint through RaceMenu when it is installed, and loading or saving presets (.jslot via CharGen). This is the base for 'create my character from a description' (FEAT-121 applies a blueprint with it) and for FEAT-208/209. Without RaceMenu, fall back to the native tools (FEAT-226, FEAT-208).",
+          "history": [
+            {
+              "datetime": "2026-11-15T12:30",
+              "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Jarvann replied (15 Nov) that working with other SKSE plugins is on the feature list and RaceMenu is a good first one."
+            }
+          ]
         }
       ]
     },
@@ -1761,6 +1775,20 @@
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
             }
           ]
+        },
+        {
+          "id": "FEAT-226",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Hair colour and skin tone (native, no RaceMenu needed)",
+          "description": "Tools to set hair colour and skin tone on the player (and later NPCs) with the game's own data, so they work in every load order: TESNPC headRelatedData->hairColor (BGSColorForm), TESNPC::bodyTintColor and the player's skin-tone tint mask, then Actor::UpdateHairColor() / UpdateSkinColor(). Accept a colour by name or RGB and report the old and new values. Logic-DLL only, so it ships as a hot reload. Separate from RaceMenu support (FEAT-227), not a replacement for it: when RaceMenu is installed its own tint and overlay data may override these values, so FEAT-227 decides which path to use. To check in game: whether the face needs a refresh of the tint masks or a 3D update, and NPC faces, whose baked FaceGen textures may not follow a skin-tone change.",
+          "history": [
+            {
+              "datetime": "2026-11-15T12:30",
+              "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Estimate: about 3\u20134 human hours; for Claude about 15\u201320 minutes and 60\u201380k tokens."
+            }
+          ]
         }
       ]
     },
@@ -1839,6 +1867,20 @@
             {
               "datetime": "2026-11-15T08:00",
               "note": "Found during the 1.2.1 in-game test. Fixed and confirmed in game: off/on matched what the player saw, both before and after reloads."
+            }
+          ]
+        },
+        {
+          "id": "BUG-021",
+          "type": "bug",
+          "status": "complete",
+          "priority": "medium",
+          "title": "Release zip needed manual fixing to install with MO2",
+          "description": "The zip had Data\\ plus a loose README.txt and example config at the top, so MO2 couldn't tell where the mod's files start and asked the player. build_release.ps1 now packages SKSE\\ at the top with the docs in SKSE\\Plugins\\SkyLinkAI\\, refuses anything beside SKSE\\, and writes the zip itself with Windows tar. The docs gained an MO2 note: point Claude Desktop at the mod's own folder, since it can't see MO2's virtual Data folder.",
+          "history": [
+            {
+              "datetime": "2026-11-15T12:30",
+              "note": "Reported by DutchiesCanadian on the Nexus posts tab (12 Nov 2026). Fixed 15 Nov: the live 1.2.1 zip was repackaged with the same binaries and replaced on GitHub and Nexus."
             }
           ]
         }
