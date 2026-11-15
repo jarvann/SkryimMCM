@@ -2,6 +2,7 @@
 #include "GameInterface.h"
 #include "TaskQueue.h"
 #include "LootManager.h"
+#include "AppearanceManager.h"
 
 #include <SKSE/SKSE.h>
 
@@ -247,6 +248,15 @@ namespace SkyrimMCP::Protocol {
         registry["get_colors"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
             return GameThread(id, [refId]() { return GameInterface::GetColors(refId); });
+        };
+        registry["list_head_part_choices"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::string type = params.value("type", "hair");
+            std::string order = params.value("order", "");
+            int start = params.value("start", 0);
+            int count = params.value("count", 21);
+            std::string around = params.value("aroundFormId", "");
+            return GameThread(id, [=]() { return AppearanceManager::ListHeadPartChoices(refId, type, order, start, count, around); });
         };
         registry["list_hair_colors"] = [](const std::string& id, const json& params) {
             bool all = params.value("includeNonPlayable", false);
