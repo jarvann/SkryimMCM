@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-12",
+  "lastUpdated": "2026-11-14",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 128,
-    "completed": 80,
+    "totalItems": 131,
+    "completed": 83,
     "completedPartial": 3,
     "implementedUntested": 2,
     "inProgress": 0,
     "planned": 60,
-    "bugs": 15
+    "bugs": 17
   },
   "phases": [
     {
@@ -1496,6 +1496,67 @@
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            }
+          ]
+        },
+        {
+          "id": "BUG-017",
+          "type": "bug",
+          "status": "complete",
+          "priority": "critical",
+          "title": "call_papyrus_function crashes the game when the function does not exist",
+          "description": "DispatchStaticCall was sent without checking the target. Fix: look up the script type in the VM first; require a global function with that name; check argument count and types against the declared parameters; reject Form/Actor/array parameters instead of sending them. Errors include the real signature. Also frees the argument object (was leaked).",
+          "history": [
+            {
+              "datetime": "2026-11-14T10:00",
+              "note": "Found 13 Nov 2026 in an in-game Claude Desktop session: calling PO3_SKSEFunctions.GetKnownEnchantments (not in the installed Papyrus Extender) through call_papyrus_function crashed the game inside SkyLink's Papyrus call. No save lost (manual save one minute earlier)."
+            },
+            {
+              "datetime": "2026-11-14T10:00",
+              "note": "Fix written on bugfix/papyrus-call-validation (PapyrusBridge.cpp). Needs a plugin build and an in-game test."
+            },
+            {
+              "datetime": "2026-11-14T19:00",
+              "note": "Verified in game with plugin 1.2.0: PO3_SKSEFunctions.GetKnownEnchantments is refused with 'Function not found', GetCurrentGameTime with an extra argument is refused with its signature, GetCurrentGameTime with no arguments returns the game time. No crash. The error text did not reach the AI (see BUG-018)."
+            }
+          ]
+        },
+        {
+          "id": "BUG-018",
+          "type": "bug",
+          "status": "complete",
+          "priority": "high",
+          "title": "Plugin error messages reach the AI as a bare 'An error occurred invoking'",
+          "description": "PipeClient threw InvalidOperationException/TimeoutException for plugin errors. The MCP SDK passes on the message only for McpException and replaces anything else with a generic text, so the AI never saw the reason (for example the Papyrus signature from BUG-017). Fix: PipeClient throws McpException for every failure.",
+          "history": [
+            {
+              "datetime": "2026-11-14T19:00",
+              "note": "Found during the BUG-017 in-game test: the plugin log shows the full error being sent, the AI got only the generic text. Fixed in SkyrimMCP/PipeClient.cs on bugfix/papyrus-call-validation; compiles. Needs a server publish and an in-game recheck."
+            },
+            {
+              "datetime": "2026-11-14T23:00",
+              "note": "Verified in game (plugin and server 1.2.0, built 22:48 local): the 'Function not found' text and the argument-count error with its signature now reach the AI in full."
+            }
+          ]
+        },
+        {
+          "id": "FEAT-211",
+          "type": "feature",
+          "status": "complete",
+          "title": "get_known_enchantments tool",
+          "description": "Lists enchantments flagged known (the enchanting-table list, same flag as Papyrus PlayerKnows), one entry per base enchantment, split into weapon and armor, with effects, plugin and armor-type restriction keywords. Effects flagged Hide in UI (script markers some mods add) are left out and counted.",
+          "history": [
+            {
+              "datetime": "2026-11-14T10:00",
+              "note": "Requested after BUG-017: the in-game session had no safe way to read learned enchantments. Written on bugfix/papyrus-call-validation; needs a plugin build and an in-game test."
+            },
+            {
+              "datetime": "2026-11-14T19:00",
+              "note": "In-game test: 45 entries (14 weapon, 31 armor); weapon list matches the enchanting table. learnedFrom was never filled: disenchanting flags the base enchantment, not the item enchantment, so the game has no record of the source item. Removed the field. Every armor entry carried a JEX_EnchEffect marker (magnitude 1000); now skipping effects flagged Hide in UI. Needs a rebuild and a recheck that the marker is gone."
+            },
+            {
+              "datetime": "2026-11-14T23:00",
+              "note": "Verified in game: 45 entries (31 armor, 14 weapon), no learnedFrom, JEX_EnchEffect gone, hiddenEffectsOmitted 32 (31 JEX markers plus vanilla Slow on Frost Damage, also flagged hidden; the enchanting table shows only Frost Damage, so the output now matches it). Weapon list matches the table; armor list to be checked by eye."
             }
           ]
         }
