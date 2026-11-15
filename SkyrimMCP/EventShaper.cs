@@ -40,7 +40,11 @@ public sealed class EventShaper
             }
 
             var collapsed = new JsonArray();
-            if (collapseQuestChurn) CollapseChurn(_backlog, collapsed);
+            if (collapseQuestChurn)
+            {
+                CollapseChurn(_backlog, collapsed);
+                CollapseBursts(_backlog, "lock_changed", collapsed);
+            }
 
             if (_backlog.Count > MaxBacklog)
             {
@@ -120,6 +124,42 @@ public sealed class EventShaper
         }
         events.Clear();
         events.AddRange(result);
+    }
+
+    /// <summary>Events of this type in one batch at or above this count become one summary event.</summary>
+    public const int BurstThreshold = 10;
+
+    /// <summary>
+    /// Replaces a burst of one event type (doors reporting lock changes as a cell loads) with a
+    /// single "&lt;type&gt;_burst" event holding the count and the first few events, placed where the
+    /// last one was.
+    /// </summary>
+    internal static void CollapseBursts(List<JsonNode> events, string type, JsonArray collapsedSummary)
+    {
+        var indexes = new List<int>();
+        for (var i = 0; i < events.Count; i++)
+            if (EventName(events[i]) == type) indexes.Add(i);
+        if (indexes.Count < BurstThreshold) return;
+
+        var sample = new JsonArray();
+        foreach (var i in indexes.Take(5)) sample.Add(events[i]["data"]?.DeepClone());
+        var summary = new JsonObject
+        {
+            ["type"] = "event",
+            ["event"] = type + "_burst",
+            ["data"] = new JsonObject { ["count"] = indexes.Count, ["first5"] = sample },
+        };
+        var last = indexes[^1];
+        var remove = indexes.ToHashSet();
+        var result = new List<JsonNode>(events.Count - indexes.Count + 1);
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (i == last) result.Add(summary);
+            else if (!remove.Contains(i)) result.Add(events[i]);
+        }
+        events.Clear();
+        events.AddRange(result);
+        collapsedSummary.Add(new JsonObject { ["event"] = type, ["events"] = indexes.Count });
     }
 
     private static string? EventName(JsonNode? e) =>
