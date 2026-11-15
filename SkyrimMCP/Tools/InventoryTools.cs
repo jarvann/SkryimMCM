@@ -26,11 +26,95 @@ public class InventoryTools : ToolBase
 
     [McpServerTool]
     [Description("Get all currently equipped items including armor, weapons, jewelry, and shield. " +
-        "Shows which slot each item occupies (head, body, hands, feet, leftHand, rightHand, etc.).")]
+        "Shows which slot each item occupies (head, body, hands, feet, leftHand, rightHand, etc.). " +
+        "leftHand and rightHand are always listed: an empty hand has empty=true; otherwise type is weapon, spell, shield, torch or scroll.")]
     public async Task<object> GetEquippedItems()
     {
         var data = await _pipe.SendRequestAsync("get_equipped_items");
         return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
+    [Description("Equip one or more items, spells or shouts in one call, on the player or (with refId) an NPC. " +
+        "items: a JSON array whose entries are FormID strings or {\"formId\": \"...\", \"hand\": \"left|right|both\"}, " +
+        "or a comma-separated list of FormIDs or known item names. " +
+        "hand applies to one-handed weapons and spells (spells default to the right hand; 'both' is for spells only). " +
+        "Items must already be in the actor's inventory; the copy it holds is equipped, so enchantments and tempering are kept. " +
+        "Spells equip even if the actor has not learned them. Each entry reports ok or an error; " +
+        "the game applies equips on its next frame, so confirm with GetEquippedItems. " +
+        "NPCs may switch back to their outfit when their cell reloads.")]
+    public async Task<object> EquipItems(string items, string? refId = null)
+    {
+        return await SendEquipItems(items, refId, unequip: false);
+    }
+
+    [McpServerTool]
+    [Description("Unequip one or more items, on the player or (with refId) an NPC. " +
+        "items: a JSON array of FormID strings or {\"formId\": \"...\"}, or a comma-separated list of FormIDs or known item names. " +
+        "Weapons, armor, ammo and torches can be unequipped; spells and shouts cannot yet (equip something else instead). " +
+        "Each entry reports ok or an error; confirm with GetEquippedItems.")]
+    public async Task<object> UnequipItems(string items, string? refId = null)
+    {
+        return await SendEquipItems(items, refId, unequip: true);
+    }
+
+    private async Task<object> SendEquipItems(string items, string? refId, bool unequip)
+    {
+        JsonArray list;
+        try
+        {
+            list = ParseItemList(items);
+        }
+        catch (Exception ex)
+        {
+            return new { error = $"Could not read items: {ex.Message}" };
+        }
+        if (list.Count == 0) return new { error = "No items given" };
+
+        var parms = new JsonObject { ["items"] = list, ["unequip"] = unequip };
+        if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
+        var data = await _pipe.SendRequestAsync("equip_items", parms);
+
+        var succeeded = data?["succeeded"]?.GetValue<int>() ?? 0;
+        if (succeeded > 0) await NotifyInGame($"{(unequip ? "Unequipped" : "Equipped")} {succeeded} item{(succeeded == 1 ? "" : "s")}");
+        return DeserializeResponse(data);
+    }
+
+    // Accepts a JSON array (strings or {formId, hand}) or "a, b, c". Known item names are
+    // resolved through SkyrimOffsets; anything else is passed on as a FormID.
+    internal static JsonArray ParseItemList(string items)
+    {
+        var text = items.Trim();
+        var list = new JsonArray();
+        if (text.StartsWith('['))
+        {
+            var parsed = JsonNode.Parse(text)?.AsArray() ?? throw new FormatException("expected a JSON array");
+            foreach (var node in parsed)
+            {
+                if (node is JsonValue v && v.TryGetValue<string>(out var id))
+                {
+                    list.Add(SkyrimOffsets.GetItemFormId(id) ?? id);
+                }
+                else if (node is JsonObject o)
+                {
+                    var entry = new JsonObject();
+                    var formId = o["formId"]?.GetValue<string>() ?? o["name"]?.GetValue<string>()
+                        ?? throw new FormatException("each object needs a formId");
+                    entry["formId"] = SkyrimOffsets.GetItemFormId(formId) ?? formId;
+                    if (o["hand"] is JsonNode hand) entry["hand"] = hand.GetValue<string>().ToLowerInvariant();
+                    list.Add(entry);
+                }
+                else
+                {
+                    throw new FormatException("entries must be FormID strings or objects");
+                }
+            }
+            return list;
+        }
+
+        foreach (var part in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            list.Add(SkyrimOffsets.GetItemFormId(part) ?? part);
+        return list;
     }
 
     [McpServerTool]

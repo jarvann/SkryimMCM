@@ -64,6 +64,7 @@ namespace SkyrimMCP {
         inline json RemoveItem(const std::string& formIdHex, int count) { return InventoryManager::RemoveItem(formIdHex, count); }
         inline json EquipItem(const std::string& formIdHex) { return InventoryManager::EquipItem(formIdHex); }
         inline json UnequipItem(const std::string& formIdHex) { return InventoryManager::UnequipItem(formIdHex); }
+        inline json EquipItems(const json& items, const std::string& refId, bool unequip) { return InventoryManager::EquipItems(items, refId, unequip); }
 
         // === Quests (QuestManager) ===
         inline json GetQuestInfo() { return QuestManager::GetQuestInfo(); }
