@@ -77,8 +77,7 @@ public class PipeClient : IPipeClient
                     bool connected = await TryConnectAsync();
                     if (!connected)
                     {
-                        throw new McpException(
-                            "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded.");
+                        throw new McpException(DescribeConnectFailure());
                     }
                 }
 
@@ -136,6 +135,35 @@ public class PipeClient : IPipeClient
         {
             _sendLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Why the pipe didn't answer, as far as the server can tell from outside the game (FEAT-210).
+    /// </summary>
+    internal static string DescribeConnectFailure()
+    {
+        bool running;
+        try
+        {
+            running = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Length > 0
+                   || System.Diagnostics.Process.GetProcessesByName("SkyrimVR").Length > 0;
+        }
+        catch
+        {
+            return "Cannot connect to Skyrim. Make sure the game is running with SKSE and the SkyrimMCPPlugin is loaded. " +
+                   "Call WaitForSkyrim to wait for it.";
+        }
+
+        if (!running)
+        {
+            return "Skyrim is not running. Start it through SKSE (skse64_loader.exe or your mod manager); SkyLink connects " +
+                   "once the game reaches the main menu. Call WaitForSkyrim to wait for it instead of retrying.";
+        }
+
+        return "Skyrim is running but SkyLink's plugin isn't answering. Usually the game is still starting: the plugin " +
+               "opens its connection when the main menu appears, so call WaitForSkyrim. If it never connects, check that " +
+               "SkyrimMCPPlugin.dll is in Data\\SKSE\\Plugins and listed as loaded in skse64.log, and that no other " +
+               "SkyLink client (another Claude Desktop window or a fork's in-game chat) is holding the connection.";
     }
 
     /// <summary>

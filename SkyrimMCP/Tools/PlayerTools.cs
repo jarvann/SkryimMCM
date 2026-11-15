@@ -27,6 +27,40 @@ public class PlayerTools : ToolBase
     private static readonly string? ServerSource = Environment.GetEnvironmentVariable("SKYLINK_SERVER_SOURCE");
 
     [McpServerTool]
+    [Description("Wait until Skyrim is running with SkyLink's plugin answering, then report the connection like CheckConnection. " +
+        "Use this when a call fails because the game isn't running or is still starting, instead of retrying by hand. " +
+        "Checks every 2 seconds for up to timeoutSeconds (default 120, max 600). The plugin answers from the main menu onward.")]
+    public async Task<object> WaitForSkyrim(int timeoutSeconds = 120)
+    {
+        timeoutSeconds = Math.Clamp(timeoutSeconds, 1, 600);
+        var started = DateTime.UtcNow;
+        var deadline = started.AddSeconds(timeoutSeconds);
+        var attempts = 0;
+        while (true)
+        {
+            attempts++;
+            if (await _pipe.PingAsync())
+            {
+                var waited = (int)(DateTime.UtcNow - started).TotalSeconds;
+                if (attempts > 1) await NotifyInGame("SkyLink connected");
+                return new { waitedSeconds = waited, attempts, connection = await CheckConnection() };
+            }
+            if (DateTime.UtcNow >= deadline) break;
+            var delay = TimeSpan.FromSeconds(2);
+            var left = deadline - DateTime.UtcNow;
+            await Task.Delay(left < delay ? left : delay);
+        }
+
+        return new
+        {
+            connected = false,
+            waitedSeconds = timeoutSeconds,
+            attempts,
+            message = PipeClient.DescribeConnectFailure()
+        };
+    }
+
+    [McpServerTool]
     [Description("Check if Skyrim is running and the SKSE MCP plugin is connected. Also reports which plugin and server builds " +
         "are loaded (version, build time, server path), so a stale build is easy to spot. 'logic' describes the plugin's " +
         "reloadable logic DLL (version, build time, when it was loaded, reload count). When the server runs under " +
