@@ -1,7 +1,14 @@
 #pragma once
 
+#include <cstddef>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
+
+namespace RE {
+    class BGSHeadPart;
+    class TESNPC;
+}
 
 namespace SkyrimMCP {
 
@@ -23,6 +30,18 @@ namespace SkyrimMCP {
 
         // color: "#RRGGBB" or "r,g,b". refresh rebuilds the actor's 3D (needed for the face).
         json SetSkinTone(const std::string& refId, const std::string& color, bool refresh);
+
+        // FEAT-209: the head parts a character menu offers for one type (playable, this sex,
+        // valid for this race, not an extra part), in one of the candidate orders:
+        // "editorId" (byte order, case-sensitive), "editorIdNoCase", "name", "loadOrder".
+        // RaceMenu's slider order isn't confirmed yet, so tools report the index in each.
+        inline constexpr const char* kHeadPartOrders[] = { "editorId", "editorIdNoCase", "name", "loadOrder" };
+        inline constexpr std::size_t kHeadPartOrderCount = 4;
+        std::vector<RE::BGSHeadPart*> HeadPartChoices(RE::TESNPC* npc, int type, const std::string& order);
+
+        // A page of that list, or the entries around one part: for checking against RaceMenu.
+        json ListHeadPartChoices(const std::string& refId, const std::string& type, const std::string& order,
+                                 int start, int count, const std::string& aroundFormId);
     }
 
 }

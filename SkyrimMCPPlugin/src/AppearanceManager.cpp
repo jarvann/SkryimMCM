@@ -9,6 +9,8 @@
 #include <climits>
 #include <cstdio>
 #include <format>
+#include <iterator>
+#include <utility>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -279,6 +281,93 @@ namespace SkyrimMCP::AppearanceManager {
             result["note"] = "NPC faces use pre-baked textures, so the face may not match the new body tone.";
         }
         return result;
+    }
+
+    namespace {
+        std::string EditorIdOf(RE::BGSHeadPart* part) {
+            const char* id = part->GetFormEditorID();
+            return (id && id[0]) ? id : std::format("{:08X}", part->GetFormID());
+        }
+
+        int HeadPartTypeFromName(const std::string& name) {
+            static const char* names[] = { "misc", "face", "eyes", "hair", "facialhair", "scar", "eyebrows" };
+            const auto wanted = Lower(name);
+            for (int i = 0; i < static_cast<int>(std::size(names)); ++i) {
+                if (wanted == names[i]) return i;
+            }
+            if (wanted == "brows") return 6;
+            if (wanted == "beard") return 4;
+            return -1;
+        }
+    }
+
+    std::vector<RE::BGSHeadPart*> HeadPartChoices(RE::TESNPC* npc, int type, const std::string& order) {
+        std::vector<RE::BGSHeadPart*> list;
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!npc || !dataHandler) return list;
+        auto* race = npc->GetRace();
+        const bool female = npc->GetSex() == RE::SEX::kFemale;
+        for (auto* part : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
+            if (!part || part->IsExtraPart()) continue;
+            if (!part->flags.all(RE::BGSHeadPart::Flag::kPlayable)) continue;
+            if (static_cast<int>(std::to_underlying(part->type.get())) != type) continue;
+            if (!part->flags.all(female ? RE::BGSHeadPart::Flag::kFemale : RE::BGSHeadPart::Flag::kMale)) continue;
+            if (race && part->validRaces && !part->validRaces->HasForm(race)) continue;
+            list.push_back(part);
+        }
+        if (order == "loadOrder") return list;  // the data handler's order
+        std::vector<std::pair<std::string, RE::BGSHeadPart*>> keyed;
+        keyed.reserve(list.size());
+        for (auto* part : list) {
+            std::string key;
+            if (order == "name") {
+                const char* name = part->GetName();
+                key = (name && name[0]) ? name : EditorIdOf(part);
+            } else {
+                key = EditorIdOf(part);
+            }
+            if (order == "editorIdNoCase" || order == "name") key = Lower(key);
+            keyed.emplace_back(std::move(key), part);
+        }
+        std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (std::size_t i = 0; i < keyed.size(); ++i) list[i] = keyed[i].second;
+        return list;
+    }
+
+    json ListHeadPartChoices(const std::string& refId, const std::string& type, const std::string& order,
+                             int start, int count, const std::string& aroundFormId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor) return {{"error", "Actor not found: " + refId}};
+        auto* npc = actor->GetActorBase();
+        const int t = HeadPartTypeFromName(type);
+        if (t < 0) return {{"error", "type must be hair, eyes, eyebrows, facialHair, scar, face or misc"}};
+        const std::string ord = order.empty() ? "editorId" : order;
+        if (std::find_if(std::begin(kHeadPartOrders), std::end(kHeadPartOrders), [&](const char* o) { return ord == o; }) == std::end(kHeadPartOrders))
+            return {{"error", "order must be editorId, editorIdNoCase, name or loadOrder"}};
+
+        auto list = HeadPartChoices(npc, t, ord);
+        count = std::clamp(count, 1, 200);
+        if (!aroundFormId.empty()) {
+            RE::FormID wanted = 0;
+            try { wanted = Helpers::ParseFormId(aroundFormId); } catch (...) { return {{"error", "Invalid aroundFormId"}}; }
+            auto it = std::find_if(list.begin(), list.end(), [&](RE::BGSHeadPart* p) { return p->GetFormID() == wanted; });
+            if (it == list.end()) return {{"error", "That head part isn't in this list (wrong type, sex or race, or not playable)"}};
+            start = static_cast<int>(it - list.begin()) - count / 2;
+        }
+        start = std::clamp(start, 0, std::max(0, static_cast<int>(list.size()) - 1));
+
+        json entries = json::array();
+        for (int i = start; i < static_cast<int>(list.size()) && i < start + count; ++i) {
+            auto* part = list[i];
+            json e;
+            e["index"] = i;
+            e["formId"] = std::format("{:08X}", part->GetFormID());
+            e["editorId"] = EditorIdOf(part);
+            if (const char* name = part->GetName(); name && name[0]) e["name"] = name;
+            if (auto* file = part->GetFile(0)) e["mod"] = file->fileName;
+            entries.push_back(std::move(e));
+        }
+        return {{"type", type}, {"order", ord}, {"total", list.size()}, {"start", start}, {"entries", entries}};
     }
 
 }
