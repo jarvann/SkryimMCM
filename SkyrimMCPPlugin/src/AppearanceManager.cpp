@@ -93,7 +93,7 @@ namespace SkyrimMCP::AppearanceManager {
         std::vector<RE::TintMask*> PlayerSkinToneMasks(RE::PlayerCharacter* player) {
             std::vector<RE::TintMask*> masks;
             for (auto* mask : player->GetPlayerRuntimeData().tintMasks) {
-                if (mask && mask->type.all(RE::TintMask::Type::kSkinTone)) masks.push_back(mask);
+                if (mask && mask->type.get() == RE::TintMask::Type::kSkinTone) masks.push_back(mask);  // a value, not a bit flag
             }
             return masks;
         }
