@@ -7,6 +7,7 @@
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <cctype>
 #include <format>
 #include <iterator>
 #include <utility>
@@ -501,22 +502,40 @@ namespace SkyrimMCP::PlayerQueries {
             result["facePresets"] = parts;
         }
 
-        // Head parts. FEAT-209: menuIndex is the part's position (1-based) among the playable
-        // parts of the same type for this race and sex, in load order: the number the
-        // character menu's slider shows. RaceMenu usually matches; a mod that re-sorts the
-        // list can differ.
+        // Head parts. FEAT-209: menuIndex is the part's position (0-based) among the playable
+        // parts of the same type for this race and sex, sorted by editor ID without regard to
+        // case: the number RaceMenu's slider shows (checked in game 2026-11-15: KSSMP hair).
+        // choiceCounts reports the list size under looser filters, because RaceMenu showed two
+        // more hairs than the default filter finds and the difference isn't known yet.
         static const char* typeNames[] = { "misc", "face", "eyes", "hair", "facialHair", "scar", "eyebrows" };
         auto* race = base->GetRace();
         const bool female = base->GetSex() == RE::SEX::kFemale;
-        std::vector<RE::BGSHeadPart*> choices[std::to_underlying(RE::BGSHeadPart::HeadPartType::kTotal)];
+        constexpr auto kTypes = static_cast<std::size_t>(std::to_underlying(RE::BGSHeadPart::HeadPartType::kTotal));
+        std::vector<RE::BGSHeadPart*> choices[kTypes];
+        int withExtraParts[kTypes] = {};
+        int ignoringSex[kTypes] = {};
+        int ignoringRace[kTypes] = {};
+        auto sortKey = [](RE::BGSHeadPart* part) {
+            const char* editorId = part->GetFormEditorID();
+            std::string key = (editorId && editorId[0]) ? editorId : std::format("{:08X}", part->GetFormID());
+            std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return key;
+        };
         if (auto* dataHandler = RE::TESDataHandler::GetSingleton()) {
             for (auto* candidate : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
-                if (!candidate || candidate->IsExtraPart()) continue;
-                if (!candidate->flags.all(RE::BGSHeadPart::Flag::kPlayable)) continue;
-                if (!candidate->flags.all(female ? RE::BGSHeadPart::Flag::kFemale : RE::BGSHeadPart::Flag::kMale)) continue;
-                if (race && candidate->validRaces && !candidate->validRaces->HasForm(race)) continue;
-                const auto t = std::to_underlying(candidate->type.get());
-                if (t >= 0 && t < static_cast<int>(std::size(choices))) choices[t].push_back(candidate);
+                if (!candidate || !candidate->flags.all(RE::BGSHeadPart::Flag::kPlayable)) continue;
+                const auto t = static_cast<std::size_t>(std::to_underlying(candidate->type.get()));
+                if (t >= kTypes) continue;
+                const bool sexOk = candidate->flags.all(female ? RE::BGSHeadPart::Flag::kFemale : RE::BGSHeadPart::Flag::kMale);
+                const bool raceOk = !race || !candidate->validRaces || candidate->validRaces->HasForm(race);
+                const bool extra = candidate->IsExtraPart();
+                if (sexOk && raceOk) ++withExtraParts[t];
+                if (!extra && raceOk) ++ignoringSex[t];
+                if (!extra && sexOk) ++ignoringRace[t];
+                if (sexOk && raceOk && !extra) choices[t].push_back(candidate);
+            }
+            for (auto& list : choices) {
+                std::stable_sort(list.begin(), list.end(), [&](RE::BGSHeadPart* a, RE::BGSHeadPart* b) { return sortKey(a) < sortKey(b); });
             }
         }
 
@@ -535,11 +554,13 @@ namespace SkyrimMCP::PlayerQueries {
                                                                                           : std::format("other ({})", t);
                 if (const char* editorId = part->GetFormEditorID(); editorId && editorId[0]) hp["editorId"] = editorId;
                 if (auto* file = part->GetFile(0)) hp["mod"] = file->fileName;
-                if (t >= 0 && t < static_cast<int>(std::size(choices))) {
+                if (t >= 0 && static_cast<std::size_t>(t) < kTypes) {
                     auto& list = choices[t];
                     auto it = std::find(list.begin(), list.end(), part);
-                    if (it != list.end()) hp["menuIndex"] = static_cast<int>(it - list.begin()) + 1;
+                    if (it != list.end()) hp["menuIndex"] = static_cast<int>(it - list.begin());
                     hp["menuChoices"] = list.size();
+                    hp["choiceCounts"] = {{"withExtraParts", withExtraParts[t]}, {"ignoringSex", ignoringSex[t]},
+                                          {"ignoringRace", ignoringRace[t]}};
                 }
                 headParts.push_back(hp);
             }

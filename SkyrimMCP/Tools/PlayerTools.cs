@@ -154,8 +154,9 @@ public class PlayerTools : ToolBase
     [McpServerTool]
     [Description("Get the player's appearance data: race, sex, weight, height, all 19 face morph values, " +
         "face presets, and head parts (hair, eyes, etc.). Use this for character recreation or face morphing. " +
-        "Each head part has typeName and menuIndex: its number among the playable choices of that type for this race and sex " +
-        "(the slider number in the character menu, out of menuChoices). RaceMenu usually shows the same number. " +
+        "Each head part has typeName and menuIndex: its 0-based number among the playable choices of that type for this race and sex, " +
+        "sorted by editor ID like RaceMenu's slider (out of menuChoices). choiceCounts gives the list size under looser filters, " +
+        "for checking against the slider's range. " +
         "Hair colour and skin tone: GetHairAndSkinColor.")]
     public async Task<object> GetAppearance()
     {
