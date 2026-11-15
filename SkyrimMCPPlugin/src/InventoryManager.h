@@ -12,6 +12,7 @@ namespace SkyrimMCP {
         json RemoveItem(const std::string& formIdHex, int count);
         json EquipItem(const std::string& formIdHex);
         json UnequipItem(const std::string& formIdHex);
+        json EquipItems(const json& items, const std::string& refId, bool unequip);
     }
 
 }

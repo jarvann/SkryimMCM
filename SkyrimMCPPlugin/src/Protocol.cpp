@@ -234,6 +234,14 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [command]() { return GameInterface::ExecuteConsoleCommand(command); });
         };
 
+        // FEAT-205: {"items": ["0001397E", {"formId": "...", "hand": "left"}], "refId": "", "unequip": false}
+        registry["equip_items"] = [](const std::string& id, const json& params) {
+            json items = params.value("items", json::array());
+            std::string refId = params.value("refId", "");
+            bool unequip = params.value("unequip", false);
+            return GameThread(id, [items, refId, unequip]() { return GameInterface::EquipItems(items, refId, unequip); });
+        };
+
         registry["add_item"] = [](const std::string& id, const json& params) {
             std::string formId = params.value("formId", "");
             int count = params.value("count", 1);
