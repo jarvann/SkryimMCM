@@ -53,6 +53,7 @@ set(LOGIC_SOURCES
     src/PlayerQueries.cpp
     src/AppearanceManager.cpp
     src/LootManager.cpp
+    src/ScriptStats.cpp
     src/Protocol.cpp
     src/QuestManager.cpp
     src/TaskQueue.cpp
