@@ -45,7 +45,8 @@ namespace SkyrimMCP {
 
         // Parts of one type the menu list leaves out by exactly one rule (playable, sex, race,
         // extra part), to find what RaceMenu shows that the list doesn't.
-        json ExcludedHeadParts(const std::string& refId, const std::string& type);
+        json ExcludedHeadParts(const std::string& refId, const std::string& type, int start, int count,
+                               const std::string& rule, const std::string& explain);
 
         // FEAT-208: change head parts. part is a FormID or editor ID; or type + index (menu order).
         // Misc parts are added (several can be worn), other types replace the current part.

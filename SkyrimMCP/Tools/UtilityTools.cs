@@ -317,6 +317,32 @@ public class UtilityTools : ToolBase
         return DeserializeResponse(data);
     }
 
+    // Waits until the file stops growing, then renames ScreenShotN.png to ScreenShot_yyyy-MM-dd_HH-mm-ss.png.
+    // Leaves it where it is if it can't be renamed.
+    private static async Task<FileInfo> KeepScreenshot(FileInfo file)
+    {
+        long last = -1;
+        for (var i = 0; i < 40; i++)
+        {
+            file.Refresh();
+            if (file.Length > 0 && file.Length == last) break;
+            last = file.Length;
+            await Task.Delay(250);
+        }
+        var stem = Path.GetFileNameWithoutExtension(file.Name);
+        var digits = stem.Length - stem.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9').Length;
+        var prefix = digits > 0 ? stem[..^digits] : stem;
+        var target = Path.Combine(file.DirectoryName!, $"{prefix}_{file.LastWriteTime:yyyy-MM-dd_HH-mm-ss}{file.Extension}");
+        try
+        {
+            if (File.Exists(target)) return file;
+            file.MoveTo(target);
+            return new FileInfo(target);
+        }
+        catch (IOException) { return file; }
+        catch (UnauthorizedAccessException) { return file; }
+    }
+
     [McpServerTool]
     [Description("Take a screenshot with the game's own Print Screen handler, then wait for the file and report its path. " +
         "The game writes it where Skyrim.ini's sScreenShotBaseName points (the game folder by default) and only while it is " +
@@ -349,8 +375,18 @@ public class UtilityTools : ToolBase
                 .FirstOrDefault();
             if (file != null)
             {
+                // The game numbers screenshots from 0 each session and overwrites older files of the
+                // same name, so give this one a timestamped name once it has finished writing.
+                var saved = await KeepScreenshot(file);
                 await NotifyInGame("Screenshot taken");
-                return new { success = true, file = file.FullName, bytes = file.Length };
+                return new
+                {
+                    success = true,
+                    file = saved.FullName,
+                    written = saved.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    bytes = saved.Length,
+                    renamedFrom = saved.FullName == file.FullName ? null : file.Name,
+                };
             }
         }
         return new
