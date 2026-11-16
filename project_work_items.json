@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-15",
+  "lastUpdated": "2026-11-16",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 167,
-    "completed": 120,
+    "totalItems": 195,
+    "completed": 124,
     "completedPartial": 2,
-    "implementedUntested": 6,
+    "implementedUntested": 15,
     "inProgress": 0,
-    "planned": 42,
-    "bugs": 21
+    "planned": 25,
+    "bugs": 22
   },
   "phases": [
     {
@@ -1296,7 +1296,7 @@
         {
           "id": "FEAT-227",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "RaceMenu integration (skee64.dll)",
           "description": "General RaceMenu support, beyond hair and skin colour: detect skee64.dll (PLUG-004, INFRA-010) and use its Papyrus API through the existing bridge. Scope: read and set RaceMenu sliders and morphs (NiOverride), body morphs (SetBodyMorph + UpdateModelWeight), overlays such as tattoos and warpaint, hair and skin tint through RaceMenu when it is installed, and loading or saving presets (.jslot via CharGen). This is the base for 'create my character from a description' (FEAT-121 applies a blueprint with it) and for FEAT-208/209. Without RaceMenu, fall back to the native tools (FEAT-226, FEAT-208).",
@@ -1304,6 +1304,10 @@
             {
               "datetime": "2026-11-15T12:30",
               "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Jarvann replied (15 Nov) that working with other SKSE plugins is on the feature list and RaceMenu is a good first one."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: RaceMenu tools through NiOverride/CharGen (body morphs, overlays, presets); the Papyrus bridge now passes forms/references and returns arrays (host change). Not tested in game yet."
             }
           ],
           "targetRelease": "1.3"
@@ -1319,7 +1323,7 @@
         {
           "id": "FEAT-205",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Equip / unequip MCP tools",
           "description": "Plugin already handles equip_item and unequip_item (Protocol.cpp) but the C# server exposes no tool for them. Ten items had to be equipped through ten console commands. Add EquipItem/UnequipItem tools, ideally accepting a list.",
           "history": [
@@ -1334,6 +1338,10 @@
             {
               "datetime": "2026-11-15T16:00",
               "note": "Tested in game: unequip/equip torch by FormID, spell to left hand, two items in one call, not-in-inventory error. Weapon hand path still to run."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Right-hand weapon equip passed in game 2026-11-16; all equip tests now pass."
             }
           ],
           "targetRelease": "1.3"
@@ -1341,13 +1349,17 @@
         {
           "id": "FEAT-206",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Portable form IDs in the blueprint",
           "description": "Store plugin name plus local form ID for every modded form so a blueprint survives a load-order change. Resolve back to a runtime ID on import. Prerequisite for FEAT-121.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: GetCharacterBlueprint adds <key>Source {plugin, localId} next to every form ID, formatVersion 2. Not tested in game yet."
             }
           ],
           "targetRelease": "1.3"
@@ -1355,13 +1367,17 @@
         {
           "id": "FEAT-207",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "One-call apply blueprint with dry run",
           "description": "Single call that adds items, equips them and restores gold from a blueprint, with a dry-run option that reports what would change. First deliverable slice of FEAT-121 (inventory/equipment/gold sections only).",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: ApplyBlueprint (dry run by default) adds missing items, raises gold, equips. Not tested in game yet."
             }
           ],
           "targetRelease": "1.3"
@@ -1369,13 +1385,17 @@
         {
           "id": "FEAT-208",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Appearance write tools",
           "description": "Head parts can be read but not changed. Add tools to set or remove head parts (the case that prompted it: fixing horns directly). Relates to FEAT-121 appearance section.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: SetHeadPart (FormID/editor ID or type+menu index) and RemoveHeadPart (not face/eyes). Not tested in game yet."
             }
           ],
           "targetRelease": "1.3"
@@ -1383,13 +1403,17 @@
         {
           "id": "FEAT-209",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Slider / part index in appearance read",
           "description": "get_appearance should include the RaceMenu slider or part index for each head part so 'which number was that hair' has an answer.",
           "history": [
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "menuIndex order confirmed for hair (1160 = RaceMenu). Eyes 96 / brows 165 and the 2 missing hairs still to check in RaceMenu."
             }
           ],
           "targetRelease": "1.3"
@@ -1419,7 +1443,7 @@
         {
           "id": "INFRA-015",
           "type": "infrastructure",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "poll_events: smaller default page and mute quest start/stop churn",
           "description": "One poll returned 500 events and about 59,000 characters; 365 were quest start/stop noise, 250 from a single quest ('Quest Alias NPC') cycling. Lower the default page size and mute or collapse repeated start/stop of the same quest.",
           "history": [
@@ -1430,6 +1454,10 @@
             {
               "datetime": "2026-11-15T14:30",
               "note": "Done in the C# server (no host change): PollEvents returns maxEvents (default 50), keeps the rest for the next poll (remaining), collapses quests with 3+ start/stops into quest_churn. Branch per item, merged to develop; deployed by hot reload while Cory plays."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Passed in game 2026-11-16: 13 events, remaining 0; 102 lock changes as one lock_changed_burst, quest churn as one quest_churn."
             }
           ],
           "targetRelease": "1.3"
@@ -1488,6 +1516,10 @@
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Procedure written in docs/1.3-test-plan.md step 10 (AddItem one gold as the first call after a Skyrim restart; gold must rise by exactly 1). Code review: the client only resends when the write itself fails, so a request can't run twice."
             }
           ],
           "targetRelease": "1.3"
@@ -1502,6 +1534,10 @@
             {
               "datetime": "2026-11-12T22:00",
               "note": "Reported from the 1.1.0 smoke-test and play sessions, 10-12 Nov 2026."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "No GOG copy and no reply yet. Build 13 adds CheckConnection diagnostics (store, Address Library file, game-thread tasks queued vs run, diagnostics.problem) so the next GOG report shows whether SKSE runs SkyLink's tasks at all. Host DLL change."
             }
           ],
           "targetRelease": "1.3"
@@ -1773,7 +1809,7 @@
         {
           "id": "FEAT-219",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Crash recorder: what SkyLink and the game did just before a crash",
           "description": "The host DLL (never unloaded) keeps a ring buffer of the last few hundred events: AI tool calls, Papyrus calls, game events, current cell, quest stage changes. A vectored exception handler writes it to a file on a fatal exception, then lets Crash Logger SSE write its normal report (chained, never swallowing the crash). On the next launch the AI reads both together (with FEAT-217) to explain the crash. Does not try to recover or to make an emergency save: the game state is already damaged by then.",
@@ -1781,6 +1817,10 @@
             {
               "datetime": "2026-11-15T05:30",
               "note": "Discussed with Cory 15 Nov 2026 after asking whether SkyLink could catch every plugin's CTD. A catch-all is not safe (skipping a fault turns it into a hang or a corrupt save); recording context is. Estimate with FEAT-220 and FEAT-217: 14-22 human hours; about 1-1.5 h and 350-500k tokens for Claude, plus one deliberate test crash in game."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: host CrashRecorder, a memory-mapped ring of 512 entries (requests, events, cell, Papyrus, notes) in My Games\\...\\SkyLinkAI\\crash-recorder.bin; previous unclean session kept as crash-recorder-previous.bin; GetCrashLog shows it. Host DLL: needs a deploy with the game closed."
             }
           ],
           "targetRelease": "1.3"
@@ -1788,7 +1828,7 @@
         {
           "id": "FEAT-220",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Crash protection for every game-thread task SkyLink runs",
           "description": "Extend the SEH guard that already wraps console commands to every TaskQueue job, so an AI request that hits a bad form or pointer comes back as an error instead of a CTD. Only covers SkyLink's own calls, not other plugins.",
@@ -1796,6 +1836,10 @@
             {
               "datetime": "2026-11-15T05:30",
               "note": "Part of the crash discussion with Cory, 15 Nov 2026; see FEAT-219."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built 2026-11-15: TaskQueue SEH guard (CallGuarded/FaultFilter) on every game-thread task. No fault has occurred to exercise it."
             }
           ],
           "targetRelease": "1.3"
@@ -1818,6 +1862,10 @@
             {
               "datetime": "2026-11-16T00:00",
               "note": "TransferItems passed in game (build 9, player chest 0300309E): dry run with crosshair and no menu listed 24 smithing stacks (value 8,076) and moved nothing; real run moved exactly those; with the chest menu open, to=container moved 16 ingredient stacks; reverse from=container returned all 24. Observations: smithing follows the game's vendor keywords, so Quarried Stone and Dwemer scrap are included (clay, logs, nails, hinges, glass are not); whether the open container menu refreshes during a transfer is unconfirmed. Still open: LootBodies retest on build 9 (worn gear, hidden items), includeGold=false, real run with categories=all."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "2026-11-16: LootBodies retest, minValue, radius and a real run with categories=all pass (worn pieces taken, marked equipped). includeGold=false still took gold ('valuables' and 'all' both match gold); fixed in build 14 with an explicit exclude."
             }
           ],
           "targetRelease": "1.3"
@@ -1825,7 +1873,7 @@
         {
           "id": "INFRA-020",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "complete",
           "title": "Configurable file paths for Wabbajack and MO2 lists",
           "description": "Let players set the paths SkyLink uses for INI and config files (and the Data folder) when a Wabbajack or MO2 setup uses nonstandard locations, instead of relying on junctions.",
           "history": [
@@ -1836,6 +1884,10 @@
             {
               "datetime": "2026-11-15T16:00",
               "note": "Tested in game: skyrimPath found from the server install location; ListPluginConfigs finds po3 files."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Passed in game 2026-11-15 (settings and config tools)."
             }
           ],
           "targetRelease": "1.3"
@@ -1843,13 +1895,17 @@
         {
           "id": "FEAT-221",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Skyrim guidebook the AI checks first",
           "description": "Give the AI a game reference (quests, locations, skills, crafting, alchemy) and tell it to look there before answering a help question, so answers come from the book rather than memory. Options: an MCP resource or a search tool over a bundled reference. Licence check before bundling anything: UESP text is CC BY-SA 2.5 (attribution and share-alike).",
           "history": [
             {
               "datetime": "2026-11-15T00:00",
               "note": "Idea from KringleKiller's in-game client fork of SkyLink (Nexus DM to Jarvann, 2026-11-12), where it already works. Credit them in the release notes if adopted; check what they can share first."
+            },
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Built: SearchGuidebook and GetGuidebookPage over the live UESP API (CC BY-SA 2.5 attribution in every reply, 7-day cache), plus MCP server instructions telling the AI to check it first. Not tested in game yet."
             }
           ],
           "targetRelease": "1.3"
@@ -2030,6 +2086,20 @@
               "note": "Reported by DutchiesCanadian on the Nexus posts tab (12 Nov 2026). Fixed 15 Nov: the live 1.2.1 zip was repackaged with the same binaries and replaced on GitHub and Nexus."
             }
           ]
+        },
+        {
+          "id": "BUG-022",
+          "type": "bug",
+          "status": "implemented-untested",
+          "title": "KillActor leaves the actor standing",
+          "description": "KillActor marked the actor dead (isDead true, LootBodies treats it as a body) but the death never played: it stayed upright and animated, and followers kept attacking it. Console kill on an identical bandit fell normally (2026-11-16, Lakeview cellar). KillActor used Actor::KillImmediate.",
+          "history": [
+            {
+              "datetime": "2026-11-16T16:00",
+              "note": "Fixed in build 14: KillActor calls Actor::KillImpl(nullptr, 0, sendEvent=true, ragdollInstant=false), the game's kill routine the console and Papyrus Actor.Kill use."
+            }
+          ],
+          "targetRelease": "1.3"
         }
       ]
     }
@@ -2095,10 +2165,16 @@
     {
       "id": "INFRA-006",
       "type": "infrastructure",
-      "status": "planned",
+      "status": "complete",
       "title": "Config file",
       "description": ".ini or .toml for pipe name, log level, feature toggles.",
-      "targetRelease": "1.3"
+      "targetRelease": "1.3",
+      "history": [
+        {
+          "datetime": "2026-11-16T16:00",
+          "note": "Passed in game 2026-11-15 (settings.json, GetSkyLinkSettings/SetSkyLinkSetting)."
+        }
+      ]
     },
     {
       "id": "INFRA-007",
@@ -2172,10 +2248,16 @@
     {
       "id": "FEAT-150",
       "type": "feature",
-      "status": "planned",
+      "status": "implemented-untested",
       "title": "GetScriptStats \u2014 Papyrus VM diagnostics",
       "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods.",
-      "targetRelease": "1.3"
+      "targetRelease": "1.3",
+      "history": [
+        {
+          "datetime": "2026-11-16T16:00",
+          "note": "Built (ScriptStats.cpp, GetScriptStats). In game: runningStacks, states and top lists work (about 22 stacks, never overstressed over 5 samples). attachedScripts and arrays read 0 (the VM only fills those while saving); fixed in build 14 to count the live tables (objectsWithScripts, arrays)."
+        }
+      ]
     },
     {
       "id": "BUG-011",
