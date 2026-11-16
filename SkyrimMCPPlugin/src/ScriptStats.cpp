@@ -67,8 +67,16 @@ namespace SkyrimMCP::ScriptStats {
         json result;
         result["overstressed"] = impl->overstressed;
         result["waitingFunctionMessages"] = impl->uiWaitingFunctionMessages;
-        result["attachedScripts"] = impl->scriptCount;
-        result["arrays"] = impl->arrayCount;
+        // scriptCount/arrayCount are only filled in while saving (they read 0 in play), so count
+        // the live tables instead.
+        {
+            RE::BSSpinLockGuard guard(impl->attachedScriptsLock);
+            result["objectsWithScripts"] = impl->attachedScripts.size();
+        }
+        {
+            RE::BSSpinLockGuard guard(impl->arraysLock);
+            result["arrays"] = impl->arrays.size();
+        }
         result["frozenStacks"] = impl->frozenStacksCount;
 
         std::map<std::string, int> byState, byCurrentFunction, byScript, byEntryPoint;

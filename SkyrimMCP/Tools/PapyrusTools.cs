@@ -101,7 +101,7 @@ public class PapyrusTools : ToolBase
     [McpServerTool]
     [Description("Papyrus script engine diagnostics, to find the mod behind script lag or a save that bloats. " +
         "Reports runningStacks (scripts active right now), how many wait on latent functions, waitingFunctionMessages, " +
-        "overstressed, attachedScripts and arrays, and the busiest scripts: topScripts (scripts on any running stack), " +
+        "overstressed, objectsWithScripts (game objects with scripts attached) and arrays, and the busiest scripts: topScripts (scripts on any running stack), " +
         "topEntryPoints (where each call started, usually a mod's event handler) and topCurrentFunctions. " +
         "samples (default 1, max 20) takes several snapshots intervalMs apart (default 500) and adds them up, " +
         "which shows steady load better than one snapshot. top (default 15) is how many scripts to list. " +
@@ -153,7 +153,7 @@ public class PapyrusTools : ToolBase
             ["runningStacks"] = new JsonObject { ["min"] = running.Min(), ["max"] = running.Max(), ["average"] = Math.Round(running.Average(), 1) },
             ["waitingFunctionMessages"] = new JsonObject { ["min"] = waiting.Min(), ["max"] = waiting.Max() },
             ["overstressedSamples"] = overstressed,
-            ["attachedScripts"] = last?["attachedScripts"]?.DeepClone(),
+            ["objectsWithScripts"] = last?["objectsWithScripts"]?.DeepClone(),
             ["arrays"] = last?["arrays"]?.DeepClone(),
             ["topScripts"] = Top(sums["topScripts"]),
             ["topEntryPoints"] = Top(sums["topEntryPoints"]),
