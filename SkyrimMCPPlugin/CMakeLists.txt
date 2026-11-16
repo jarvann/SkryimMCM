@@ -35,6 +35,7 @@ add_subdirectory(extern/CommonLibSSE-NG)
 #                               while the game runs, so most changes need no restart
 set(HOST_SOURCES
     src/BuildInfo.cpp
+    src/CrashRecorder.cpp
     src/EventSystem.cpp
     src/HostCore.cpp
     src/LogicLoader.cpp

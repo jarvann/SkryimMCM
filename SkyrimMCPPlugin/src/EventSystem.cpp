@@ -1,6 +1,9 @@
 #include "EventSystem.h"
+#include "CrashRecorder.h"
 #include "Helpers.h"
 
+#include <atomic>
+#include <chrono>
 #include <format>
 #include <unordered_set>
 
@@ -84,8 +87,35 @@ namespace SkyrimMCP {
         return false;
     }
 
+    // Crash recorder (FEAT-219). Hits and inventory changes can arrive many times a second
+    // in a fight or while looting; at most one of each per half second is recorded, so they
+    // do not push SkyLink's requests out of the ring buffer.
+    static bool RecorderThrottled(const std::string& eventType) {
+        static std::atomic<long long> lastHit{ 0 };
+        static std::atomic<long long> lastInventory{ 0 };
+        std::atomic<long long>* last = eventType == "hit" ? &lastHit
+            : eventType == "inventory_change"              ? &lastInventory
+                                                           : nullptr;
+        if (!last) return false;
+        const long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        long long previous = last->load();
+        if (now - previous < 500) return true;
+        return !last->compare_exchange_strong(previous, now);
+    }
+
+    static void RecordEvent(const std::string& eventType, const json& data) {
+        if (!CrashRecorder::Enabled() || RecorderThrottled(eventType)) return;
+        try {
+            const auto kind = eventType == "location_change" ? CrashRecorder::Kind::Cell : CrashRecorder::Kind::Event;
+            CrashRecorder::Recordf(kind, "{} {}", eventType, data.dump(-1, ' ', false, json::error_handler_t::replace));
+        } catch (...) {
+        }
+    }
+
     void EventSystem::PushEvent(const std::string& eventType, json data) {
         bool muted = IsMutedEvent(eventType, data);
+        if (!muted) RecordEvent(eventType, data);
 
         std::lock_guard lock(_mutex);
 
@@ -199,6 +229,23 @@ namespace SkyrimMCP {
 
     RE::BSEventNotifyControl EventSystem::ProcessEvent(const RE::TESCellFullyLoadedEvent* event, RE::BSTEventSource<RE::TESCellFullyLoadedEvent>*) {
         if (!event || !event->cell) return RE::BSEventNotifyControl::kContinue;
+
+        // cell_loaded is muted (dozens per fast travel), so the crash recorder notes only
+        // the player's own cell, and only when it changes.
+        if (CrashRecorder::Enabled()) {
+            static std::atomic<RE::FormID> lastPlayerCell{ 0 };
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* cell = player ? player->GetParentCell() : nullptr;
+            if (cell) {
+                const RE::FormID cellId = cell->GetFormID();
+                if (lastPlayerCell.exchange(cellId) != cellId) {
+                    const char* name = cell->GetName();
+                    CrashRecorder::Recordf(CrashRecorder::Kind::Cell, "Player cell {} [{:08X}]",
+                        name && *name ? name : "(unnamed)", cellId);
+                }
+            }
+        }
+
         PushEvent("cell_loaded", {
             {"cellName", event->cell->GetName() ? event->cell->GetName() : "unnamed"},
             {"cellFormId", std::format("{:08X}", event->cell->GetFormID())}
