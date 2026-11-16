@@ -130,9 +130,9 @@
   },
   "summary": {
     "totalItems": 199,
-    "completed": 127,
+    "completed": 128,
     "completedPartial": 2,
-    "implementedUntested": 12,
+    "implementedUntested": 11,
     "inProgress": 0,
     "planned": 28,
     "bugs": 26
@@ -1411,7 +1411,7 @@
         {
           "id": "FEAT-209",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Slider / part index in appearance read",
           "description": "get_appearance should include the RaceMenu slider or part index for each head part so 'which number was that hair' has an answer.",
           "history": [
@@ -1426,6 +1426,10 @@
             {
               "datetime": "2026-11-16T19:00",
               "note": "RaceMenu shows 2 more entries than the list on hair (1,400 vs 1,398) and eyes (121 vs 119); for eyes one sorts between 3 and 94, one after 97. Build 15 adds ListHeadPartChoices showExcluded=true to name them; run after the Claude Desktop restart."
+            },
+            {
+              "datetime": "2026-11-16T22:00",
+              "note": "Passed on build 25: eyes total 121 (RaceMenu 0-120), player's eyes at 97; hair total 1,400, player's hair at 1160, zz02NoHair at 1399 (zz02NewEllenHair at 1398). Cause of the gap: playable parts with no sex flag, which RaceMenu offers to both sexes; found with ListHeadPartChoices explain."
             }
           ],
           "targetRelease": "1.3"
@@ -2181,6 +2185,10 @@
             {
               "datetime": "2026-11-16T21:30",
               "note": "In game: the agent copied a Presets-tab .jslot into CharGen\\Exported and loaded it with RaceMenu open; it reported success but the face and neck turned purple-blue (most likely the missing Textures\\CharGen\\Exported\\<name>.dds tint that SaveCharacter writes, possibly also the open menu). Build 24: LoadRaceMenuPreset refuses while RaceSex Menu is open, only loads Exported presets, and refuses one without its tint texture. Fix for the player: reload their preset from RaceMenu's Presets tab."
+            },
+            {
+              "datetime": "2026-11-16T22:00",
+              "note": "Build 24 guard confirmed in game: a load with RaceMenu open was refused. The missing-tint refusal is not tested yet."
             }
           ],
           "targetRelease": "1.3"
