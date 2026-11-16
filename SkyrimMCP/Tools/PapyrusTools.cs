@@ -97,4 +97,68 @@ public class PapyrusTools : ToolBase
         var data = await _pipe.SendRequestAsync("call_papyrus_function", parms);
         return DeserializeResponse(data);
     }
+
+    [McpServerTool]
+    [Description("Papyrus script engine diagnostics, to find the mod behind script lag or a save that bloats. " +
+        "Reports runningStacks (scripts active right now), how many wait on latent functions, waitingFunctionMessages, " +
+        "overstressed, attachedScripts and arrays, and the busiest scripts: topScripts (scripts on any running stack), " +
+        "topEntryPoints (where each call started, usually a mod's event handler) and topCurrentFunctions. " +
+        "samples (default 1, max 20) takes several snapshots intervalMs apart (default 500) and adds them up, " +
+        "which shows steady load better than one snapshot. top (default 15) is how many scripts to list. " +
+        "Map script names to mods with SearchForms or the player's knowledge; a script prefix usually names the mod.")]
+    public async Task<object> GetScriptStats(int samples = 1, int intervalMs = 500, int top = 15)
+    {
+        samples = Math.Clamp(samples, 1, 20);
+        intervalMs = Math.Clamp(intervalMs, 100, 5000);
+        if (samples == 1)
+            return DeserializeResponse(await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = top }));
+
+        // Several snapshots: sum the per-script counts and keep min/max of the totals.
+        var sums = new Dictionary<string, Dictionary<string, int>>
+        {
+            ["topScripts"] = new(), ["topEntryPoints"] = new(), ["topCurrentFunctions"] = new(),
+        };
+        var running = new List<int>();
+        var waiting = new List<int>();
+        var overstressed = 0;
+        JsonNode? last = null;
+        for (var i = 0; i < samples; i++)
+        {
+            if (i > 0) await Task.Delay(intervalMs);
+            var data = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 100 });
+            if (data?["error"] != null) return DeserializeResponse(data);
+            last = data;
+            running.Add(data?["runningStacks"]?.GetValue<int>() ?? 0);
+            waiting.Add(data?["waitingFunctionMessages"]?.GetValue<int>() ?? 0);
+            if (data?["overstressed"]?.GetValue<bool>() == true) overstressed++;
+            foreach (var (key, sum) in sums)
+            {
+                if (data?[key] is not JsonArray list) continue;
+                foreach (var item in list)
+                {
+                    var name = item?["name"]?.GetValue<string>() ?? "?";
+                    sum[name] = sum.GetValueOrDefault(name) + (item?["stacks"]?.GetValue<int>() ?? 0);
+                }
+            }
+        }
+
+        JsonArray Top(Dictionary<string, int> sum) => new(sum.OrderByDescending(p => p.Value).ThenBy(p => p.Key).Take(Math.Clamp(top, 1, 100))
+            .Select(p => (JsonNode)new JsonObject { ["name"] = p.Key, ["stacksSummed"] = p.Value, ["average"] = Math.Round((double)p.Value / samples, 1) })
+            .ToArray());
+
+        return DeserializeResponse(new JsonObject
+        {
+            ["samples"] = samples,
+            ["intervalMs"] = intervalMs,
+            ["runningStacks"] = new JsonObject { ["min"] = running.Min(), ["max"] = running.Max(), ["average"] = Math.Round(running.Average(), 1) },
+            ["waitingFunctionMessages"] = new JsonObject { ["min"] = waiting.Min(), ["max"] = waiting.Max() },
+            ["overstressedSamples"] = overstressed,
+            ["attachedScripts"] = last?["attachedScripts"]?.DeepClone(),
+            ["arrays"] = last?["arrays"]?.DeepClone(),
+            ["topScripts"] = Top(sums["topScripts"]),
+            ["topEntryPoints"] = Top(sums["topEntryPoints"]),
+            ["topCurrentFunctions"] = Top(sums["topCurrentFunctions"]),
+            ["note"] = last?["note"]?.DeepClone(),
+        });
+    }
 }

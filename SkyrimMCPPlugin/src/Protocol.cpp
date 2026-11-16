@@ -3,6 +3,7 @@
 #include "TaskQueue.h"
 #include "LootManager.h"
 #include "AppearanceManager.h"
+#include "ScriptStats.h"
 
 #include <SKSE/SKSE.h>
 
@@ -242,6 +243,12 @@ namespace SkyrimMCP::Protocol {
         };
         registry["loot_bodies"] = [](const std::string& id, const json& params) {
             return GameThread(id, [params]() { return LootManager::LootBodies(params); });
+        };
+
+        // FEAT-150: Papyrus VM diagnostics
+        registry["get_script_stats"] = [](const std::string& id, const json& params) {
+            int top = params.value("top", 15);
+            return GameThread(id, [top]() { return ScriptStats::GetScriptStats(top); });
         };
 
         // FEAT-226: hair colour and skin tone with the game's own data (no RaceMenu needed)
