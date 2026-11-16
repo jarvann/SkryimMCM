@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 197,
+    "totalItems": 198,
     "completed": 127,
     "completedPartial": 2,
     "implementedUntested": 12,
     "inProgress": 0,
-    "planned": 27,
-    "bugs": 24
+    "planned": 28,
+    "bugs": 25
   },
   "phases": [
     {
@@ -2149,6 +2149,20 @@
             {
               "datetime": "2026-11-16T19:00",
               "note": "Reported from the build 16 retest session."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-025",
+          "type": "bug",
+          "status": "planned",
+          "title": "get_enchantment_info reports magnitude 100 for console-made enchantments",
+          "description": "On an item enchanted with the playerenchantobject console command, get_enchantment_info showed magnitude 100 on both effects while the game shows Turn Undead at level 0 (2026-11-16). Check which magnitude the tool reads (base effect vs the created enchantment's effect items) and the cost/level the game displays.",
+          "history": [
+            {
+              "datetime": "2026-11-16T20:00",
+              "note": "Reported by the in-game agent."
             }
           ],
           "targetRelease": "1.4"
