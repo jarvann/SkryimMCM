@@ -309,10 +309,12 @@ namespace SkyrimMCP::Protocol {
             float angle = params.value("angleDeg", 0.0f);
             float distance = params.value("distance", 40.0f);
             float height = params.value("heightOffset", 0.0f);
+            bool aimFromHead = params.value("aimFromHead", true);
+            if (mode == "prepare") return GameThread(id, []() { return FaceCamera::Prepare(); });
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair); });
-            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height); });
+            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
             if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
-            return MakeResponse(id, false, {}, "mode must be enter, aim or exit").dump() + "\n";
+            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim or exit").dump() + "\n";
         };
         registry["restore_head_parts"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");

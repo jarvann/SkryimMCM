@@ -41,6 +41,31 @@ namespace SkyrimMCP {
             return std::max(f1.Dot(a_wanted), f2.Dot(a_wanted));
         }
 
+        // The heading (Skyrim convention: 0 = +Y, clockwise) the head faces: the head bone's local axis that
+        // lies closest to the body's facing, flattened. Returns false when no axis is close (head turned
+        // over ~60 degrees), so the caller can fall back to the body.
+        bool HeadHeading(RE::NiAVObject* a_head, float a_bodyHeading, float& a_out) {
+            const RE::NiPoint3 body{ std::sin(a_bodyHeading), std::cos(a_bodyHeading), 0.0f };
+            const RE::NiPoint3 axes[3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+            float best = -2.0f;
+            RE::NiPoint3 bestDir;
+            for (const auto& axis : axes) {
+                for (float sign : { 1.0f, -1.0f }) {
+                    RE::NiPoint3 dir = (a_head->world.rotate * axis) * sign;  // local axis in world space
+                    dir.z = 0.0f;
+                    if (dir.Length() < 0.3f) continue;  // mostly vertical
+                    dir.Unitize();
+                    if (const float d = dir.Dot(body); d > best) {
+                        best = d;
+                        bestDir = dir;
+                    }
+                }
+            }
+            if (best < 0.5f) return false;
+            a_out = std::atan2(bestDir.x, bestDir.y);
+            return true;
+        }
+
         void HideHair(RE::Actor* a_actor) {
             auto* npc = a_actor->GetActorBase();
             auto* root = a_actor->Get3D(false);
@@ -64,6 +89,19 @@ namespace SkyrimMCP {
 
     namespace FaceCamera {
 
+        json Prepare() {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (!player) return {{"error", "Player not available"}};
+            const bool idleReset = player->NotifyAnimationGraph(RE::BSFixedString("IdleForceDefaultState"));
+            bool expressionReset = false;
+            if (auto* face = player->GetFaceGenAnimationData()) {
+                face->ClearExpressionOverride();
+                face->Reset(0.0f, true, true, true, false);
+                expressionReset = true;
+            }
+            return {{"idleReset", idleReset}, {"expressionReset", expressionReset}};
+        }
+
         json Enter(bool hideHud, bool hideHair) {
             auto* camera = RE::PlayerCamera::GetSingleton();
             auto* player = RE::PlayerCharacter::GetSingleton();
@@ -85,6 +123,10 @@ namespace SkyrimMCP {
                 s_hidHud = true;
             }
             if (hideHair) HideHair(player);
+            if (auto* face = player->GetFaceGenAnimationData()) {
+                face->ClearExpressionOverride();
+                face->Reset(0.0f, true, true, true, false);
+            }
             s_active = true;
 
             json result = {{"freeCamera", true}, {"hudHidden", s_hidHud}, {"hiddenNodes", s_hiddenNodes}};
@@ -96,7 +138,7 @@ namespace SkyrimMCP {
             return result;
         }
 
-        json Aim(float angleDeg, float distance, float heightOffset) {
+        json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead) {
             auto* camera = RE::PlayerCamera::GetSingleton();
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!camera || !player) return {{"error", "Camera or player not available"}};
@@ -107,7 +149,11 @@ namespace SkyrimMCP {
 
             // Skyrim headings: 0 = +Y, clockwise seen from above, so the facing direction is (sin, cos).
             constexpr float pi = std::numbers::pi_v<float>;
-            const float facing = player->GetAngleZ();
+            const float bodyFacing = player->GetAngleZ();
+            float facing = bodyFacing;
+            bool fromHead = false;
+            if (aimFromHead) fromHead = HeadHeading(head, bodyFacing, facing);
+            if (!fromHead) facing = bodyFacing;
             const float around = facing + angleDeg * pi / 180.0f;
             const RE::NiPoint3 target = head->world.translate + RE::NiPoint3{ 0.0f, 0.0f, heightOffset };
             const RE::NiPoint3 position = target + RE::NiPoint3{ std::sin(around), std::cos(around), 0.0f } * distance;
@@ -141,6 +187,8 @@ namespace SkyrimMCP {
             return {{"camera", {position.x, position.y, position.z}},
                     {"head", {target.x, target.y, target.z}},
                     {"facingDeg", facing * 180.0f / pi},
+                    {"bodyFacingDeg", bodyFacing * 180.0f / pi},
+                    {"aimedFrom", fromHead ? "head" : "body"},
                     {"angleDeg", angleDeg},
                     {"distance", distance},
                     {"rotationLayout", layout},

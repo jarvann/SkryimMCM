@@ -17,6 +17,8 @@ public class FaceCaptureTools : ToolBase
 {
     public FaceCaptureTools(IPipeClient pipe) : base(pipe) { }
 
+    private const double MinDistance = 28;
+
     private static readonly Dictionary<string, float> Views = new(StringComparer.OrdinalIgnoreCase)
     {
         ["front"] = 0f,
@@ -28,19 +30,36 @@ public class FaceCaptureTools : ToolBase
 
     [McpServerTool]
     [Description("Take a framed screenshot of the player's face, the same way every time, and return a cropped preview image. " +
-        "Freezes time (so the idle can't move the head), puts the camera in front of the head, hides the HUD, takes the shot " +
-        "and puts the camera back. view: front (default), three-quarter, three-quarter-left, profile, profile-left; or angle in " +
-        "degrees (0 front, 90 the character's right, -90 their left). distance from the head (default 40; smaller is closer), " +
-        "heightOffset above the head node (default 4, about eye level). hideHair hides the hair for the shot so the brows and " +
-        "forehead show. crop 'x,y,width,height' in fractions of the frame; by default a square on the middle of the screen. " +
-        "The game must be the active window. Compare captures only when they use the same view, distance and heightOffset.")]
-    public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 40,
-        double heightOffset = 4, bool hideHair = false, string? crop = null, int previewWidth = 1200, int waitSeconds = 10)
+        "First puts her in a neutral pose (default idle, neutral expression; neutralPose=false skips it), then freezes time, puts " +
+        "the camera in front of the face, aimed from the way the head faces (aimFromHead), hides the HUD, takes the shot and puts " +
+        "the camera back. view: front (default), three-quarter, three-quarter-left, profile, profile-left; or angle in degrees " +
+        "(0 front, 90 the character's right, -90 their left). distance from the head (default 32; below 28 the camera can end up " +
+        "inside the head, so it is raised to 28), heightOffset from the head node (default -3, a straight-on portrait). hideHair " +
+        "hides the hair for the shot so brows, forehead and ears show. crop 'x,y,width,height' in fractions of the frame; by " +
+        "default a square on the middle of the screen. The game must be the active window. Compare captures only when they use " +
+        "the same view, distance and heightOffset.")]
+    public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,
+        double heightOffset = -3, bool hideHair = false, bool neutralPose = true, bool aimFromHead = true, string? crop = null,
+        int previewWidth = 1200, int waitSeconds = 10)
     {
         float angleDeg;
         if (angle.HasValue) angleDeg = (float)angle.Value;
         else if (!Views.TryGetValue(view.Trim(), out angleDeg))
             return Error($"view must be one of {string.Join(", ", Views.Keys)}, or pass angle");
+
+        string? distanceNote = null;
+        if (distance < MinDistance)
+        {
+            distanceNote = $"distance {distance} was raised to {MinDistance}: closer, the camera can end up inside the head.";
+            distance = MinDistance;
+        }
+
+        JsonNode? pose = null;
+        if (neutralPose)
+        {
+            pose = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "prepare" });
+            await Task.Delay(700);  // let the idle and the face settle before time stops
+        }
 
         var enter = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair });
         if (enter?["error"] is JsonNode enterError) return Error(enterError.ToString());
@@ -51,8 +70,9 @@ public class FaceCaptureTools : ToolBase
             {
                 ["mode"] = "aim",
                 ["angleDeg"] = angleDeg,
-                ["distance"] = Math.Clamp(distance, 10, 300),
+                ["distance"] = Math.Min(distance, 300),
                 ["heightOffset"] = heightOffset,
+                ["aimFromHead"] = aimFromHead,
             });
             if (aim?["error"] is JsonNode aimError) return Error(aimError.ToString());
             await Task.Delay(300);
@@ -69,7 +89,9 @@ public class FaceCaptureTools : ToolBase
                     heightOffset,
                     hideHair,
                     crop,
+                    pose,
                     camera = aim,
+                    distanceNote,
                     warning = aim?["aimed"]?.GetValue<bool>() == false
                         ? "The camera may not be pointing at the face (alignment below 0.95): check the image."
                         : null,
