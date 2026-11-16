@@ -1,11 +1,14 @@
 #include "PapyrusBridge.h"
 #include "LogicHost.h"
+#include "Helpers.h"
+#include "TaskQueue.h"
 
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <regex>
 #include <cstring>
@@ -292,9 +295,45 @@ namespace SkyrimMCP::PapyrusBridge {
             return "Argument '" + a_paramName + "' must be " + a_expected + ", got " + a_arg.dump();
         };
 
-        if (a_type.IsArray() || a_type.IsObject()) {
+        if (a_type.IsArray()) {
             return "Argument '" + a_paramName + "' is " + TypeName(a_type) +
-                   "; call_papyrus_function can only pass String, Int, Float and Bool values";
+                   "; call_papyrus_function can't pass arrays";
+        }
+        if (a_type.IsObject()) {
+            // Forms and references (FEAT-227): a FormID, "player", or null for None. Packed on
+            // the game thread, where the VM binds script objects.
+            if (a_arg.is_null()) { a_out.SetNone(); return {}; }
+            if (!a_arg.is_string()) return mismatch("a FormID string, \"player\" or null");
+            const auto text = a_arg.get<std::string>();
+            RE::TESForm* form = nullptr;
+            if (text == "player") {
+                form = RE::PlayerCharacter::GetSingleton();
+            } else {
+                try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(text)); } catch (...) {}
+            }
+            if (!form) return "Argument '" + a_paramName + "': no form with ID " + text;
+            const auto* info = a_type.GetTypeInfo();
+            const std::string expected = info && info->GetName() ? info->GetName() : "";
+            const bool wantsRef = expected == "ObjectReference" || expected == "Actor";
+            if (wantsRef && !form->AsReference()) {
+                return "Argument '" + a_paramName + "' must be a reference (" + expected + "), but " + text +
+                       " is a base form. Pass the reference ID (player, or a refId from the NPC tools).";
+            }
+            if (expected == "Actor" && !form->As<RE::Actor>()) {
+                return "Argument '" + a_paramName + "' must be an Actor, but " + text + " isn't one";
+            }
+            // The task owns its Variable: if the wait times out, the game thread may still run it later.
+            auto holder = std::make_shared<RE::BSScript::Variable>();
+            try {
+                TaskQueue::RunOnGameThread([holder, form]() -> json {
+                    RE::BSScript::PackHandle(holder.get(), form, static_cast<RE::VMTypeID>(form->GetFormType()));
+                    return json::object();
+                });
+            } catch (const std::exception& e) {
+                return "Argument '" + a_paramName + "': " + e.what();
+            }
+            a_out = *holder;
+            return {};
         }
         if (a_type.IsString()) {
             if (!a_arg.is_string()) return mismatch("a string");

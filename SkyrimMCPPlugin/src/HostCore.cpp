@@ -17,10 +17,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
+#include <format>
 #include <memory>
 #include <mutex>
 
@@ -95,25 +97,37 @@ namespace SkyrimMCP::HostCore {
         // The callback object the Papyrus VM holds for a call made by the logic DLL.
         // It lives in the host, which is never unloaded, so a call still running when
         // the logic DLL is swapped (or one that timed out) calls back into valid code.
+        // A Papyrus value as JSON: basic types as themselves, forms as their FormID, arrays as
+        // lists (FEAT-227: RaceMenu's NiOverride returns string arrays).
+        json VariableToJson(const RE::BSScript::Variable& v, int depth) {
+            if (v.IsNoneObject() || v.IsNoneArray()) return nullptr;
+            const auto rawType = v.GetType().GetRawType();
+            if (rawType == RE::BSScript::TypeInfo::RawType::kNone) return nullptr;
+            if (v.IsString()) return std::string(v.GetString());
+            if (v.IsInt()) return v.GetSInt();
+            if (v.IsFloat()) return v.GetFloat();
+            if (v.IsBool()) return v.GetBool();
+            if (v.IsArray()) {
+                json arr = json::array();
+                auto array = v.GetArray();
+                if (!array || depth > 2) return arr;
+                const auto n = std::min<std::uint32_t>(array->size(), 4096);
+                for (std::uint32_t i = 0; i < n; ++i) arr.push_back(VariableToJson((*array)[i], depth + 1));
+                return arr;
+            }
+            if (v.IsObject()) {
+                if (auto* form = v.Unpack<RE::TESForm*>()) return std::format("{:08X}", form->GetFormID());
+                return "object";
+            }
+            return "complex_type";
+        }
+
         class HostPapyrusCallback final : public RE::BSScript::IStackCallbackFunctor {
         public:
             void operator()(RE::BSScript::Variable a_result) override {
                 json out;
                 try {
-                    auto rawType = a_result.GetType().GetRawType();
-                    if (rawType == RE::BSScript::TypeInfo::RawType::kNone) {
-                        out["result"] = nullptr;
-                    } else if (rawType == RE::BSScript::TypeInfo::RawType::kString) {
-                        out["result"] = std::string(a_result.GetString());
-                    } else if (rawType == RE::BSScript::TypeInfo::RawType::kInt) {
-                        out["result"] = a_result.GetSInt();
-                    } else if (rawType == RE::BSScript::TypeInfo::RawType::kFloat) {
-                        out["result"] = a_result.GetFloat();
-                    } else if (rawType == RE::BSScript::TypeInfo::RawType::kBool) {
-                        out["result"] = a_result.GetBool();
-                    } else {
-                        out["result"] = "complex_type";
-                    }
+                    out["result"] = VariableToJson(a_result, 0);
                 } catch (...) {
                     out = json{ { "error", "Failed to unpack result" } };
                 }
