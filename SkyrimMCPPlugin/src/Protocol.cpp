@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
+#include "UtilityManager.h"
 
 #include <SKSE/SKSE.h>
 
@@ -249,6 +250,16 @@ namespace SkyrimMCP::Protocol {
         // FEAT-207: add missing items, equip and restore gold from a blueprint
         registry["apply_blueprint_items"] = [](const std::string& id, const json& params) {
             return GameThread(id, [params]() { return BlueprintManager::ApplyBlueprintItems(params); });
+        };
+
+        // FEAT-131/133: native volume and screenshot (the console versions did nothing)
+        registry["set_volume"] = [](const std::string& id, const json& params) {
+            std::string category = params.value("category", "master");
+            float volume = params.value("volume", 1.0f);
+            return GameThread(id, [=]() { return UtilityManager::SetVolume(category, volume); });
+        };
+        registry["take_screenshot"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return UtilityManager::TakeScreenshot(); });
         };
 
         // FEAT-150: Papyrus VM diagnostics

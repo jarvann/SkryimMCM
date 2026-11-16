@@ -306,29 +306,49 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Set the master volume. Value from 0.0 (mute) to 1.0 (full). " +
-        "Affects all game audio including music, effects, and voice.")]
-    public async Task<object> SetVolume(float volume)
+    [Description("Set a game volume, like the Audio menu sliders: volume 0.0 (mute) to 1.0 (full). " +
+        "category: 'master' (default) or another Audio menu category such as Music, Effects, Voice or Footsteps; " +
+        "'list' shows the categories and their current volumes. Reports the previous volume so it can be put back. " +
+        "Applies at once; ask the player whether they hear the change.")]
+    public async Task<object> SetVolume(float volume, string category = "master")
     {
-        // Use console command to set master volume via game setting
-        var data = await _pipe.SendRequestAsync("execute_command", new JsonObject
-        {
-            ["command"] = $"setgs fAudioMasterVolume {volume:F2}"
-        });
-        await NotifyInGame($"Volume: {volume:P0}");
-        return new { success = true, volume, message = $"Volume set to {volume:P0}" };
+        var data = await _pipe.SendRequestAsync("set_volume", new JsonObject { ["volume"] = volume, ["category"] = category });
+        if (category != "list") await NotifyInGame($"{data?["category"]?.GetValue<string>() ?? "Volume"}: {volume:P0}");
+        return DeserializeResponse(data);
     }
 
     [McpServerTool]
-    [Description("Take a screenshot. Saves to the Skyrim root directory as a .bmp file.")]
+    [Description("Take a screenshot with the game's own Print Screen handler, then wait up to 5 seconds for the file and report its path " +
+        "(ScreenShot<N>.png or .bmp in the game folder). Returns an error if no file appeared. " +
+        "Close menus first if the player wants the plain view.")]
     public async Task<object> TakeScreenshot()
     {
-        var data = await _pipe.SendRequestAsync("execute_command", new JsonObject
+        var (game, _) = SkyLinkSettings.SkyrimPath();
+        var started = DateTime.Now.AddSeconds(-1);
+        var data = await _pipe.SendRequestAsync("take_screenshot");
+
+        if (game == null || !Directory.Exists(game))
+            return new { queued = true, verified = false, note = "Screenshot queued, but the game folder is unknown so the file can't be checked. Set skyrimPath with SetSkyLinkSetting.", plugin = DeserializeResponse(data) };
+
+        for (var waited = 0; waited < 5000; waited += 250)
         {
-            ["command"] = "screenshot"
-        });
-        await NotifyInGame("Screenshot taken");
-        return new { success = true, message = "Screenshot saved to Skyrim directory" };
+            await Task.Delay(250);
+            var file = new DirectoryInfo(game).EnumerateFiles("ScreenShot*.*")
+                .Where(f => f.LastWriteTime >= started)
+                .OrderByDescending(f => f.LastWriteTime)
+                .FirstOrDefault();
+            if (file != null)
+            {
+                await NotifyInGame("Screenshot taken");
+                return new { success = true, file = file.FullName, bytes = file.Length, plugin = DeserializeResponse(data) };
+            }
+        }
+        return new
+        {
+            error = $"The screenshot was queued but no new ScreenShot file appeared in {game} within 5 seconds.",
+            plugin = DeserializeResponse(data),
+            hint = "The game writes screenshots only while it is rendering (not paused in a menu that stops rendering) and only with bAllowScreenShot on; the plugin turns that on for the session.",
+        };
     }
 
     [McpServerTool]
