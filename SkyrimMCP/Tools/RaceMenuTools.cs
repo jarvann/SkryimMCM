@@ -243,35 +243,69 @@ public class RaceMenuTools : ToolBase
         var appearance = await _pipe.SendRequestAsync("get_appearance");
         var race = appearance?["raceFormId"]?.GetValue<string>();
         if (string.IsNullOrEmpty(race)) return new { error = "Couldn't read the player's race" };
-        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, name.Trim());
+        var presets = FindPresets();
+        var match = presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)
+                                             || Path.GetFileName(p.Name).Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
+        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, match?.Name ?? name.Trim());
         var ok = result?.GetValueKind() == System.Text.Json.JsonValueKind.True;
-        if (ok) await NotifyInGame("RaceMenu preset loaded");
+        if (ok)
+        {
+            await NotifyInGame("RaceMenu preset loaded");
+            return new { loaded = true, name = name.Trim(), note = "If the face looks unchanged, open and close RaceMenu or save and load." };
+        }
+
+        // Not loaded: say where the file is and what this RaceMenu offers, instead of guessing.
+        object? loaders = null;
+        try
+        {
+            var fns = await _pipe.SendRequestAsync("get_script_functions", new JsonObject { ["className"] = "CharGen" });
+            loaders = fns?.ToJsonString().Split('"').Where(t => t.Contains("Load", StringComparison.OrdinalIgnoreCase) && t.Length < 120).Distinct().ToArray();
+        }
+        catch (McpException) { }
         return new
         {
-            loaded = ok,
+            loaded = false,
             name = name.Trim(),
-            presets = ok ? null : ListPresets(),
-            note = ok ? "If the face looks unchanged, open and close RaceMenu or save and load." : "CharGen.LoadCharacter returned false: check the name against presets.",
+            foundAt = match?.Path,
+            folderKind = match?.Kind,
+            note = match == null
+                ? "No preset with that name was found; see presets."
+                : match.Kind == "Presets"
+                    ? "This preset is in CharGen\\Presets (RaceMenu's Presets tab). CharGen.LoadCharacter didn't load it; it may only read " +
+                      "presets exported with SaveCharacter (CharGen\\Exported). Load it from RaceMenu's Presets tab instead."
+                    : "CharGen.LoadCharacter returned false for this exported preset.",
+            charGenLoadFunctions = loaders,
+            presets = presets.Select(p => $"{p.Kind}/{p.Name}").ToArray(),
         };
     }
 
-    // .jslot files RaceMenu writes, in the folders SkyLink knows about (MO2 overwrite first).
-    private static string[] ListPresets()
+    private sealed record PresetFile(string Name, string Kind, string Path);
+
+    // .jslot files RaceMenu writes, in the folders SkyLink knows about (MO2 overwrite first),
+    // including subfolders; Name is relative to Exported or Presets, without the extension.
+    private static List<PresetFile> FindPresets()
     {
-        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var found = new List<PresetFile>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var plugins in SkyLinkSettings.ConfigFolders())
         {
-            foreach (var sub in new[] { "Exported", "Presets" })
+            foreach (var kind in new[] { "Exported", "Presets" })
             {
-                var folder = Path.Combine(plugins, "CharGen", sub);
+                var folder = Path.Combine(plugins, "CharGen", kind);
                 try
                 {
-                    if (Directory.Exists(folder))
-                        foreach (var f in Directory.EnumerateFiles(folder, "*.jslot")) names.Add(Path.GetFileNameWithoutExtension(f));
+                    if (!Directory.Exists(folder)) continue;
+                    foreach (var f in Directory.EnumerateFiles(folder, "*.jslot", SearchOption.AllDirectories))
+                    {
+                        var rel = Path.ChangeExtension(Path.GetRelativePath(folder, f), null)!.Replace('\\', '/');
+                        if (seen.Add(kind + "/" + rel)) found.Add(new PresetFile(rel, kind, f));
+                    }
                 }
                 catch { /* unreadable folder: skip */ }
             }
         }
-        return names.ToArray();
+        return found.OrderBy(p => p.Kind).ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    private static string[] ListPresets() => FindPresets().Select(p => $"{p.Kind}/{p.Name}").ToArray();
 }

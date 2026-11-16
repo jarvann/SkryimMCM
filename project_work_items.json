@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 198,
+    "totalItems": 199,
     "completed": 127,
     "completedPartial": 2,
     "implementedUntested": 12,
     "inProgress": 0,
     "planned": 28,
-    "bugs": 25
+    "bugs": 26
   },
   "phases": [
     {
@@ -2166,6 +2166,20 @@
             }
           ],
           "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-026",
+          "type": "bug",
+          "status": "needs-research",
+          "title": "LoadRaceMenuPreset: CharGen.LoadCharacter returns false for a RaceMenu preset",
+          "description": "In game 2026-11-16: LoadRaceMenuPreset returned loaded:false for a valid preset listed from CharGen\\Presets (an untouched copy of the player's own), and presets in subfolders (e.g. _Cory) weren't listed. CharGen.LoadCharacter may only read presets exported with SaveCharacter (CharGen\\Exported); RaceMenu's Presets-tab presets may need a different loader or can only be loaded from the menu. Workaround: load from RaceMenu's Presets tab (showracemenu).",
+          "history": [
+            {
+              "datetime": "2026-11-16T21:00",
+              "note": "Build 23: the tool now lists presets in subfolders with their folder kind, and on failure reports where the file is and the CharGen load functions this RaceMenu has. Next: test whether an Exported preset (from SaveRaceMenuPreset) loads, and check RaceMenu's source for a Presets-tab loader."
+            }
+          ],
+          "targetRelease": "1.3"
         }
       ]
     }
