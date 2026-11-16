@@ -132,9 +132,9 @@
     "totalItems": 212,
     "completed": 129,
     "completedPartial": 2,
-    "implementedUntested": 13,
+    "implementedUntested": 14,
     "inProgress": 0,
-    "planned": 37,
+    "planned": 36,
     "bugs": 28
   },
   "phases": [
@@ -2174,7 +2174,7 @@
         {
           "id": "BUG-026",
           "type": "bug",
-          "status": "needs-research",
+          "status": "implemented-untested",
           "title": "LoadRaceMenuPreset: CharGen.LoadCharacter returns false for a RaceMenu preset",
           "description": "In game 2026-11-16: LoadRaceMenuPreset returned loaded:false for a valid preset listed from CharGen\\Presets (an untouched copy of the player's own), and presets in subfolders (e.g. _Cory) weren't listed. CharGen.LoadCharacter may only read presets exported with SaveCharacter (CharGen\\Exported); RaceMenu's Presets-tab presets may need a different loader or can only be loaded from the menu. Workaround: load from RaceMenu's Presets tab (showracemenu).",
           "history": [
@@ -2189,6 +2189,10 @@
             {
               "datetime": "2026-11-16T22:00",
               "note": "Build 24 guard confirmed in game: a load with RaceMenu open was refused. The missing-tint refusal is not tested yet."
+            },
+            {
+              "datetime": "2026-11-17T01:30",
+              "note": "CharGen has LoadCharacterPreset/SaveCharacterPreset (Presets folder, the Presets tab's loader). LoadRaceMenuPreset now loads Presets-tab presets with it (hair colour from get_appearance.hairColorFormId); SaveRaceMenuPreset saves to Presets by default. Built b13_29 on the FEAT-228 branch."
             }
           ],
           "targetRelease": "1.3"
@@ -2268,7 +2272,7 @@
         {
           "id": "FEAT-228",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Face builder M1: live face control (GetFacePreset, SetFaceSliders, SetFaceTint)",
           "description": "Read the live face: the 19 vanilla morphs and 4 presets, RaceMenu extended sliders by name, tints with colour and alpha, head parts, and a sculpt summary per host (vertex count, entries, largest offset). Set a batch of named sliders in one call and refresh the face, reporting previous values and saying when a value is beyond the UI range. Set one tint's colour and alpha and rebuild the tint texture (also the fix for the purple face after manual edits). Also read a .jslot file offline and diff two presets (sliders, tints, sculpt). Guard rails: refuse while RaceMenu is open, back up to a named preset before the first change, never leave the face without a tint texture. Vanilla morphs and tints have SKSE Papyrus (ActorBase.SetFaceMorph, Game.SetTintMaskColor/UpdateTintMaskColors); the extended sliders need skee's face-morph API, to be confirmed with GetScriptFunctions on NiOverride and CharGen. Test: NSK_EyelidOpen changed from chat opens the eye with no user action, and reads back.",
@@ -2280,6 +2284,10 @@
             {
               "datetime": "2026-11-17T00:00",
               "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
+            },
+            {
+              "datetime": "2026-11-17T01:30",
+              "note": "In game, GetScriptFunctions (via the VM, FEAT-237) showed NiOverride (185 functions) and CharGen (23) have no call to set a face slider. Built the preset round trip instead (b13_29, branch feature/FEAT-228-preset-face-control, not merged to develop): SaveCharacterPreset to CharGen\\Presets\\_SkyLink\\_current, edit the .jslot, LoadCharacterPreset. Tools: GetFacePreset, DiffFacePresets, SetFaceSliders, SetFaceTint; backup before the first change per session. RaceMenu's native C++ interface (skee) is the alternative if the round trip is too slow or breaks tints."
             }
           ],
           "targetRelease": "1.4"
