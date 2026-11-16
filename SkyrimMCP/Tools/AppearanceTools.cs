@@ -52,7 +52,10 @@ public class AppearanceTools : ToolBase
         "color: #RRGGBB, 'r,g,b', or pale, fair, tan, olive, dark, ebony. The body changes at once. " +
         "The player's face may keep the old tone until the 3D is rebuilt: refresh=true rebuilds it (a brief flicker), " +
         "and saving then loading always applies it. NPC faces use pre-baked textures and may not match. " +
-        "Reports the previous tone so it can be put back. If RaceMenu is installed, its skin tint may override this.")]
+        "Reports the previous tone so it can be put back. " +
+        "With RaceMenu installed the change does NOT survive a full reload: RaceMenu keeps its own copy of the skin tint in the SKSE " +
+        "co-save and restores it when the face is rebuilt (seen in game; a quick reload in the same session can hide this). " +
+        "Tell the player to set skin tone in RaceMenu for a lasting change; this tool is for a quick look or for games without RaceMenu.")]
     public async Task<object> SetSkinTone(string color, string? refId = null, bool refresh = false)
     {
         var parms = new JsonObject { ["color"] = color, ["refresh"] = refresh };

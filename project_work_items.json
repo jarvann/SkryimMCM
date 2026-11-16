@@ -1989,6 +1989,10 @@
             {
               "datetime": "2026-11-15T16:00",
               "note": "Tested in game 2026-11-15 (Claude Desktop agent): SetHairColor auburn and back, SetSkinTone dark with refresh=false (body changes at once, face keeps old tone) then refresh=true (face updates), restored to #B9B3AA. RaceMenu did not override either change. Still to check: persistence after save and load."
+            },
+            {
+              "datetime": "2026-11-16T18:00",
+              "note": "Save/load test: hair colour persists. Skin tone persists in the main save but RaceMenu restores its own stored tint (SKSE co-save) on a full face rebuild, so with RaceMenu installed the change reverts; a reload in the same session hid it once. SetSkinTone's description now says so. Lasting fix would go through RaceMenu's API (FEAT-227 follow-up), untested."
             }
           ],
           "targetRelease": "1.3"
