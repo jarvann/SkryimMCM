@@ -71,7 +71,7 @@ public class AppearanceTools : ToolBase
         "editorIdNoCase, name and loadOrder are also available. start and count (default 21, max 200) page through it; " +
         "aroundFormId centres the page on one part. Use it to answer 'which hair is number N' or to pick a part to apply. " +
         "showExcluded=true also lists the parts of this type the list leaves out (reasons: extraPart, notPlayable, otherSex, " +
-        "noSexFlag, raceNotInValidRaces), fewest failed rules first, with the index each would take; page with excludedStart " +
+        "raceNotInValidRaces; parts with no sex flag count for both sexes, as in RaceMenu), fewest failed rules first, with the index each would take; page with excludedStart " +
         "and excludedCount (max 200), filter with excludedRule. explain=<editorId or FormID> says why one part is left out. " +
         "Use these when RaceMenu shows more entries than this list.")]
     public async Task<object> ListHeadPartChoices(string type = "hair", string? order = null, int start = 0, int count = 21,

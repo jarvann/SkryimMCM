@@ -301,6 +301,15 @@ namespace SkyrimMCP::AppearanceManager {
         }
     }
 
+    namespace {
+        bool SexMatches(RE::BGSHeadPart* part, bool female) {
+            const bool male = part->flags.all(RE::BGSHeadPart::Flag::kMale);
+            const bool fem = part->flags.all(RE::BGSHeadPart::Flag::kFemale);
+            if (!male && !fem) return true;
+            return female ? fem : male;
+        }
+    }
+
     std::vector<RE::BGSHeadPart*> HeadPartChoices(RE::TESNPC* npc, int type, const std::string& order) {
         std::vector<RE::BGSHeadPart*> list;
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
@@ -311,7 +320,9 @@ namespace SkyrimMCP::AppearanceManager {
             if (!part || part->IsExtraPart()) continue;
             if (!part->flags.all(RE::BGSHeadPart::Flag::kPlayable)) continue;
             if (static_cast<int>(std::to_underlying(part->type.get())) != type) continue;
-            if (!part->flags.all(female ? RE::BGSHeadPart::Flag::kFemale : RE::BGSHeadPart::Flag::kMale)) continue;
+            // A part with neither sex flag is offered to both, as RaceMenu does (found in game: "NoEyes"
+            // and "NoHair" parts from boss mods were the entries RaceMenu showed and this list didn't).
+            if (!SexMatches(part, female)) continue;
             if (race && part->validRaces && !part->validRaces->HasForm(race)) continue;
             list.push_back(part);
         }
@@ -541,8 +552,7 @@ namespace SkyrimMCP::AppearanceManager {
             json reasons = json::array();
             if (part->IsExtraPart()) reasons.push_back("extraPart");
             if (!part->flags.all(RE::BGSHeadPart::Flag::kPlayable)) reasons.push_back("notPlayable");
-            const bool male = part->flags.all(RE::BGSHeadPart::Flag::kMale), fem = part->flags.all(RE::BGSHeadPart::Flag::kFemale);
-            if (!(female ? fem : male)) reasons.push_back(male || fem ? "otherSex" : "noSexFlag");
+            if (!SexMatches(part, female)) reasons.push_back("otherSex");
             if (race && part->validRaces && !part->validRaces->HasForm(race)) reasons.push_back("raceNotInValidRaces");
             return reasons;
         };
