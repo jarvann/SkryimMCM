@@ -500,7 +500,7 @@ namespace SkyrimMCP::UtilityManager {
     namespace {
         std::string CategoryName(RE::BGSSoundCategory* c) {
             const char* name = c->GetFullName();
-            if (name && name[0]) return name;
+            if (name && name[0]) return name[0] == '$' && name[1] ? name + 1 : name;  // "$Music" is a localisation key
             const char* edid = c->GetFormEditorID();
             return (edid && edid[0]) ? edid : std::format("{:08X}", c->GetFormID());
         }
@@ -508,6 +508,13 @@ namespace SkyrimMCP::UtilityManager {
         std::string LowerCopy(std::string s) {
             std::transform(s.begin(), s.end(), s.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
             return s;
+        }
+
+        // Category names are localisation keys such as "$Music" (BUG-027): compare without the "$"
+        // and without case, so "Music", "music" and "$Music" all match.
+        std::string CategoryKey(std::string s) {
+            if (!s.empty() && s.front() == '$') s.erase(0, 1);
+            return LowerCopy(s);
         }
     }
 
@@ -529,7 +536,7 @@ namespace SkyrimMCP::UtilityManager {
         }
         if (category == "list") return {{"categories", listed}, {"master", "separate: the Audio menu's Master slider is fAudioMasterVolume, not a category"}};
 
-        const auto wanted = LowerCopy(category.empty() ? "master" : category);
+        const auto wanted = CategoryKey(category.empty() ? "master" : category);
         volume = std::clamp(volume, 0.0f, 1.0f);
 
         // The Master slider isn't a sound category (found in game: the old fallback picked
@@ -556,8 +563,10 @@ namespace SkyrimMCP::UtilityManager {
         }
 
         RE::BGSSoundCategory* target = nullptr;
+        const auto wantedKey = CategoryKey(wanted);
         for (auto* c : menu) {
-            if (LowerCopy(CategoryName(c)) == wanted) { target = c; break; }
+            const char* edid = c->GetFormEditorID();
+            if (CategoryKey(CategoryName(c)) == wantedKey || (edid && CategoryKey(edid) == wantedKey)) { target = c; break; }
         }
         if (!target) return {{"error", "No Audio menu category named '" + category + "'"}, {"categories", listed}};
 
