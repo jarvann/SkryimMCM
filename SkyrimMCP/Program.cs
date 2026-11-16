@@ -32,6 +32,8 @@ class Program
                     Version = typeof(Program).Assembly
                         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown"
                 };
+                // Tells the AI to check the guidebook (UESP) before answering game help questions (FEAT-221).
+                options.ServerInstructions = Tools.GuidebookTools.ServerInstructions;
             })
             .WithStdioServerTransport()
             .WithToolsFromAssembly();
