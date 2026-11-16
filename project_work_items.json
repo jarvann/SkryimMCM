@@ -2335,6 +2335,10 @@
             {
               "datetime": "2026-11-17T04:00",
               "note": "Built (b13_33, branch feature/FEAT-229-capture-face on top of FEAT-228): face_camera action (free camera with time frozen, aimed at the head node at an angle and distance, rotation layout checked against the camera's look direction, HUD hidden, optional hair hidden, restored on exit); CaptureFace (views front/three-quarter/profile or angle, auto square crop, preview image) and ResetFaceCamera."
+            },
+            {
+              "datetime": "2026-11-17T04:45",
+              "note": "In game (b13_33): aiming worked (rotation.y = yaw, alignment 1.0), hair hiding and restore worked, framing small and low, and two identical captures differed (idle frame, head turn, smile). Build 34: neutral pose first (IdleForceDefaultState, face animation reset), expression reset again once frozen, camera placed from the head bone's forward axis, defaults distance 32 / heightOffset -3, minimum distance 28."
             }
           ],
           "targetRelease": "1.4"
