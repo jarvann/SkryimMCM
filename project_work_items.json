@@ -130,11 +130,11 @@
   },
   "summary": {
     "totalItems": 212,
-    "completed": 129,
+    "completed": 130,
     "completedPartial": 2,
     "implementedUntested": 14,
     "inProgress": 0,
-    "planned": 36,
+    "planned": 35,
     "bugs": 28
   },
   "phases": [
@@ -2174,7 +2174,7 @@
         {
           "id": "BUG-026",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "LoadRaceMenuPreset: CharGen.LoadCharacter returns false for a RaceMenu preset",
           "description": "In game 2026-11-16: LoadRaceMenuPreset returned loaded:false for a valid preset listed from CharGen\\Presets (an untouched copy of the player's own), and presets in subfolders (e.g. _Cory) weren't listed. CharGen.LoadCharacter may only read presets exported with SaveCharacter (CharGen\\Exported); RaceMenu's Presets-tab presets may need a different loader or can only be loaded from the menu. Workaround: load from RaceMenu's Presets tab (showracemenu).",
           "history": [
@@ -2201,6 +2201,10 @@
             {
               "datetime": "2026-11-17T03:00",
               "note": "In game (b13_30): purple face fixed (tint rebuilt after load, confirmed under candlelight); slider round trip clean. Ears still dropped: every head part from a light plugin failed to resolve ('Plugin|BD3820' carries the light index, and LookupForm adds the ID unmasked). Builds 31-32: mask to 12 bits for light plugins in restore_head_parts and the blueprint loader; SetFaceSliders no longer calls a slider unknown just because RaceMenu didn't save it at 0 (checks the loose slider ini files instead)."
+            },
+            {
+              "datetime": "2026-11-17T04:00",
+              "note": "Confirmed in game on builds 31-32: Presets-tab presets load by script with head parts and face tint intact."
             }
           ],
           "targetRelease": "1.3"
@@ -2304,6 +2308,10 @@
             {
               "datetime": "2026-11-17T03:00",
               "note": "In game (b13_30): purple face fixed (tint rebuilt after load, confirmed under candlelight); slider round trip clean. Ears still dropped: every head part from a light plugin failed to resolve ('Plugin|BD3820' carries the light index, and LookupForm adds the ID unmasked). Builds 31-32: mask to 12 bits for light plugins in restore_head_parts and the blueprint loader; SetFaceSliders no longer calls a slider unknown just because RaceMenu didn't save it at 0 (checks the loose slider ini files instead)."
+            },
+            {
+              "datetime": "2026-11-17T04:00",
+              "note": "Builds 31-32 confirmed in game: ears restored (RepairFace and after LoadRaceMenuPreset), live face identical to the preset afterwards, skin colour normal. Remaining: a brief purple flash during the load; build 33 rebuilds the tint straight after the load and the descriptions say the flash is normal."
             }
           ],
           "targetRelease": "1.4"
@@ -2311,7 +2319,7 @@
         {
           "id": "FEAT-229",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Face builder M2: repeatable face capture (CaptureFace)",
           "description": "Fixed neutral pose with the idle paused and head tracking off, camera at set positions (front, three-quarter, profile), screenshot, crop to the head and return a ~1200-1568 px image plus the full-size path; same framing every call. Option to hide hair and headgear. Restore pose and camera afterwards. Builds on FEAT-234's preview. Test: two captures a minute apart with no change are near-identical.",
@@ -2323,6 +2331,10 @@
             {
               "datetime": "2026-11-17T00:00",
               "note": "Player: hiding hair and headgear for captures is fine, as an option."
+            },
+            {
+              "datetime": "2026-11-17T04:00",
+              "note": "Built (b13_33, branch feature/FEAT-229-capture-face on top of FEAT-228): face_camera action (free camera with time frozen, aimed at the head node at an angle and distance, rotation layout checked against the camera's look direction, HUD hidden, optional hair hidden, restored on exit); CaptureFace (views front/three-quarter/profile or angle, auto square crop, preview image) and ResetFaceCamera."
             }
           ],
           "targetRelease": "1.4"
