@@ -235,48 +235,76 @@ public class RaceMenuTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Load a RaceMenu character preset (from SaveRaceMenuPreset, or one exported in RaceMenu) onto the player with " +
-        "CharGen.LoadCharacter. Changes the whole look; save first if the player may want the old one back (SaveRaceMenuPreset). " +
-        "Lists the presets found when the name doesn't match.")]
+    [Description("Load a RaceMenu preset onto the player with CharGen.LoadCharacter. It only loads EXPORTED presets: ones written by " +
+        "SaveRaceMenuPreset (CharGen\\Exported), which come with their face-tint texture (Textures\\CharGen\\Exported\\<name>.dds). " +
+        "Presets from RaceMenu's Presets tab (CharGen\\Presets) must be loaded in RaceMenu itself; copying one into Exported without " +
+        "its texture turns the face purple (seen in game). Refused while RaceMenu is open. Changes the whole look: save first " +
+        "(SaveRaceMenuPreset) if the player may want the old one back. To try face changes, SaveRaceMenuPreset a working copy, " +
+        "edit that copy's .jslot, and load it.")]
     public async Task<object> LoadRaceMenuPreset(string name)
     {
+        // Loading by script while RaceMenu is open broke the face tint in game.
+        var menus = await _pipe.SendRequestAsync("get_menu_state");
+        if ((menus?["allOpenMenus"]?.ToJsonString() ?? "").Contains("RaceSex Menu", StringComparison.OrdinalIgnoreCase))
+            return new { error = "RaceMenu is open. Close it first: loading a preset by script while it is open breaks the face tint." };
+
+        var presets = FindPresets();
+        var wanted = name.Trim();
+        bool Same(PresetFile p) => p.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)
+                                   || Path.GetFileName(p.Name).Equals(wanted, StringComparison.OrdinalIgnoreCase);
+        var exported = presets.FirstOrDefault(p => p.Kind == "Exported" && Same(p));
+        if (exported == null)
+        {
+            var inPresets = presets.FirstOrDefault(p => p.Kind == "Presets" && Same(p));
+            return new
+            {
+                error = inPresets != null
+                    ? $"'{wanted}' is a RaceMenu Presets-tab preset ({inPresets.Path}). Load it in RaceMenu (showracemenu, Presets tab). " +
+                      "This tool can only load exported presets (SaveRaceMenuPreset)."
+                    : $"No exported preset named '{wanted}'.",
+                exportedPresets = presets.Where(p => p.Kind == "Exported").Select(p => p.Name).ToArray(),
+            };
+        }
+        if (!HasTintTexture(exported))
+        {
+            return new
+            {
+                error = $"'{wanted}' has no face-tint texture (Textures\\CharGen\\Exported\\{exported.Name}.dds), so loading it would turn " +
+                        "the face purple. Make exported presets with SaveRaceMenuPreset, which writes the texture; don't copy .jslot files into Exported.",
+                file = exported.Path,
+            };
+        }
+
         var appearance = await _pipe.SendRequestAsync("get_appearance");
         var race = appearance?["raceFormId"]?.GetValue<string>();
         if (string.IsNullOrEmpty(race)) return new { error = "Couldn't read the player's race" };
-        var presets = FindPresets();
-        var match = presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)
-                                             || Path.GetFileName(p.Name).Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
-        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, match?.Name ?? name.Trim());
+        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, exported.Name);
         var ok = result?.GetValueKind() == System.Text.Json.JsonValueKind.True;
-        if (ok)
-        {
-            await NotifyInGame("RaceMenu preset loaded");
-            return new { loaded = true, name = name.Trim(), note = "If the face looks unchanged, open and close RaceMenu or save and load." };
-        }
-
-        // Not loaded: say where the file is and what this RaceMenu offers, instead of guessing.
-        object? loaders = null;
-        try
-        {
-            var fns = await _pipe.SendRequestAsync("get_script_functions", new JsonObject { ["className"] = "CharGen" });
-            loaders = fns?.ToJsonString().Split('"').Where(t => t.Contains("Load", StringComparison.OrdinalIgnoreCase) && t.Length < 120).Distinct().ToArray();
-        }
-        catch (McpException) { }
+        if (ok) await NotifyInGame("RaceMenu preset loaded");
         return new
         {
-            loaded = false,
-            name = name.Trim(),
-            foundAt = match?.Path,
-            folderKind = match?.Kind,
-            note = match == null
-                ? "No preset with that name was found; see presets."
-                : match.Kind == "Presets"
-                    ? "This preset is in CharGen\\Presets (RaceMenu's Presets tab). CharGen.LoadCharacter didn't load it; it may only read " +
-                      "presets exported with SaveCharacter (CharGen\\Exported). Load it from RaceMenu's Presets tab instead."
-                    : "CharGen.LoadCharacter returned false for this exported preset.",
-            charGenLoadFunctions = loaders,
-            presets = presets.Select(p => $"{p.Kind}/{p.Name}").ToArray(),
+            loaded = ok,
+            name = exported.Name,
+            file = exported.Path,
+            note = ok ? "Check the face (a screenshot): if the tint looks wrong, reload the player's own preset in RaceMenu before saving."
+                      : "CharGen.LoadCharacter returned false.",
         };
+    }
+
+    // The tint texture SaveCharacter writes beside an exported preset, in any Data folder SkyLink searches.
+    private static bool HasTintTexture(PresetFile preset)
+    {
+        foreach (var plugins in SkyLinkSettings.ConfigFolders())
+        {
+            try
+            {
+                var dataRoot = Path.GetFullPath(Path.Combine(plugins, "..", ".."));
+                var dds = Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset.Name.Replace('/', Path.DirectorySeparatorChar) + ".dds");
+                if (File.Exists(dds)) return true;
+            }
+            catch { /* bad path: skip */ }
+        }
+        return false;
     }
 
     private sealed record PresetFile(string Name, string Kind, string Path);

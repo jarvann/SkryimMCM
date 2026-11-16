@@ -2177,6 +2177,10 @@
             {
               "datetime": "2026-11-16T21:00",
               "note": "Build 23: the tool now lists presets in subfolders with their folder kind, and on failure reports where the file is and the CharGen load functions this RaceMenu has. Next: test whether an Exported preset (from SaveRaceMenuPreset) loads, and check RaceMenu's source for a Presets-tab loader."
+            },
+            {
+              "datetime": "2026-11-16T21:30",
+              "note": "In game: the agent copied a Presets-tab .jslot into CharGen\\Exported and loaded it with RaceMenu open; it reported success but the face and neck turned purple-blue (most likely the missing Textures\\CharGen\\Exported\\<name>.dds tint that SaveCharacter writes, possibly also the open menu). Build 24: LoadRaceMenuPreset refuses while RaceSex Menu is open, only loads Exported presets, and refuses one without its tint texture. Fix for the player: reload their preset from RaceMenu's Presets tab."
             }
           ],
           "targetRelease": "1.3"
