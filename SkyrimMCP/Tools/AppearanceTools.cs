@@ -66,11 +66,13 @@ public class AppearanceTools : ToolBase
     [Description("List the head parts the character menu offers for one type (hair, eyes, eyebrows, facialHair, scar, face, misc) " +
         "for this race and sex. The default order (editorId: case-sensitive editor ID) is RaceMenu's slider order, so index = slider number; " +
         "editorIdNoCase, name and loadOrder are also available. start and count (default 21, max 200) page through it; " +
-        "aroundFormId centres the page on one part. Use it to answer 'which hair is number N' or to pick a part to apply.")]
+        "aroundFormId centres the page on one part. Use it to answer 'which hair is number N' or to pick a part to apply. " +
+        "showExcluded=true also lists parts of this type left out by exactly one rule (not playable, other sex, race not valid, " +
+        "extra part) with the index each would take: use it when RaceMenu shows more entries than this list.")]
     public async Task<object> ListHeadPartChoices(string type = "hair", string? order = null, int start = 0, int count = 21,
-        string? aroundFormId = null, string? refId = null)
+        string? aroundFormId = null, string? refId = null, bool showExcluded = false)
     {
-        var parms = new JsonObject { ["type"] = type, ["start"] = start, ["count"] = count };
+        var parms = new JsonObject { ["type"] = type, ["start"] = start, ["count"] = count, ["showExcluded"] = showExcluded };
         if (!string.IsNullOrEmpty(order)) parms["order"] = order;
         if (!string.IsNullOrEmpty(aroundFormId)) parms["aroundFormId"] = aroundFormId;
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;

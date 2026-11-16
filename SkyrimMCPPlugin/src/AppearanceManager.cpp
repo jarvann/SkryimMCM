@@ -520,4 +520,47 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
+    json ExcludedHeadParts(const std::string& refId, const std::string& type) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor) return {{"error", "Actor not found: " + refId}};
+        auto* npc = actor->GetActorBase();
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        const int t = HeadPartTypeFromName(type);
+        if (!npc || !dataHandler || t < 0) return {{"error", "type must be hair, eyes, eyebrows, facialHair, scar, face or misc"}};
+        auto* race = npc->GetRace();
+        const bool female = npc->GetSex() == RE::SEX::kFemale;
+
+        // The menu list in editor ID order, to say where each excluded part would sort.
+        auto shown = HeadPartChoices(npc, t, "editorId");
+        std::vector<std::string> shownIds;
+        shownIds.reserve(shown.size());
+        for (auto* p : shown) shownIds.push_back(EditorIdOf(p));
+
+        json excluded = json::array();
+        int total = 0;
+        for (auto* part : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
+            if (!part || static_cast<int>(std::to_underlying(part->type.get())) != t) continue;
+            json reasons = json::array();
+            if (part->IsExtraPart()) reasons.push_back("extraPart");
+            if (!part->flags.all(RE::BGSHeadPart::Flag::kPlayable)) reasons.push_back("notPlayable");
+            const bool male = part->flags.all(RE::BGSHeadPart::Flag::kMale), fem = part->flags.all(RE::BGSHeadPart::Flag::kFemale);
+            if (!(female ? fem : male)) reasons.push_back(male || fem ? "otherSex" : "noSexFlag");
+            if (race && part->validRaces && !part->validRaces->HasForm(race)) reasons.push_back("raceNotInValidRaces");
+            if (reasons.empty()) continue;
+            ++total;
+            // Parts that miss on one rule are the likely ones a menu shows anyway.
+            if (reasons.size() > 1) continue;
+            const auto id = EditorIdOf(part);
+            json e = DescribePart(part);
+            e["reason"] = reasons[0];
+            e["wouldBeIndex"] = static_cast<int>(std::lower_bound(shownIds.begin(), shownIds.end(), id) - shownIds.begin());
+            e["validRaces"] = part->validRaces ? json(std::format("{:08X}", part->validRaces->GetFormID())) : json(nullptr);
+            excluded.push_back(std::move(e));
+            if (excluded.size() >= 60) break;
+        }
+        return {{"type", type}, {"shown", shown.size()}, {"excludedTotal", total}, {"excludedByOneRule", excluded},
+                {"note", "Parts left out of the menu list by exactly one rule, with the index each would take if a menu showed it. "
+                         "Compare with RaceMenu's extra entries to see which rule it doesn't apply."}};
+    }
+
 }
