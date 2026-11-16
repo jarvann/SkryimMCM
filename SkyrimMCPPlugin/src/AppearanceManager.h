@@ -42,6 +42,12 @@ namespace SkyrimMCP {
         // A page of that list, or the entries around one part: for checking against RaceMenu.
         json ListHeadPartChoices(const std::string& refId, const std::string& type, const std::string& order,
                                  int start, int count, const std::string& aroundFormId);
+
+        // FEAT-208: change head parts. part is a FormID or editor ID; or type + index (menu order).
+        // Misc parts are added (several can be worn), other types replace the current part.
+        json SetHeadPart(const std::string& refId, const std::string& part, const std::string& type, int index, bool refresh);
+        // Removes one part (by FormID/editor ID, or the current part of a type). Not face or eyes.
+        json RemoveHeadPart(const std::string& refId, const std::string& part, const std::string& type, bool refresh);
     }
 
 }

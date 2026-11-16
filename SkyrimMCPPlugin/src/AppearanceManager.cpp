@@ -370,4 +370,154 @@ namespace SkyrimMCP::AppearanceManager {
         return {{"type", type}, {"order", ord}, {"total", list.size()}, {"start", start}, {"entries", entries}};
     }
 
+    namespace {
+        const char* kTypeNames[] = { "misc", "face", "eyes", "hair", "facialHair", "scar", "eyebrows" };
+
+        const char* TypeName(RE::BGSHeadPart* part) {
+            const auto t = static_cast<int>(std::to_underlying(part->type.get()));
+            return (t >= 0 && t < static_cast<int>(std::size(kTypeNames))) ? kTypeNames[t] : "other";
+        }
+
+        json DescribePart(RE::BGSHeadPart* part) {
+            if (!part) return nullptr;
+            json p;
+            p["formId"] = std::format("{:08X}", part->GetFormID());
+            p["editorId"] = EditorIdOf(part);
+            p["type"] = TypeName(part);
+            if (const char* name = part->GetName(); name && name[0]) p["name"] = name;
+            if (auto* file = part->GetFile(0)) p["mod"] = file->fileName;
+            return p;
+        }
+
+        // A head part by FormID or editor ID, or by type + index in the character menu's order
+        // (ListHeadPartChoices, the same numbers RaceMenu shows).
+        RE::BGSHeadPart* FindPart(RE::TESNPC* npc, const std::string& part, const std::string& type, int index, std::string& error) {
+            if (!part.empty()) {
+                RE::TESForm* form = nullptr;
+                try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(part)); } catch (...) {}
+                if (!form) form = RE::TESForm::LookupByEditorID(part);
+                auto* hp = form ? form->As<RE::BGSHeadPart>() : nullptr;
+                if (!hp) error = "No head part with FormID or editor ID '" + part + "'";
+                return hp;
+            }
+            const int t = HeadPartTypeFromName(type);
+            if (t < 0) { error = "Pass part (FormID or editor ID), or type and index from ListHeadPartChoices"; return nullptr; }
+            auto list = HeadPartChoices(npc, t, "editorId");
+            if (index < 0 || index >= static_cast<int>(list.size())) {
+                error = std::format("index must be 0 to {} for {}", static_cast<int>(list.size()) - 1, type);
+                return nullptr;
+            }
+            return list[index];
+        }
+
+        json CurrentParts(RE::TESNPC* npc) {
+            json parts = json::array();
+            if (npc->headParts) {
+                for (std::int8_t i = 0; i < npc->numHeadParts; ++i) {
+                    if (npc->headParts[i]) parts.push_back(DescribePart(npc->headParts[i]));
+                }
+            }
+            return parts;
+        }
+    }
+
+    json SetHeadPart(const std::string& refId, const std::string& part, const std::string& type, int index, bool refresh) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor) return {{"error", "Actor not found: " + refId}};
+        auto* npc = actor->GetActorBase();
+        if (!npc) return {{"error", "Actor has no base record"}};
+        if (npc->HasOverlays()) return {{"error", "This character uses head part overlays; changing them isn't supported"}};
+
+        std::string error;
+        auto* newPart = FindPart(npc, part, type, index, error);
+        if (!newPart) return {{"error", error}};
+        if (newPart->IsExtraPart()) return {{"error", EditorIdOf(newPart) + " is an extra part (added with its main part); pick the main part instead"}};
+        const auto newType = newPart->type.get();
+        if (newType == RE::BGSHeadPart::HeadPartType::kFace) {
+            return {{"error", "Changing the face part isn't supported: it carries the face shape and would distort the head"}};
+        }
+
+        // Misc parts stack (several can be worn at once), so a new one is added; every other
+        // type replaces the current part of that type.
+        RE::BGSHeadPart* oldPart = newType == RE::BGSHeadPart::HeadPartType::kMisc ? nullptr : npc->GetCurrentHeadPartByType(newType);
+        if (oldPart == newPart) return {{"actor", ActorLabel(actor)}, {"unchanged", true}, {"part", DescribePart(newPart)}};
+
+        json warnings = json::array();
+        auto choices = HeadPartChoices(npc, static_cast<int>(std::to_underlying(newType)), "editorId");
+        auto it = std::find(choices.begin(), choices.end(), newPart);
+        if (it == choices.end()) warnings.push_back("This part isn't in the character menu's list for this race and sex (not playable, other sex or race); it may not fit.");
+
+        npc->ChangeHeadPart(newPart);           // the record (saved with the game)
+        actor->ChangeHeadPart(oldPart, newPart);  // the loaded 3D
+        npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+        if (refresh) actor->DoReset3D(false);
+
+        json result;
+        result["actor"] = ActorLabel(actor);
+        result["previous"] = DescribePart(oldPart);
+        result["part"] = DescribePart(newPart);
+        if (it != choices.end()) result["menuIndex"] = static_cast<int>(it - choices.begin());
+        result["added"] = oldPart == nullptr;
+        if (!warnings.empty()) result["warnings"] = warnings;
+        result["note"] = actor->IsPlayerRef()
+            ? "Saved with the game. If the change doesn't show, call again with refresh=true or save and load. To undo, set the previous part."
+            : "This changes the NPC's base record, so every copy of this NPC changes. NPC faces use pre-baked FaceGen, so the result may not match until the face is regenerated.";
+        return result;
+    }
+
+    json RemoveHeadPart(const std::string& refId, const std::string& part, const std::string& type, bool refresh) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor) return {{"error", "Actor not found: " + refId}};
+        auto* npc = actor->GetActorBase();
+        if (!npc) return {{"error", "Actor has no base record"}};
+        if (npc->HasOverlays()) return {{"error", "This character uses head part overlays; changing them isn't supported"}};
+        if (!npc->headParts || npc->numHeadParts <= 0) return {{"error", "This character has no head parts"}};
+
+        RE::BGSHeadPart* target = nullptr;
+        if (!part.empty()) {
+            std::string error;
+            target = FindPart(npc, part, "", -1, error);
+            if (!target) return {{"error", error}};
+        } else {
+            const int t = HeadPartTypeFromName(type);
+            if (t < 0) return {{"error", "Pass part (FormID or editor ID, from GetAppearance or the current list), or type"}};
+            target = npc->GetCurrentHeadPartByType(static_cast<RE::BGSHeadPart::HeadPartType>(t));
+            if (target && target->type.get() == RE::BGSHeadPart::HeadPartType::kMisc) {
+                // Several misc parts can be worn: make the caller say which.
+                return {{"error", "Several misc parts can be worn at once; pass part with the FormID of the one to remove"}, {"current", CurrentParts(npc)}};
+            }
+        }
+        if (!target) return {{"error", "The character has no part of that type"}, {"current", CurrentParts(npc)}};
+        const auto t = target->type.get();
+        if (t == RE::BGSHeadPart::HeadPartType::kFace || t == RE::BGSHeadPart::HeadPartType::kEyes) {
+            return {{"error", "The face and eyes can't be removed, only replaced (SetHeadPart)"}};
+        }
+
+        // Remove it from the record by closing the gap: the game owns the array and frees it
+        // whole, so it is shortened in place rather than reallocated. Its extra parts (a hair's
+        // hairline, for example) are not in this list; they are rebuilt from the remaining parts.
+        int at = -1;
+        for (std::int8_t i = 0; i < npc->numHeadParts; ++i) {
+            if (npc->headParts[i] == target) { at = i; break; }
+        }
+        if (at < 0) return {{"error", EditorIdOf(target) + " isn't one of this character's head parts"}, {"current", CurrentParts(npc)}};
+        for (std::int8_t i = static_cast<std::int8_t>(at); i + 1 < npc->numHeadParts; ++i) npc->headParts[i] = npc->headParts[i + 1];
+        npc->headParts[npc->numHeadParts - 1] = nullptr;
+        --npc->numHeadParts;
+        npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+
+        // The loaded head keeps the old mesh until its 3D is rebuilt.
+        if (refresh) actor->DoReset3D(false);
+
+        json result;
+        result["actor"] = ActorLabel(actor);
+        result["removed"] = DescribePart(target);
+        result["current"] = CurrentParts(npc);
+        result["refreshed3D"] = refresh;
+        result["note"] = refresh
+            ? "Removed from the record and the 3D was rebuilt. If it still shows, save and load. To undo, SetHeadPart with the removed part."
+            : "Removed from the record (saved with the game). It stays visible until the 3D is rebuilt: call again with refresh=true, or save and load.";
+        return result;
+    }
+
 }
