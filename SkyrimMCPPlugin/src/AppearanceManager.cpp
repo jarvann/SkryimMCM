@@ -520,7 +520,8 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
-    json ExcludedHeadParts(const std::string& refId, const std::string& type) {
+    json ExcludedHeadParts(const std::string& refId, const std::string& type, int start, int count,
+                           const std::string& rule, const std::string& explain) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};
         auto* npc = actor->GetActorBase();
@@ -536,31 +537,57 @@ namespace SkyrimMCP::AppearanceManager {
         shownIds.reserve(shown.size());
         for (auto* p : shown) shownIds.push_back(EditorIdOf(p));
 
-        json excluded = json::array();
-        int total = 0;
-        for (auto* part : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
-            if (!part || static_cast<int>(std::to_underlying(part->type.get())) != t) continue;
+        auto reasonsFor = [&](RE::BGSHeadPart* part) {
             json reasons = json::array();
             if (part->IsExtraPart()) reasons.push_back("extraPart");
             if (!part->flags.all(RE::BGSHeadPart::Flag::kPlayable)) reasons.push_back("notPlayable");
             const bool male = part->flags.all(RE::BGSHeadPart::Flag::kMale), fem = part->flags.all(RE::BGSHeadPart::Flag::kFemale);
             if (!(female ? fem : male)) reasons.push_back(male || fem ? "otherSex" : "noSexFlag");
             if (race && part->validRaces && !part->validRaces->HasForm(race)) reasons.push_back("raceNotInValidRaces");
-            if (reasons.empty()) continue;
-            ++total;
-            // Parts that miss on one rule are the likely ones a menu shows anyway.
-            if (reasons.size() > 1) continue;
-            const auto id = EditorIdOf(part);
+            return reasons;
+        };
+        auto describe = [&](RE::BGSHeadPart* part, const json& reasons) {
             json e = DescribePart(part);
-            e["reason"] = reasons[0];
-            e["wouldBeIndex"] = static_cast<int>(std::lower_bound(shownIds.begin(), shownIds.end(), id) - shownIds.begin());
+            e["reasons"] = reasons;
+            e["wouldBeIndex"] = static_cast<int>(std::lower_bound(shownIds.begin(), shownIds.end(), EditorIdOf(part)) - shownIds.begin());
             e["validRaces"] = part->validRaces ? json(std::format("{:08X}", part->validRaces->GetFormID())) : json(nullptr);
-            excluded.push_back(std::move(e));
-            if (excluded.size() >= 60) break;
+            e["playable"] = part->flags.all(RE::BGSHeadPart::Flag::kPlayable);
+            return e;
+        };
+
+        // One part by editor ID or FormID: every rule it fails, whatever its type.
+        if (!explain.empty()) {
+            RE::TESForm* form = nullptr;
+            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(explain)); } catch (...) {}
+            if (!form) form = RE::TESForm::LookupByEditorID(explain);
+            auto* part = form ? form->As<RE::BGSHeadPart>() : nullptr;
+            if (!part) return {{"error", "No head part '" + explain + "'"}};
+            auto reasons = reasonsFor(part);
+            auto e = describe(part, reasons);
+            e["shownInList"] = reasons.empty() && static_cast<int>(std::to_underlying(part->type.get())) == t;
+            return {{"explain", e}};
         }
-        return {{"type", type}, {"shown", shown.size()}, {"excludedTotal", total}, {"excludedByOneRule", excluded},
-                {"note", "Parts left out of the menu list by exactly one rule, with the index each would take if a menu showed it. "
-                         "Compare with RaceMenu's extra entries to see which rule it doesn't apply."}};
+
+        std::vector<json> all;
+        for (auto* part : dataHandler->GetFormArray<RE::BGSHeadPart>()) {
+            if (!part || static_cast<int>(std::to_underlying(part->type.get())) != t) continue;
+            auto reasons = reasonsFor(part);
+            if (reasons.empty()) continue;
+            if (!rule.empty() && std::find(reasons.begin(), reasons.end(), rule) == reasons.end()) continue;
+            all.push_back(describe(part, reasons));
+        }
+        // Fewest failed rules first (the likeliest to be shown by a laxer menu), then by sort position.
+        std::stable_sort(all.begin(), all.end(), [](const json& a, const json& b) {
+            if (a["reasons"].size() != b["reasons"].size()) return a["reasons"].size() < b["reasons"].size();
+            return a["wouldBeIndex"].get<int>() < b["wouldBeIndex"].get<int>();
+        });
+        count = std::clamp(count, 1, 200);
+        start = std::clamp(start, 0, static_cast<int>(all.size()));
+        json page = json::array();
+        for (int i = start; i < static_cast<int>(all.size()) && i < start + count; ++i) page.push_back(all[i]);
+        return {{"type", type}, {"shown", shown.size()}, {"excludedTotal", all.size()}, {"start", start}, {"entries", page},
+                {"note", "Head parts of this type the menu list leaves out, fewest failed rules first, with the index each would "
+                         "take. rule filters by one reason; explain=<editorId> says why one part is left out."}};
     }
 
 }

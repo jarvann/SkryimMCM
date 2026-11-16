@@ -281,9 +281,15 @@ namespace SkyrimMCP::Protocol {
             int count = params.value("count", 21);
             std::string around = params.value("aroundFormId", "");
             bool showExcluded = params.value("showExcluded", false);
+            int exStart = params.value("excludedStart", 0);
+            int exCount = params.value("excludedCount", 60);
+            std::string rule = params.value("excludedRule", "");
+            std::string explain = params.value("explain", "");
             return GameThread(id, [=]() {
+                if (!explain.empty()) return AppearanceManager::ExcludedHeadParts(refId, type, 0, 1, "", explain);
                 auto result = AppearanceManager::ListHeadPartChoices(refId, type, order, start, count, around);
-                if (showExcluded && !result.contains("error")) result["excluded"] = AppearanceManager::ExcludedHeadParts(refId, type);
+                if (showExcluded && !result.contains("error"))
+                    result["excluded"] = AppearanceManager::ExcludedHeadParts(refId, type, exStart, exCount, rule, "");
                 return result;
             });
         };
