@@ -482,6 +482,9 @@ namespace SkyrimMCP::PlayerQueries {
         result["sex"] = base->GetSex() == RE::SEX::kMale ? "male" : "female";
         result["weight"] = base->GetWeight();
         result["height"] = base->GetHeight();
+        // CharGen.LoadCharacterPreset takes the hair colour form (FEAT-228).
+        result["hairColorFormId"] = (base->headRelatedData && base->headRelatedData->hairColor)
+                                        ? json(std::format("{:08X}", base->headRelatedData->hairColor->GetFormID())) : json(nullptr);
 
         // Face morphs (19 values)
         if (base->faceData) {
