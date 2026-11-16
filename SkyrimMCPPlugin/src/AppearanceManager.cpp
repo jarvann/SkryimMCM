@@ -498,8 +498,15 @@ namespace SkyrimMCP::AppearanceManager {
             RE::BGSHeadPart* part = nullptr;
             if (bar != std::string::npos) {
                 try {
-                    const auto local = static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16));
-                    if (auto* form = dataHandler->LookupForm(local, id.substr(0, bar))) part = form->As<RE::BGSHeadPart>();
+                    // RaceMenu writes the low 24 bits of the runtime ID, which for a light plugin still holds
+                    // the light index (FEBD3820 -> "BD3820"); LookupForm adds the local ID to the plugin's
+                    // prefix unmasked, so keep only the plugin's own part (12 bits light, 24 regular).
+                    const auto plugin = id.substr(0, bar);
+                    auto local = static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16));
+                    if (const auto* file = dataHandler->LookupModByName(plugin)) {
+                        local &= file->IsLight() ? 0xFFFu : 0xFFFFFFu;
+                        if (auto* form = dataHandler->LookupForm(local, plugin)) part = form->As<RE::BGSHeadPart>();
+                    }
                 } catch (...) {}
             }
             if (!part) { problems.push_back(id + ": not a loaded head part"); continue; }

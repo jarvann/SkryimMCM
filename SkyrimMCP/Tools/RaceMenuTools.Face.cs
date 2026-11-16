@@ -342,6 +342,39 @@ public partial class RaceMenuTools
         return (outcome, backupMade, editedPath);
     }
 
+    private static HashSet<string>? _knownSliders;
+
+    /// <summary>
+    /// Slider names the loose RaceMenu slider files define (meshes\actors\character\FaceGenMorphs\*\sliders\*.ini:
+    /// "Name = 128, Slider, MorphDown, MorphUp"). Sliders packed in BSAs aren't included.
+    /// </summary>
+    private static HashSet<string> KnownSliderNames()
+    {
+        if (_knownSliders != null) return _knownSliders;
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var (game, _) = SkyLinkSettings.SkyrimPath();
+        var root = game == null ? null : Path.Combine(game, "Data", "meshes", "actors", "character", "FaceGenMorphs");
+        try
+        {
+            if (root != null && Directory.Exists(root))
+            {
+                foreach (var ini in Directory.EnumerateFiles(root, "*.ini", SearchOption.AllDirectories))
+                {
+                    if (!Path.GetDirectoryName(ini)!.EndsWith("sliders", StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (var line in File.ReadLines(ini))
+                    {
+                        var eq = line.IndexOf('=');
+                        if (eq <= 0 || line.TrimStart().StartsWith('#') || line.TrimStart().StartsWith(';')) continue;
+                        var name = line[..eq].Trim();
+                        if (name.Length > 0 && name.All(c => char.IsLetterOrDigit(c) || c == '_')) names.Add(name);
+                    }
+                }
+            }
+        }
+        catch { /* unreadable folder: fewer known names */ }
+        return _knownSliders = names;
+    }
+
     [McpServerTool]
     [Description("Change face sliders on the player's live face, several at once: sliders is a map of slider name to value, " +
         "e.g. {\"NSK_EyelidOpen\": -0.3, \"eyesInOut\": 0.2}. Names: the vanilla morphs (noseLongShort ... eyesForwardBack, -1 to 1), " +
@@ -395,10 +428,17 @@ public partial class RaceMenuTools
                     string.Equals(e["name"]?.GetValue<string>(), name, StringComparison.OrdinalIgnoreCase));
                 if (entry == null)
                 {
+                    // RaceMenu doesn't save sliders at 0, so a missing name is usually a slider at 0. Only a
+                    // name no slider file defines is suspect (sliders packed in BSAs can't be checked).
                     custom.Add(new JsonObject { ["name"] = name, ["value"] = value });
-                    unknown.Add(name);
-                    changes.Add(new { slider = name, kind = "extended (added)", previous = 0.0, value,
-                                      note = (string?)"not in the live face's slider list: RaceMenu ignores names it doesn't know, so check the spelling" });
+                    var known = KnownSliderNames();
+                    var defined = known.Contains(name);
+                    if (!defined && known.Count > 0) unknown.Add(name);
+                    changes.Add(new { slider = name, kind = "extended", previous = 0.0, value,
+                                      note = defined ? null
+                                           : (string?)"Was at 0 or isn't a slider: RaceMenu saves no sliders at 0, and no loose slider file " +
+                                             "defines this name (some come packed in BSAs). RaceMenu ignores names it doesn't know, so check " +
+                                             "the spelling if nothing changes." });
                 }
                 else
                 {
@@ -419,7 +459,7 @@ public partial class RaceMenuTools
             tints = outcome?.Tints,
             dryRun,
             changes,
-            unknownSliders = unknown.Count > 0 ? unknown : null,
+            notInSliderFiles = unknown.Count > 0 ? unknown : null,
             backup,
             restoreWith = _sessionBackup != null ? $"LoadRaceMenuPreset('{_sessionBackup}')" : null,
             file,
