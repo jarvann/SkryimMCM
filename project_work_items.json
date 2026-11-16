@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 209,
+    "totalItems": 211,
     "completed": 128,
     "completedPartial": 2,
     "implementedUntested": 13,
     "inProgress": 0,
-    "planned": 35,
+    "planned": 37,
     "bugs": 28
   },
   "phases": [
@@ -2257,6 +2257,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
             }
           ],
           "targetRelease": "1.4"
@@ -2272,6 +2276,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player: hiding hair and headgear for captures is fine, as an option."
             }
           ],
           "targetRelease": "1.4"
@@ -2317,6 +2325,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
             }
           ],
           "targetRelease": "1.4"
@@ -2332,6 +2344,36 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-235",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Face builder: offline face model",
+          "description": "Rebuild the face outside the game: read chargen TRI files (base + vanilla morphs), RaceMenu extension TRIs and slider definitions (meshes\\actors\\character\\FaceGenMorphs\\<plugin>\\morphs.ini, races.ini, sliders\\*.ini; some sets are in BSAs, so a BSA v105 reader), .jslot presets (sliders, tints, head parts, sculpt) and tint masks; reconstruct the mesh (base + morphs + extensions + sculpt), composite tints, and software-render front, three-quarter and profile views for landmark measurement. Validate against RaceMenu's exported head (SKSE\\Plugins\\CharGen\\<name>.nif). Critical path for the offline fitting loop.",
+          "history": [
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-236",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Face builder: hair picker without cycling",
+          "description": "Some hairs are heavy to load, so the AI must not slide through them in game. List hair head parts grouped by source plugin and mod, with the Nexus mod ID from Vortex's vortex.deployment.json (source folder names end in -<modId>-<version>-<time>) or MO2's meta.ini, so the AI can look up pictures online and propose a shortlist. Apply one with SetHeadPart; toggle only between shortlisted parts, on request, one at a time.",
+          "history": [
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
             }
           ],
           "targetRelease": "1.4"
