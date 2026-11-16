@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Drawing;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace SkyrimMCP.Tools;
@@ -347,9 +349,17 @@ public class UtilityTools : ToolBase
     [Description("Take a screenshot with the game's own Print Screen handler, then wait for the file and report its path. " +
         "The game writes it where Skyrim.ini's sScreenShotBaseName points (the game folder by default) and only while it is " +
         "rendering: if the player is tabbed out, ask them to click into the game first. waitSeconds (default 8, max 30). " +
+        "The full-size file can be huge (63 MB at 7680x2160), so a small JPEG copy is also saved next to it as " +
+        "<name>_preview.jpg: previewWidth (default 1568, 0 for none) caps its width, and crop 'x,y,width,height' in " +
+        "fractions of the frame (e.g. '0.4,0.05,0.2,0.6' for the middle) cuts it first, so a face can fill the preview. " +
+        "showImage (default true) also returns the preview as an image you can look at. " +
         "Returns an error if no file appeared. Close menus first if the player wants the plain view.")]
-    public async Task<object> TakeScreenshot(int waitSeconds = 8)
+    public async Task<CallToolResult> TakeScreenshot(int waitSeconds = 8, int previewWidth = 1568, string? crop = null, bool showImage = true)
     {
+        RectangleF? cropFraction;
+        try { cropFraction = ScreenshotPreview.ParseCrop(crop); }
+        catch (Exception ex) when (ex is ArgumentException or FormatException) { return ToolJson(new { error = ex.Message }, isError: true); }
+
         var (game, _) = SkyLinkSettings.SkyrimPath();
         var started = DateTime.Now.AddSeconds(-1);
         var data = await _pipe.SendRequestAsync("take_screenshot");
@@ -363,14 +373,14 @@ public class UtilityTools : ToolBase
         if (string.IsNullOrEmpty(prefix)) prefix = "ScreenShot";
 
         if (folder == null || !Directory.Exists(folder))
-            return new { queued = true, verified = false, baseName, note = $"Screenshot queued, but the folder it goes to ({folder ?? "unknown"}) can't be checked.", plugin = DeserializeResponse(data) };
+            return ToolJson(new { queued = true, verified = false, baseName, note = $"Screenshot queued, but the folder it goes to ({folder ?? "unknown"}) can't be checked.", plugin = DeserializeResponse(data) });
 
         waitSeconds = Math.Clamp(waitSeconds, 1, 30);
         for (var waited = 0; waited < waitSeconds * 1000; waited += 250)
         {
             await Task.Delay(250);
             var file = new DirectoryInfo(folder).EnumerateFiles(prefix + "*.*")
-                .Where(f => f.LastWriteTime >= started)
+                .Where(f => f.LastWriteTime >= started && !f.Name.EndsWith("_preview.jpg", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(f => f.LastWriteTime)
                 .FirstOrDefault();
             if (file != null)
@@ -379,24 +389,58 @@ public class UtilityTools : ToolBase
                 // same name, so give this one a timestamped name once it has finished writing.
                 var saved = await KeepScreenshot(file);
                 await NotifyInGame("Screenshot taken");
-                return new
+
+                ScreenshotPreview.Result? preview = null;
+                string? previewError = null;
+                if (previewWidth > 0 && OperatingSystem.IsWindows())
+                {
+                    try { preview = ScreenshotPreview.Make(saved.FullName, Math.Clamp(previewWidth, 64, 4096), cropFraction); }
+                    catch (Exception ex) { previewError = $"No preview: {ex.Message}"; }
+                }
+
+                var result = ToolJson(new
                 {
                     success = true,
                     file = saved.FullName,
                     written = saved.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
                     bytes = saved.Length,
                     renamedFrom = saved.FullName == file.FullName ? null : file.Name,
-                };
+                    preview = preview == null ? null : new
+                    {
+                        file = preview.Path,
+                        width = preview.Width,
+                        height = preview.Height,
+                        bytes = preview.Bytes,
+                        sourceSize = $"{preview.SourceWidth}x{preview.SourceHeight}",
+                        cropPixels = $"{preview.Crop.X},{preview.Crop.Y},{preview.Crop.Width},{preview.Crop.Height}",
+                    },
+                    previewError,
+                });
+                if (showImage && preview != null)
+                {
+                    result.Content.Add(new ImageContentBlock
+                    {
+                        Data = Convert.ToBase64String(await File.ReadAllBytesAsync(preview.Path)),
+                        MimeType = "image/jpeg",
+                    });
+                }
+                return result;
             }
         }
-        return new
+        return ToolJson(new
         {
             error = $"The screenshot was queued but no new {prefix}* file appeared in {folder} within {waitSeconds} seconds.",
             plugin = DeserializeResponse(data),
             hint = "Skyrim pauses while it isn't the active window, and the screenshot is only written when it renders again: " +
                    "ask the player to click into the game, then call again with a longer waitSeconds.",
-        };
+        }, isError: true);
     }
+
+    private static CallToolResult ToolJson(object value, bool isError = false) => new()
+    {
+        Content = [new TextContentBlock { Text = JsonSerializer.Serialize(value) }],
+        IsError = isError,
+    };
 
     [McpServerTool]
     [Description("Load a save game by name. Immediately begins loading — current game state is lost. " +
