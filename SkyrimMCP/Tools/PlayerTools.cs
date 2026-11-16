@@ -177,7 +177,8 @@ public class PlayerTools : ToolBase
         "known spells, known shouts, equipped items, full inventory, gold, and active effects. " +
         "Use this to save a character template that can be re-applied to a new character. " +
         "IMPORTANT: Pass an outputPath to write the blueprint directly to a file on disk — the data is too large " +
-        "for the MCP response. Example outputPath: 'C:\\Users\\cory\\Downloads\\blueprint.json'")]
+        "for the MCP response. Example outputPath: 'C:\\Users\\<you>\\Documents\\blueprint.json'. " +
+        "Every form ID also carries its plugin name and local ID (formIdSource), so ApplyBlueprint still finds modded items after a load-order change.")]
     public async Task<object> GetCharacterBlueprint(string? outputPath = null)
     {
         var data = await _pipe.SendRequestAsync("get_character_blueprint");
@@ -219,6 +220,50 @@ public class PlayerTools : ToolBase
         }
 
         return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
+    [Description("Apply the inventory, equipment and gold of a character blueprint file (from GetCharacterBlueprint) to the player. " +
+        "dryRun defaults to TRUE: first show the player what would change, then call again with dryRun=false once they agree. " +
+        "sections (comma-separated, default 'inventory,equipment,gold'). Only missing items are added (blueprint count minus what " +
+        "the player has); nothing is ever removed, and gold only goes up unless exactGold=true. Then the blueprint's equipped " +
+        "armor, weapons and spells are equipped. Items are found by plugin name and local ID, so a different load order works; " +
+        "items from plugins that aren't loaded, items created in game, and blueprints from before 1.3 whose form IDs now point at " +
+        "a different item are listed as unresolved. Player-made enchantments are not restored (the plain item is added).")]
+    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false)
+    {
+        JsonNode? blueprint;
+        try
+        {
+            blueprint = JsonNode.Parse(await File.ReadAllTextAsync(path));
+        }
+        catch (Exception ex)
+        {
+            return new { error = $"Could not read the blueprint at {path}: {ex.Message}" };
+        }
+        if (blueprint is not JsonObject bp) return new { error = "The file isn't a blueprint (expected a JSON object)" };
+
+        var parms = new JsonObject
+        {
+            ["sections"] = new JsonArray(sections.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => (JsonNode)s.ToLowerInvariant()).ToArray()),
+            ["dryRun"] = dryRun,
+            ["exactGold"] = exactGold,
+            ["inventory"] = bp["inventory"]?["items"]?.DeepClone() ?? new JsonArray(),
+            ["equipped"] = bp["equipped"]?["equipped"]?.DeepClone() ?? new JsonArray(),
+        };
+        if (bp["gold"]?["gold"] is JsonNode gold) parms["gold"] = gold.DeepClone();
+
+        var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
+        if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
+        var result = DeserializeResponse(data);
+        return new
+        {
+            blueprint = path,
+            exportedBy = bp["exportSource"]?.GetValue<string>(),
+            portableIds = bp["formatVersion"]?.GetValue<int>() >= 2,
+            result,
+        };
     }
 
     [McpServerTool]

@@ -1,4 +1,6 @@
 #include "PlayerQueries.h"
+#include "BlueprintManager.h"
+#include "BuildInfo.h"
 #include "Helpers.h"
 #include "NPCManager.h"
 #include "CombatAnalysis.h"
@@ -573,7 +575,7 @@ namespace SkyrimMCP::PlayerQueries {
         // Single call that exports everything needed to recreate a character
         json blueprint;
         blueprint["exportDate"] = "auto";
-        blueprint["exportSource"] = "Skyrim MCP Plugin v1.0";
+        blueprint["exportSource"] = "SkyLink AI " SKYLINK_VERSION_STRING;
 
         // Player info
         blueprint["character"] = GetPlayerInfo();
@@ -616,6 +618,11 @@ namespace SkyrimMCP::PlayerQueries {
         // Cross-module data
         blueprint["factions"] = NPCManager::GetFactions();
         blueprint["damageStats"] = CombatAnalysis::GetDamageStats();
+
+        // FEAT-206: plugin name + local ID next to every form ID, so the blueprint survives a
+        // load-order change (ApplyBlueprint resolves them back).
+        BlueprintManager::AddPortableIds(blueprint);
+        blueprint["formatVersion"] = 2;
 
         return blueprint;
     }

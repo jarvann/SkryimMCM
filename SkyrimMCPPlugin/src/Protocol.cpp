@@ -4,6 +4,7 @@
 #include "LootManager.h"
 #include "AppearanceManager.h"
 #include "ScriptStats.h"
+#include "BlueprintManager.h"
 
 #include <SKSE/SKSE.h>
 
@@ -243,6 +244,11 @@ namespace SkyrimMCP::Protocol {
         };
         registry["loot_bodies"] = [](const std::string& id, const json& params) {
             return GameThread(id, [params]() { return LootManager::LootBodies(params); });
+        };
+
+        // FEAT-207: add missing items, equip and restore gold from a blueprint
+        registry["apply_blueprint_items"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return BlueprintManager::ApplyBlueprintItems(params); });
         };
 
         // FEAT-150: Papyrus VM diagnostics
