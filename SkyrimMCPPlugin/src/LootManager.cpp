@@ -349,8 +349,25 @@ namespace SkyrimMCP::LootManager {
                 if (!wasMoved) heldBack.push_back(std::format("{:08X}", id));
             }
             if (!heldBack.empty()) {
-                result["heldBack"] = heldBack;
-                result["heldBackNote"] = "Worn, favourite or quest items stay unless includeEquipped / includeFavorites / includeQuestItems is true.";
+                // Name and the reason for each, from the source's inventory entry.
+                json detailed = json::array();
+                for (auto& [object, data] : from->GetInventory()) {
+                    if (!object) continue;
+                    const auto idText = std::format("{:08X}", object->GetFormID());
+                    if (std::find(heldBack.begin(), heldBack.end(), idText) == heldBack.end()) continue;
+                    json h = {{"formId", idText}, {"name", object->GetName() ? object->GetName() : ""}};
+                    auto& entry = data.second;
+                    std::string why;
+                    if (entry && entry->IsWorn() && !f.includeEquipped) why = "worn (includeEquipped=true moves it)";
+                    else if (entry && entry->IsFavorited() && !f.includeFavorites) why = "favourite (includeFavorites=true moves it)";
+                    else if (entry && entry->IsQuestObject() && !f.includeQuestItems) why = "quest item (includeQuestItems=true moves it)";
+                    else if (!Lootable(object)) why = "hidden item (can't be moved)";
+                    else if (f.minValue > 0 && object->GetGoldValue() < f.minValue) why = "below minValue";
+                    else why = "not moved";
+                    h["reason"] = why;
+                    detailed.push_back(h);
+                }
+                result["heldBack"] = detailed;
             }
         }
         return result;
