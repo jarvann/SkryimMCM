@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <format>
 #include <string_view>
@@ -494,6 +495,87 @@ namespace SkyrimMCP::UtilityManager {
 
         bool success = mgr->LoadMostRecentSaveGame();
         return {{"loading", success}};
+    }
+
+    namespace {
+        std::string CategoryName(RE::BGSSoundCategory* c) {
+            const char* name = c->GetFullName();
+            if (name && name[0]) return name;
+            const char* edid = c->GetFormEditorID();
+            return (edid && edid[0]) ? edid : std::format("{:08X}", c->GetFormID());
+        }
+
+        std::string LowerCopy(std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            return s;
+        }
+    }
+
+    // FEAT-131: the Audio menu's sliders are sound categories (Master, Effects, Music, Voice...);
+    // setting a category's volume is what the menu does. The old tool ran "setgs
+    // fAudioMasterVolume", an INI preference the console can't change, so nothing happened.
+    json SetVolume(const std::string& category, float volume) {
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) return {{"error", "Game data not ready"}};
+
+        std::vector<RE::BGSSoundCategory*> menu;
+        for (auto* c : dataHandler->GetFormArray<RE::BGSSoundCategory>()) {
+            if (c && c->IsMenuCategory()) menu.push_back(c);
+        }
+        json listed = json::array();
+        for (auto* c : menu) {
+            listed.push_back({{"name", CategoryName(c)}, {"formId", std::format("{:08X}", c->GetFormID())},
+                              {"volume", c->GetCategoryVolume()}, {"master", c->parentCategory == nullptr}});
+        }
+        if (category == "list") return {{"categories", listed}};
+
+        // "master" is the menu category with no parent: every other category sits under it.
+        RE::BGSSoundCategory* target = nullptr;
+        const auto wanted = LowerCopy(category.empty() ? "master" : category);
+        for (auto* c : menu) {
+            if (LowerCopy(CategoryName(c)) == wanted) { target = c; break; }
+        }
+        if (!target && wanted == "master") {
+            for (auto* c : menu) if (!c->parentCategory) { target = c; break; }
+        }
+        if (!target) return {{"error", "No Audio menu category named '" + category + "'"}, {"categories", listed}};
+
+        volume = std::clamp(volume, 0.0f, 1.0f);
+        const float before = target->GetCategoryVolume();
+        target->SetCategoryVolume(volume);
+        const float after = target->GetCategoryVolume();
+        json result = {{"category", CategoryName(target)}, {"previous", before}, {"volume", after}};
+        if (std::abs(after - volume) > 0.01f) {
+            result["error"] = std::format("The game kept the volume at {:.2f} after setting {:.2f}", after, volume);
+        } else {
+            result["note"] = "Applies at once, like the Audio menu slider. The Audio menu may show the old position until reopened.";
+        }
+        return result;
+    }
+
+    // FEAT-133: queue a screenshot through the game's own Print Screen handler. The game only
+    // writes it when bAllowScreenShot (Skyrim.ini [Display]) is on, so that is switched on for
+    // this session if needed. The caller checks the file actually appeared.
+    json TakeScreenshot() {
+        auto* controls = RE::MenuControls::GetSingleton();
+        auto* handler = controls ? controls->screenshotHandler : nullptr;
+        if (!handler) return {{"error", "The game's screenshot handler isn't available"}};
+
+        json result;
+        if (auto* ini = RE::INISettingCollection::GetSingleton()) {
+            if (auto* allow = ini->GetSetting("bAllowScreenShot:Display")) {
+                result["allowScreenShotWas"] = allow->data.b;
+                if (!allow->data.b) {
+                    allow->data.b = true;
+                    result["allowScreenShotChanged"] = "Turned bAllowScreenShot on for this session (Skyrim.ini is not changed)";
+                }
+            } else {
+                result["allowScreenShotWas"] = nullptr;
+            }
+        }
+        handler->screenshotQueued = true;
+        result["queued"] = true;
+        return result;
     }
 
 }
