@@ -83,6 +83,10 @@ cd W:\home\cory\personal\skyrim_mcp
 # With Claude Desktop pointed at SkyLinkLauncher.dll, no need to close Claude: the launcher restarts the server.
 .\build_plugin.ps1 -ServerOnly     # or -Deploy -Server to build and deploy both halves
 
+# From WSL (Claude Code sessions): build a second worktree (<repo>-build, detached at develop) so the
+# main checkout can stay on a feature branch. Logs land in <repo>-build/.build-logs/.
+#   scripts/deploy-from-wsl.sh [-r ref] [-p plugin only | -s server only] [-c configure] [log-name]
+
 # Release build for Nexus
 .\build_release.ps1 -Version "1.2.1"
 ```
