@@ -127,7 +127,15 @@ namespace SkyrimMCP::LootManager {
             // TransferItems "items": exact forms to move, with a count (-1 = all). When set, it
             // replaces the category match.
             std::unordered_map<RE::FormID, int> items;
+            // Items asked for by a custom name (a renamed weapon): only stacks with that display
+            // name move, not other copies of the base item. Lower case.
+            std::unordered_map<RE::FormID, std::string> stackNames;
         };
+
+        std::string StackName(RE::ExtraDataList* xList, RE::TESBoundObject* object) {
+            const char* n = xList ? xList->GetDisplayName(object) : nullptr;
+            return (n && n[0]) ? n : "";
+        }
 
         bool ReadFilter(const json& params, Filter& f, std::string& error) {
             auto cats = params.value("categories", json::array());
@@ -181,6 +189,24 @@ namespace SkyrimMCP::LootManager {
                 if (!f.includeEquipped && entry->IsWorn()) continue;
                 if (!f.includeFavorites && entry->IsFavorited()) continue;
 
+                // Asked for by custom name: only the stacks carrying that name.
+                std::vector<RE::ExtraDataList*> namedLists;
+                std::string customName;
+                if (auto it = f.stackNames.find(object->GetFormID()); it != f.stackNames.end()) {
+                    int available = 0;
+                    if (entry->extraLists) {
+                        for (auto* xList : *entry->extraLists) {
+                            const auto shown = StackName(xList, object);
+                            if (xList && Lower(shown) == it->second) {
+                                namedLists.push_back(xList);
+                                available += std::max(1, xList->GetCount());
+                                customName = shown;
+                            }
+                        }
+                    }
+                    if (namedLists.empty()) continue;
+                    count = available;
+                }
                 // A named item moves only as many as asked for (and keeps its other copies).
                 if (!f.items.empty()) {
                     const int wanted = f.items.at(object->GetFormID());
@@ -189,7 +215,8 @@ namespace SkyrimMCP::LootManager {
                 const char* name = object->GetName();
                 json m;
                 m["formId"] = std::format("{:08X}", object->GetFormID());
-                m["name"] = (name && name[0]) ? name : m["formId"].get<std::string>();
+                m["name"] = !customName.empty() ? customName : (name && name[0]) ? name : m["formId"].get<std::string>();
+                if (!customName.empty()) m["baseName"] = (name && name[0]) ? name : "";
                 const int itemValue = std::max(0, object->GetGoldValue()) * count;
                 m["count"] = count;
                 m["value"] = itemValue;
@@ -201,8 +228,8 @@ namespace SkyrimMCP::LootManager {
 
                 // Stacks that carry extra data first, then the plain remainder.
                 std::int32_t remaining = count;
-                std::vector<RE::ExtraDataList*> lists;
-                if (entry->extraLists) {
+                std::vector<RE::ExtraDataList*> lists = namedLists;
+                if (namedLists.empty() && entry->extraLists) {
                     for (auto* xList : *entry->extraLists) if (xList) lists.push_back(xList);
                 }
                 for (auto* xList : lists) {
@@ -211,7 +238,7 @@ namespace SkyrimMCP::LootManager {
                     from->RemoveItem(object, n, reason, xList, to);
                     remaining -= n;
                 }
-                if (remaining > 0) from->RemoveItem(object, remaining, reason, nullptr, to);
+                if (remaining > 0 && namedLists.empty()) from->RemoveItem(object, remaining, reason, nullptr, to);
             }
             return moved;
         }
@@ -230,11 +257,20 @@ namespace SkyrimMCP::LootManager {
         // matched against what the source actually holds: exact (case-insensitive) first, then a
         // unique partial match; an ambiguous name is an error listing the candidates.
         bool ResolveItems(const json& list, RE::TESObjectREFR* from, Filter& f, json& unresolved, std::string& error) {
-            std::vector<std::pair<RE::TESBoundObject*, std::string>> held;
+            // Base names, plus the custom names of renamed stacks (what the player calls the item).
+            struct Held { RE::TESBoundObject* object; std::string name; bool custom; std::string shown; };
+            std::vector<Held> held;
             for (auto& [object, data] : from->GetInventory()) {
                 if (!object || data.first <= 0) continue;
-                const char* name = object->GetName();
-                held.emplace_back(object, Lower((name && name[0]) ? name : ""));
+                const char* base = object->GetName();
+                const std::string baseName = (base && base[0]) ? base : "";
+                held.push_back({object, Lower(baseName), false, baseName});
+                if (data.second && data.second->extraLists) {
+                    for (auto* xList : *data.second->extraLists) {
+                        const auto shown = StackName(xList, object);
+                        if (!shown.empty() && shown != baseName) held.push_back({object, Lower(shown), true, shown});
+                    }
+                }
             }
             for (const auto& entry : list) {
                 std::string key;
@@ -246,28 +282,29 @@ namespace SkyrimMCP::LootManager {
                 }
                 if (key.empty()) continue;
 
-                RE::TESBoundObject* found = nullptr;
+                const Held* found = nullptr;
                 try {
                     const auto id = Helpers::ParseFormId(key);
-                    for (auto& [object, name] : held) if (object->GetFormID() == id) { found = object; break; }
+                    for (auto& h : held) if (!h.custom && h.object->GetFormID() == id) { found = &h; break; }
                 } catch (...) {}
                 if (!found) {
                     const auto wanted = Lower(key);
-                    std::vector<RE::TESBoundObject*> partial;
-                    for (auto& [object, name] : held) {
-                        if (name == wanted) { found = object; break; }
-                        if (!wanted.empty() && name.find(wanted) != std::string::npos) partial.push_back(object);
+                    std::vector<const Held*> partial;
+                    for (auto& h : held) {
+                        if (h.name == wanted) { found = &h; break; }
+                        if (!wanted.empty() && h.name.find(wanted) != std::string::npos) partial.push_back(&h);
                     }
                     if (!found && partial.size() == 1) found = partial[0];
                     if (!found && partial.size() > 1) {
                         json names = json::array();
-                        for (auto* o : partial) names.push_back(std::format("{} ({:08X})", o->GetName(), o->GetFormID()));
-                        error = "'" + key + "' matches several items; use the FormID: " + names.dump();
+                        for (auto* h : partial) names.push_back(std::format("{} ({:08X})", h->shown, h->object->GetFormID()));
+                        error = "'" + key + "' matches several items; use the full name or the FormID: " + names.dump();
                         return false;
                     }
                 }
                 if (!found) { unresolved.push_back(key); continue; }
-                f.items[found->GetFormID()] = count;
+                f.items[found->object->GetFormID()] = count;
+                if (found->custom) f.stackNames[found->object->GetFormID()] = found->name;
             }
             return true;
         }
@@ -299,7 +336,9 @@ namespace SkyrimMCP::LootManager {
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (to == player && from != player) {
             auto* owner = from->GetOwner();
-            const bool ownedByOther = owner && owner != player->GetActorBase() && !from->IsDead(true);
+            auto* fromActor = from->As<RE::Actor>();
+            const bool follower = fromActor && fromActor->IsPlayerTeammate();
+            const bool ownedByOther = owner && owner != player->GetActorBase() && !from->IsDead(true) && !follower;
             if (ownedByOther) {
                 if (!allowStealing) {
                     return {{"error", RefLabel(from) + " belongs to someone else, so taking from it is stealing. "
@@ -308,7 +347,8 @@ namespace SkyrimMCP::LootManager {
                 reason = RE::ITEM_REMOVE_REASON::kSteal;
             }
         }
-        if (auto* actor = from->As<RE::Actor>(); actor && !actor->IsDead() && !actor->IsPlayerRef() && !allowStealing) {
+        // A follower's (teammate's) inventory is shared like the game's own trade menu: not theft.
+        if (auto* actor = from->As<RE::Actor>(); actor && !actor->IsDead() && !actor->IsPlayerRef() && !actor->IsPlayerTeammate() && !allowStealing) {
             return {{"error", RefLabel(from) + " is a living NPC: taking their items is pickpocketing. Use allowStealing=true only if the player asks."}};
         }
 

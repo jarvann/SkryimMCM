@@ -127,13 +127,15 @@ public class InventoryTools : ToolBase
         "Example: store smithing materials: categories='smithing', from='player', to='crosshair'. " +
         "categories (comma-separated): " + CategoryList + ". " +
         "items (instead of categories, for specific things): a JSON list of FormIDs or names with optional counts, " +
-        "e.g. '[\"Ebony Sword\", {\"item\": \"0001397E\", \"count\": 2}]' or a comma-separated list; names match what the source holds. " +
+        "e.g. '[\"Ebony Sword\", {\"item\": \"0001397E\", \"count\": 2}]' or a comma-separated list; names match what the source holds, including custom names of renamed items " +
+        "(then only that renamed copy moves). " +
         "This is a real move: enchantments, tempering and custom names go with the item (never add a copy and remove the original). " +
         "Each moved item reports destinationBefore and destinationAfter, so a top-up of an existing pile is visible; " +
         "destinationAlreadyHadSome counts those. Run a dry run first for sorting jobs. " +
         "minValue skips cheaper items. Equipped items, favorites and quest items stay unless includeEquipped / includeFavorites / " +
         "includeQuestItems is true. Enchanted and tempered items keep their properties. " +
         "Taking from something another NPC owns, or from a living NPC, is stealing and is refused unless allowStealing=true " +
+        "(followers are exempt: moving items to and from a follower is like the game's trade menu) " +
         "(ask the player first; the game's normal crime rules apply). dryRun=true lists what would move without moving it.")]
     public async Task<object> TransferItems(string? categories = null, string from = "player", string to = "crosshair", int minValue = 0,
         bool includeEquipped = false, bool includeFavorites = false, bool includeQuestItems = false,
