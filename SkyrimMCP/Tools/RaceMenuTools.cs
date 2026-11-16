@@ -273,17 +273,22 @@ public partial class RaceMenuTools : ToolBase
         if (match == null)
             return new { error = $"No preset named '{wanted}'.", presets = ListPresets() };
 
+        var backup = await EnsureSessionBackup();
         if (match.Kind == "Presets")
         {
-            var ok = await LoadPresetsTabPreset(match.Name);
-            if (ok) await NotifyInGame("RaceMenu preset loaded");
+            var outcome = await LoadPresetsTabPreset(match.Name, match.Path);
+            if (outcome.Loaded) await NotifyInGame("RaceMenu preset loaded");
             return new
             {
-                loaded = ok,
+                loaded = outcome.Loaded,
                 preset = $"Presets/{match.Name}",
                 file = match.Path,
                 method = "CharGen.LoadCharacterPreset",
-                note = ok ? "Check the face with a screenshot." : "CharGen.LoadCharacterPreset returned false: the face is unchanged.",
+                headParts = outcome.HeadParts?.DeepClone(),
+                tints = outcome.Tints,
+                backup,
+                note = outcome.Loaded ? "Check the face with a screenshot. Hair colour isn't changed by this load (use SetHairColor)."
+                                      : "CharGen.LoadCharacterPreset returned false: the face is unchanged.",
             };
         }
 
@@ -302,13 +307,22 @@ public partial class RaceMenuTools : ToolBase
         if (string.IsNullOrEmpty(race)) return new { error = "Couldn't read the player's race" };
         var result = await Papyrus("CharGen", "LoadCharacter", "player", race, match.Name);
         var loaded = result?.GetValueKind() == System.Text.Json.JsonValueKind.True;
-        if (loaded) await NotifyInGame("RaceMenu preset loaded");
+        (JsonNode? HeadParts, string Tints)? repair = null;
+        if (loaded)
+        {
+            await Task.Delay(300);
+            repair = await RepairAfterLoad(PresetHeadParts(ReadJslot(match.Path)));
+            await NotifyInGame("RaceMenu preset loaded");
+        }
         return new
         {
             loaded,
             preset = $"Exported/{match.Name}",
             file = match.Path,
             method = "CharGen.LoadCharacter",
+            headParts = repair?.HeadParts?.DeepClone(),
+            tints = repair?.Tints,
+            backup,
             note = loaded ? "Check the face (a screenshot): if the tint looks wrong, reload the player's own preset in RaceMenu before saving."
                           : "CharGen.LoadCharacter returned false.",
         };

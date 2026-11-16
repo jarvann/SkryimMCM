@@ -75,14 +75,68 @@ public partial class RaceMenuTools
         throw new McpException($"CharGen.SaveCharacterPreset didn't write CharGen\\Presets\\{PapyrusPresetName(clean)}.jslot");
     }
 
-    /// <summary>Applies a Presets-tab preset to the player with RaceMenu's own preset loader.</summary>
-    private async Task<bool> LoadPresetsTabPreset(string clean)
+    /// <summary>
+    /// Applies a Presets-tab preset to the player with RaceMenu's own preset loader, then repairs what that
+    /// loader leaves undone outside the menu (both seen in game 2026-11-16, explained by skee's source):
+    /// ApplyPresetData resets the head parts to the race defaults and only re-adds parts with a sex flag and a
+    /// valid-race list, so others (an ears part) are dropped; and the menu rebuilds the face-tint texture
+    /// itself afterwards, which a script call doesn't, so the face shows purple.
+    /// </summary>
+    private async Task<LoadOutcome> LoadPresetsTabPreset(string clean, string path)
     {
-        var appearance = await _pipe.SendRequestAsync("get_appearance");
-        var hairColor = appearance?["hairColorFormId"]?.GetValue<string>();
-        var result = await Papyrus("CharGen", "LoadCharacterPreset", "player", PapyrusPresetName(clean),
-            hairColor == null ? null : JsonValue.Create(hairColor));
-        return result?.GetValueKind() == JsonValueKind.True;
+        var parts = PresetHeadParts(ReadJslot(path));
+        // No hair colour form: skee writes the preset's hair RGB into the form it is given, and the
+        // player's hair colour form can be shared with NPCs.
+        var result = await Papyrus("CharGen", "LoadCharacterPreset", "player", PapyrusPresetName(clean), null);
+        if (result?.GetValueKind() != JsonValueKind.True) return new LoadOutcome(false, null, null);
+        await Task.Delay(300);
+        var (restored, tints) = await RepairAfterLoad(parts);
+        return new LoadOutcome(true, restored, tints);
+    }
+
+    private sealed record LoadOutcome(bool Loaded, JsonNode? HeadParts, string Tints);
+
+    private static JsonArray PresetHeadParts(JsonObject preset) => new((preset["headParts"] as JsonArray ?? new JsonArray())
+        .OfType<JsonObject>()
+        .Select(p => p["formIdentifier"]?.GetValue<string>())
+        .Where(id => !string.IsNullOrEmpty(id))
+        .Select(id => (JsonNode?)JsonValue.Create(id))
+        .ToArray());
+
+    /// <summary>Re-adds the preset's head parts the character is missing, then rebuilds the face tint.</summary>
+    private async Task<(JsonNode? HeadParts, string Tints)> RepairAfterLoad(JsonArray? parts)
+    {
+        JsonNode? restored = null;
+        if (parts != null && parts.Count > 0)
+        {
+            restored = await _pipe.SendRequestAsync("restore_head_parts", new JsonObject { ["parts"] = parts, ["refresh"] = true });
+            await Task.Delay(500);
+        }
+        return (restored, await RefreshTints());
+    }
+
+    /// <summary>SKSE's Game.UpdateTintMaskColors rebuilds the player's face-tint texture from the tint layers.</summary>
+    private async Task<string> RefreshTints()
+    {
+        try
+        {
+            await Papyrus("Game", "UpdateTintMaskColors");
+            await Papyrus("Game", "UpdateHairColor");
+            return "Face tint rebuilt (Game.UpdateTintMaskColors, Game.UpdateHairColor).";
+        }
+        catch (McpException ex)
+        {
+            return "Couldn't rebuild the face tint: " + ex.Message + ". If the face is purple, reload the preset from RaceMenu's Presets tab.";
+        }
+    }
+
+    /// <summary>Saves the live face once per session before the first change or load, so it can be put back.</summary>
+    private async Task<string?> EnsureSessionBackup()
+    {
+        if (_sessionBackup != null) return null;
+        var name = $"{WorkFolder}/backup_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}";
+        await SaveLivePreset(name);
+        return _sessionBackup = name;
     }
 
     private static JsonObject ReadJslot(string path) =>
@@ -149,7 +203,7 @@ public partial class RaceMenuTools
         return hosts;
     }
 
-    private static object Describe(PresetFile file, JsonObject preset, bool allSliders)
+    private static object Describe(PresetFile file, JsonObject preset, bool allSliders, double minValue)
     {
         var sliders = Sliders(preset);
         var tints = (preset["tintInfo"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().Select(t =>
@@ -166,10 +220,10 @@ public partial class RaceMenuTools
             sliderCount = sliders.Count - VanillaMorphs.Length - VanillaPresets.Length,
             sliders = sliders.Where(kv => !VanillaMorphs.Contains(kv.Key, StringComparer.OrdinalIgnoreCase)
                                           && !VanillaPresets.Any(p => p.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))
-                                          && (allSliders || Math.Abs(kv.Value) > 1e-6))
+                                          && (allSliders || Math.Abs(kv.Value) >= minValue))
                              .OrderByDescending(kv => Math.Abs(kv.Value))
                              .ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value, 4)),
-            slidersNote = allSliders ? null : "Only non-zero extended sliders are listed; pass allSliders=true for every one.",
+            slidersNote = allSliders ? null : $"Extended sliders below {minValue} (either way) aren't listed; lower minValue or pass allSliders=true for every one.",
             tints = tints.Where(t => t.alpha > 0).OrderByDescending(t => t.alpha).ToList(),
             hiddenTints = tints.Count(t => t.alpha <= 0),
             headParts = preset["headParts"]?.DeepClone(),
@@ -184,18 +238,19 @@ public partial class RaceMenuTools
     [Description("Read a face: the 18 vanilla face morphs and 3 vanilla presets, RaceMenu's extended sliders by name (CME_*, NSK_*, " +
         "EFM_* and so on), makeup tints with colour and alpha (0-1), head parts, and a sculpt summary per mesh (vertices sculpted, " +
         "largest offset). Without name it reads the player's LIVE face (saved to CharGen\\Presets\\_SkyLink\\_current first); " +
-        "with name it reads that preset file (Presets or Exported, subfolders as 'MyFolder/Name'). allSliders lists zero sliders too. " +
+        "with name it reads that preset file (Presets or Exported, subfolders as 'MyFolder/Name'). Extended sliders nearer zero than " +
+        "minValue (default 0.02) are left out; allSliders lists every one. " +
         "A face with a full-head sculpt reacts to sliders less predictably: change one thing at a time.")]
-    public async Task<object> GetFacePreset(string? name = null, bool allSliders = false)
+    public async Task<object> GetFacePreset(string? name = null, bool allSliders = false, double minValue = 0.02)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             if (await RaceMenuOpenError() is string open) return new { error = open };
             var live = await SaveLivePreset($"{WorkFolder}/_current");
-            return Describe(live, ReadJslot(live.Path), allSliders);
+            return Describe(live, ReadJslot(live.Path), allSliders, minValue);
         }
         var file = ResolvePreset(name);
-        return Describe(file, ReadJslot(file.Path), allSliders);
+        return Describe(file, ReadJslot(file.Path), allSliders, minValue);
     }
 
     [McpServerTool]
@@ -272,26 +327,19 @@ public partial class RaceMenuTools
     // ---- changing the live face ----
 
     /// <summary>Saves the live face, lets the caller edit the JSON, writes it as _SkyLink/_edit and loads it.</summary>
-    private async Task<(bool Loaded, string? Backup, string Edited)> RoundTrip(Func<JsonObject, bool> edit, bool dryRun)
+    private async Task<(LoadOutcome? Outcome, string? Backup, string Edited)> RoundTrip(Func<JsonObject, bool> edit, bool dryRun)
     {
         if (await RaceMenuOpenError() is string open) throw new McpException(open);
-
-        string? backupMade = null;
-        if (_sessionBackup == null && !dryRun)
-        {
-            var name = $"{WorkFolder}/backup_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}";
-            await SaveLivePreset(name);
-            _sessionBackup = backupMade = name;
-        }
+        var backupMade = dryRun ? null : await EnsureSessionBackup();
 
         var live = await SaveLivePreset($"{WorkFolder}/_current");
         var preset = ReadJslot(live.Path);
-        if (!edit(preset) || dryRun) return (false, backupMade, live.Path);
+        if (!edit(preset) || dryRun) return (null, backupMade, live.Path);
 
         var editedPath = Path.Combine(Path.GetDirectoryName(live.Path)!, "_edit.jslot");
         WriteJslot(editedPath, preset);
-        var loaded = await LoadPresetsTabPreset($"{WorkFolder}/_edit");
-        return (loaded, backupMade, editedPath);
+        var outcome = await LoadPresetsTabPreset($"{WorkFolder}/_edit", editedPath);
+        return (outcome, backupMade, editedPath);
     }
 
     [McpServerTool]
@@ -308,7 +356,7 @@ public partial class RaceMenuTools
         var changes = new List<object>();
         var unknown = new List<string>();
 
-        var (loaded, backup, file) = await RoundTrip(preset =>
+        var (outcome, backup, file) = await RoundTrip(preset =>
         {
             var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
             preset["morphs"] = morphs;
@@ -362,10 +410,13 @@ public partial class RaceMenuTools
             return true;
         }, dryRun);
 
+        var loaded = outcome?.Loaded == true;
         if (loaded) await NotifyInGame("Face sliders changed");
         return new
         {
             applied = loaded,
+            headParts = outcome?.HeadParts?.DeepClone(),
+            tints = outcome?.Tints,
             dryRun,
             changes,
             unknownSliders = unknown.Count > 0 ? unknown : null,
@@ -408,7 +459,7 @@ public partial class RaceMenuTools
 
         object? change = null;
         string? missing = null;
-        var (loaded, backup, file) = await RoundTrip(preset =>
+        var (outcome, backup, file) = await RoundTrip(preset =>
         {
             var layer = (preset["tintInfo"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
                 .FirstOrDefault(t => t["index"]?.GetValue<int>() == index);
@@ -429,10 +480,13 @@ public partial class RaceMenuTools
         }, dryRun);
 
         if (missing != null) return new { error = missing };
+        var loaded = outcome?.Loaded == true;
         if (loaded) await NotifyInGame("Face tint changed");
         return new
         {
             applied = loaded,
+            headParts = outcome?.HeadParts?.DeepClone(),
+            tints = outcome?.Tints,
             dryRun,
             change,
             backup,
@@ -440,5 +494,24 @@ public partial class RaceMenuTools
             file,
             error = !dryRun && !loaded ? "CharGen.LoadCharacterPreset returned false: the face is unchanged." : null,
         };
+    }
+
+    [McpServerTool]
+    [Description("Repair the player's face after a preset load went wrong: rebuilds the face-tint texture (fixes a purple face) and, " +
+        "given a preset name, puts back any head parts from that preset the player is missing (RaceMenu's script loader drops parts " +
+        "with no sex flag or valid-race list, such as some ears). Refused while RaceMenu is open.")]
+    public async Task<object> RepairFace(string? preset = null)
+    {
+        if (await RaceMenuOpenError() is string open) return new { error = open };
+        JsonArray? parts = null;
+        string? source = null;
+        if (!string.IsNullOrWhiteSpace(preset))
+        {
+            var file = ResolvePreset(preset);
+            parts = PresetHeadParts(ReadJslot(file.Path));
+            source = $"{file.Kind}/{file.Name}";
+        }
+        var (restored, tints) = await RepairAfterLoad(parts);
+        return new { headPartsFrom = source, headParts = restored?.DeepClone(), tints, note = "Check the face with a screenshot." };
     }
 }

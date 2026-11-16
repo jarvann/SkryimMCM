@@ -476,6 +476,55 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
+    json RestoreHeadParts(const std::string& refId, const std::vector<std::string>& parts, bool refresh) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor) return {{"error", "Actor not found: " + refId}};
+        auto* npc = actor->GetActorBase();
+        if (!npc) return {{"error", "Actor has no base record"}};
+        if (npc->HasOverlays()) return {{"error", "This character uses head part overlays; changing them isn't supported"}};
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) return {{"error", "Game data not ready"}};
+
+        auto has = [npc](RE::BGSHeadPart* a_part) {
+            for (int i = 0; npc->headParts && i < npc->numHeadParts; i++) {
+                if (npc->headParts[i] == a_part) return true;
+            }
+            return false;
+        };
+
+        json added = json::array(), present = json::array(), problems = json::array();
+        for (const auto& id : parts) {
+            const auto bar = id.find('|');
+            RE::BGSHeadPart* part = nullptr;
+            if (bar != std::string::npos) {
+                try {
+                    const auto local = static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16));
+                    if (auto* form = dataHandler->LookupForm(local, id.substr(0, bar))) part = form->As<RE::BGSHeadPart>();
+                } catch (...) {}
+            }
+            if (!part) { problems.push_back(id + ": not a loaded head part"); continue; }
+            if (part->IsExtraPart()) continue;  // added with its main part
+            if (has(part)) { present.push_back(id); continue; }
+
+            const auto type = part->type.get();
+            auto* oldPart = type == RE::BGSHeadPart::HeadPartType::kMisc ? nullptr : npc->GetCurrentHeadPartByType(type);
+            npc->ChangeHeadPart(part);
+            actor->ChangeHeadPart(oldPart, part);
+            json entry = DescribePart(part);
+            entry["formIdentifier"] = id;
+            if (oldPart) entry["replaced"] = DescribePart(oldPart);
+            added.push_back(entry);
+        }
+
+        if (!added.empty()) {
+            npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+            if (refresh) actor->DoReset3D(false);
+        }
+        json result = {{"actor", ActorLabel(actor)}, {"added", added}, {"alreadyPresent", present.size()}};
+        if (!problems.empty()) result["problems"] = problems;
+        return result;
+    }
+
     json RemoveHeadPart(const std::string& refId, const std::string& part, const std::string& type, bool refresh) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};
