@@ -76,4 +76,39 @@ public class AppearanceTools : ToolBase
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         return DeserializeResponse(await _pipe.SendRequestAsync("list_head_part_choices", parms));
     }
+
+    [McpServerTool]
+    [Description("Change a head part (hair, eyes, eyebrows, facialHair, scar or misc such as horns) without RaceMenu. Defaults to the player. " +
+        "Give part (a FormID or editor ID), or type plus index (the number from ListHeadPartChoices, the same as RaceMenu's slider). " +
+        "Hair, eyes, eyebrows, facial hair and scars replace the current part; misc parts are added, since several can be worn " +
+        "(remove one with RemoveHeadPart). The face part can't be changed. Reports the previous part so it can be put back. " +
+        "If the change doesn't show, refresh=true rebuilds the 3D (a brief flicker), and saving then loading always applies it. " +
+        "On an NPC this changes the base record (every copy of that NPC) and pre-baked faces may not match.")]
+    public async Task<object> SetHeadPart(string? part = null, string? type = null, int index = -1, string? refId = null, bool refresh = false)
+    {
+        var parms = new JsonObject { ["index"] = index, ["refresh"] = refresh };
+        if (!string.IsNullOrEmpty(part)) parms["part"] = part;
+        if (!string.IsNullOrEmpty(type)) parms["type"] = type;
+        if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
+        var data = await _pipe.SendRequestAsync("set_head_part", parms);
+        if (data?["error"] == null) await NotifyInGame("Head part changed");
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
+    [Description("Remove a head part, for example unwanted horns, a scar, a beard or the eyebrows. Defaults to the player. " +
+        "part: the FormID or editor ID of the part (GetAppearance lists the current ones), or type for the current part of that type " +
+        "(misc needs part, since several can be worn). The face and eyes can't be removed, only replaced. " +
+        "The part stays visible until the 3D is rebuilt: refresh=true does it now, or save and load. " +
+        "Reports the removed part so SetHeadPart can put it back.")]
+    public async Task<object> RemoveHeadPart(string? part = null, string? type = null, string? refId = null, bool refresh = false)
+    {
+        var parms = new JsonObject { ["refresh"] = refresh };
+        if (!string.IsNullOrEmpty(part)) parms["part"] = part;
+        if (!string.IsNullOrEmpty(type)) parms["type"] = type;
+        if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
+        var data = await _pipe.SendRequestAsync("remove_head_part", parms);
+        if (data?["error"] == null) await NotifyInGame("Head part removed");
+        return DeserializeResponse(data);
+    }
 }

@@ -265,6 +265,21 @@ namespace SkyrimMCP::Protocol {
             std::string around = params.value("aroundFormId", "");
             return GameThread(id, [=]() { return AppearanceManager::ListHeadPartChoices(refId, type, order, start, count, around); });
         };
+        registry["set_head_part"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::string part = params.value("part", "");
+            std::string type = params.value("type", "");
+            int index = params.value("index", -1);
+            bool refresh = params.value("refresh", false);
+            return GameThread(id, [=]() { return AppearanceManager::SetHeadPart(refId, part, type, index, refresh); });
+        };
+        registry["remove_head_part"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::string part = params.value("part", "");
+            std::string type = params.value("type", "");
+            bool refresh = params.value("refresh", false);
+            return GameThread(id, [=]() { return AppearanceManager::RemoveHeadPart(refId, part, type, refresh); });
+        };
         registry["list_hair_colors"] = [](const std::string& id, const json& params) {
             bool all = params.value("includeNonPlayable", false);
             return GameThread(id, [all]() { return GameInterface::ListHairColors(all); });
