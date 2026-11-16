@@ -34,7 +34,9 @@ public class PapyrusTools : ToolBase
 
     [McpServerTool]
     [Description("Get all available functions for a specific Papyrus script class (e.g., 'ConsoleUtil', 'PapyrusUtil', 'JArray'). " +
-        "Shows function names, parameter types, return types. Use GetPapyrusCatalog first to see available script classes.")]
+        "Shows function names, parameter types, return types. Use GetPapyrusCatalog first to see available script classes. " +
+        "Classes missing from the catalog (scripts packed in a BSA, such as RaceMenu's NiOverride and CharGen) are read " +
+        "from the Papyrus VM instead (source 'vm'), which works for any class the game can load.")]
     public async Task<object> GetScriptFunctions(string className)
     {
         var data = await _pipe.SendRequestAsync("get_script_functions", new JsonObject { ["className"] = className });

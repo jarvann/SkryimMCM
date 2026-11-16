@@ -192,6 +192,8 @@ namespace SkyrimMCP::PapyrusBridge {
         return s_catalog;
     }
 
+    static json FunctionsFromVM(const std::string& className);
+
     json GetScriptFunctions(const std::string& className) {
         auto catalog = GetPapyrusCatalog();
         auto& scripts = catalog["scripts"];
@@ -212,7 +214,9 @@ namespace SkyrimMCP::PapyrusBridge {
             }
         }
 
-        return {{"error", "Script class not found: " + className}};
+        // Not in the catalog: the catalog only reads loose .psc sources, and many mods (RaceMenu's
+        // NiOverride and CharGen among them) ship their scripts packed in a BSA. Ask the VM instead.
+        return FunctionsFromVM(className);
     }
 
     // ==================== VM Call Bridge ====================
@@ -285,6 +289,58 @@ namespace SkyrimMCP::PapyrusBridge {
             }
         }
         return false;
+    }
+
+    static json FunctionToJson(RE::BSScript::IFunction* a_func, bool a_global) {
+        json params = json::array();
+        for (std::uint32_t i = 0; i < a_func->GetParamCount(); i++) {
+            RE::BSFixedString name;
+            RE::BSScript::TypeInfo type;
+            a_func->GetParam(i, name, type);
+            params.push_back({{"type", TypeName(type)}, {"name", name.c_str() ? name.c_str() : ""}});
+        }
+        return {{"name", a_func->GetName().c_str() ? a_func->GetName().c_str() : ""},
+                {"returnType", TypeName(a_func->GetReturnType())},
+                {"isGlobal", a_global},
+                {"isNative", a_func->GetIsNative()},
+                {"params", params}};
+    }
+
+    // Lists a class's functions from the VM's own type info, which covers scripts the catalog can't
+    // see (packed in BSAs). Runs on the game thread. GetScriptObjectType loads the class if needed.
+    static json FunctionsFromVM(const std::string& className) {
+        auto* vm = RE::SkyrimVM::GetSingleton();
+        auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;
+        if (!impl) return {{"error", "Papyrus VM not available"}};
+
+        RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> typeInfo;
+        if (!impl->GetScriptObjectType(RE::BSFixedString(className), typeInfo) || !typeInfo) {
+            return {{"error", "Script class not found: " + className +
+                              " (not in the loose-source catalog, and the Papyrus VM doesn't know it either)"}};
+        }
+        auto* type = typeInfo.get();
+
+        json functions = json::array();
+        auto* globals = type->GetGlobalFuncIter();
+        for (std::uint32_t i = 0; globals && i < type->GetNumGlobalFuncs(); i++) {
+            if (auto* func = globals[i].func.get()) functions.push_back(FunctionToJson(func, true));
+        }
+        auto* members = type->GetMemberFuncIter();
+        for (std::uint32_t i = 0; members && i < type->GetNumMemberFuncs(); i++) {
+            if (auto* func = members[i].func.get()) functions.push_back(FunctionToJson(func, false));
+        }
+        std::sort(functions.begin(), functions.end(), [](const json& a, const json& b) {
+            return a["name"].get<std::string>() < b["name"].get<std::string>();
+        });
+
+        json result = {{"source", "vm"},
+                       {"className", type->GetName() ? type->GetName() : className},
+                       {"functionCount", functions.size()},
+                       {"functions", functions},
+                       {"note", "Read from the Papyrus VM (the script isn't in the loose-source catalog). Member "
+                                "functions inherited from parent classes are not listed; see 'parent'."}};
+        if (auto* parent = type->GetParent(); parent && parent->GetName()) result["parent"] = parent->GetName();
+        return result;
     }
 
     // Converts one JSON argument to a Variable of the parameter's declared type.
