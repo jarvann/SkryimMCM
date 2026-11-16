@@ -307,7 +307,7 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set a game volume, like the Audio menu sliders: volume 0.0 (mute) to 1.0 (full). " +
-        "category: 'master' (default) or another Audio menu category such as Music, Effects, Voice or Footsteps; " +
+        "category: 'master' (default, the Master slider) or an Audio menu category such as Music, Effects, Voice, Footsteps or Magic; " +
         "'list' shows the categories and their current volumes. Reports the previous volume so it can be put back. " +
         "Applies at once; ask the player whether they hear the change.")]
     public async Task<object> SetVolume(float volume, string category = "master")
@@ -318,36 +318,47 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Take a screenshot with the game's own Print Screen handler, then wait up to 5 seconds for the file and report its path " +
-        "(ScreenShot<N>.png or .bmp in the game folder). Returns an error if no file appeared. " +
-        "Close menus first if the player wants the plain view.")]
-    public async Task<object> TakeScreenshot()
+    [Description("Take a screenshot with the game's own Print Screen handler, then wait for the file and report its path. " +
+        "The game writes it where Skyrim.ini's sScreenShotBaseName points (the game folder by default) and only while it is " +
+        "rendering: if the player is tabbed out, ask them to click into the game first. waitSeconds (default 8, max 30). " +
+        "Returns an error if no file appeared. Close menus first if the player wants the plain view.")]
+    public async Task<object> TakeScreenshot(int waitSeconds = 8)
     {
         var (game, _) = SkyLinkSettings.SkyrimPath();
         var started = DateTime.Now.AddSeconds(-1);
         var data = await _pipe.SendRequestAsync("take_screenshot");
 
-        if (game == null || !Directory.Exists(game))
-            return new { queued = true, verified = false, note = "Screenshot queued, but the game folder is unknown so the file can't be checked. Set skyrimPath with SetSkyLinkSetting.", plugin = DeserializeResponse(data) };
+        // sScreenShotBaseName is a path prefix: absolute, or relative to the game folder.
+        var baseName = data?["baseName"]?.GetValue<string>() ?? "ScreenShot";
+        string? folder = null;
+        var prefix = Path.GetFileName(baseName);
+        if (Path.IsPathRooted(baseName)) folder = Path.GetDirectoryName(baseName);
+        else if (game != null) folder = Path.GetDirectoryName(Path.Combine(game, baseName));
+        if (string.IsNullOrEmpty(prefix)) prefix = "ScreenShot";
 
-        for (var waited = 0; waited < 5000; waited += 250)
+        if (folder == null || !Directory.Exists(folder))
+            return new { queued = true, verified = false, baseName, note = $"Screenshot queued, but the folder it goes to ({folder ?? "unknown"}) can't be checked.", plugin = DeserializeResponse(data) };
+
+        waitSeconds = Math.Clamp(waitSeconds, 1, 30);
+        for (var waited = 0; waited < waitSeconds * 1000; waited += 250)
         {
             await Task.Delay(250);
-            var file = new DirectoryInfo(game).EnumerateFiles("ScreenShot*.*")
+            var file = new DirectoryInfo(folder).EnumerateFiles(prefix + "*.*")
                 .Where(f => f.LastWriteTime >= started)
                 .OrderByDescending(f => f.LastWriteTime)
                 .FirstOrDefault();
             if (file != null)
             {
                 await NotifyInGame("Screenshot taken");
-                return new { success = true, file = file.FullName, bytes = file.Length, plugin = DeserializeResponse(data) };
+                return new { success = true, file = file.FullName, bytes = file.Length };
             }
         }
         return new
         {
-            error = $"The screenshot was queued but no new ScreenShot file appeared in {game} within 5 seconds.",
+            error = $"The screenshot was queued but no new {prefix}* file appeared in {folder} within {waitSeconds} seconds.",
             plugin = DeserializeResponse(data),
-            hint = "The game writes screenshots only while it is rendering (not paused in a menu that stops rendering) and only with bAllowScreenShot on; the plugin turns that on for the session.",
+            hint = "Skyrim pauses while it isn't the active window, and the screenshot is only written when it renders again: " +
+                   "ask the player to click into the game, then call again with a longer waitSeconds.",
         };
     }
 

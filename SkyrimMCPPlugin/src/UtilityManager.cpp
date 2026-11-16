@@ -527,20 +527,40 @@ namespace SkyrimMCP::UtilityManager {
             listed.push_back({{"name", CategoryName(c)}, {"formId", std::format("{:08X}", c->GetFormID())},
                               {"volume", c->GetCategoryVolume()}, {"master", c->parentCategory == nullptr}});
         }
-        if (category == "list") return {{"categories", listed}};
+        if (category == "list") return {{"categories", listed}, {"master", "separate: the Audio menu's Master slider is fAudioMasterVolume, not a category"}};
 
-        // "master" is the menu category with no parent: every other category sits under it.
-        RE::BGSSoundCategory* target = nullptr;
         const auto wanted = LowerCopy(category.empty() ? "master" : category);
+        volume = std::clamp(volume, 0.0f, 1.0f);
+
+        // The Master slider isn't a sound category (found in game: the old fallback picked
+        // "Magic"). It is the fAudioMasterVolume preference, which the audio manager keeps as
+        // its own masterVolume.
+        if (wanted == "master") {
+            auto* prefs = RE::INIPrefSettingCollection::GetSingleton();
+            auto* setting = prefs ? prefs->GetSetting("fAudioMasterVolume:AudioMenu") : nullptr;
+            auto* audio = RE::BSAudioManager::GetSingleton();
+            if (!setting && !audio) return {{"error", "Neither the master volume setting nor the audio manager is available"}};
+            json result = {{"category", "Master"}};
+            if (setting) {
+                result["previous"] = setting->data.f;
+                setting->data.f = volume;
+            }
+            if (audio) {
+                if (!result.contains("previous")) result["previous"] = audio->masterVolume;
+                audio->masterVolume = volume;
+            }
+            result["volume"] = volume;
+            result["note"] = "Set the Audio menu's master value. Ask the player whether they hear the change: if not, it applies "
+                             "when the Audio menu is next opened and closed. Saved to SkyrimPrefs.ini when the game saves its settings.";
+            return result;
+        }
+
+        RE::BGSSoundCategory* target = nullptr;
         for (auto* c : menu) {
             if (LowerCopy(CategoryName(c)) == wanted) { target = c; break; }
         }
-        if (!target && wanted == "master") {
-            for (auto* c : menu) if (!c->parentCategory) { target = c; break; }
-        }
         if (!target) return {{"error", "No Audio menu category named '" + category + "'"}, {"categories", listed}};
 
-        volume = std::clamp(volume, 0.0f, 1.0f);
         const float before = target->GetCategoryVolume();
         target->SetCategoryVolume(volume);
         const float after = target->GetCategoryVolume();
@@ -571,6 +591,14 @@ namespace SkyrimMCP::UtilityManager {
                 }
             } else {
                 result["allowScreenShotWas"] = nullptr;
+            }
+        }
+        // Where the game writes it: sScreenShotBaseName is a path prefix ("ScreenShot" in the game
+        // folder by default; players often point it elsewhere, e.g. Pictures).
+        if (auto* ini = RE::INISettingCollection::GetSingleton()) {
+            if (auto* base = ini->GetSetting("sScreenShotBaseName:Display")) {
+                const char* text = base->GetString();
+                result["baseName"] = (text && text[0]) ? text : "ScreenShot";
             }
         }
         handler->screenshotQueued = true;
