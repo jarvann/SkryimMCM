@@ -79,7 +79,9 @@ public class FaceCaptureTools : ToolBase
         }
         finally
         {
-            await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "exit" });
+            // Never let a failed restore hide the capture's own result or error; ResetFaceCamera retries it.
+            try { await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "exit" }); }
+            catch { /* reported by ResetFaceCamera */ }
         }
     }
 
