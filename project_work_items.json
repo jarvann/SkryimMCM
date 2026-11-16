@@ -129,8 +129,8 @@
     ]
   },
   "summary": {
-    "totalItems": 211,
-    "completed": 128,
+    "totalItems": 212,
+    "completed": 129,
     "completedPartial": 2,
     "implementedUntested": 13,
     "inProgress": 0,
@@ -2196,7 +2196,7 @@
         {
           "id": "FEAT-234",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "TakeScreenshot: small cropped preview, returned as an image",
           "description": "Screenshots are 63 MB PNGs at the player's 7680x2160, too big for the AI to look at. TakeScreenshot now writes <name>_preview.jpg next to the file (previewWidth, default 1568, 0 for none), can crop to fractions of the frame first ('x,y,width,height'), and returns the preview inline as an image (showImage, default true). Needs Claude Desktop restarted for the new parameters.",
@@ -2204,6 +2204,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Asked for by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude). Built (server build b13_26)."
+            },
+            {
+              "datetime": "2026-11-17T00:30",
+              "note": "Confirmed in game by the in-game agent: the tool returns the preview image with the file."
             }
           ],
           "targetRelease": "1.3"
@@ -2234,6 +2238,21 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Reported by the in-game agent."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "FEAT-237",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "GetScriptFunctions reads the Papyrus VM for BSA-packed scripts",
+          "description": "The Papyrus catalog only reads loose .psc sources, so classes packed in BSAs (RaceMenu's NiOverride and CharGen in RaceMenu.bsa) came back 'Script class not found' although calls to them work (NiOverride.GetScriptVersion 8, CharGen 4). get_script_functions now falls back to the VM's type info: global and member functions with parameter names and types, native flag, parent class. Needed for the face builder (FEAT-228).",
+          "history": [
+            {
+              "datetime": "2026-11-17T00:30",
+              "note": "Found by the in-game agent. Built (b13_28)."
             }
           ],
           "targetRelease": "1.3"
