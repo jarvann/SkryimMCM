@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 199,
+    "totalItems": 209,
     "completed": 128,
     "completedPartial": 2,
-    "implementedUntested": 11,
+    "implementedUntested": 13,
     "inProgress": 0,
-    "planned": 28,
-    "bugs": 26
+    "planned": 35,
+    "bugs": 28
   },
   "phases": [
     {
@@ -2192,6 +2192,149 @@
             }
           ],
           "targetRelease": "1.3"
+        },
+        {
+          "id": "FEAT-234",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "TakeScreenshot: small cropped preview, returned as an image",
+          "description": "Screenshots are 63 MB PNGs at the player's 7680x2160, too big for the AI to look at. TakeScreenshot now writes <name>_preview.jpg next to the file (previewWidth, default 1568, 0 for none), can crop to fractions of the frame first ('x,y,width,height'), and returns the preview inline as an image (showImage, default true). Needs Claude Desktop restarted for the new parameters.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Asked for by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude). Built (server build b13_26)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-027",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetVolume rejects \"Music\": category names are localisation keys ($Music)",
+          "description": "The Audio menu categories are named $Music, $Effects..., so the tool description's 'Music' was refused and only '$Music' worked. Names are now listed without the $ and matching ignores it and case, and also accepts the editor ID.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Reported by the in-game agent 2026-11-16. Fixed in logic build b13_27."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-028",
+          "type": "bug",
+          "status": "needs-research",
+          "priority": "medium",
+          "title": "SetVolume: no audible change; Music read back 0.16 after setting 0.23",
+          "description": "In game 2026-11-16 (in-game agent): Master stored but not heard; $Music set to 0 did not silence music, and a later set to 0.23 read back as 0.16. Check whether the music system ducks or overrides the category volume each frame, whether the Audio menu applies menu categories through another path (static attenuation, INI prefs such as fAudioMusicVolume?), and whether the master needs BSAudioManager to re-apply. Confirm by ear with the player.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Reported by the in-game agent."
+            }
+          ],
+          "targetRelease": "1.3"
+        }
+      ]
+    },
+    {
+      "phase": 16,
+      "name": "Face builder",
+      "priority": "medium",
+      "status": "planned",
+      "items": [
+        {
+          "id": "FEAT-228",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Face builder M1: live face control (GetFacePreset, SetFaceSliders, SetFaceTint)",
+          "description": "Read the live face: the 19 vanilla morphs and 4 presets, RaceMenu extended sliders by name, tints with colour and alpha, head parts, and a sculpt summary per host (vertex count, entries, largest offset). Set a batch of named sliders in one call and refresh the face, reporting previous values and saying when a value is beyond the UI range. Set one tint's colour and alpha and rebuild the tint texture (also the fix for the purple face after manual edits). Also read a .jslot file offline and diff two presets (sliders, tints, sculpt). Guard rails: refuse while RaceMenu is open, back up to a named preset before the first change, never leave the face without a tint texture. Vanilla morphs and tints have SKSE Papyrus (ActorBase.SetFaceMorph, Game.SetTintMaskColor/UpdateTintMaskColors); the extended sliders need skee's face-morph API, to be confirmed with GetScriptFunctions on NiOverride and CharGen. Test: NSK_EyelidOpen changed from chat opens the eye with no user action, and reads back.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-229",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Face builder M2: repeatable face capture (CaptureFace)",
+          "description": "Fixed neutral pose with the idle paused and head tracking off, camera at set positions (front, three-quarter, profile), screenshot, crop to the head and return a ~1200-1568 px image plus the full-size path; same framing every call. Option to hide hair and headgear. Restore pose and camera afterwards. Builds on FEAT-234's preview. Test: two captures a minute apart with no change are near-identical.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-230",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Face builder M3: measurement (CompareFace)",
+          "description": "Face-landmark detection on a capture and on a reference image (candidate: MediaPipe Face Mesh, server-side, not in the plugin; check it on game renders first). Landmarks become scale-free ratios (eye width/face width, eye spacing, eye opening, corner tilt, brow-to-eye, nose length, mouth width, jaw/cheek, chin height). CompareFace returns both tables and the differences, largest first.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-231",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Face builder M4: slider response map",
+          "description": "For the current head, nudge each relevant slider both ways, capture, and record which ratios move and by how much; cache per head and slider set; drop sliders with no measurable effect. Test: NSK_EyeAngle labelled as corner tilt, EFM_Eyelid_Lower as no effect on the player's head.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-232",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Face builder M5: fitting loop, plus the agent skill",
+          "description": "Given a reference and the response map: pick the slider changes that most reduce the largest differences, apply, capture, re-measure, repeat in small clamped steps until improvement stalls; save a named preset at each accepted step; return before/after/reference crops with the ratio table. The in-game agent writes the usage skill once M1-M3 tool names exist. Open questions for the player: reference kinds (in-game character, render, photo), whether makeup and head parts may change or shape only, whether hair may be hidden during captures.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-233",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Face builder M6: sculpt-aware checks",
+          "description": "Report when a face carries a full-head sculpt (sliders then interact with it); select eye-mesh pieces by connected component (the female eye TRI is six pieces per eye: eyeball, three lash pieces, tear duct, a thin strip); optional offline mesh rebuild (base + sculpt + morphs) to measure eyeball-to-lid and lash-to-lid clearance. Needs the extended sliders' morph sources.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            }
+          ],
+          "targetRelease": "1.4"
         }
       ]
     }
@@ -2435,6 +2578,21 @@
         }
       ],
       "targetRelease": "1.3"
+    },
+    {
+      "id": "INFRA-023",
+      "type": "infrastructure",
+      "status": "planned",
+      "priority": "low",
+      "title": "Pipe serves more than one client",
+      "description": "The plugin's pipe accepts one client at a time, so while Claude Desktop's server is connected the dev agent can't query the game (scripts/pipe-call.sh, added 2026-11-16). Serve each client on its own instance and check the pipe-thread paths (Papyrus catalog, DispatchStaticCall) are safe with two clients. Host change: needs a game restart.",
+      "history": [
+        {
+          "datetime": "2026-11-16T23:00",
+          "note": "Found while trying to query RaceMenu script functions from Claude Code."
+        }
+      ],
+      "targetRelease": "1.4"
     }
   ],
   "confirmedWorking": [
