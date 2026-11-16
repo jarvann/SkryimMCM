@@ -366,7 +366,10 @@ namespace SkyrimMCP::NPCManager {
                 flags.reset(RE::Actor::BOOL_FLAGS::kEssential);
             }
 
-            actor->KillImmediate();
+            // The game's own kill routine, the one the console's kill and Papyrus Actor.Kill use:
+            // death event, death animation and ragdoll. KillImmediate only flagged the actor dead
+            // on 1.7.x, leaving it standing and animating (seen 2026-11-16). No attacker, so no crime.
+            actor->KillImpl(nullptr, 0.0f, true, false);
 
             return {{"killed", true}, {"refId", refFormIdHex}, {"name", actor->GetName()},
                     {"wasEssential", wasEssential}, {"wasProtected", wasProtected}};
