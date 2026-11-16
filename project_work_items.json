@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 195,
-    "completed": 124,
+    "totalItems": 197,
+    "completed": 127,
     "completedPartial": 2,
-    "implementedUntested": 15,
+    "implementedUntested": 12,
     "inProgress": 0,
-    "planned": 25,
-    "bugs": 22
+    "planned": 27,
+    "bugs": 24
   },
   "phases": [
     {
@@ -1197,6 +1197,10 @@
             {
               "datetime": "2026-03-24T18:05",
               "note": "Implemented, pending test on next restart."
+            },
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "Build 16 replaced the console setgs (did nothing) with sound categories, but master fell back to the Magic category. Build 17: master sets fAudioMasterVolume:AudioMenu and BSAudioManager::masterVolume. Retest by ear."
             }
           ],
           "targetRelease": "1.3"
@@ -1224,6 +1228,10 @@
             {
               "datetime": "2026-03-24T18:05",
               "note": "Implemented, pending test on next restart."
+            },
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "Build 16: the native trigger works (ScreenShot0/1.png written to the player's sScreenShotBaseName folder, OneDrive Pictures, even while tabbed out) but the tool watched the game folder and reported an error. Build 17 reads sScreenShotBaseName and watches that folder. allowScreenShotWas is null: the bAllowScreenShot:Display setting isn't registered on this build."
             }
           ],
           "targetRelease": "1.3"
@@ -1414,6 +1422,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "menuIndex order confirmed for hair (1160 = RaceMenu). Eyes 96 / brows 165 and the 2 missing hairs still to check in RaceMenu."
+            },
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "RaceMenu shows 2 more entries than the list on hair (1,400 vs 1,398) and eyes (121 vs 119); for eyes one sorts between 3 and 94, one after 97. Build 15 adds ListHeadPartChoices showExcluded=true to name them; run after the Claude Desktop restart."
             }
           ],
           "targetRelease": "1.3"
@@ -1847,7 +1859,7 @@
         {
           "id": "FEAT-218",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Loot and item transfer by category",
           "description": "Bulk item moves the AI can do in one call: move all items of a category (for example smithing materials) to the container under the crosshair, or collect only valuable loot and gold from nearby bodies after a fight. Builds on ScanLoot and the container tools.",
           "history": [
@@ -1866,6 +1878,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "2026-11-16: LootBodies retest, minValue, radius and a real run with categories=all pass (worn pieces taken, marked equipped). includeGold=false still took gold ('valuables' and 'all' both match gold); fixed in build 14 with an explicit exclude."
+            },
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "includeGold=false passes on build 16 (67 gold left on the body with default and 'all'). All FEAT-218 tests pass."
             }
           ],
           "targetRelease": "1.3"
@@ -2094,16 +2110,48 @@
         {
           "id": "BUG-022",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "KillActor leaves the actor standing",
           "description": "KillActor marked the actor dead (isDead true, LootBodies treats it as a body) but the death never played: it stayed upright and animated, and followers kept attacking it. Console kill on an identical bandit fell normally (2026-11-16, Lakeview cellar). KillActor used Actor::KillImmediate.",
           "history": [
             {
               "datetime": "2026-11-16T16:00",
               "note": "Fixed in build 14: KillActor calls Actor::KillImpl(nullptr, 0, sendEvent=true, ragdollInstant=false), the game's kill routine the console and Papyrus Actor.Kill use."
+            },
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "Passed on build 14/16: the tool-killed bandit fell, health 0."
             }
           ],
           "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-023",
+          "type": "bug",
+          "status": "planned",
+          "title": "Unknown tool parameter returns an error with no message",
+          "description": "Calling a tool with a parameter it doesn't have returns an error without any text (seen 2026-11-16 by the in-game agent). Should name the unknown parameter and list the valid ones.",
+          "history": [
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "Reported from the build 16 retest session."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-024",
+          "type": "bug",
+          "status": "planned",
+          "title": "Console teleport reports a timeout even when it works",
+          "description": "ExecuteConsoleCommand with a teleport (coc/moveto into another cell) reports the 5-second game-thread timeout although the teleport happens: the loading screen blocks the game thread before the task returns. Should detect the loading screen and report 'teleport started' instead.",
+          "history": [
+            {
+              "datetime": "2026-11-16T19:00",
+              "note": "Reported from the build 16 retest session."
+            }
+          ],
+          "targetRelease": "1.4"
         }
       ]
     }
@@ -2252,7 +2300,7 @@
     {
       "id": "FEAT-150",
       "type": "feature",
-      "status": "implemented-untested",
+      "status": "complete",
       "title": "GetScriptStats \u2014 Papyrus VM diagnostics",
       "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods.",
       "targetRelease": "1.3",
@@ -2260,6 +2308,10 @@
         {
           "datetime": "2026-11-16T16:00",
           "note": "Built (ScriptStats.cpp, GetScriptStats). In game: runningStacks, states and top lists work (about 22 stacks, never overstressed over 5 samples). attachedScripts and arrays read 0 (the VM only fills those while saving); fixed in build 14 to count the live tables (objectsWithScripts, arrays)."
+        },
+        {
+          "datetime": "2026-11-16T19:00",
+          "note": "Counts populated on build 16 (objectsWithScripts 220220, arrays 5142)."
         }
       ]
     },
