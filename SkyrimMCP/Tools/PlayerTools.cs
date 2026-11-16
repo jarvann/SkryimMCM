@@ -64,7 +64,10 @@ public class PlayerTools : ToolBase
     [Description("Check if Skyrim is running and the SKSE MCP plugin is connected. Also reports which plugin and server builds " +
         "are loaded (version, build time, server path), so a stale build is easy to spot. 'logic' describes the plugin's " +
         "reloadable logic DLL (version, build time, when it was loaded, reload count). When the server runs under " +
-        "SkyLinkLauncher, launcherVersion is set, serverPath is the shadow copy and serverSource is the deployed DLL.")]
+        "SkyLinkLauncher, launcherVersion is set, serverPath is the shadow copy and serverSource is the deployed DLL. " +
+        "diagnostics (1.3+) shows the game's store (Steam, GOG, Epic), whether the Address Library file for this game build is " +
+        "present, and gameThread counters: if tasksQueued is above 0 and tasksRun is 0, SKSE never runs SkyLink's game-thread " +
+        "calls, which is why every other tool fails; diagnostics.problem then says what to check.")]
     public async Task<object> CheckConnection()
     {
         try
@@ -80,6 +83,8 @@ public class PlayerTools : ToolBase
                 gameVersion = info?["gameVersion"]?.GetValue<string>(),
                 loadingScreen = info?["loadingScreen"]?.GetValue<bool>(),  // 1.2.1+
                 logic = info?["logic"] is JsonNode logicNode ? DeserializeResponse(logicNode) : null,
+                // 1.3+: store, Address Library file, and whether game-thread calls run at all (BUG-012)
+                diagnostics = info?["diagnostics"] is JsonNode diag ? DeserializeResponse(diag) : null,
                 serverVersion = ServerVersion,
                 serverBuilt = ServerBuilt,
                 serverPath = ServerPath,

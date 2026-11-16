@@ -36,6 +36,17 @@ namespace SkyrimMCP::HostCore {
 
         std::unique_ptr<LogicLoader> g_loader;
         std::atomic<std::uint32_t> g_pendingTasks{ 0 };
+
+        // BUG-012 diagnostics: whether game-thread work is queued and actually runs. On the GOG
+        // report every game-thread call failed while ping worked; these counters tell "SKSE never
+        // runs our tasks" apart from "tasks run and fail".
+        std::atomic<std::uint64_t> g_tasksQueued{ 0 };
+        std::atomic<std::uint64_t> g_tasksRun{ 0 };
+        std::atomic<std::int64_t> g_lastTaskRunMs{ 0 };  // steady clock, 0 = never
+
+        std::int64_t SteadyMs() {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
         SkyLinkHostApi g_hostApi{};
 
         // ---- services the host gives the logic DLL ----
@@ -52,10 +63,21 @@ namespace SkyrimMCP::HostCore {
             // Counted before queueing: the game thread may run the task before AddTask
             // even returns.
             ++g_pendingTasks;
+            ++g_tasksQueued;
             try {
-                SKSE::GetTaskInterface()->AddTask([fn, ctx]() {
+                auto* tasks = SKSE::GetTaskInterface();
+                if (!tasks) {
+                    --g_pendingTasks;
+                    SKSE::log::error("SKSE task interface is not available: game-thread calls cannot run");
+                    return 1;
+                }
+                tasks->AddTask([fn, ctx]() {
                     struct Done {
-                        ~Done() { --g_pendingTasks; }
+                        ~Done() {
+                            ++g_tasksRun;
+                            g_lastTaskRunMs = SteadyMs();
+                            --g_pendingTasks;
+                        }
                     } done;
                     try {
                         fn(ctx);
@@ -269,6 +291,43 @@ namespace SkyrimMCP::HostCore {
             return Respond(id, true, data);
         }
 
+        // Which store's copy of the game this is, from the DLLs each one loads.
+        const char* GameStore() {
+            if (GetModuleHandleW(L"Galaxy64.dll")) return "GOG";
+            if (GetModuleHandleW(L"steam_api64.dll")) return "Steam";
+            if (GetModuleHandleW(L"eossdk-win64-shipping.dll")) return "Epic";
+            return "unknown";
+        }
+
+        json Diagnostics() {
+            json d;
+            d["store"] = GameStore();
+            const auto version = REL::Module::get().version();
+            // Address Library: AE builds (1.6+) use versionlib-*.bin, SE builds version-*.bin.
+            const auto stem = version[1] >= 6 ? "versionlib-" : "version-";
+            const auto file = std::string(stem) + version.string("-") + ".bin";
+            std::error_code ec;
+            d["addressLibrary"] = {
+                {"file", "Data\\SKSE\\Plugins\\" + file},
+                {"found", std::filesystem::exists(std::filesystem::path("Data") / "SKSE" / "Plugins" / file, ec)},
+            };
+            d["skseTaskInterface"] = SKSE::GetTaskInterface() != nullptr;
+            const auto queued = g_tasksQueued.load();
+            const auto run = g_tasksRun.load();
+            const auto last = g_lastTaskRunMs.load();
+            json game;
+            game["tasksQueued"] = queued;
+            game["tasksRun"] = run;
+            game["pending"] = g_pendingTasks.load();
+            game["lastTaskRanSecondsAgo"] = last == 0 ? json(nullptr) : json((SteadyMs() - last) / 1000.0);
+            d["gameThread"] = game;
+            if (queued > 0 && run == 0) {
+                d["problem"] = "Game-thread calls are queued but none has ever run: SKSE is not running SkyLink's tasks. "
+                               "Check that the SKSE version matches the game build and send the SKSE logs.";
+            }
+            return d;
+        }
+
         std::string Ping(const std::string& id) {
             // Answered on the pipe thread, so it still works when game-thread calls do not.
             AutoReloadIfNewer("ping");
@@ -278,6 +337,7 @@ namespace SkyrimMCP::HostCore {
             info["gameVersion"] = REL::Module::get().version().string(".");
             info["loadingScreen"] = LoadingScreenWatcher::Get().Active();
             info["logic"] = LogicStatusJson();
+            info["diagnostics"] = Diagnostics();
             return Respond(id, true, info);
         }
 
