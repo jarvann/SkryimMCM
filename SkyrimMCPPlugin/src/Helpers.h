@@ -5,6 +5,9 @@
 
 #include <excpt.h>
 #include <format>
+#include <stdexcept>
+#include <cctype>
+#include <algorithm>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -18,7 +21,19 @@ namespace SkyrimMCP::Helpers {
 
     // ==================== Form ID / Actor Value Helpers ====================
 
-    inline RE::FormID ParseFormId(const std::string& hex) {
+    // Strict: the whole string must be 1-8 hex digits (optional 0x, surrounding spaces allowed).
+    // std::stoul alone stops at the first non-hex character, so a name like "Forsworn" parsed as
+    // 0xF (gold) and "Beef" as 0xBEEF: TransferItems then matched the player's gold (2026-11-16).
+    inline RE::FormID ParseFormId(const std::string& text) {
+        std::size_t start = text.find_first_not_of(" \t");
+        std::size_t end = text.find_last_not_of(" \t");
+        if (start == std::string::npos) throw std::invalid_argument("empty FormID");
+        std::string hex = text.substr(start, end - start + 1);
+        if (hex.size() > 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X')) hex = hex.substr(2);
+        if (hex.empty() || hex.size() > 8 ||
+            !std::all_of(hex.begin(), hex.end(), [](unsigned char c) { return std::isxdigit(c) != 0; })) {
+            throw std::invalid_argument("not a FormID: " + text);
+        }
         return static_cast<RE::FormID>(std::stoul(hex, nullptr, 16));
     }
 
