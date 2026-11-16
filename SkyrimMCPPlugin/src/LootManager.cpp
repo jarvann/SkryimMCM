@@ -122,6 +122,7 @@ namespace SkyrimMCP::LootManager {
             bool includeEquipped = false;
             bool includeFavorites = false;
             bool includeQuestItems = false;
+            bool excludeGold = false;  // LootBodies includeGold=false: wins over every category
         };
 
         bool ReadFilter(const json& params, Filter& f, std::string& error) {
@@ -167,6 +168,7 @@ namespace SkyrimMCP::LootManager {
                 auto& [count, entry] = data;
                 if (!object || count <= 0 || !entry) continue;
                 if (!Lootable(object)) continue;
+                if (f.excludeGold && object->GetFormID() == kGold) continue;
                 if (!Matches(f, object)) continue;
                 if (f.minValue > 0 && object->GetFormID() != kGold && object->GetGoldValue() < f.minValue) continue;
                 if (!f.includeQuestItems && entry->IsQuestObject()) continue;
@@ -255,7 +257,9 @@ namespace SkyrimMCP::LootManager {
         Filter f;
         std::string error;
         if (!ReadFilter(filterParams, f, error)) return {{"error", error}};
+        // includeGold=false keeps gold out even with "all" or "valuables" (both match gold).
         if (params.value("includeGold", true)) f.categories.insert("gold");
+        else f.excludeGold = true;
         // A body's worn armor, jewelry and weapons are normal loot (the game's own loot menu
         // shows them), so they are offered unless the caller says otherwise.
         f.includeEquipped = params.value("includeEquipped", true);
