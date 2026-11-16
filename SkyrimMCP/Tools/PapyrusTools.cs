@@ -44,7 +44,11 @@ public class PapyrusTools : ToolBase
     [McpServerTool]
     [Description("Call any Papyrus function from any installed mod via the Papyrus VM. " +
         "Pass className (script class), functionName, and args (JSON array of values). " +
-        "Supports string, int, float, bool arguments. Returns the function's return value. " +
+        "Supports string, int, float and bool arguments, and (1.3+) forms and references: pass a FormID string, \"player\", " +
+        "or null for None to an Actor, ObjectReference, Form or other object parameter. Arrays can't be passed. " +
+        "Returns the function's return value: arrays come back as lists and forms as FormIDs (1.3+). " +
+        "Example: SKSE's WornObject.SetDisplayName(akActor, handSlot, slotMask, name, force) renames a worn item, " +
+        "WornObject.SetItemHealthPercent sets tempering (1.0 = none, 1.6 = legendary). " +
         "Only GLOBAL functions can be called. Before sending, the plugin checks the installed script: an unknown class, " +
         "a missing function, a member function, or a wrong argument count or type is rejected with an error and the " +
         "function's real signature, so read the error instead of guessing other names. " +
