@@ -2193,6 +2193,10 @@
             {
               "datetime": "2026-11-17T01:30",
               "note": "CharGen has LoadCharacterPreset/SaveCharacterPreset (Presets folder, the Presets tab's loader). LoadRaceMenuPreset now loads Presets-tab presets with it (hair colour from get_appearance.hairColorFormId); SaveRaceMenuPreset saves to Presets by default. Built b13_29 on the FEAT-228 branch."
+            },
+            {
+              "datetime": "2026-11-17T02:30",
+              "note": "In game (b13_29): the slider and tint round trip worked (values, previous values, backup, restore), but every script load left the face purple and dropped the [Melodic] Olga Discordia ears part. skee's source (expired6978/SKSE64Plugins, PresetInterface::ApplyPresetData) explains both: head parts are reset to the race defaults and only parts with a sex flag and a valid-race list are re-added; the menu rebuilds the tint texture itself after loading, a script call doesn't; and LoadCharacterPreset overwrites the RGB of the hair colour form it is given. Build 30: restore_head_parts after each load, then Game.UpdateTintMaskColors + UpdateHairColor; no hair colour form passed; backup before the first load; RepairFace tool; GetFacePreset minValue."
             }
           ],
           "targetRelease": "1.3"
@@ -2288,6 +2292,10 @@
             {
               "datetime": "2026-11-17T01:30",
               "note": "In game, GetScriptFunctions (via the VM, FEAT-237) showed NiOverride (185 functions) and CharGen (23) have no call to set a face slider. Built the preset round trip instead (b13_29, branch feature/FEAT-228-preset-face-control, not merged to develop): SaveCharacterPreset to CharGen\\Presets\\_SkyLink\\_current, edit the .jslot, LoadCharacterPreset. Tools: GetFacePreset, DiffFacePresets, SetFaceSliders, SetFaceTint; backup before the first change per session. RaceMenu's native C++ interface (skee) is the alternative if the round trip is too slow or breaks tints."
+            },
+            {
+              "datetime": "2026-11-17T02:30",
+              "note": "In game (b13_29): the slider and tint round trip worked (values, previous values, backup, restore), but every script load left the face purple and dropped the [Melodic] Olga Discordia ears part. skee's source (expired6978/SKSE64Plugins, PresetInterface::ApplyPresetData) explains both: head parts are reset to the race defaults and only parts with a sex flag and a valid-race list are re-added; the menu rebuilds the tint texture itself after loading, a script call doesn't; and LoadCharacterPreset overwrites the RGB of the hair colour form it is given. Build 30: restore_head_parts after each load, then Game.UpdateTintMaskColors + UpdateHairColor; no hair colour form passed; backup before the first load; RepairFace tool; GetFacePreset minValue."
             }
           ],
           "targetRelease": "1.4"
