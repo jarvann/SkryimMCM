@@ -248,7 +248,8 @@ public partial class RaceMenuTools : ToolBase
         "CharGen.LoadCharacterPreset, RaceMenu's own preset loader. Exported presets (CharGen\\Exported) load with CharGen.LoadCharacter and " +
         "need their face-tint texture (Textures\\CharGen\\Exported\\<name>.dds), or the face turns purple. folder: 'presets', 'exported', " +
         "or empty to find the name in either (Presets first). Refused while RaceMenu is open. Changes the whole look: save first " +
-        "(SaveRaceMenuPreset) if the player may want the old one back. Take a screenshot afterwards to check the face.")]
+        "(SaveRaceMenuPreset) if the player may want the old one back. The face can flash purple for a moment while its tint is rebuilt; " +
+        "that is normal. Head parts RaceMenu's loader drops are put back (see headParts). Take a screenshot afterwards to check the face.")]
     public async Task<object> LoadRaceMenuPreset(string name, string? folder = null)
     {
         // Loading by script while RaceMenu is open broke the face tint in game.

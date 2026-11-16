@@ -89,7 +89,9 @@ public partial class RaceMenuTools
         // player's hair colour form can be shared with NPCs.
         var result = await Papyrus("CharGen", "LoadCharacterPreset", "player", PapyrusPresetName(clean), null);
         if (result?.GetValueKind() != JsonValueKind.True) return new LoadOutcome(false, null, null);
-        await Task.Delay(300);
+        // Rebuild the tint at once to shorten the purple flash, then again after the head parts are back
+        // (their 3D reset drops the tint again).
+        await RefreshTints();
         var (restored, tints) = await RepairAfterLoad(parts);
         return new LoadOutcome(true, restored, tints);
     }
@@ -110,7 +112,7 @@ public partial class RaceMenuTools
         if (parts != null && parts.Count > 0)
         {
             restored = await _pipe.SendRequestAsync("restore_head_parts", new JsonObject { ["parts"] = parts, ["refresh"] = true });
-            await Task.Delay(500);
+            if (restored?["added"] is JsonArray added && added.Count > 0) await Task.Delay(250);
         }
         return (restored, await RefreshTints());
     }
@@ -380,7 +382,8 @@ public partial class RaceMenuTools
         "e.g. {\"NSK_EyelidOpen\": -0.3, \"eyesInOut\": 0.2}. Names: the vanilla morphs (noseLongShort ... eyesForwardBack, -1 to 1), " +
         "presetNose/presetEyes/presetMouth (whole numbers), or any RaceMenu extended slider by its name as GetFacePreset lists it. " +
         "Values beyond a slider's menu range are accepted. How it works: RaceMenu has no script call for one slider, so the live face " +
-        "is saved as a preset, edited, and loaded back with RaceMenu's preset loader (about a second). The first change in a session " +
+        "is saved as a preset, edited, and loaded back with RaceMenu's preset loader (about a second; the face can flash purple for a " +
+        "moment before its tint is rebuilt, which is normal). The first change in a session " +
         "first saves a backup (CharGen\\Presets\\_SkyLink\\backup_<time>; restore with LoadRaceMenuPreset). Refused while RaceMenu is open. " +
         "Reports each slider's previous value. dryRun=true shows the changes without applying them. Take a screenshot to judge the result.")]
     public async Task<object> SetFaceSliders(Dictionary<string, double> sliders, bool dryRun = false)
