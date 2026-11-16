@@ -9,6 +9,7 @@
 #include "HostCore.h"
 
 #include "BuildInfo.h"
+#include "CrashRecorder.h"
 #include "EventSystem.h"
 #include "HostApi.h"
 #include "LogicLoader.h"
@@ -94,6 +95,7 @@ namespace SkyrimMCP::HostCore {
                 } catch (...) {
                     out = json{ { "error", "Failed to unpack result" } };
                 }
+                CrashRecorder::Record(CrashRecorder::Kind::Papyrus, "Papyrus call returned");
                 {
                     std::scoped_lock lock(_mutex);
                     _result = out.dump();
@@ -228,6 +230,8 @@ namespace SkyrimMCP::HostCore {
                 if (event && event->menuName == RE::LoadingMenu::MENU_NAME) {
                     active_ = event->opening;
                     SKSE::log::info("Loading screen {}", event->opening ? "started" : "ended");
+                    CrashRecorder::Record(CrashRecorder::Kind::Note,
+                        event->opening ? "Loading screen started" : "Loading screen ended");
                 }
                 return RE::BSEventNotifyControl::kContinue;
             }
@@ -243,7 +247,13 @@ namespace SkyrimMCP::HostCore {
             if (g_loader && g_loader->ShouldAutoReload()) {
                 SKSE::log::info("A newer logic DLL is on disk; reloading before '{}'{}", action,
                     LoadingScreenWatcher::Get().Active() ? " (during a loading screen)" : "");
-                g_loader->Reload(true, kAutoDrainMs);
+                auto result = g_loader->Reload(true, kAutoDrainMs);
+                if (result.ok && !result.skipped) {
+                    CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL auto-reloaded before '{}': built {}",
+                        action, result.built);
+                } else if (!result.ok) {
+                    CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL auto-reload failed: {}", result.error);
+                }
             }
         }
 
@@ -307,7 +317,12 @@ namespace SkyrimMCP::HostCore {
             const bool duringLoadingScreen = LoadingScreenWatcher::Get().Active();
             if (duringLoadingScreen) SKSE::log::info("Manual reload requested during a loading screen");
             auto result = g_loader->Reload(false, kManualDrainMs);
-            if (!result.ok) return Respond(id, false, {}, result.error);
+            if (!result.ok) {
+                CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL reload failed: {}", result.error);
+                return Respond(id, false, {}, result.error);
+            }
+            CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL reloaded: built {} (was {})", result.built,
+                result.previousBuilt);
             json data;
             data["reloaded"] = true;
             data["duringLoadingScreen"] = duringLoadingScreen;
@@ -339,9 +354,92 @@ namespace SkyrimMCP::HostCore {
                 spdlog::log(static_cast<spdlog::level::level_enum>(level), "{}", message);
             });
 
-        if (!g_loader->Load()) {
+        if (g_loader->Load()) {
+            CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL loaded: built {}", g_loader->Status().built);
+        } else {
+            CrashRecorder::Recordf(CrashRecorder::Kind::Note, "Logic DLL not loaded: {}", g_loader->Status().error);
             SKSE::log::error("SkyLink logic DLL not loaded. Only ping, poll_events and reload_plugin will work "
                 "until it is. Expected at {}", Text(source));
+        }
+    }
+
+    namespace {
+        std::string Dispatch(const std::string& requestLine, const json& request, const std::string& id,
+            const std::string& action) {
+            try {
+                if (action == "ping") return Ping(id);
+                if (action == "poll_events") return PollEvents(id, request.value("params", json::object()));
+                if (action == "reload_plugin") return Reload(id);
+                if (action == "get_game_safety" && LoadingScreenWatcher::Get().Active()) return LoadingScreenSafety(id);
+
+                if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
+
+                AutoReloadIfNewer(action);
+
+                std::string response;
+                if (!g_loader->Handle(requestLine, response)) {
+                    auto status = g_loader->Status();
+                    return Respond(id, false, {},
+                        "SkyLink's logic DLL is not loaded" + (status.error.empty() ? std::string() : ": " + status.error) +
+                        ". Check that SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll is installed, then call reload_plugin "
+                        "or restart the game.");
+                }
+                if (response.empty()) return Respond(id, false, {}, "The logic DLL returned no response");
+                if (response.back() != '\n') response.push_back('\n');
+                return response;
+            } catch (const std::exception& e) {
+                SKSE::log::error("Error handling action '{}': {}", action, e.what());
+                return Respond(id, false, {}, e.what());
+            }
+        }
+
+        // ---- crash recorder (FEAT-219) ----
+
+        // The MCP server sends these constantly; recording them would push everything else
+        // out of the ring buffer.
+        bool RecordsRequest(const std::string& action) {
+            return action != "ping" && action != "poll_events";
+        }
+
+        void RecordRequestStart(const std::string& action, const json& request) {
+            if (!CrashRecorder::Enabled()) return;
+            try {
+                std::string params;
+                const auto it = request.find("params");
+                const bool hasParams = it != request.end() && it->is_object() && !it->empty();
+                if (hasParams) params = it->dump(-1, ' ', false, json::error_handler_t::replace);
+                CrashRecorder::Recordf(CrashRecorder::Kind::Request, "> {} {}", action, params);
+
+                if (action == "call_papyrus_function" && hasParams) {
+                    std::size_t argCount = 0;
+                    if (auto args = it->find("args"); args != it->end() && args->is_array()) argCount = args->size();
+                    CrashRecorder::Recordf(CrashRecorder::Kind::Papyrus, "Calling {}.{} ({} args)",
+                        it->value("className", std::string("?")), it->value("functionName", std::string("?")), argCount);
+                }
+            } catch (...) {
+            }
+        }
+
+        // Responses are dumped from nlohmann::json, whose object keys are sorted, so
+        // "success" is the last top-level key: read the tail rather than parse a large reply.
+        void RecordRequestEnd(const std::string& action, const std::string& response, long long elapsedMs) {
+            if (!CrashRecorder::Enabled()) return;
+            try {
+                constexpr std::string_view kSuccess = "\"success\":";
+                const auto pos = response.rfind(kSuccess);
+                const bool ok = pos != std::string::npos && response.compare(pos + kSuccess.size(), 4, "true") == 0;
+                if (ok) {
+                    CrashRecorder::Recordf(CrashRecorder::Kind::Request, "< {} ok ({} ms)", action, elapsedMs);
+                    return;
+                }
+                std::string error;
+                try {
+                    error = json::parse(response).value("error", std::string());
+                } catch (...) {
+                }
+                CrashRecorder::Recordf(CrashRecorder::Kind::Request, "< {} error ({} ms): {}", action, elapsedMs, error);
+            } catch (...) {
+            }
         }
     }
 
@@ -356,31 +454,17 @@ namespace SkyrimMCP::HostCore {
         std::string id = request.value("id", "");
         std::string action = request.value("action", "");
 
-        try {
-            if (action == "ping") return Ping(id);
-            if (action == "poll_events") return PollEvents(id, request.value("params", json::object()));
-            if (action == "reload_plugin") return Reload(id);
-            if (action == "get_game_safety" && LoadingScreenWatcher::Get().Active()) return LoadingScreenSafety(id);
+        if (!RecordsRequest(action)) return Dispatch(requestLine, request, id, action);
 
-            if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
-
-            AutoReloadIfNewer(action);
-
-            std::string response;
-            if (!g_loader->Handle(requestLine, response)) {
-                auto status = g_loader->Status();
-                return Respond(id, false, {},
-                    "SkyLink's logic DLL is not loaded" + (status.error.empty() ? std::string() : ": " + status.error) +
-                    ". Check that SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll is installed, then call reload_plugin "
-                    "or restart the game.");
-            }
-            if (response.empty()) return Respond(id, false, {}, "The logic DLL returned no response");
-            if (response.back() != '\n') response.push_back('\n');
-            return response;
-        } catch (const std::exception& e) {
-            SKSE::log::error("Error handling action '{}': {}", action, e.what());
-            return Respond(id, false, {}, e.what());
-        }
+        // Crash recorder: an entry before the request runs, so a call that crashes the game
+        // is still on record, and one with the outcome once it returns.
+        RecordRequestStart(action, request);
+        const auto started = std::chrono::steady_clock::now();
+        std::string response = Dispatch(requestLine, request, id, action);
+        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        RecordRequestEnd(action, response, static_cast<long long>(elapsedMs));
+        return response;
     }
 
 }

@@ -3,7 +3,11 @@
 
 #include <spdlog/sinks/basic_file_sink.h>
 
+#include <cstring>
+#include <string_view>
+
 #include "BuildInfo.h"
+#include "CrashRecorder.h"
 #include "EventSystem.h"
 #include "HostCore.h"
 #include "PipeServer.h"
@@ -12,10 +16,28 @@
 namespace {
     std::unique_ptr<SkyrimMCP::PipeServer> g_pipeServer;
 
+    // A save name from an SKSE message (pre-load, save): bounded by dataLen.
+    std::string_view SaveName(const SKSE::MessagingInterface::Message* a_msg) {
+        if (!a_msg->data || a_msg->dataLen == 0) return "(unnamed)";
+        const auto* text = static_cast<const char*>(a_msg->data);
+        return std::string_view(text, strnlen(text, a_msg->dataLen));
+    }
+
+    void RecordPlayerCell() {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* cell = player ? player->GetParentCell() : nullptr;
+        if (!cell) return;
+        const char* name = cell->GetName();
+        SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Cell, "Player cell {} [{:08X}]",
+            name && *name ? name : "(unnamed)", cell->GetFormID());
+    }
+
     void MessageCallback(SKSE::MessagingInterface::Message* a_msg) {
         switch (a_msg->type) {
             case SKSE::MessagingInterface::kDataLoaded:
                 SKSE::log::info("Game data loaded, starting systems...");
+                SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note, "Game data loaded");
+                SkyrimMCP::CrashRecorder::StartQuitWatcher();
 
                 // Console output: no hook needed — commands open console menu briefly
 
@@ -39,10 +61,23 @@ namespace {
 
             case SKSE::MessagingInterface::kPreLoadGame:
                 SKSE::log::info("Game loading...");
+                SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Note, "Loading save {}", SaveName(a_msg));
                 break;
 
             case SKSE::MessagingInterface::kPostLoadGame:
                 SKSE::log::info("Game loaded");
+                // data is the load result (a bool passed as the pointer value).
+                SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note,
+                    a_msg->data ? "Save loaded" : "Save load failed");
+                RecordPlayerCell();
+                break;
+
+            case SKSE::MessagingInterface::kSaveGame:
+                SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Note, "Game saved: {}", SaveName(a_msg));
+                break;
+
+            case SKSE::MessagingInterface::kNewGame:
+                SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note, "New game started");
                 break;
         }
     }
@@ -78,6 +113,10 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
 
     // Steam, GOG and downgraded installs all report here; first thing to check in a bug report.
     SKSE::log::info("Skyrim runtime {}", REL::Module::get().version().string("."));
+
+    // Crash recorder (FEAT-219): a memory-mapped ring buffer of recent activity that
+    // survives a crash. Never throws; on failure it logs a warning and stays off.
+    SkyrimMCP::CrashRecorder::Init();
 
     // Console output capture: opens console menu briefly during command execution
 
