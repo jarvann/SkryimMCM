@@ -126,17 +126,24 @@ public class InventoryTools : ToolBase
         "or 'container' (the open container only); defaults from=player, to=crosshair. " +
         "Example: store smithing materials: categories='smithing', from='player', to='crosshair'. " +
         "categories (comma-separated): " + CategoryList + ". " +
+        "items (instead of categories, for specific things): a JSON list of FormIDs or names with optional counts, " +
+        "e.g. '[\"Ebony Sword\", {\"item\": \"0001397E\", \"count\": 2}]' or a comma-separated list; names match what the source holds. " +
+        "This is a real move: enchantments, tempering and custom names go with the item (never add a copy and remove the original). " +
+        "Each moved item reports destinationBefore and destinationAfter, so a top-up of an existing pile is visible; " +
+        "destinationAlreadyHadSome counts those. Run a dry run first for sorting jobs. " +
         "minValue skips cheaper items. Equipped items, favorites and quest items stay unless includeEquipped / includeFavorites / " +
         "includeQuestItems is true. Enchanted and tempered items keep their properties. " +
         "Taking from something another NPC owns, or from a living NPC, is stealing and is refused unless allowStealing=true " +
         "(ask the player first; the game's normal crime rules apply). dryRun=true lists what would move without moving it.")]
-    public async Task<object> TransferItems(string categories, string from = "player", string to = "crosshair", int minValue = 0,
+    public async Task<object> TransferItems(string? categories = null, string from = "player", string to = "crosshair", int minValue = 0,
         bool includeEquipped = false, bool includeFavorites = false, bool includeQuestItems = false,
-        bool allowStealing = false, bool dryRun = false)
+        bool allowStealing = false, bool dryRun = false, string? items = null)
     {
+        if (string.IsNullOrWhiteSpace(categories) && string.IsNullOrWhiteSpace(items))
+            return new { error = "Pass categories (e.g. 'smithing') or items (FormIDs or names)" };
         var parms = new JsonObject
         {
-            ["categories"] = SplitList(categories),
+            ["categories"] = string.IsNullOrWhiteSpace(categories) ? new JsonArray() : SplitList(categories),
             ["from"] = from,
             ["to"] = to,
             ["minValue"] = minValue,
@@ -146,6 +153,14 @@ public class InventoryTools : ToolBase
             ["allowStealing"] = allowStealing,
             ["dryRun"] = dryRun,
         };
+        if (!string.IsNullOrWhiteSpace(items))
+        {
+            JsonNode? list = null;
+            var trimmed = items.Trim();
+            if (trimmed.StartsWith('[')) { try { list = JsonNode.Parse(trimmed); } catch { /* fall back to a plain list */ } }
+            parms["items"] = list ?? new JsonArray(trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(t => (JsonNode)t).ToArray());
+        }
         var data = await _pipe.SendRequestAsync("transfer_items", parms);
         var stacks = data?["stacks"]?.GetValue<int>() ?? 0;
         if (!dryRun && stacks > 0) await NotifyInGame($"Moved {stacks} item stack{(stacks == 1 ? "" : "s")}");

@@ -10,6 +10,7 @@
 #include <format>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace SkyrimMCP::LootManager {
@@ -123,6 +124,9 @@ namespace SkyrimMCP::LootManager {
             bool includeFavorites = false;
             bool includeQuestItems = false;
             bool excludeGold = false;  // LootBodies includeGold=false: wins over every category
+            // TransferItems "items": exact forms to move, with a count (-1 = all). When set, it
+            // replaces the category match.
+            std::unordered_map<RE::FormID, int> items;
         };
 
         bool ReadFilter(const json& params, Filter& f, std::string& error) {
@@ -138,7 +142,7 @@ namespace SkyrimMCP::LootManager {
                 }
                 f.categories.insert(name);
             }
-            if (f.categories.empty()) { error = "categories is required (for example [\"smithing\"] or [\"all\"])"; return false; }
+            if (f.categories.empty() && !params.contains("items")) { error = "categories or items is required (for example [\"smithing\"] or [\"all\"])"; return false; }
             f.minValue = params.value("minValue", 0);
             f.includeEquipped = params.value("includeEquipped", false);
             f.includeFavorites = params.value("includeFavorites", false);
@@ -147,6 +151,7 @@ namespace SkyrimMCP::LootManager {
         }
 
         bool Matches(const Filter& f, RE::TESBoundObject* object) {
+            if (!f.items.empty()) return f.items.contains(object->GetFormID());
             if (f.categories.contains("all")) return true;
             auto cats = CategoriesOf(object);
             for (const auto& c : cats) if (f.categories.contains(c)) return true;
@@ -165,7 +170,8 @@ namespace SkyrimMCP::LootManager {
             json moved = json::array();
             auto inventory = from->GetInventory();
             for (auto& [object, data] : inventory) {
-                auto& [count, entry] = data;
+                auto count = data.first;
+                auto& entry = data.second;
                 if (!object || count <= 0 || !entry) continue;
                 if (!Lootable(object)) continue;
                 if (f.excludeGold && object->GetFormID() == kGold) continue;
@@ -175,6 +181,11 @@ namespace SkyrimMCP::LootManager {
                 if (!f.includeEquipped && entry->IsWorn()) continue;
                 if (!f.includeFavorites && entry->IsFavorited()) continue;
 
+                // A named item moves only as many as asked for (and keeps its other copies).
+                if (!f.items.empty()) {
+                    const int wanted = f.items.at(object->GetFormID());
+                    if (wanted > 0) count = std::min(count, wanted);
+                }
                 const char* name = object->GetName();
                 json m;
                 m["formId"] = std::format("{:08X}", object->GetFormID());
@@ -206,6 +217,62 @@ namespace SkyrimMCP::LootManager {
         }
     }
 
+    namespace {
+        std::unordered_map<RE::FormID, int> Counts(RE::TESObjectREFR* ref) {
+            std::unordered_map<RE::FormID, int> counts;
+            for (auto& [object, data] : ref->GetInventory()) {
+                if (object && data.first > 0) counts[object->GetFormID()] += data.first;
+            }
+            return counts;
+        }
+
+        // TransferItems "items": [{"item": FormID or name, "count": n}] or plain strings. Names are
+        // matched against what the source actually holds: exact (case-insensitive) first, then a
+        // unique partial match; an ambiguous name is an error listing the candidates.
+        bool ResolveItems(const json& list, RE::TESObjectREFR* from, Filter& f, json& unresolved, std::string& error) {
+            std::vector<std::pair<RE::TESBoundObject*, std::string>> held;
+            for (auto& [object, data] : from->GetInventory()) {
+                if (!object || data.first <= 0) continue;
+                const char* name = object->GetName();
+                held.emplace_back(object, Lower((name && name[0]) ? name : ""));
+            }
+            for (const auto& entry : list) {
+                std::string key;
+                int count = -1;
+                if (entry.is_string()) key = entry.get<std::string>();
+                else if (entry.is_object()) {
+                    key = entry.value("item", entry.value("formId", entry.value("name", "")));
+                    count = entry.value("count", -1);
+                }
+                if (key.empty()) continue;
+
+                RE::TESBoundObject* found = nullptr;
+                try {
+                    const auto id = Helpers::ParseFormId(key);
+                    for (auto& [object, name] : held) if (object->GetFormID() == id) { found = object; break; }
+                } catch (...) {}
+                if (!found) {
+                    const auto wanted = Lower(key);
+                    std::vector<RE::TESBoundObject*> partial;
+                    for (auto& [object, name] : held) {
+                        if (name == wanted) { found = object; break; }
+                        if (!wanted.empty() && name.find(wanted) != std::string::npos) partial.push_back(object);
+                    }
+                    if (!found && partial.size() == 1) found = partial[0];
+                    if (!found && partial.size() > 1) {
+                        json names = json::array();
+                        for (auto* o : partial) names.push_back(std::format("{} ({:08X})", o->GetName(), o->GetFormID()));
+                        error = "'" + key + "' matches several items; use the FormID: " + names.dump();
+                        return false;
+                    }
+                }
+                if (!found) { unresolved.push_back(key); continue; }
+                f.items[found->GetFormID()] = count;
+            }
+            return true;
+        }
+    }
+
     json TransferItems(const json& params) {
         std::string error;
         auto* from = ResolveRef(params.value("from", "player"), error);
@@ -216,6 +283,13 @@ namespace SkyrimMCP::LootManager {
 
         Filter f;
         if (!ReadFilter(params, f, error)) return {{"error", error}};
+        json unresolved = json::array();
+        if (params.contains("items")) {
+            auto list = params["items"];
+            if (list.is_string()) list = json::array({list});
+            if (!ResolveItems(list, from, f, unresolved, error)) return {{"error", error}};
+            if (f.items.empty()) return {{"error", RefLabel(from) + " has none of the named items"}, {"notFound", unresolved}};
+        }
         const bool dryRun = params.value("dryRun", false);
         const bool allowStealing = params.value("allowStealing", false);
 
@@ -238,13 +312,48 @@ namespace SkyrimMCP::LootManager {
             return {{"error", RefLabel(from) + " is a living NPC: taking their items is pickpocketing. Use allowStealing=true only if the player asks."}};
         }
 
+        // What the destination holds before and after, so a top-up of an existing pile is visible.
+        const auto destBefore = Counts(to);
         int stacks = 0, value = 0;
         auto moved = MoveMatching(from, to, f, reason, dryRun, stacks, value);
-        return {
+        const auto destAfter = dryRun ? destBefore : Counts(to);
+        int alreadyHeldStacks = 0;
+        for (auto& m : moved) {
+            RE::FormID id = 0;
+            try { id = Helpers::ParseFormId(m["formId"].get<std::string>()); } catch (...) {}
+            const int before = destBefore.contains(id) ? destBefore.at(id) : 0;
+            m["destinationBefore"] = before;
+            m["destinationAfter"] = dryRun ? before + m["count"].get<int>() : (destAfter.contains(id) ? destAfter.at(id) : 0);
+            if (before > 0) ++alreadyHeldStacks;
+        }
+
+        json result = {
             {"from", RefLabel(from)}, {"to", RefLabel(to)}, {"dryRun", dryRun},
             {"stacks", stacks}, {"totalValue", value}, {"items", moved},
             {"stolen", reason == RE::ITEM_REMOVE_REASON::kSteal},
+            {"destinationStacksBefore", destBefore.size()},
+            {"destinationAlreadyHadSome", alreadyHeldStacks},
         };
+        if (alreadyHeldStacks > 0) {
+            result["destinationNote"] = std::format("{} of these {} already in {}: the move tops up those piles (see destinationBefore).",
+                                                    alreadyHeldStacks, alreadyHeldStacks == 1 ? "item was" : "items were", RefLabel(to));
+        }
+        if (!unresolved.empty()) result["notFound"] = unresolved;
+        // Named items the filters held back (worn, favourite, quest item).
+        if (!f.items.empty()) {
+            json heldBack = json::array();
+            for (auto& [id, n] : f.items) {
+                const bool wasMoved = std::any_of(moved.begin(), moved.end(), [&](const json& m) {
+                    try { return Helpers::ParseFormId(m["formId"].get<std::string>()) == id; } catch (...) { return false; }
+                });
+                if (!wasMoved) heldBack.push_back(std::format("{:08X}", id));
+            }
+            if (!heldBack.empty()) {
+                result["heldBack"] = heldBack;
+                result["heldBackNote"] = "Worn, favourite or quest items stay unless includeEquipped / includeFavorites / includeQuestItems is true.";
+            }
+        }
+        return result;
     }
 
     json LootBodies(const json& params) {
