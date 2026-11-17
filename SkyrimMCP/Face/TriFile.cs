@@ -3,7 +3,7 @@ namespace SkyrimMCP.Face;
 /// <summary>
 /// Reads the connected pieces of a head part's chargen TRI file (FRTRI003: a 64-byte header with the vertex and
 /// triangle counts, then vertex positions and triangles), so the sculpt brush can tell an eye mesh's eyeball from its
-/// lashes and tear duct (BUG-047). Loose files only: MO2's overwrite and mods, then Data\meshes.
+/// lashes and tear duct (BUG-047). Loose files or BSA archives (MeshFiles).
 /// </summary>
 public static class TriFile
 {
@@ -15,19 +15,16 @@ public static class TriFile
         lock (Cache)
         {
             if (Cache.TryGetValue(host, out var cached)) return cached;
-            var path = Find(host);
             List<int[]>? pieces = null;
-            try { pieces = path == null ? null : Read(path); } catch (Exception) { pieces = null; }
+            try { pieces = MeshFiles.Read(host) is byte[] bytes ? Read(bytes) : null; } catch (Exception) { pieces = null; }
             Cache[host] = pieces;
             return pieces;
         }
     }
 
-    private static string? Find(string host) => MeshFiles.Find(host);
-
-    private static List<int[]> Read(string path)
+    private static List<int[]> Read(byte[] data)
     {
-        using var reader = new BinaryReader(File.OpenRead(path));
+        using var reader = new BinaryReader(new MemoryStream(data));
         var magic = new string(reader.ReadChars(8));
         if (magic != "FRTRI003") throw new InvalidDataException("not a FRTRI003 file");
         var header = new uint[14];

@@ -2942,6 +2942,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-254",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Meshes read from BSA archives (hair picker, sculpt eye pieces)",
+          "description": "Some hair packs ship their meshes in BSA archives (KS Hairdos - Wigs SE by Xtudo.bsa here: 108 wig meshes). BsaArchive reads SE archives (version 105): folder and file records, the name tables, embedded names, per-file compression toggles, LZ4 frame decoding written in (no new package). MeshFiles.Read returns a mesh from a loose file first (MO2 overwrite and mods, Data), else from any mesh archive (texture and sound archives skipped). FindHairstyles, its contact sheet and the sculpt brush's TRI pieces use it. Also fixed in NifShape: Skyrim SE always stores full-precision positions (a wig's vertex flags lacked VF_FULLPREC and read as garbage half floats).",
+          "history": [
+            {
+              "datetime": "2026-11-18T14:00",
+              "note": "Archive layout and a wig's skin-partition vertices checked offline in Python (character-space z about 107). Built on feature/FEAT-254-bsa-meshes."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",
