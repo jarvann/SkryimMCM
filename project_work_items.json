@@ -2530,6 +2530,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-033",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Blush read low with a heavy blush band; lid gaps moved with gaze; hair rendered brown",
+          "description": "In game (build 42, neutral daylight): a full-strength anime blush band across cheeks and nose read blush 0.153 (too low) against the reference's 0.458, because the skin sample included the nose (inside the band) and the cheek spots missed it. The skin is now sampled on the chin only, and blush is the reddest fifth of a wider cheek area (cheekbones to apples) against the skin: the same capture now reads 0.5, too high, as it looks. Upper and lower lid gaps to the iris centre moved 0.747 to 0.651 and 0.74 to 0.802 with the sliders unchanged (gaze); added lid height and depth from the corner-to-corner line in eye widths, which don't move with gaze. The hair rendered dark brown where it was blonde all day; every preset stores hairColor #5E442E and the brows' shader colour read #BB875C earlier (about twice the stored value), so the colour in the save is brown and something changed the rendered tint. New read-only GetHairTint shows the hair and brow shader colours next to the stored hair colour (get_appearance now returns hairColor as hex) to find out.",
+          "history": [
+            {
+              "datetime": "2026-11-17T22:20",
+              "note": "Fixed on bugfix/BUG-033-blush-lids-hair-diag. Hair cause still open."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-230",
           "type": "feature",
           "status": "complete",

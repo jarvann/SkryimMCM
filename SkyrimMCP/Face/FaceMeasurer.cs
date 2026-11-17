@@ -312,7 +312,23 @@ public sealed class FaceMeasurer : IDisposable
             up += ((L[iris, 0] - L[upper, 0]) * nx + (L[iris, 1] - L[upper, 1]) * ny) / r;
             low += ((L[lower, 0] - L[iris, 0]) * nx + (L[lower, 1] - L[iris, 1]) * ny) / r;
         }
-        return new Dictionary<string, double> { ["upper_lid_gap / iris_radius"] = up / 2, ["lower_lid_gap / iris_radius"] = low / 2 };
+        // Lid positions from the corner-to-corner line, in eye widths: these don't move when the eyes look up or
+        // down, unlike the gaps to the iris centre.
+        double lidUp = 0, lidLow = 0;
+        foreach (var (outer, inner, upper, lower) in new[] { (33, 133, 159, 145), (263, 362, 386, 374) })
+        {
+            double ax = L[inner, 0] - L[outer, 0], ay = L[inner, 1] - L[outer, 1];
+            var width = Math.Sqrt(ax * ax + ay * ay);
+            double nx = -ay / width, ny = ax / width;
+            if (ny < 0) { nx = -nx; ny = -ny; }
+            lidUp += ((L[outer, 0] - L[upper, 0]) * nx + (L[outer, 1] - L[upper, 1]) * ny) / width;
+            lidLow += ((L[lower, 0] - L[outer, 0]) * nx + (L[lower, 1] - L[outer, 1]) * ny) / width;
+        }
+        return new Dictionary<string, double>
+        {
+            ["upper_lid_gap / iris_radius"] = up / 2, ["lower_lid_gap / iris_radius"] = low / 2,
+            ["upper_lid_height / eye_width"] = lidUp / 2, ["lower_lid_depth / eye_width"] = lidLow / 2,
+        };
     }
 
     /// <summary>Head angles from the 3D landmarks and simple expression signs: a turned head or a smile skews the ratios.</summary>
@@ -342,8 +358,8 @@ public sealed class FaceMeasurer : IDisposable
     // Sample spots: a landmark, or a pair whose midpoint is sampled.
     private static readonly Dictionary<string, (int A, int B)[]> ColourSpots = new()
     {
-        ["skin"] = [(199, 199), (200, 200), (208, 208), (428, 428), (6, 6), (197, 197)],  // chin, plus the upper nose bridge: no makeup; mostly chin, as the bridge catches highlights in sunlight
-        ["cheeks"] = [(50, 50), (280, 280), (50, 205), (280, 425)],  // where blush goes
+        ["skin"] = [(199, 199), (200, 200), (208, 208), (428, 428)],  // chin: no makeup (blush bands can cross the nose)
+        ["cheeks"] = [(50, 50), (280, 280), (50, 205), (280, 425), (101, 101), (330, 330), (118, 118), (347, 347), (205, 205), (425, 425)],  // cheekbones to the apples
         ["lips"] = [(0, 13), (14, 17), (37, 82), (267, 312), (84, 87), (314, 317)],
         ["brows"] = [(63, 53), (105, 52), (66, 65), (293, 283), (334, 282), (296, 295)],
     };
@@ -365,6 +381,17 @@ public sealed class FaceMeasurer : IDisposable
             var m = sorted.Length / 2;
             return sorted.Length % 2 == 1 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
         }).ToArray();
+    }
+
+    // numpy's default (linear) percentile.
+    private static double Percentile(IEnumerable<double> values, double pct)
+    {
+        var sorted = values.OrderBy(v => v).ToArray();
+        if (sorted.Length == 0) return 0;
+        var pos = (sorted.Length - 1) * pct / 100.0;
+        var lo = (int)Math.Floor(pos);
+        var hi = Math.Min(sorted.Length - 1, lo + 1);
+        return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
     }
 
     private static double[] MedianLab(List<double[]> rgbSamples) =>
@@ -441,7 +468,8 @@ public sealed class FaceMeasurer : IDisposable
             ["brow_lightness (brow / skin luminance)"] = R(Luminance(lin["brows"]) / Luminance(skin)),
             ["lip_redness (log2 R/G vs skin)"] = R(Lg(lin["lips"][0] / lin["lips"][1]) - Lg(skin[0] / skin[1])),
             ["lip_lightness (lip / skin luminance)"] = R(Luminance(lin["lips"]) / Luminance(skin)),
-            ["blush (log2 R/G cheek vs skin)"] = R(Lg(lin["cheeks"][0] / lin["cheeks"][1]) - Lg(skin[0] / skin[1])),
+            // The reddest fifth of the cheek pixels: a blush band is found wherever it sits on the cheek.
+            ["blush (log2 R/G cheek vs skin)"] = R(Percentile(regions["cheeks"].Select(p => { var l = Linear(p); return Lg((l[0] + 1e-4) / (l[1] + 1e-4)); }), 80) - Lg(skin[0] / skin[1])),
             ["iris_lightness (iris / skin luminance)"] = R(Luminance(lin["iris"]) / Luminance(skin)),
         };
         // Against the white of the eye (a near-neutral white under the same light): the skin's and the iris's own colour.
