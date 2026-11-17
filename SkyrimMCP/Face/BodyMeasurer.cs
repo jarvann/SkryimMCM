@@ -99,7 +99,7 @@ public sealed class BodyMeasurer
             for (var c = 0; c < 256; c++) if (r.Mask[row * 256 + c] > 0.5f) { if (first < 0) first = c; last = c; }
             return first < 0 ? double.NaN : (last - first) / k;
         }
-        double R(double v) => double.IsNaN(v) ? double.NaN : Math.Round(v, 3);
+        double R(double v) => double.IsFinite(v) ? Math.Round(v, 3) : -1;  // -1: not measurable (NaN can't be written as JSON)
         var key = new[] { 11, 12, 23, 24, 27, 28 };
         return new Dictionary<string, object?>
         {
@@ -111,9 +111,14 @@ public sealed class BodyMeasurer
                 ["legs / height"] = R(Len(hp, ankles) / height),
                 ["arm / height"] = R((D(11, 13) + D(13, 15) + D(12, 14) + D(14, 16)) / 2 / height),
                 ["head_and_neck / height"] = R((sh.Y - top) / height),
-                ["silhouette_chest / shoulder_width"] = R(WidthAt(sh.Y + 0.25 * (hp.Y - sh.Y)) / shoulders),
-                ["silhouette_waist / shoulder_width"] = R(WidthAt(sh.Y + 0.62 * (hp.Y - sh.Y)) / shoulders),
-                ["silhouette_hips / shoulder_width"] = R(WidthAt(hp.Y) / shoulders),
+            },
+            // BUG-055: outline widths include long hair, skirts and arms touching the body (waist read 1.36 then 1.02 of
+            // the shoulders on two identical captures): not compared, shown for reference only.
+            ["silhouette_unproven"] = new Dictionary<string, double>
+            {
+                ["chest / shoulder_width"] = R(WidthAt(sh.Y + 0.25 * (hp.Y - sh.Y)) / shoulders),
+                ["waist / shoulder_width"] = R(WidthAt(sh.Y + 0.62 * (hp.Y - sh.Y)) / shoulders),
+                ["hips / shoulder_width"] = R(WidthAt(hp.Y) / shoulders),
             },
             ["confidence"] = new Dictionary<string, double>
             {
@@ -121,7 +126,7 @@ public sealed class BodyMeasurer
                 ["lowest_key_visibility"] = R(key.Min(i => r.Visibility[i])),
             },
             ["heightPixels"] = Math.Round(height),
-            ["note"] = "Silhouette widths include the arms where they touch the body: compare captures in the same pose.",
+            ["note"] = "The joint-based ratios repeat well; the silhouette widths are unproven (hair, clothes and arms count) and aren't compared.",
         };
     }
 }

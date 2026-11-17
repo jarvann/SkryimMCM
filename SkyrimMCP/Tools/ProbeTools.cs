@@ -89,7 +89,10 @@ public class ProbeTools : ToolBase
                     else if (Math.Abs(x.Value) > 1e-9)
                     {
                         var pct = (y.Value - x.Value) / Math.Abs(x.Value) * 100;
-                        if (Math.Abs(pct) >= noise)
+                        // BUG-055: the picture-based lid edges move 5-10% between captures on their own (every probe,
+                        // a nose slider too), so they need four times the noise floor to count.
+                        var floor = key.Contains("lid_edge") ? noise * 4 : noise;
+                        if (Math.Abs(pct) >= floor)
                             moved.Add(new JsonObject { ["measure"] = key, ["before"] = x, ["after"] = y, ["change"] = $"{pct:+0.0;-0.0}%", ["size"] = Math.Abs(pct) });
                     }
                 }
