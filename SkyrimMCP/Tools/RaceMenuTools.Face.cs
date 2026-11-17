@@ -124,6 +124,8 @@ public partial class RaceMenuTools
         {
             await Papyrus("Game", "UpdateTintMaskColors");
             await Papyrus("Game", "UpdateHairColor");
+            // UpdateHairColor also recolours the brows: put back a brow colour set with SetBrowColor.
+            try { await Papyrus("NiOverride", "ApplyNodeOverrides", "player"); } catch (McpException) { }
             return "Face tint rebuilt (Game.UpdateTintMaskColors, Game.UpdateHairColor).";
         }
         catch (McpException ex)
@@ -556,5 +558,54 @@ public partial class RaceMenuTools
         }
         var (restored, tints) = await RepairAfterLoad(parts);
         return new { headPartsFrom = source, headParts = restored?.DeepClone(), tints, note = "Check the face with a screenshot." };
+    }
+
+    [McpServerTool]
+    [Description("Colour the player's eyebrows separately from the hair (by default the brows take the hair colour, so darkening " +
+        "them otherwise means darkening the hair). color #RRGGBB, or 'hair' to go back to the hair colour. Stored as a RaceMenu " +
+        "(NiOverride) override on the brow head part and saved with the game. Changing the brow head part later (SetHeadPart) " +
+        "needs the colour set again. Take a capture to judge it: the brow texture's own shading still shows through.")]
+    public async Task<object> SetBrowColor(string color)
+    {
+        var appearance = await _pipe.SendRequestAsync("get_appearance");
+        var isFemale = appearance?["sex"]?.GetValue<string>() == "female";
+        var brows = (appearance?["headParts"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(p => p["type"]?.GetValue<int>() == 6)
+            .Select(p => p["editorId"]?.GetValue<string>())
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Cast<string>()
+            .ToList();
+        if (brows.Count == 0) return new { error = "No eyebrow head part with an editor ID found on the player (get_appearance headParts)." };
+
+        var reset = color.Trim().Equals("hair", StringComparison.OrdinalIgnoreCase);
+        var rgb = 0;
+        if (!reset)
+        {
+            var hex = color.Trim().TrimStart('#');
+            if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out rgb))
+                return new { error = "color must be #RRGGBB or 'hair'" };
+        }
+
+        var results = new List<object>();
+        foreach (var node in brows)
+        {
+            if (reset)
+            {
+                await Papyrus("NiOverride", "RemoveNodeOverride", "player", isFemale, node, KeyTintColor, -1);
+                results.Add(new { node, color = "hair" });
+                continue;
+            }
+            await Papyrus("NiOverride", "AddNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1, rgb, true);
+            var stored = (await Papyrus("NiOverride", "GetNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1))?.GetValue<int>();
+            results.Add(new { node, color = $"#{rgb:X6}", stored = stored.HasValue ? $"#{stored.Value & 0xFFFFFF:X6}" : null });
+        }
+        if (reset) await Papyrus("Game", "UpdateHairColor");
+        else
+        {
+            try { await Papyrus("NiOverride", "ApplyNodeOverrides", "player"); }
+            catch (McpException) { /* AddNodeOverrideInt already applied it to the loaded head */ }
+        }
+        await NotifyInGame(reset ? "Brows follow the hair colour again" : "Brow colour set");
+        return new { brows = results, female = isFemale, next = "CaptureFace(hideHair: true) shows the brows clearly." };
     }
 }

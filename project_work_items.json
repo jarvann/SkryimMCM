@@ -2272,6 +2272,21 @@
             }
           ],
           "targetRelease": "1.3"
+        },
+        {
+          "id": "FEAT-238",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetBrowColor: eyebrow colour independent of the hair",
+          "description": "Brows take the hair colour, so they couldn't be darkened without darkening the hair (the one visible gap no face tool could close). SetBrowColor(color | hair) puts a NiOverride node override (key 7, tint colour) on the brow head part node, persisted with the game; Game.UpdateHairColor resets it, so the face tools re-apply node overrides after every tint refresh. Test: SetBrowColor(#2A1E18) darkens the brows only; SetFaceSliders afterwards keeps them dark; SetBrowColor(hair) puts them back.",
+          "history": [
+            {
+              "datetime": "2026-11-17T13:45",
+              "note": "Requested in face_builder_skill_draft_2026-11-17.md (item 6). Built on feature/FEAT-238-brow-color. Unverified: that the tint-colour key acts on the brow's hair-tint shader."
+            }
+          ],
+          "targetRelease": "1.3"
         }
       ]
     },
