@@ -518,26 +518,34 @@ public sealed class FaceMeasurer : IDisposable
         var width = x1 - x0 + 1;
         var total = Math.Max(1L, (long)width * (y1 - y0 + 1));
         var step = Math.Max(1, (int)(total / 20000));
-        double castA = 0, castB = 0, castA2 = 0, castB2 = 0;
+        double castA = 0, castB = 0, castA2 = 0, castB2 = 0, hueCos = 0, hueSin = 0;
         var n = 0;
+        var coloured = 0;
         for (long idx = 0; idx < total; idx += step)
         {
             var p = img.Pixel(x0 + (int)(idx % width), y0 + (int)(idx / width));
             var l = Color.SrgbToLab(p[0], p[1], p[2]);
             castA += l[1]; castB += l[2]; castA2 += l[1] * l[1]; castB2 += l[2] * l[2]; n++;
+            var chroma = Math.Sqrt(l[1] * l[1] + l[2] * l[2]);
+            if (chroma > 4) { hueCos += l[1] / chroma; hueSin += l[2] / chroma; coloured++; }
         }
         castA /= Math.Max(1, n); castB /= Math.Max(1, n);
         // BUG-042: a sepia or black-and-white picture has almost no colour variation across the face (a*/b* spread
         // 0.8/1.9 on a sepia photo, 5.1/5.1 on a colour render, 3.5/3.7 on a game capture): its colour ratios mean nothing.
         var spreadA = Math.Sqrt(Math.Max(0, castA2 / Math.Max(1, n) - castA * castA));
         var spreadB = Math.Sqrt(Math.Max(0, castB2 / Math.Max(1, n) - castB * castB));
-        var monochrome = Math.Max(spreadA, spreadB) < 3.0;
+        // The spread alone also caught a pale face under white studio light (2.73/2.93, BUG-044): a sepia picture
+        // also has a single hue (circular spread 3.5 deg), where a real face does not (17.7 deg on a game capture).
+        var hueR = coloured > 0 ? Math.Sqrt(hueCos * hueCos + hueSin * hueSin) / coloured : 1.0;
+        var hueSpread = Math.Sqrt(-2 * Math.Log(Math.Max(hueR, 1e-9))) * 180 / Math.PI;
+        var monochrome = Math.Max(spreadA, spreadB) < 3.0 && (coloured < 50 || hueSpread < 6.0);
         if (monochrome) warnings.Add("monochrome or sepia picture: its colours can't be compared (use it for shape only)");
 
         return new Dictionary<string, object>
         {
             ["usable"] = !monochrome,
             ["spread"] = new[] { R(spreadA), R(spreadB) },
+            ["hueSpreadDeg"] = R(hueSpread),
             ["hex"] = lab.ToDictionary(kv => kv.Key, kv => Color.LabToHex(kv.Value)),
             ["relative"] = rel,
             ["lighting"] = lighting,

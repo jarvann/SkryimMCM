@@ -291,7 +291,7 @@ public partial class RaceMenuTools : ToolBase
                 headParts = outcome.HeadParts?.DeepClone(),
                 tints = outcome.Tints,
                 backup,
-                note = outcome.Loaded ? "Check the face with a screenshot. Hair colour isn't changed by this load (use SetHairColor)."
+                note = outcome.Loaded ? "Check the face with a screenshot."
                                       : "CharGen.LoadCharacterPreset returned false: the face is unchanged.",
             };
         }

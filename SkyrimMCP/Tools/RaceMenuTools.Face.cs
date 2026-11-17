@@ -682,12 +682,14 @@ public partial class RaceMenuTools
     [Description("Start from a neutral head (FEAT-245): sets every face slider back to its default (the 19 vanilla morphs to 0, the " +
         "vanilla nose/eyes/mouth presets to 0, every RaceMenu extended slider removed) and removes the sculpt, so slider responses " +
         "are predictable when building a new face. Keeps head parts (hair, eyes, brows), makeup tints and colours. keepSculpt=true " +
-        "keeps the sculpt; keepSliders=true keeps the sliders (with keepSculpt=false: remove only the sculpt). Backs up first like " +
+        "keeps the sculpt; keepSliders=true keeps the sliders (with keepSculpt=false: remove only the sculpt). keep: comma-separated words; " +
+        "extended sliders whose name contains one stay (default 'scar': scar mods hide their scar with a slider). Backs up first like " +
         "every face edit; save a named preset before if you want to come back to this face. dryRun shows what would change.")]
-    public async Task<object> ResetFace(bool keepSculpt = false, bool keepSliders = false, bool dryRun = false)
+    public async Task<object> ResetFace(bool keepSculpt = false, bool keepSliders = false, bool dryRun = false, string keep = "scar")
     {
         if (keepSculpt && keepSliders) return new { error = "Nothing to reset: keepSculpt and keepSliders are both true." };
         object? reset = null;
+        string? keptNames = null;
         var (outcome, backup, file) = await RoundTrip(preset =>
         {
             var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
@@ -709,15 +711,26 @@ public partial class RaceMenuTools
                 def["morphs"] = vanilla;
                 if (def["presets"] is JsonArray presets)
                     for (var i = 0; i < presets.Count; i++) presets[i] = 0L;
-                extendedRemoved = (morphs["custom"] as JsonArray)?.Count ?? 0;
-                morphs["custom"] = new JsonArray();
+                // BUG-044: some sliders switch features off rather than shape the face (a scar mod's slider hides its
+                // scar); extended sliders whose name contains any of the comma-separated 'keep' words stay.
+                var keepWords = keep.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var kept = new JsonArray();
+                foreach (var entry in (morphs["custom"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                {
+                    var name = entry["name"]?.GetValue<string>() ?? "";
+                    if (keepWords.Any(w => name.Contains(w, StringComparison.OrdinalIgnoreCase))) kept.Add(entry.DeepClone());
+                    else extendedRemoved++;
+                }
+                morphs["custom"] = kept;
+                keptNames = string.Join(", ", kept.OfType<JsonObject>().Select(e => e["name"]?.GetValue<string>()));
             }
             if (!keepSculpt)
             {
                 sculptHosts = (morphs["sculpt"] as JsonArray)?.Count ?? 0;
                 morphs["sculpt"] = new JsonArray();
             }
-            reset = new { vanillaMorphsChanged = vanillaChanged, extendedSlidersRemoved = extendedRemoved, sculptedMeshesCleared = sculptHosts };
+            reset = new { vanillaMorphsChanged = vanillaChanged, extendedSlidersRemoved = extendedRemoved, sculptedMeshesCleared = sculptHosts,
+                          extendedSlidersKept = string.IsNullOrEmpty(keptNames) ? null : keptNames };
             return true;
         }, dryRun);
 

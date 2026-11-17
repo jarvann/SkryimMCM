@@ -368,13 +368,21 @@ def colours(rgb, L):
     # A sepia or black-and-white picture has almost no colour variation across the face (seen: a*/b* spread 0.8/1.9 on a
     # sepia photo, 5.1/5.1 on a colour render, 3.5/3.7 on a game capture): its colour ratios mean nothing.
     spread = [float(np.std(face_lab[:, 1])), float(np.std(face_lab[:, 2]))]
-    monochrome = max(spread) < 3.0
+    chroma = np.hypot(face_lab[:, 1], face_lab[:, 2])
+    sel = chroma > 4
+    if sel.sum() > 0:
+        R = np.hypot(np.mean(face_lab[sel, 1] / chroma[sel]), np.mean(face_lab[sel, 2] / chroma[sel]))
+        hue_spread = math.degrees(math.sqrt(-2 * math.log(max(R, 1e-9))))
+    else:
+        hue_spread = 0.0
+    monochrome = max(spread) < 3.0 and (sel.sum() < 50 or hue_spread < 6.0)
     return {
         "hex": {k: lab_to_hex(v) for k, v in lab.items()},
         "relative": rel,
         "lighting": lighting,
         "usable": not monochrome,
         "spread": spread,
+        "hueSpreadDeg": hue_spread,
         "cast": {"a": cast[0], "b": cast[1],
                  "warning": "strong colour cast: compare relative values, not hex" if math.hypot(*cast) > 25 else None},
     }

@@ -70,7 +70,7 @@ namespace SkyrimMCP {
         // === Appearance (AppearanceManager) ===
         inline json GetColors(const std::string& refId) { return AppearanceManager::GetColors(refId); }
         inline json ListHairColors(bool includeNonPlayable) { return AppearanceManager::ListHairColors(includeNonPlayable); }
-        inline json SetHairColor(const std::string& refId, const std::string& color) { return AppearanceManager::SetHairColor(refId, color); }
+        inline json SetHairColor(const std::string& refId, const std::string& color, bool exact = false) { return AppearanceManager::SetHairColor(refId, color, exact); }
         inline json SetSkinTone(const std::string& refId, const std::string& color, bool refresh) { return AppearanceManager::SetSkinTone(refId, color, refresh); }
 
         // === Quests (QuestManager) ===
