@@ -537,7 +537,9 @@ namespace SkyrimMCP::AppearanceManager {
         result["previous"] = DescribePart(oldPart);
         result["part"] = DescribePart(newPart);
         if (it != choices.end()) result["menuIndex"] = static_cast<int>(it - choices.begin());
-        result["added"] = oldPart == nullptr;
+        // BUG-054: "added" read as "not applied"; say whether a part was replaced or a new slot filled.
+        result["replaced"] = oldPart != nullptr;
+        result["applied"] = true;
         if (!warnings.empty()) result["warnings"] = warnings;
         result["note"] = actor->IsPlayerRef()
             ? "Saved with the game. If the change doesn't show, call again with refresh=true or save and load. To undo, set the previous part."

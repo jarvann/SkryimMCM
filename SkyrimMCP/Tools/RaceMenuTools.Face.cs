@@ -306,7 +306,14 @@ public partial class RaceMenuTools
             slidersNote = allSliders ? null : $"Extended sliders below {minValue} (either way) aren't listed; lower minValue or pass allSliders=true for every one.",
             tints = tints.Where(t => t.alpha > 0).OrderByDescending(t => t.alpha).ToList(),
             hiddenTints = tints.Count(t => t.alpha <= 0),
-            headParts = preset["headParts"]?.DeepClone(),
+            // BUG-054: a preset's head-part "type" is RaceMenu's list position, not the part type, so it is renamed here.
+            headParts = new JsonArray((preset["headParts"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().Select(hp => (JsonNode?)new JsonObject
+            {
+                ["formIdentifier"] = hp["formIdentifier"]?.DeepClone(),
+                ["formId"] = hp["formId"]?.DeepClone(),
+                ["listPosition"] = hp["type"]?.DeepClone(),
+            }).ToArray()),
+            headPartsNote = "listPosition is the order RaceMenu saved them in, not the part type; get_appearance shows each part's type.",
             sculpt = SculptSummary(preset),
             bodyMorphs = (preset["bodyMorphs"] as JsonArray)?.Count ?? 0,
             transforms = (preset["transforms"] as JsonArray)?.Count ?? 0,
@@ -586,7 +593,13 @@ public partial class RaceMenuTools
         }
 
         var parts = new List<object>();
-        if (!dryRun)
+        if (dryRun)
+        {
+            // BUG-054: the dry run lists the head parts too.
+            foreach (var (type, part) in headParts ?? new Dictionary<string, string>())
+                parts.Add(new { type, part, result = "would be set after the load" });
+        }
+        else
         {
             foreach (var (type, part) in headParts ?? new Dictionary<string, string>())
             {
