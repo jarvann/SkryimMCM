@@ -11,7 +11,7 @@ namespace SkyrimMCP.Tools;
 /// the Papyrus bridge. Without RaceMenu, the native tools (SetHairColor, SetSkinTone, SetHeadPart) still work.
 /// </summary>
 [McpServerToolType]
-public class RaceMenuTools : ToolBase
+public partial class RaceMenuTools : ToolBase
 {
     public RaceMenuTools(IPipeClient pipe) : base(pipe) { }
 
@@ -224,70 +224,108 @@ public class RaceMenuTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Save the player's whole RaceMenu look (face sliders, head parts, colours, morphs, overlays) as a RaceMenu character " +
-        "preset with CharGen.SaveCharacter, so it can be loaded later or on another character. name: the preset name, letters and numbers.")]
-    public async Task<object> SaveRaceMenuPreset(string name)
+    [Description("Save the player's whole RaceMenu look (face sliders, head parts, colours, morphs, overlays) as a RaceMenu preset. " +
+        "folder 'presets' (default) writes CharGen\\Presets\\<name>.jslot with CharGen.SaveCharacterPreset: the same files as RaceMenu's " +
+        "Presets tab, and the kind LoadRaceMenuPreset, GetFacePreset and SetFaceSliders work with. Subfolders are allowed ('MyFolder/MyFace'). " +
+        "folder 'exported' writes CharGen\\Exported with CharGen.SaveCharacter, plus its face-tint texture.")]
+    public async Task<object> SaveRaceMenuPreset(string name, string folder = "presets")
     {
-        if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-            return new { error = "name must be a plain file name" };
-        var result = await Papyrus("CharGen", "SaveCharacter", name.Trim());
-        return new { saved = name.Trim(), result = result?.DeepClone(), presets = ListPresets() };
+        var clean = CleanPresetName(name);
+        if (clean == null) return new { error = "name must be a preset name, e.g. 'MyFace' or 'MyFolder/MyFace'" };
+        if (await RaceMenuOpenError() is string open) return new { error = open };
+        if (folder.Trim().Equals("exported", StringComparison.OrdinalIgnoreCase))
+        {
+            if (clean.Contains('/')) return new { error = "Exported presets can't go in subfolders" };
+            var result = await Papyrus("CharGen", "SaveCharacter", clean);
+            return new { saved = $"Exported/{clean}", result = result?.DeepClone(), presets = ListPresets() };
+        }
+        var file = await SaveLivePreset(clean);
+        return new { saved = $"Presets/{file.Name}", file = file.Path };
     }
 
     [McpServerTool]
-    [Description("Load a RaceMenu preset onto the player with CharGen.LoadCharacter. It only loads EXPORTED presets: ones written by " +
-        "SaveRaceMenuPreset (CharGen\\Exported), which come with their face-tint texture (Textures\\CharGen\\Exported\\<name>.dds). " +
-        "Presets from RaceMenu's Presets tab (CharGen\\Presets) must be loaded in RaceMenu itself; copying one into Exported without " +
-        "its texture turns the face purple (seen in game). Refused while RaceMenu is open. Changes the whole look: save first " +
-        "(SaveRaceMenuPreset) if the player may want the old one back. To try face changes, SaveRaceMenuPreset a working copy, " +
-        "edit that copy's .jslot, and load it.")]
-    public async Task<object> LoadRaceMenuPreset(string name)
+    [Description("Load a RaceMenu preset onto the player. Presets-tab presets (CharGen\\Presets, subfolders as 'MyFolder/MyFace') load with " +
+        "CharGen.LoadCharacterPreset, RaceMenu's own preset loader. Exported presets (CharGen\\Exported) load with CharGen.LoadCharacter and " +
+        "need their face-tint texture (Textures\\CharGen\\Exported\\<name>.dds), or the face turns purple. folder: 'presets', 'exported', " +
+        "or empty to find the name in either (Presets first). Refused while RaceMenu is open. Changes the whole look: save first " +
+        "(SaveRaceMenuPreset) if the player may want the old one back. The face can flash purple for a moment while its tint is rebuilt; " +
+        "that is normal. Head parts RaceMenu's loader drops are put back (see headParts). Take a screenshot afterwards to check the face.")]
+    public async Task<object> LoadRaceMenuPreset(string name, string? folder = null)
     {
         // Loading by script while RaceMenu is open broke the face tint in game.
-        var menus = await _pipe.SendRequestAsync("get_menu_state");
-        if ((menus?["allOpenMenus"]?.ToJsonString() ?? "").Contains("RaceSex Menu", StringComparison.OrdinalIgnoreCase))
-            return new { error = "RaceMenu is open. Close it first: loading a preset by script while it is open breaks the face tint." };
+        if (await RaceMenuOpenError() is string open) return new { error = open };
+
+        var wanted = CleanPresetName(name);
+        if (wanted == null) return new { error = "name must be a preset name, e.g. 'MyFace' or 'MyFolder/MyFace'" };
+        var kind = folder?.Trim().ToLowerInvariant() switch
+        {
+            null or "" => null,
+            "presets" => "Presets",
+            "exported" => "Exported",
+            _ => "?",
+        };
+        if (kind == "?") return new { error = "folder must be 'presets', 'exported' or empty" };
 
         var presets = FindPresets();
-        var wanted = name.Trim();
-        bool Same(PresetFile p) => p.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)
-                                   || Path.GetFileName(p.Name).Equals(wanted, StringComparison.OrdinalIgnoreCase);
-        var exported = presets.FirstOrDefault(p => p.Kind == "Exported" && Same(p));
-        if (exported == null)
+        bool Same(PresetFile p) => p.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase);
+        bool SameLeaf(PresetFile p) => Path.GetFileName(p.Name).Equals(Path.GetFileName(wanted), StringComparison.OrdinalIgnoreCase);
+        var match = presets.Where(p => kind == null || p.Kind == kind).OrderBy(p => p.Kind == "Presets" ? 0 : 1).FirstOrDefault(Same)
+                    ?? presets.Where(p => kind == null || p.Kind == kind).OrderBy(p => p.Kind == "Presets" ? 0 : 1).FirstOrDefault(SameLeaf);
+        if (match == null)
+            return new { error = $"No preset named '{wanted}'.", presets = ListPresets() };
+
+        var backup = await EnsureSessionBackup();
+        if (match.Kind == "Presets")
         {
-            var inPresets = presets.FirstOrDefault(p => p.Kind == "Presets" && Same(p));
+            var outcome = await LoadPresetsTabPreset(match.Name, match.Path);
+            if (outcome.Loaded) await NotifyInGame("RaceMenu preset loaded");
             return new
             {
-                error = inPresets != null
-                    ? $"'{wanted}' is a RaceMenu Presets-tab preset ({inPresets.Path}). Load it in RaceMenu (showracemenu, Presets tab). " +
-                      "This tool can only load exported presets (SaveRaceMenuPreset)."
-                    : $"No exported preset named '{wanted}'.",
-                exportedPresets = presets.Where(p => p.Kind == "Exported").Select(p => p.Name).ToArray(),
+                loaded = outcome.Loaded,
+                preset = $"Presets/{match.Name}",
+                file = match.Path,
+                method = "CharGen.LoadCharacterPreset",
+                headParts = outcome.HeadParts?.DeepClone(),
+                tints = outcome.Tints,
+                backup,
+                note = outcome.Loaded ? "Check the face with a screenshot. Hair colour isn't changed by this load (use SetHairColor)."
+                                      : "CharGen.LoadCharacterPreset returned false: the face is unchanged.",
             };
         }
-        if (!HasTintTexture(exported))
+
+        if (!HasTintTexture(match))
         {
             return new
             {
-                error = $"'{wanted}' has no face-tint texture (Textures\\CharGen\\Exported\\{exported.Name}.dds), so loading it would turn " +
-                        "the face purple. Make exported presets with SaveRaceMenuPreset, which writes the texture; don't copy .jslot files into Exported.",
-                file = exported.Path,
+                error = $"'{wanted}' has no face-tint texture (Textures\\CharGen\\Exported\\{match.Name}.dds), so loading it would turn " +
+                        "the face purple. Put the .jslot in CharGen\\Presets instead and load it from there.",
+                file = match.Path,
             };
         }
 
         var appearance = await _pipe.SendRequestAsync("get_appearance");
         var race = appearance?["raceFormId"]?.GetValue<string>();
         if (string.IsNullOrEmpty(race)) return new { error = "Couldn't read the player's race" };
-        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, exported.Name);
-        var ok = result?.GetValueKind() == System.Text.Json.JsonValueKind.True;
-        if (ok) await NotifyInGame("RaceMenu preset loaded");
+        var result = await Papyrus("CharGen", "LoadCharacter", "player", race, match.Name);
+        var loaded = result?.GetValueKind() == System.Text.Json.JsonValueKind.True;
+        (JsonNode? HeadParts, string Tints)? repair = null;
+        if (loaded)
+        {
+            await Task.Delay(300);
+            repair = await RepairAfterLoad(PresetHeadParts(ReadJslot(match.Path)));
+            await NotifyInGame("RaceMenu preset loaded");
+        }
         return new
         {
-            loaded = ok,
-            name = exported.Name,
-            file = exported.Path,
-            note = ok ? "Check the face (a screenshot): if the tint looks wrong, reload the player's own preset in RaceMenu before saving."
-                      : "CharGen.LoadCharacter returned false.",
+            loaded,
+            preset = $"Exported/{match.Name}",
+            file = match.Path,
+            method = "CharGen.LoadCharacter",
+            headParts = repair?.HeadParts?.DeepClone(),
+            tints = repair?.Tints,
+            backup,
+            note = loaded ? "Check the face (a screenshot): if the tint looks wrong, reload the player's own preset in RaceMenu before saving."
+                          : "CharGen.LoadCharacter returned false.",
         };
     }
 

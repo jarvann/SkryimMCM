@@ -49,9 +49,12 @@ namespace SkyrimMCP::BlueprintManager {
                 const auto plugin = src->value("plugin", "");
                 const auto local = src->value("localId", "");
                 if (!plugin.empty() && !local.empty() && dataHandler) {
-                    if (!dataHandler->LookupModByName(plugin)) { how = "plugin not loaded: " + plugin; return nullptr; }
+                    const auto* file = dataHandler->LookupModByName(plugin);
+                    if (!file) { how = "plugin not loaded: " + plugin; return nullptr; }
                     try {
-                        if (auto* form = dataHandler->LookupForm(static_cast<RE::FormID>(std::stoul(local, nullptr, 16)), plugin)) {
+                        // LookupForm adds the ID to the plugin's prefix unmasked: keep the plugin's own bits.
+                        const auto id = static_cast<RE::FormID>(std::stoul(local, nullptr, 16)) & (file->IsLight() ? 0xFFFu : 0xFFFFFFu);
+                        if (auto* form = dataHandler->LookupForm(id, plugin)) {
                             how = "plugin";
                             return form;
                         }

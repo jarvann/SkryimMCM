@@ -53,6 +53,11 @@ namespace SkyrimMCP {
         json SetHeadPart(const std::string& refId, const std::string& part, const std::string& type, int index, bool refresh);
         // Removes one part (by FormID/editor ID, or the current part of a type). Not face or eyes.
         json RemoveHeadPart(const std::string& refId, const std::string& part, const std::string& type, bool refresh);
+
+        // FEAT-228: puts back head parts a preset lists ("Plugin.esp|00ABCD", as in a .jslot) that the
+        // character doesn't have. RaceMenu's script preset loader drops parts with no sex flag or no
+        // valid-race list (seen in game: an ears part), so the round trip re-adds them.
+        json RestoreHeadParts(const std::string& refId, const std::vector<std::string>& parts, bool refresh);
     }
 
 }

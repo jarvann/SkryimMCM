@@ -301,6 +301,15 @@ namespace SkyrimMCP::Protocol {
             bool refresh = params.value("refresh", false);
             return GameThread(id, [=]() { return AppearanceManager::SetHeadPart(refId, part, type, index, refresh); });
         };
+        registry["restore_head_parts"] = [](const std::string& id, const json& params) {
+            std::string refId = params.value("refId", "");
+            std::vector<std::string> parts;
+            if (params.contains("parts") && params["parts"].is_array()) {
+                for (const auto& p : params["parts"]) if (p.is_string()) parts.push_back(p.get<std::string>());
+            }
+            bool refresh = params.value("refresh", true);
+            return GameThread(id, [=]() { return AppearanceManager::RestoreHeadParts(refId, parts, refresh); });
+        };
         registry["remove_head_part"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
             std::string part = params.value("part", "");
