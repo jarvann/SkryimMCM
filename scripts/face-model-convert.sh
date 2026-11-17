@@ -4,7 +4,8 @@
 # mediapipe and opencv-python-headless at ~/.local/share/skylink-face-tools/venv.
 #   uv venv --python 3.12 ~/.local/share/skylink-face-tools/venv
 #   uv pip install --python ~/.local/share/skylink-face-tools/venv tensorflow-cpu tf2onnx onnx onnxruntime mediapipe opencv-python-headless
-# Usage: scripts/face-model-convert.sh  (writes SkyrimMCP/Models/face_detector.onnx and face_landmarks.onnx)
+# Usage: scripts/face-model-convert.sh  (writes SkyrimMCP/Models/face_detector.onnx, face_landmarks.onnx, pose_landmarks.onnx)
+# Note: tf2onnx output isn't byte-identical between runs; regenerate only when a model changes.
 set -euo pipefail
 TOOLS=~/.local/share/skylink-face-tools
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -15,9 +16,17 @@ mkdir -p "$TOOLS/model/download" "$TOOLS/model/tflite" "$REPO/SkyrimMCP/Models"
 python -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$TOOLS/model/download/face_landmarker.task" "$TOOLS/model/tflite"
 python -m tf2onnx.convert --tflite "$TOOLS/model/tflite/face_detector.tflite" --output "$REPO/SkyrimMCP/Models/face_detector.onnx" --opset 17 2>&1 | tail -2
 python -m tf2onnx.convert --tflite "$TOOLS/model/tflite/face_landmarks_detector.tflite" --output "$REPO/SkyrimMCP/Models/face_landmarks.onnx" --opset 17 2>&1 | tail -2
+# FEAT-255: MediaPipe's pose landmarker (full, float16 v1, Apache 2.0) for body measurements.
+POSE_URL=https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+mkdir -p "$TOOLS/model/pose"
+[ -f "$TOOLS/model/pose/pose_landmarker_full.task" ] || curl -sSfL -o "$TOOLS/model/pose/pose_landmarker_full.task" "$POSE_URL"
+python -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$TOOLS/model/pose/pose_landmarker_full.task" "$TOOLS/model/pose"
+# The pose detector doesn't convert (tf2onnx: "cannot reshape array of size 96 into shape (16,1,1,24)"), so the server
+# finds the body from the face detector and the landmarks themselves instead.
+python -m tf2onnx.convert --tflite "$TOOLS/model/pose/pose_landmarks_detector.tflite" --output "$REPO/SkyrimMCP/Models/pose_landmarks.onnx" --opset 17 2>&1 | tail -2
 python - "$REPO/SkyrimMCP/Models" <<'PY'
 import onnx, sys, os
-for f in ("face_detector.onnx", "face_landmarks.onnx"):
+for f in ("face_detector.onnx", "face_landmarks.onnx", "pose_landmarks.onnx"):
     m = onnx.load(os.path.join(sys.argv[1], f))
     io = lambda vs: [(v.name, [d.dim_value or d.dim_param for d in v.type.tensor_type.shape.dim]) for v in vs]
     print(f, os.path.getsize(os.path.join(sys.argv[1], f)), "in", io(m.graph.input), "out", io(m.graph.output))

@@ -2991,6 +2991,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-255",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Body measurement: MeasureBody, SetBodyReference (experimental)",
+          "description": "For full-figure references (the archer). MediaPipe Pose Landmarker full (float16 v1, Apache 2.0): its landmark model converts to ONNX (pose_landmarks.onnx, 39 points x 5 plus a 256x256 silhouette mask), its detector does not (tf2onnx reshape error), so BodyMeasurer finds the body from the face detector (a standing body about 10 face boxes tall, start 15 boxes square, 6 below the face) and lets the crop only grow to take in the landmarks (a crop cutting the legs off put the hips on the chest). Ratios: shoulder width, hip/shoulder, torso, legs, arms, head-and-neck against height (head top from the mask), and silhouette widths at chest, waist and hips against the shoulders, with a confidence. MeasureBody(image live|path, reference): live is a pulled-back face camera (distance 200, heightOffset -60). The face detector also slides across wide pictures now (the archer stands at the left of a 32:9 wallpaper). Offline on the archer wallpaper the body is found but her legs run off the bottom edge, so the lower-body numbers are unreliable there; game captures frame the whole body.",
+          "history": [
+            {
+              "datetime": "2026-11-18T15:30",
+              "note": "Player gave the go for the pose model download. Built on feature/FEAT-255-body-measure-2 (scripts/body-model-check.py is the reference implementation)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",

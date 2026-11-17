@@ -84,12 +84,17 @@ def detect(sess, rgb):
     h, w = rgb.shape[:2]
     if det or w <= h * 1.2:
         return det
-    x0 = (w - h) // 2
-    det = detect_square(sess, rgb[:, x0:x0 + h])
-    if det:
-        det["center"] = (det["center"][0] + x0, det["center"][1])
-        det["keypoints"] = [(x + x0, y) for x, y in det["keypoints"]]
-    return det
+    # Slide a square the height of the picture across it (middle first) and keep the most confident face: on a
+    # 32:9 frame the face may be anywhere, not only in the middle (FEAT-255: an archer standing at the left).
+    best = None
+    starts = sorted(set([(w - h) // 2] + list(range(0, w - h + 1, max(1, h // 2))) + [w - h]), key=lambda x: abs(x - (w - h) // 2))
+    for x0 in starts:
+        d = detect_square(sess, rgb[:, x0:x0 + h])
+        if d and (best is None or d["score"] > best["score"]):
+            d["center"] = (d["center"][0] + x0, d["center"][1])
+            d["keypoints"] = [(x + x0, y) for x, y in d["keypoints"]]
+            best = d
+    return best
 
 
 def roi_from_detection(det):
