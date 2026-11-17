@@ -2812,7 +2812,7 @@
         {
           "id": "BUG-047",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SculptFace leaves the lower lashes and tear duct behind",
           "description": "In game (build 60): lower_lids down 0.15 moved the lid smoothly and in the right direction, but a grey band (lower lashes) stayed across the eyeball and a pale piece (tear duct) floated at the inner corner: on this head they are part of the eye mesh (EyesFemaleChargen.tri), which the brush skipped. The brush now reads the mesh's chargen TRI (FRTRI003: 64-byte header, positions, triangles; loose files from MO2 overwrite/mods or Data\\\\meshes), splits it into connected pieces (checked: 38, 38, 14, 14, 11, 11, 10, 10, 8, 8, 7, 7 for the eyes) and moves every piece except the largest (the eyeballs). Without the loose file the eye mesh is left out with a note. Also: 0.01 eye widths (about 1.5 px) is below what MeasureFace sees; the description now says the measurement sees from about 0.03.",
@@ -2820,6 +2820,10 @@
             {
               "datetime": "2026-11-18T07:20",
               "note": "Found in game by the in-game agent. Fixed on bugfix/BUG-047-sculpt-lashes; TRI parsing checked offline on the eye file."
+            },
+            {
+              "datetime": "2026-11-18T09:20",
+              "note": "In game (build 62): lower_lids down 0.15 moved 57 head, 60 eye-mesh and 4 brow vertices; the grey band across the eyeball is gone and the lid edge is clean. A small pale wedge remains at one inner corner."
             }
           ],
           "targetRelease": "1.3"
@@ -2854,6 +2858,21 @@
             {
               "datetime": "2026-11-18T08:40",
               "note": "Built on feature/FEAT-249-face-state-on-load; the player asked for it and will restart the game later."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-049",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Lower-lid measures don't follow the real lid; probes with two samples fake effects",
+          "description": "In game (build 62): lower_lids sculpted down 0.15 eye widths showed white under the iris in close-up, but lower lid depth (0.149 -> 0.143) and lower lid gap (0.827 -> 0.827) did not follow: the MediaPipe landmarks 145/374 stay put (checked on the captures: the red landmark sits at the same place before and after while the lid edge moves about 0.3 iris radii). Earlier inert verdicts for lower-lid sliders and the lower-lid gaps to the reference are therefore unproven. A first image-based edge (brightness, then warmth along a vertical line through the iris) was not reliable on these renders: sclera and pale skin are close in both. Now: tool descriptions say the lower-lid measures are unreliable and to judge the lower lid by eye; ProbeSlider defaults to 3 samples (with 2, head-pitch drift made an inert CME_NoseLength show brow -4%, nose +3.8%, chin -3.4%). Next: a calibration set of known sculpt steps to design an image-based lid measure.",
+          "history": [
+            {
+              "datetime": "2026-11-18T09:20",
+              "note": "Found by the in-game agent with the sculpt brush as a known lid move. Partial fix on bugfix/BUG-049-probe-samples-lid-caveat."
             }
           ],
           "targetRelease": "1.3"
