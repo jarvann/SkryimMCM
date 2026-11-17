@@ -81,22 +81,52 @@ public static class FaceState
     /// </summary>
     public static async Task<string> RaceMenuSaveTints(IPipeClient pipe)
     {
-        try
+        // BUG-048: the mod event didn't update the store (save 94 still loaded the old makeup), so call RaceMenu's own
+        // SaveHair and SaveTints on its quest script directly, and wait for them to finish.
+        var quest = await RaceMenuQuest(pipe);
+        if (quest != null)
         {
-            var handle = await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            try
             {
-                ["className"] = "ModEvent", ["functionName"] = "Create", ["args"] = new JsonArray("RSM_RequestTintSave"),
-            });
-            if (handle?["error"] is JsonNode error) return "RaceMenu tint store not updated: " + error;
-            var id = handle?["result"]?.GetValue<int>() ?? 0;
-            if (id == 0) return "RaceMenu tint store not updated: ModEvent.Create returned 0";
-            await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
-            {
-                ["className"] = "ModEvent", ["functionName"] = "Send", ["args"] = new JsonArray(id),
-            });
-            return "RaceMenu's own tint store updated (kept through saves, loads and cell changes)";
+                foreach (var fn in new[] { "SaveHair", "SaveTints" })
+                {
+                    var r = await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "RaceMenu", ["functionName"] = fn, ["args"] = new JsonArray(), ["target"] = quest,
+                    });
+                    if (r?["error"] is JsonNode error) throw new InvalidOperationException($"RaceMenu.{fn}: {error}");
+                }
+                return $"RaceMenu's own tint and hair store updated (RaceMenu.SaveHair and SaveTints on quest {quest})";
+            }
+            catch (Exception ex) { return "RaceMenu tint store not updated: " + ex.Message; }
         }
-        catch (Exception ex) { return "RaceMenu tint store not updated: " + ex.Message; }
+        return "RaceMenu tint store not updated: RaceMenu's quest wasn't found (is RaceMenu installed?)";
+    }
+
+    private static string? _raceMenuQuest;
+
+    /// <summary>The form ID of the quest running RaceMenu's script, found once per server session.</summary>
+    private static async Task<string?> RaceMenuQuest(IPipeClient pipe)
+    {
+        if (_raceMenuQuest != null) return _raceMenuQuest;
+        foreach (var editorId in new[] { "RaceMenu", "RaceMenuQuest", "RaceMenuBase" })
+        {
+            try
+            {
+                // A harmless member call tells whether this form carries the RaceMenu script.
+                var r = await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = "RaceMenu", ["functionName"] = "SaveHair", ["args"] = new JsonArray(), ["target"] = editorId,
+                });
+                if (r?["error"] == null)
+                {
+                    _raceMenuQuest = r?["target"]?.GetValue<string>() ?? editorId;
+                    return _raceMenuQuest;
+                }
+            }
+            catch (Exception) { }
+        }
+        return null;
     }
 
     /// <summary>Puts the character's stored brow colour back on the loaded head. Returns the colour, or null if none is stored.</summary>

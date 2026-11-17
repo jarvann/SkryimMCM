@@ -2821,6 +2821,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-048",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "RaceMenu tint store still not updated (mod event route failed)",
+          "description": "Save 94: after build 61 the makeup still loaded as the old set, and the custom auburn hair reverted too. Instead of the RSM_RequestTintSave mod event, SkyLink now calls RaceMenu's own SaveHair and SaveTints member functions on its quest script (editor ID RaceMenu, RaceMenu.esp 0x800, checked in the plugin file) and waits for them: the Papyrus bridge gained member-function calls on a target form (call_papyrus_function target: form ID or editor ID; DispatchMethodCall through the VM's handle policy), also exposed as CallPapyrusFunction(target). Runs after every face-tint refresh, SetHairColor and SetSkinTone. RaceMenu then restores the right makeup and hair on every load and 3D load, with or without SkyLink running.",
+          "history": [
+            {
+              "datetime": "2026-11-18T07:50",
+              "note": "Built on bugfix/BUG-048-racemenu-method-calls, logic DLL and server (no game restart). Brow colour is not in RaceMenu's store; holding it through loads needs a host-DLL load event (game restart)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-044",
           "type": "bug",
           "status": "implemented-untested",

@@ -156,7 +156,8 @@ namespace SkyrimMCP::Protocol {
             // DO NOT use GameThread — DispatchStaticCall queues onto the VM which
             // executes on the game thread. If we block the game thread waiting for
             // the result, we deadlock. Call directly from the pipe thread instead.
-            auto result = GameInterface::CallPapyrusFunction(className, functionName, args);
+            std::string target = params.value("target", "");
+            auto result = GameInterface::CallPapyrusFunction(className, functionName, args, target);
             if (result.contains("error"))
                 return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump() + "\n";
             return MakeResponse(id, true, result).dump() + "\n";
