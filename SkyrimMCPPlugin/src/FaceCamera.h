@@ -16,7 +16,8 @@ namespace SkyrimMCP {
         // While the player moves it does nothing and returns {"moving": true}.
         // expression: 0-16 (the game's expression list, e.g. 2 = DialogueHappy) held at strength 0-1 through
         // the capture and cleared by Exit; -1 = neutral.
-        json Prepare(int expression, float strength);
+        // mouthOpen 0-1 opens the jaw (phoneme BigAah), for an open-mouthed smile.
+        json Prepare(int expression, float strength, float mouthOpen);
 
         // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair. Mid-blink it
         // returns {"blinking": true} without entering: wait a moment and call it again.

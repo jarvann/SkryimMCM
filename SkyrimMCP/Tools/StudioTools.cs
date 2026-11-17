@@ -180,10 +180,11 @@ public class StudioTools : ToolBase
             {
                 try
                 {
-                    result["lights"] = await _pipe.SendRequestAsync("studio", new JsonObject
+                    // BUG-043: copy the reply: a node that belongs to the pipe response can't be put in another object.
+                    result["lights"] = (await _pipe.SendRequestAsync("studio", new JsonObject
                     {
                         ["mode"] = "lights", ["preset"] = preset, ["intensity"] = state["intensity"]?.GetValue<double>() ?? 1.0,
-                    });
+                    }))?.DeepClone();
                 }
                 catch (Exception ex) { result["lights"] = "Lights not turned on: " + ex.Message + ". Call StudioLights."; }
             }
@@ -204,7 +205,7 @@ public class StudioTools : ToolBase
         {
             try
             {
-                result["cleanup"] = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = state["markerId"]?.ToString() });
+                result["cleanup"] = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = state["markerId"]?.ToString() }))?.DeepClone();
                 SaveState(new JsonObject());
                 result["returned"] = true;
                 result["to"] = state["markedCell"]?.DeepClone();

@@ -277,7 +277,8 @@ public partial class RaceMenuTools : ToolBase
         var backup = await EnsureSessionBackup();
         if (match.Kind == "Presets")
         {
-            var outcome = await LoadPresetsTabPreset(match.Name, match.Path);
+            var hairForm = await RaceMenuHairColorForm();
+            var outcome = await LoadPresetsTabPreset(match.Name, match.Path, hairForm);
             if (outcome.Loaded) await NotifyInGame("RaceMenu preset loaded");
             return new
             {
@@ -285,6 +286,8 @@ public partial class RaceMenuTools : ToolBase
                 preset = $"Presets/{match.Name}",
                 file = match.Path,
                 method = "CharGen.LoadCharacterPreset",
+                hairColor = hairForm != null ? $"restored from the preset (RaceMenu colour form {hairForm})"
+                                             : "not restored: RaceMenu's hair colour form wasn't found (set it with SetHairColor)",
                 headParts = outcome.HeadParts?.DeepClone(),
                 tints = outcome.Tints,
                 backup,

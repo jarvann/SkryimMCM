@@ -119,7 +119,7 @@ namespace SkyrimMCP {
 
     namespace FaceCamera {
 
-        json Prepare(int expression, float strength) {
+        json Prepare(int expression, float strength, float mouthOpen) {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
             // A walking character turns and bobs between frames, so the shot misses the face (FEAT-241).
@@ -158,6 +158,12 @@ namespace SkyrimMCP {
                 // Set before the caller's settle wait so it has blended in when time stops.
                 if (expression >= 0 && expression <= 16) {
                     face->SetExpressionOverride(static_cast<std::uint32_t>(expression), std::clamp(strength, 0.0f, 1.0f));
+                    s_expressionSet = true;
+                }
+                // BUG-043: the game smile keeps the lips closed; a photo often shows an open-mouthed smile. Phoneme 1
+                // ("BigAah", as the mfg console command numbers them) opens the jaw.
+                if (mouthOpen > 0.0f) {
+                    face->phenomeKeyFrame.SetValue(1, std::clamp(mouthOpen, 0.0f, 1.0f));
                     s_expressionSet = true;
                 }
             }
@@ -313,7 +319,10 @@ namespace SkyrimMCP {
             if (camera && camera->IsInFreeCameraMode() && (!s_active || !s_wasFreeCamera)) camera->ToggleFreeCameraMode(false);
             if (main && s_active && !s_wasFrozen) main->GetRuntimeData().freezeTime = false;
             if (s_expressionSet && player) {
-                if (auto* face = player->GetFaceGenAnimationData()) face->ClearExpressionOverride();
+                if (auto* face = player->GetFaceGenAnimationData()) {
+                    face->ClearExpressionOverride();
+                    face->Reset(0.0f, true, true, false, false);  // expression and phonemes (mouthOpen)
+                }
                 s_expressionSet = false;
                 result["expressionCleared"] = true;
             }

@@ -50,12 +50,13 @@ public class FaceCaptureTools : ToolBase
         "window. hideEffects (default true) hides particle effects on the character, such as cold-weather breath across the mouth. " +
         "framing in the result says whether the face was found in the middle of the shot. expression (neutral, happy/smile, sad, angry, surprised, puzzled, disgusted, afraid, mood-happy, mood-sad) with strength " +
         "0-1 (default 0.7) holds that expression for the shot, to compare with a reference that isn't neutral (a smiling photo); " +
-        "it needs neutralPose (the default) and is cleared afterwards. Compare captures only when they use the same view, " +
+        "it needs neutralPose (the default) and is cleared afterwards. mouthOpen 0-1 parts the lips (the game smile keeps them " +
+        "closed; for an open-mouthed photo try smile 0.6 with mouthOpen 0.3). Compare captures only when they use the same view, " +
         "distance, heightOffset and expression.")]
     public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,
         double heightOffset = -3, bool hideHair = false, bool neutralPose = true, bool aimFromHead = true, string? crop = null,
         int previewWidth = 1200, int waitSeconds = 10, bool showImage = true, string expression = "neutral", double strength = 0.7,
-        bool hideEffects = true)
+        bool hideEffects = true, double mouthOpen = 0)
     {
         if (!Expressions.TryGetValue(expression.Trim(), out var expressionIndex))
             return Error($"expression must be one of {string.Join(", ", Expressions.Keys)}");
@@ -89,6 +90,7 @@ public class FaceCaptureTools : ToolBase
                     ["mode"] = "prepare",
                     ["expression"] = expressionIndex,
                     ["strength"] = Math.Clamp(strength, 0, 1),
+                    ["mouthOpen"] = Math.Clamp(mouthOpen, 0, 1),
                 });
                 var moving = pose?["moving"]?.GetValue<bool>() == true;
                 if (pose?["sheathing"]?.GetValue<bool>() != true && !moving) break;

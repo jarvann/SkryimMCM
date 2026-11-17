@@ -2719,9 +2719,24 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-043",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Studio: node already has a parent; preset loads drop the hair colour; closed-mouth smile",
+          "description": "In game (build 54, photo control pass): StudioGo arrived but reported Lights not turned on: The node already has a parent, and StudioReturn reported Marker not deleted yet with the same text (the pipe reply was put into the result without a copy, after the call itself had worked; the trip record then stayed). Copies now. LoadRaceMenuPreset left the hair colour as it was (no hair colour form passed, deliberately, since skee writes into the form it is given); the agent restored Arya with LoadCharacterPreset(player, preset, FE0C9801). Loading a saved look now passes RaceMenu's own custom hair colour form (found by its plugin in list_hair_colors); face-edit round trips still pass none. The game smile keeps the lips closed where the photo is open-mouthed: CaptureFace and MeasureFace take mouthOpen 0-1 (phoneme BigAah), cleared afterwards. Also seen: head pitch -3.3 to +3.1 deg between studio measurements with nothing changed; ResetFace revealed a scar head part.",
+          "history": [
+            {
+              "datetime": "2026-11-18T03:00",
+              "note": "Found in game by the in-game agent. ResetFace passed (8 vanilla morphs changed, 132 extended sliders removed, 6 sculpted meshes cleared). Fixed on bugfix/BUG-043-studio-parent-hair-load. After the build, StudioStatus finishes the stuck return (marker FF004A3D)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-245",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "ResetFace: neutral head for building a new face",
           "description": "Asked for by the in-game agent before the control builds (photo, illustration): a face with a full-head sculpt and dozens of extended sliders reacts unpredictably. ResetFace(keepSculpt, keepSliders, dryRun): preset round trip with the 19 vanilla morphs at 0, vanilla presets at 0, the extended-slider list emptied and the sculpt removed (RaceMenu's loader erases morph and sculpt data before applying, checked in PresetInterface.cpp); head parts and tints kept. Note from the same source: a preset load also removes all node overrides, which is why the NiOverride brow colour never held.",
@@ -2729,6 +2744,10 @@
             {
               "datetime": "2026-11-18T01:30",
               "note": "Built on feature/FEAT-245-reset-face-studio-quick. The smile capture asked for alongside it already exists (CaptureFace expression, FEAT-240)."
+            },
+            {
+              "datetime": "2026-11-18T03:00",
+              "note": "In game (build 54): ResetFace changed 8 vanilla morphs, removed 132 extended sliders, cleared 6 sculpted meshes, kept hair, brows and makeup; the photo control build started from it."
             }
           ],
           "targetRelease": "1.3"
