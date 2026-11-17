@@ -30,6 +30,11 @@ namespace SkyrimMCP {
         // is still shot straight on.
         json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead);
 
+        // FEAT-233: every vertex of the player's head parts projected onto the screen (x, y top-down in 0-1, and
+        // distance from the camera), per part, with the part's chargen TRI path (RaceMenu's sculpt host) and how
+        // one mesh unit along each axis moves on screen. Call between Aim and Exit.
+        json SculptSnapshot();
+
         // Restores hair, HUD and camera mode.
         json Exit();
     }

@@ -334,8 +334,9 @@ namespace SkyrimMCP::Protocol {
             bool hideEffects = params.value("hideEffects", true);
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair, hideEffects); });
             if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
-            if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
-            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim or exit").dump() + "\n";
+            if (mode == "snapshot") return GameThread(id, []() { return FaceCamera::SculptSnapshot(); });
+                        if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
+            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim, snapshot or exit").dump() + "\n";
         };
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);

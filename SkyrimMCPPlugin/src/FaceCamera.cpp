@@ -289,6 +289,113 @@ namespace SkyrimMCP {
                     {"aimed", alignment > 0.95f}};
         }
 
+        json SculptSnapshot() {
+            // FEAT-233: where every vertex of the player's head parts lands on the screen right now (call while the
+            // capture camera is frozen in place), so the server can pick the vertices under a face landmark and
+            // turn a move on the picture into a sculpt offset in the mesh's own space.
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* npc = player ? player->GetActorBase() : nullptr;
+            auto* root = player ? player->Get3D(false) : nullptr;
+            auto* camera = RE::Main::WorldRootCamera();
+            if (!npc || !root || !camera) return {{"error", "Player 3D or camera not available"}};
+            auto* head = HeadNode(player);
+            if (!head) return {{"error", "The player's head isn't loaded"}};
+            const RE::NiPoint3 camPos = camera->world.translate;
+
+            // Screen y from WorldPtToScreenPt3 may grow upward: check with a point above the head and report top-down.
+            float hx, hy, hz, ux, uy, uz;
+            if (!camera->WorldPtToScreenPt3(head->world.translate, hx, hy, hz, 1e-5f) ||
+                !camera->WorldPtToScreenPt3(head->world.translate + RE::NiPoint3{ 0, 0, 10 }, ux, uy, uz, 1e-5f)) {
+                return {{"error", "The head isn't on screen: take the snapshot during a face capture"}};
+            }
+            const bool yUp = uy > hy;
+            auto project = [&](const RE::NiPoint3& w, float& x, float& y, float& dist) {
+                float z;
+                if (!camera->WorldPtToScreenPt3(w, x, y, z, 1e-5f)) return false;
+                if (yUp) y = 1.0f - y;
+                dist = (w - camPos).Length();
+                return true;
+            };
+
+            std::vector<RE::BGSHeadPart*> parts;
+            for (int i = 0; npc->headParts && i < npc->numHeadParts; i++) {
+                if (auto* part = npc->headParts[i]) {
+                    parts.push_back(part);
+                    for (auto* extra : part->extraParts) if (extra) parts.push_back(extra);
+                }
+            }
+
+            json hosts = json::array();
+            for (auto* part : parts) {
+                const char* host = part->morphs[RE::BGSHeadPart::MorphIndex::kChargenMorph].GetModel();
+                const char* name = part->GetFormEditorID();
+                if (!host || !host[0] || !name || !name[0]) continue;
+                auto* node = root->GetObjectByName(RE::BSFixedString(name));
+                if (!node) continue;
+                RE::BSDynamicTriShape* shape = nullptr;
+                RE::BSVisit::TraverseScenegraphGeometries(node, [&](RE::BSGeometry* geo) {
+                    if (auto* dyn = netimmerse_cast<RE::BSDynamicTriShape*>(geo)) { shape = dyn; return RE::BSVisit::BSVisitControl::kStop; }
+                    return RE::BSVisit::BSVisitControl::kContinue;
+                });
+                if (!shape) continue;
+
+                // Mesh (skin) space to world: through the head bone when skinned to it.
+                RE::NiTransform toWorld = shape->world;
+                auto& geoData = shape->GetGeometryRuntimeData();
+                if (auto* skin = geoData.skinInstance.get(); skin && skin->skinData && skin->bones) {
+                    const auto count = skin->skinData->bones;
+                    std::uint32_t pick = 0;
+                    for (std::uint32_t b = 0; b < count; b++) {
+                        if (skin->bones[b] && std::string_view(skin->bones[b]->name.c_str()) == "NPC Head [Head]") { pick = b; break; }
+                    }
+                    if (count > 0 && skin->bones[pick]) toWorld = skin->bones[pick]->world * skin->skinData->boneData[pick].skinToBone;
+                }
+
+                auto& dyn = shape->GetDynamicTrishapeRuntimeData();
+                const std::uint32_t vertexCount = shape->GetTrishapeRuntimeData().vertexCount;
+                json xy = json::array();
+                RE::NiPoint3 centre{};
+                std::uint32_t used = 0;
+                {
+                    RE::BSSpinLockGuard guard(dyn.lock);
+                    const auto* data = static_cast<const float*>(dyn.dynamicData);
+                    const std::uint32_t n = data ? std::min<std::uint32_t>(vertexCount, dyn.dataSize / 16) : 0;
+                    for (std::uint32_t v = 0; v < n; v++) {
+                        const RE::NiPoint3 local{ data[v * 4], data[v * 4 + 1], data[v * 4 + 2] };
+                        float x = -1, y = -1, dist = -1;
+                        project(toWorld * local, x, y, dist);
+                        xy.push_back(std::round(x * 100000.0f) / 100000.0f);
+                        xy.push_back(std::round(y * 100000.0f) / 100000.0f);
+                        xy.push_back(std::round(dist * 1000.0f) / 1000.0f);
+                        centre += local;
+                        ++used;
+                    }
+                }
+                if (used == 0) continue;
+                centre = centre / static_cast<float>(used);
+
+                // How a step of one mesh unit along each mesh axis moves on screen (x, y fractions) and in distance
+                // from the camera, at the part's centre: the server inverts this to turn a picture move into a
+                // mesh offset.
+                json jacobian = json::array();
+                float cx, cy, cd;
+                project(toWorld * centre, cx, cy, cd);
+                const RE::NiPoint3 axes[3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+                for (const auto& axis : axes) {
+                    float x, y, d;
+                    project(toWorld * (centre + axis), x, y, d);
+                    jacobian.push_back({ x - cx, y - cy, d - cd });
+                }
+                hosts.push_back({{"host", host},
+                                 {"part", name},
+                                 {"type", static_cast<int>(std::to_underlying(part->type.get()))},
+                                 {"vertices", vertexCount},
+                                 {"xyd", xy},
+                                 {"jacobian", jacobian}});
+            }
+            return {{"hosts", hosts}, {"yFlipped", yUp}};
+        }
+
         json Exit() {
             auto* camera = RE::PlayerCamera::GetSingleton();
             auto* player = RE::PlayerCharacter::GetSingleton();
