@@ -476,14 +476,20 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
-    json HeadPartTint(int partType, const std::string& color) {
+    json HeadPartTint(int partType, const std::string& color, bool fromHairColor) {
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* npc = player ? player->GetActorBase() : nullptr;
         auto* root = player ? player->Get3D(false) : nullptr;
         if (!npc || !root) return {{"error", "The player's 3D isn't loaded"}};
 
         std::optional<RE::NiColor> wanted;
-        if (!color.empty()) {
+        if (fromHairColor) {
+            // BUG-034: the game renders hair and brows with twice the stored hair colour (seen in game: stored
+            // #5E442E, shader #BC885C), so this is what a cell change or load puts back.
+            auto* form = npc->headRelatedData ? npc->headRelatedData->hairColor : nullptr;
+            if (!form) return {{"error", "The player has no stored hair colour"}};
+            wanted = RE::NiColor(form->color.red * 2.0f / 255.0f, form->color.green * 2.0f / 255.0f, form->color.blue * 2.0f / 255.0f);
+        } else if (!color.empty()) {
             std::string hex = color[0] == '#' ? color.substr(1) : color;
             unsigned rgb = 0;
             if (hex.size() != 6 || std::sscanf(hex.c_str(), "%6x", &rgb) != 1) return {{"error", "color must be #RRGGBB"}};
@@ -494,10 +500,18 @@ namespace SkyrimMCP::AppearanceManager {
             return std::format("#{:02X}{:02X}{:02X}", b(c.red), b(c.green), b(c.blue));
         };
 
-        json parts = json::array();
+        // The parts of this type, with their extra parts (a hair's hairline, for example).
+        std::vector<RE::BGSHeadPart*> selected;
         for (int i = 0; npc->headParts && i < npc->numHeadParts; i++) {
             auto* part = npc->headParts[i];
             if (!part || static_cast<int>(std::to_underlying(part->type.get())) != partType) continue;
+            selected.push_back(part);
+            for (auto* extra : part->extraParts) {
+                if (extra) selected.push_back(extra);
+            }
+        }
+        json parts = json::array();
+        for (auto* part : selected) {
             const char* name = part->GetFormEditorID();
             json entry = {{"part", name ? name : ""}, {"formId", std::format("{:08X}", part->GetFormID())}};
             auto* node = (name && name[0]) ? root->GetObjectByName(RE::BSFixedString(name)) : nullptr;
@@ -534,7 +548,9 @@ namespace SkyrimMCP::AppearanceManager {
             parts.push_back(entry);
         }
         if (parts.empty()) return {{"error", std::format("The player has no head part of type {}", partType)}};
-        return {{"parts", parts}, {"set", wanted.has_value()}};
+        json result = {{"parts", parts}, {"set", wanted.has_value()}};
+        if (fromHairColor && wanted) result["fromHairColor"] = hex(*wanted);
+        return result;
     }
 
     json RestoreHeadParts(const std::string& refId, const std::vector<std::string>& parts, bool refresh) {

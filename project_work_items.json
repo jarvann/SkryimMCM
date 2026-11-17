@@ -2545,6 +2545,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-034",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Hair renders brown after face edits; SliderNotes inert list misses annotated notes",
+          "description": "GetHairTint (build 44): hair KSSMP_Lavender and brow EMBrow_08D_HF render #BC885C, exactly twice the stored hair colour #5E442E, after a cell change; outdoors, after the v7 slider passes, the hair rendered close to the stored brown. Likely cause: every face edit ran Game.UpdateHairColor (RefreshTints), which sets the stored colour without the game's doubling, until the next cell change put the game's own value back. RefreshTints and SetBrowColor(hair) now set the hair (with its extra parts) and brow shaders to twice the stored colour natively (head_part_tint fromHairColor). SliderNotes counts notes starting with inert (e.g. inert (detail)) in the inert list. Test: GetHairTint, SetFaceSliders with any change, GetHairTint: both #BC885C.",
+          "history": [
+            {
+              "datetime": "2026-11-17T23:00",
+              "note": "Fixed on bugfix/BUG-034-hair-tint-doubling; the cause is inferred from the readings, to be confirmed by the test."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-230",
           "type": "feature",
           "status": "complete",

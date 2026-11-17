@@ -322,7 +322,8 @@ namespace SkyrimMCP::Protocol {
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);
             std::string color = params.value("color", "");
-            return GameThread(id, [=]() { return AppearanceManager::HeadPartTint(type, color); });
+            bool fromHair = params.value("fromHairColor", false);
+            return GameThread(id, [=]() { return AppearanceManager::HeadPartTint(type, color, fromHair); });
         };
         registry["restore_head_parts"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");

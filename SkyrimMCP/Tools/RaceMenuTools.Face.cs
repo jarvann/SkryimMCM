@@ -123,10 +123,13 @@ public partial class RaceMenuTools
         try
         {
             await Papyrus("Game", "UpdateTintMaskColors");
-            await Papyrus("Game", "UpdateHairColor");
-            // UpdateHairColor also recolours the brows: put back a brow colour set with SetBrowColor.
+            // BUG-034: not Game.UpdateHairColor, which looks to leave the hair rendering at the stored colour (half as bright
+            // as the game draws it: the hair went brown until the next cell change). Set the hair and brow shaders
+            // to what the game itself uses, then put back a brow colour set with SetBrowColor.
+            await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 3, ["fromHairColor"] = true });
+            await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
             await ReapplyBrowColor();
-            return "Face tint rebuilt (Game.UpdateTintMaskColors, Game.UpdateHairColor).";
+            return "Face tint rebuilt (Game.UpdateTintMaskColors; hair and brow shaders set as the game draws them).";
         }
         catch (McpException ex)
         {
@@ -635,8 +638,7 @@ public partial class RaceMenuTools
         SkyrimMCP.Face.FaceState.SetBrowColor(key, browColor);
         if (reset)
         {
-            await Papyrus("Game", "UpdateHairColor");
-            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6 });
+            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
         }
         else
         {
@@ -656,7 +658,7 @@ public partial class RaceMenuTools
 
     [McpServerTool]
     [Description("Record what a face slider does on this character's head, so later sessions don't probe it again: note 'inert' " +
-        "(no measurable effect), or the effect found (e.g. 'nose length -8% at 0.7'). Several at once: notes is a map of slider " +
+        "(no measurable effect; 'inert (detail)' also counts), or the effect found (e.g. 'nose length -8% at 0.7'). Several at once: notes is a map of slider " +
         "name to note; an empty note removes the entry. Without notes, lists what is recorded. Stored per character (name and " +
         "race) in SkyLinkAI\\face_state.json.")]
     public async Task<object> SliderNotes(Dictionary<string, string>? notes = null)
@@ -666,7 +668,7 @@ public partial class RaceMenuTools
         JsonObject result = SkyrimMCP.Face.FaceState.GetSliderNotes(key);
         foreach (var (slider, note) in notes ?? new Dictionary<string, string>())
             result = SkyrimMCP.Face.FaceState.SetSliderNote(key, slider.Trim(), note);
-        var inert = result.Where(kv => kv.Value?["note"]?.GetValue<string>()?.Trim().Equals("inert", StringComparison.OrdinalIgnoreCase) == true)
+        var inert = result.Where(kv => kv.Value?["note"]?.GetValue<string>()?.Trim().StartsWith("inert", StringComparison.OrdinalIgnoreCase) == true)
             .Select(kv => kv.Key).ToList();
         return DeserializeResponse(new JsonObject
         {
