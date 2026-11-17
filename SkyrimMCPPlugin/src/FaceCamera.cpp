@@ -16,6 +16,7 @@ namespace SkyrimMCP {
         bool s_wasFreeCamera = false;
         bool s_wasFrozen = false;
         bool s_hidHud = false;
+        bool s_expressionSet = false;  // Prepare set an expression: Enter keeps it, Exit clears it
         std::vector<std::string> s_hiddenNodes;
 
         RE::NiAVObject* HeadNode(RE::Actor* a_actor) {
@@ -89,7 +90,7 @@ namespace SkyrimMCP {
 
     namespace FaceCamera {
 
-        json Prepare() {
+        json Prepare(int expression, float strength) {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
             // Forcing the default idle with a weapon or spell out leaves the hands stuck readied (BUG-029):
@@ -100,12 +101,19 @@ namespace SkyrimMCP {
             }
             const bool idleReset = player->NotifyAnimationGraph(RE::BSFixedString("IdleForceDefaultState"));
             bool expressionReset = false;
+            s_expressionSet = false;
             if (auto* face = player->GetFaceGenAnimationData()) {
                 face->ClearExpressionOverride();
                 face->Reset(0.0f, true, true, true, false);
                 expressionReset = true;
+                // FEAT-240: an expression to compare with a smiling (or otherwise not neutral) reference.
+                // Set before the caller's settle wait so it has blended in when time stops.
+                if (expression >= 0 && expression <= 16) {
+                    face->SetExpressionOverride(static_cast<std::uint32_t>(expression), std::clamp(strength, 0.0f, 1.0f));
+                    s_expressionSet = true;
+                }
             }
-            return {{"idleReset", idleReset}, {"expressionReset", expressionReset}};
+            return {{"idleReset", idleReset}, {"expressionReset", expressionReset}, {"expression", s_expressionSet ? expression : -1}};
         }
 
         json Enter(bool hideHud, bool hideHair) {
@@ -142,7 +150,7 @@ namespace SkyrimMCP {
                 s_hidHud = true;
             }
             if (hideHair) HideHair(player);
-            if (auto* face = player->GetFaceGenAnimationData()) {
+            if (auto* face = player->GetFaceGenAnimationData(); face && !s_expressionSet) {
                 face->ClearExpressionOverride();
                 face->Reset(0.0f, true, true, true, false);
             }
@@ -244,6 +252,11 @@ namespace SkyrimMCP {
             }
             if (camera && camera->IsInFreeCameraMode() && (!s_active || !s_wasFreeCamera)) camera->ToggleFreeCameraMode(false);
             if (main && s_active && !s_wasFrozen) main->GetRuntimeData().freezeTime = false;
+            if (s_expressionSet && player) {
+                if (auto* face = player->GetFaceGenAnimationData()) face->ClearExpressionOverride();
+                s_expressionSet = false;
+                result["expressionCleared"] = true;
+            }
             s_active = false;
             result["freeCamera"] = camera && camera->IsInFreeCameraMode();
             return result;
