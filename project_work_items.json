@@ -2927,6 +2927,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-253",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "ProbeSliders: probe a list of sliders in one call",
+          "description": "From the in-game agent's list (probe a region in one call, cached per head). ProbeSliders(sliders: name to test value) runs ProbeSlider for each in turn, reusing the before-measurement, within a time budget (default 100 s), and returns the results so far plus the sliders still to do; every result goes to SliderNotes.",
+          "history": [
+            {
+              "datetime": "2026-11-18T13:30",
+              "note": "Built on feature/FEAT-253-probe-sliders."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",

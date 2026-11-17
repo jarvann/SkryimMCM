@@ -121,6 +121,43 @@ public class ProbeTools : ToolBase
         catch (Exception ex) { return Error("ProbeSlider: " + ex.Message); }
     }
 
+    [McpServerTool]
+    [Description("Probe several face sliders in one call (FEAT-253): ProbeSlider for each entry of sliders (a map of slider name to " +
+        "test value), one after another, sharing the before-measurement, until about 100 seconds have passed; the reply lists the " +
+        "results so far and the sliders still to do (call again with those). Every result is recorded with SliderNotes. Use it to " +
+        "map a region: all the lip sliders, all the nose sliders. Studio light, as for ProbeSlider.")]
+    public async Task<CallToolResult> ProbeSliders(Dictionary<string, double> sliders, int samples = 3, double noise = 3.0, int budgetSeconds = 100)
+    {
+        var started = DateTime.UtcNow;
+        var done = new JsonArray();
+        var remaining = new JsonObject();
+        foreach (var (slider, value) in sliders)
+        {
+            if ((DateTime.UtcNow - started).TotalSeconds > Math.Clamp(budgetSeconds, 30, 300) - 35)
+            {
+                remaining[slider] = value;
+                continue;
+            }
+            var result = await ProbeSlider(slider, value, samples, noise);
+            var text = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
+            JsonNode? node = null;
+            try { node = text == null ? null : JsonNode.Parse(text); } catch (JsonException) { }
+            done.Add(new JsonObject
+            {
+                ["slider"] = slider,
+                ["note"] = node?["note"]?.DeepClone() ?? node?["error"]?.DeepClone(),
+                ["moved"] = node?["moved"]?.DeepClone(),
+                ["putBack"] = node?["putBack"]?.DeepClone(),
+            });
+        }
+        return Json(new JsonObject
+        {
+            ["probed"] = done,
+            ["remaining"] = remaining.Count > 0 ? remaining : null,
+            ["next"] = remaining.Count > 0 ? "Call ProbeSliders again with remaining." : "All probed; SliderNotes() lists what is recorded.",
+        });
+    }
+
     private static async Task<(JsonObject? Measurement, string? Error)> Measure(FaceMeasureTools measure, int samples)
     {
         var result = await measure.MeasureFace(image: "live", reference: null, samples: samples);
