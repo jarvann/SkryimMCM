@@ -654,6 +654,28 @@ public partial class RaceMenuTools
         };
     }
 
+    [McpServerTool]
+    [Description("Record what a face slider does on this character's head, so later sessions don't probe it again: note 'inert' " +
+        "(no measurable effect), or the effect found (e.g. 'nose length -8% at 0.7'). Several at once: notes is a map of slider " +
+        "name to note; an empty note removes the entry. Without notes, lists what is recorded. Stored per character (name and " +
+        "race) in SkyLinkAI\\face_state.json.")]
+    public async Task<object> SliderNotes(Dictionary<string, string>? notes = null)
+    {
+        var key = SkyrimMCP.Face.FaceState.Key(await _pipe.SendRequestAsync("get_appearance"));
+        if (key == null) return new { error = "Couldn't read the player's name for the character key." };
+        JsonObject result = SkyrimMCP.Face.FaceState.GetSliderNotes(key);
+        foreach (var (slider, note) in notes ?? new Dictionary<string, string>())
+            result = SkyrimMCP.Face.FaceState.SetSliderNote(key, slider.Trim(), note);
+        var inert = result.Where(kv => kv.Value?["note"]?.GetValue<string>()?.Trim().Equals("inert", StringComparison.OrdinalIgnoreCase) == true)
+            .Select(kv => kv.Key).ToList();
+        return DeserializeResponse(new JsonObject
+        {
+            ["character"] = key,
+            ["inert"] = new JsonArray(inert.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()),
+            ["notes"] = result,
+        });
+    }
+
     /// <summary>Puts the character's stored brow colour back after Game.UpdateHairColor reset it.</summary>
     private Task ReapplyBrowColor() => SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
 }
