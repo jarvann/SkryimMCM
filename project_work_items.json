@@ -2793,7 +2793,7 @@
         {
           "id": "BUG-046",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Makeup set through SkyLink reverts on every load and cell change",
           "description": "In game (build 60): after loading a save, sliders, head parts, sculpt and the exact hair colour were right but four tint layers were back to the original makeup (the same values as after the earlier studio trip). Cause, from RaceMenu's own script (racemenu.psc): it keeps the player's tint layers and hair colour in quest-script arrays, saved only when its menu closes or a menu slider changes, and puts them back on OnGameReload and On3DLoaded (LoadTints), so any tint set outside its menu is undone by the next load or 3D reload. The script listens for the mod event RSM_RequestTintSave (SaveHair + SaveTints). SkyLink now sends it (ModEvent.Create/Send through the Papyrus bridge) after every face-tint refresh (every preset load and face edit), after SetHairColor and after SetSkinTone on the player, so RaceMenu stores the live makeup itself.",
@@ -2801,6 +2801,10 @@
             {
               "datetime": "2026-11-18T06:40",
               "note": "Found by the in-game agent after a save and load; cause confirmed from RaceMenu's script source. Fixed on bugfix/BUG-046-tints-persist."
+            },
+            {
+              "datetime": "2026-11-18T08:10",
+              "note": "Superseded by BUG-048: the RSM_RequestTintSave mod event did not update RaceMenu's store (save 94); the direct SaveHair/SaveTints calls did (save 95)."
             }
           ],
           "targetRelease": "1.3"
@@ -2823,7 +2827,7 @@
         {
           "id": "BUG-048",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "RaceMenu tint store still not updated (mod event route failed)",
           "description": "Save 94: after build 61 the makeup still loaded as the old set, and the custom auburn hair reverted too. Instead of the RSM_RequestTintSave mod event, SkyLink now calls RaceMenu's own SaveHair and SaveTints member functions on its quest script (editor ID RaceMenu, RaceMenu.esp 0x800, checked in the plugin file) and waits for them: the Papyrus bridge gained member-function calls on a target form (call_papyrus_function target: form ID or editor ID; DispatchMethodCall through the VM's handle policy), also exposed as CallPapyrusFunction(target). Runs after every face-tint refresh, SetHairColor and SetSkinTone. RaceMenu then restores the right makeup and hair on every load and 3D load, with or without SkyLink running.",
@@ -2831,6 +2835,10 @@
             {
               "datetime": "2026-11-18T07:50",
               "note": "Built on bugfix/BUG-048-racemenu-method-calls, logic DLL and server (no game restart). Brow colour is not in RaceMenu's store; holding it through loads needs a host-DLL load event (game restart)."
+            },
+            {
+              "datetime": "2026-11-18T08:10",
+              "note": "In game (build 62): after loading save 95, DiffFacePresets(live, Arya_Look_v11) empty: makeup and the custom auburn hair kept (stored #381A10, shader #703420), where saves 92-94 loaded the old four tints. RaceMenu quest resolved to FE0C9800. Brows came back hair-coloured as expected (not in RaceMenu's store)."
             }
           ],
           "targetRelease": "1.3"
