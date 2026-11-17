@@ -528,7 +528,7 @@ namespace SkyrimMCP::AppearanceManager {
                     }
                 }
                 geometries.push_back(g);
-                return RE::BSVisitControl::kContinue;
+                return RE::BSVisit::BSVisitControl::kContinue;
             });
             entry["geometries"] = geometries;
             parts.push_back(entry);
