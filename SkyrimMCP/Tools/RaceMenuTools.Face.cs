@@ -495,66 +495,7 @@ public partial class RaceMenuTools
         var changes = new List<object>();
         var unknown = new List<string>();
 
-        var (outcome, backup, file) = await RoundTrip(preset =>
-        {
-            var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
-            preset["morphs"] = morphs;
-            var def = morphs["default"] as JsonObject ?? new JsonObject();
-            morphs["default"] = def;
-            var vanilla = def["morphs"] as JsonArray ?? new JsonArray();
-            def["morphs"] = vanilla;
-            while (vanilla.Count < 19) vanilla.Add(0.0);
-            var presets = def["presets"] as JsonArray;
-            var custom = morphs["custom"] as JsonArray ?? new JsonArray();
-            morphs["custom"] = custom;
-
-            foreach (var (rawName, value) in sliders)
-            {
-                var name = rawName.Trim();
-                var vi = Array.FindIndex(VanillaMorphs, n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
-                if (vi >= 0)
-                {
-                    var before = vanilla[vi]?.GetValue<double>() ?? 0;
-                    vanilla[vi] = value;
-                    changes.Add(new { slider = VanillaMorphs[vi], kind = "vanilla morph", previous = Math.Round(before, 4), value,
-                                      note = Math.Abs(value) > 1 ? "beyond the menu range (-1 to 1)" : null });
-                    continue;
-                }
-                var vp = Array.FindIndex(VanillaPresets, p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                if (vp >= 0)
-                {
-                    if (presets == null) { unknown.Add(name + " (the preset has no vanilla presets list)"); continue; }
-                    var index = VanillaPresets[vp].Index;
-                    var before = presets[index]?.GetValue<long>() ?? 0;
-                    presets[index] = (long)Math.Round(value);
-                    changes.Add(new { slider = VanillaPresets[vp].Name, kind = "vanilla preset", previous = (double)before, value = Math.Round(value), note = (string?)null });
-                    continue;
-                }
-                var entry = custom.OfType<JsonObject>().FirstOrDefault(e =>
-                    string.Equals(e["name"]?.GetValue<string>(), name, StringComparison.OrdinalIgnoreCase));
-                if (entry == null)
-                {
-                    // RaceMenu doesn't save sliders at 0, so a missing name is usually a slider at 0. Only a
-                    // name no slider file and no saved preset knows is suspect.
-                    custom.Add(new JsonObject { ["name"] = name, ["value"] = value });
-                    var known = KnownSliderNames();
-                    var defined = known.Contains(name);
-                    if (!defined && known.Count > 0) unknown.Add(name);
-                    changes.Add(new { slider = name, kind = "extended", previous = 0.0, value,
-                                      note = defined ? null
-                                           : (string?)"Unknown name: no loose slider file and no saved RaceMenu preset has it. It may still " +
-                                             "be a real slider at 0 from a BSA that no preset has used yet; RaceMenu ignores names it doesn't " +
-                                             "know, so check the spelling if nothing changes." });
-                }
-                else
-                {
-                    var before = entry["value"]?.GetValue<double>() ?? 0;
-                    entry["value"] = value;
-                    changes.Add(new { slider = entry["name"]!.GetValue<string>(), kind = "extended", previous = Math.Round(before, 4), value, note = (string?)null });
-                }
-            }
-            return true;
-        }, dryRun);
+        var (outcome, backup, file) = await RoundTrip(preset => ApplySliders(preset, sliders, changes, unknown), dryRun);
 
         var loaded = outcome?.Loaded == true;
         if (loaded) await NotifyInGame("Face sliders changed");
@@ -571,6 +512,168 @@ public partial class RaceMenuTools
             file,
             error = !dryRun && !loaded ? "CharGen.LoadCharacterPreset returned false: the face is unchanged." : null,
         };
+    }
+
+    [McpServerTool]
+    [Description("Change several things on the player's face at once, with a single preset load (one purple flash, not one per " +
+        "change): sliders as SetFaceSliders (a map of slider name to value), tints as a map of tint index to '#RRGGBB', " +
+        "'#RRGGBB@alpha' or '@alpha' (alpha 0-1; SetFaceTint without index lists the layers), and headParts as a map of type " +
+        "(hair, eyes, eyebrows, facialHair, scar) to a part's editor ID or FormID, applied right after the load. dryRun shows the " +
+        "slider and tint changes without applying them. Same session backup and restore as the other face tools.")]
+    public async Task<object> SetFace(Dictionary<string, double>? sliders = null, Dictionary<string, string>? tints = null,
+        Dictionary<string, string>? headParts = null, bool dryRun = false)
+    {
+        if ((sliders == null || sliders.Count == 0) && (tints == null || tints.Count == 0) && (headParts == null || headParts.Count == 0))
+            return new { error = "Nothing to change: pass sliders, tints and/or headParts." };
+        var changes = new List<object>();
+        var unknown = new List<string>();
+        var tintChanges = new List<object>();
+        var problems = new List<string>();
+
+        // Parse the tints first, so a typo doesn't half-apply the face.
+        var tintEdits = new List<(int Index, uint? Rgb, double? Alpha)>();
+        foreach (var (key, value) in tints ?? new Dictionary<string, string>())
+        {
+            if (!int.TryParse(key.Trim(), out var index)) return new { error = $"tints: '{key}' is not a tint index" };
+            var text = value.Trim();
+            uint? rgb = null;
+            double? alpha = null;
+            var at = text.IndexOf('@');
+            var colorPart = at >= 0 ? text[..at] : text;
+            if (at >= 0)
+            {
+                if (!double.TryParse(text[(at + 1)..], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var a) || a < 0 || a > 1)
+                    return new { error = $"tints[{key}]: alpha after @ must be 0 to 1" };
+                alpha = a;
+            }
+            if (colorPart.Length > 0)
+            {
+                var hex = colorPart.TrimStart('#');
+                if (hex.Length != 6 || !uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var parsed))
+                    return new { error = $"tints[{key}]: colour must be #RRGGBB" };
+                rgb = parsed;
+            }
+            if (rgb == null && alpha == null) return new { error = $"tints[{key}]: give #RRGGBB, @alpha or both" };
+            tintEdits.Add((index, rgb, alpha));
+        }
+
+        LoadOutcome? outcome = null;
+        string? backup = null, file = null;
+        if ((sliders?.Count ?? 0) > 0 || tintEdits.Count > 0)
+        {
+            (outcome, backup, file) = await RoundTrip(preset =>
+            {
+                if (sliders != null && sliders.Count > 0) ApplySliders(preset, sliders, changes, unknown);
+                foreach (var (index, rgb, alpha) in tintEdits)
+                {
+                    var layer = (preset["tintInfo"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                        .FirstOrDefault(t => t["index"]?.GetValue<int>() == index);
+                    if (layer == null) { problems.Add($"No tint layer {index}: skipped."); continue; }
+                    var (argb, hexBefore, alphaBefore) = Tint(layer["color"]);
+                    var newAlpha = alpha.HasValue ? (uint)Math.Round(alpha.Value * 255) : (argb >> 24) & 0xFF;
+                    var newRgb = rgb ?? (argb & 0xFFFFFF);
+                    layer["color"] = (long)((newAlpha << 24) | newRgb);
+                    tintChanges.Add(new
+                    {
+                        index,
+                        texture = layer["texture"]?.GetValue<string>(),
+                        previous = new { color = hexBefore, alpha = alphaBefore },
+                        value = new { color = $"#{newRgb:X6}", alpha = Math.Round(newAlpha / 255.0, 3) },
+                    });
+                }
+                return true;
+            }, dryRun);
+        }
+
+        var parts = new List<object>();
+        if (!dryRun)
+        {
+            foreach (var (type, part) in headParts ?? new Dictionary<string, string>())
+            {
+                var reply = await _pipe.SendRequestAsync("set_head_part", new JsonObject { ["part"] = part.Trim(), ["type"] = type.Trim(), ["index"] = -1, ["refresh"] = false });
+                parts.Add(new { type, part, result = reply?.DeepClone() });
+            }
+            if (parts.Count > 0) await RefreshTints();
+        }
+        var loaded = outcome?.Loaded;
+        if (loaded == true || parts.Count > 0) await NotifyInGame("Face changed");
+        return new
+        {
+            applied = dryRun ? (bool?)null : (loaded ?? true),
+            dryRun,
+            sliders = changes.Count > 0 ? changes : null,
+            notInSliderFiles = unknown.Count > 0 ? unknown : null,
+            tints = tintChanges.Count > 0 ? tintChanges : null,
+            headParts = parts.Count > 0 ? parts : null,
+            problems = problems.Count > 0 ? problems : null,
+            tintRefresh = outcome?.Tints,
+            backup,
+            restoreWith = _sessionBackup != null ? $"LoadRaceMenuPreset('{_sessionBackup}')" : null,
+            file,
+            error = !dryRun && loaded == false ? "CharGen.LoadCharacterPreset returned false: the face is unchanged." : null,
+        };
+    }
+
+    /// <summary>The slider edits of SetFaceSliders, on a preset (also used by SetFace).</summary>
+    private static bool ApplySliders(JsonObject preset, Dictionary<string, double> sliders, List<object> changes, List<string> unknown)
+    {
+        var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
+        preset["morphs"] = morphs;
+        var def = morphs["default"] as JsonObject ?? new JsonObject();
+        morphs["default"] = def;
+        var vanilla = def["morphs"] as JsonArray ?? new JsonArray();
+        def["morphs"] = vanilla;
+        while (vanilla.Count < 19) vanilla.Add(0.0);
+        var presets = def["presets"] as JsonArray;
+        var custom = morphs["custom"] as JsonArray ?? new JsonArray();
+        morphs["custom"] = custom;
+
+        foreach (var (rawName, value) in sliders)
+        {
+            var name = rawName.Trim();
+            var vi = Array.FindIndex(VanillaMorphs, n => n.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (vi >= 0)
+            {
+                var before = vanilla[vi]?.GetValue<double>() ?? 0;
+                vanilla[vi] = value;
+                changes.Add(new { slider = VanillaMorphs[vi], kind = "vanilla morph", previous = Math.Round(before, 4), value,
+                                  note = Math.Abs(value) > 1 ? "beyond the menu range (-1 to 1)" : null });
+                continue;
+            }
+            var vp = Array.FindIndex(VanillaPresets, p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (vp >= 0)
+            {
+                if (presets == null) { unknown.Add(name + " (the preset has no vanilla presets list)"); continue; }
+                var index = VanillaPresets[vp].Index;
+                var before = presets[index]?.GetValue<long>() ?? 0;
+                presets[index] = (long)Math.Round(value);
+                changes.Add(new { slider = VanillaPresets[vp].Name, kind = "vanilla preset", previous = (double)before, value = Math.Round(value), note = (string?)null });
+                continue;
+            }
+            var entry = custom.OfType<JsonObject>().FirstOrDefault(e =>
+                string.Equals(e["name"]?.GetValue<string>(), name, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                // RaceMenu doesn't save sliders at 0, so a missing name is usually a slider at 0. Only a
+                // name no slider file and no saved preset knows is suspect.
+                custom.Add(new JsonObject { ["name"] = name, ["value"] = value });
+                var known = KnownSliderNames();
+                var defined = known.Contains(name);
+                if (!defined && known.Count > 0) unknown.Add(name);
+                changes.Add(new { slider = name, kind = "extended", previous = 0.0, value,
+                                  note = defined ? null
+                                       : (string?)"Unknown name: no loose slider file and no saved RaceMenu preset has it. It may still " +
+                                         "be a real slider at 0 from a BSA that no preset has used yet; RaceMenu ignores names it doesn't " +
+                                         "know, so check the spelling if nothing changes." });
+            }
+            else
+            {
+                var before = entry["value"]?.GetValue<double>() ?? 0;
+                entry["value"] = value;
+                changes.Add(new { slider = entry["name"]!.GetValue<string>(), kind = "extended", previous = Math.Round(before, 4), value, note = (string?)null });
+            }
+        }
+        return true;
     }
 
     [McpServerTool]
