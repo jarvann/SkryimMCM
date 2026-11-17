@@ -15,6 +15,7 @@ namespace SkyrimMCP {
         // Studio lights are found again by this name prefix (the logic DLL can be reloaded between calls).
         constexpr std::string_view kLightPrefix = "SkyLinkStudio_";
         std::string s_preset;  // empty: no studio lights
+        RE::FormID s_marker = 0;  // the marked spot, so a caller that lost the Go reply (a loading-screen timeout) can find it
 
         struct LightSpec {
             const char* name;
@@ -29,7 +30,10 @@ namespace SkyrimMCP {
 
         std::vector<LightSpec> Preset(const std::string& name) {
             const RE::NiColor white{ 1.0f, 1.0f, 1.0f };
-            if (name == "neutral") return { { "key", 40, 60, 15, white, 1.6f }, { "fill", -40, 70, 0, white, 0.7f }, { "rim", 180, 60, 35, white, 0.5f } };
+            // neutral is even on both sides (for measuring: a strong key light tripped the one-sided-light warning);
+            // portrait is the classic strong key and soft fill.
+            if (name == "neutral") return { { "key", 40, 65, 15, white, 1.2f }, { "fill", -40, 65, 15, white, 1.1f }, { "rim", 180, 60, 35, white, 0.4f } };
+            if (name == "portrait") return { { "key", 40, 60, 15, white, 1.6f }, { "fill", -40, 70, 0, white, 0.7f }, { "rim", 180, 60, 35, white, 0.5f } };
             if (name == "warm") return { { "key", 40, 60, 15, { 1.0f, 0.85f, 0.68f }, 1.6f }, { "fill", -40, 70, 0, { 1.0f, 0.9f, 0.8f }, 0.7f }, { "rim", 180, 60, 35, { 1.0f, 0.85f, 0.7f }, 0.4f } };
             if (name == "daylight") return { { "key", 40, 60, 25, { 1.0f, 0.97f, 0.9f }, 2.0f }, { "fill", -40, 70, 0, { 0.8f, 0.88f, 1.0f }, 0.8f }, { "rim", 180, 60, 35, white, 0.6f } };
             if (name == "soft") return { { "key", 35, 70, 10, white, 1.1f }, { "fill", -35, 70, 10, white, 1.1f }, { "rim", 180, 60, 35, white, 0.3f } };
@@ -83,7 +87,7 @@ namespace SkyrimMCP {
             if (preset == "off" || preset.empty()) return {{"removed", removed}, {"preset", "off"}};
 
             const auto specs = Preset(preset);
-            if (specs.empty()) return {{"error", "preset must be neutral, warm, daylight, soft or off"}};
+            if (specs.empty()) return {{"error", "preset must be neutral, portrait, warm, daylight, soft or off"}};
             auto* head = root->GetObjectByName(RE::BSFixedString("NPC Head [Head]"));
             if (!head) return {{"error", "The player's head isn't loaded"}};
 
@@ -149,6 +153,7 @@ namespace SkyrimMCP {
             RemoveLights(Root(player));
             s_preset.clear();
             const char* cellName = player->GetParentCell() ? player->GetParentCell()->GetFormEditorID() : nullptr;
+            s_marker = marker->GetFormID();
             json result = {{"markerId", std::format("{:08X}", marker->GetFormID())},
                            {"markedCell", cellName ? cellName : ""},
                            {"markedPosition", {player->GetPosition().x, player->GetPosition().y, player->GetPosition().z}},
@@ -156,6 +161,7 @@ namespace SkyrimMCP {
             if (!player->CenterOnCell(cellEditorId.c_str())) {
                 marker->Disable();
                 marker->SetDelete(true);
+                s_marker = 0;
                 return {{"error", std::format("No cell with editor ID '{}' (the move didn't start; nothing was changed)", cellEditorId)}};
             }
             result["going"] = cellEditorId;
@@ -174,9 +180,13 @@ namespace SkyrimMCP {
 
         json Cleanup(RE::FormID markerId) {
             auto* marker = RE::TESForm::LookupByID<RE::TESObjectREFR>(markerId);
-            if (!marker) return {{"deleted", false}, {"note", "marker already gone"}};
+            if (!marker) {
+                if (s_marker == markerId) s_marker = 0;
+                return {{"deleted", false}, {"note", "marker already gone"}};
+            }
             marker->Disable();
             marker->SetDelete(true);
+            if (s_marker == markerId) s_marker = 0;
             return {{"deleted", true}};
         }
 
@@ -194,7 +204,8 @@ namespace SkyrimMCP {
             return {{"lights", lights},
                     {"preset", s_preset.empty() ? json(nullptr) : json(s_preset)},
                     {"cell", cellId ? cellId : ""},
-                    {"interior", cell && cell->IsInteriorCell()}};
+                    {"interior", cell && cell->IsInteriorCell()},
+                    {"markerId", s_marker ? json(std::format("{:08X}", s_marker)) : json(nullptr)}};
         }
     }
 }
