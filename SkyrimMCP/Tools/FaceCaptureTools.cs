@@ -162,6 +162,9 @@ public class FaceCaptureTools : ToolBase
                     crop,
                     pose,
                     browColor,
+                    lightSpell = pose?["lightEffects"] is JsonArray le && le.Count > 0
+                        ? $"A light spell is on her ({string.Join(", ", le.Select(n => n?.ToString()))}): it washes out the face; dispel it before comparing colours."
+                        : null,
                     studio = studio == null ? null : new { preset = studio["preset"]?.ToString(), cell = studio["cell"]?.ToString() },
                     effectsHidden = enter?["effectsHidden"],
                     framing,

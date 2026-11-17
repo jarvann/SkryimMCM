@@ -2922,6 +2922,25 @@
             {
               "datetime": "2026-11-18T11:00",
               "note": "Found by the in-game agent on photo pass 4 (all proportions within 5%, most within 3%). Fixed on bugfix/BUG-051-sculpt-new-rows."
+            },
+            {
+              "datetime": "2026-11-18T11:30",
+              "note": "In game (build 67): SculptFace on the control build (no sculpt) applied cleanly three times. Lid-edge exclusion not yet confirmed: the stored photo reference was registered before the build and needs re-registering."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-052",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Light spell washes out captures; cheek strokes reach too little and touch the eye mesh",
+          "description": "In game (build 67, photo pass 5): the washed-out studio captures (skin lightness about 72) came from the player's Candlelight spell; hideEffects hid its particles but not its light (63 after dispelling). The face camera now lists active light effects (archetype Light) and CaptureFace warns; StudioGo dispels them before the move and reports which. SculptFace defaults the radius to 0.6 for cheeks, cheekbones, jaw and chin (0.3 moved only 21 head vertices on the cheeks) and only touches the eye mesh for lid and eye-corner regions (wide cheek strokes nudged 1-4 eyeball vertices).",
+          "history": [
+            {
+              "datetime": "2026-11-18T11:30",
+              "note": "Found by the in-game agent. Fixed on bugfix/BUG-052-light-spells-cheek-reach. BUG-051's sculpt fix passed in the same session (three cheek strokes applied, 21-50 head vertices each)."
             }
           ],
           "targetRelease": "1.3"

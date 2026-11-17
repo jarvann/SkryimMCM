@@ -1,5 +1,6 @@
 #include "Studio.h"
 #include "Helpers.h"
+#include "FaceCamera.h"
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 #include <algorithm>
@@ -152,6 +153,7 @@ namespace SkyrimMCP {
             marker->data.angle = player->data.angle;  // MoveTo back matches the marker's rotation
 
             RemoveLights(Root(player));
+            const json dispelled = FaceCamera::LightEffects(true);  // BUG-052: the studio is about controlled light
             const char* cellName = player->GetParentCell() ? player->GetParentCell()->GetFormEditorID() : nullptr;
             s_marker = marker->GetFormID();
             json result = {{"markerId", std::format("{:08X}", marker->GetFormID())},
@@ -165,6 +167,7 @@ namespace SkyrimMCP {
                 return {{"error", std::format("No cell with editor ID '{}' (the move didn't start; nothing was changed)", cellEditorId)}};
             }
             result["going"] = cellEditorId;
+            if (!dispelled.empty()) result["lightSpellsDispelled"] = dispelled;
             return result;
         }
 
