@@ -38,6 +38,7 @@ set(HOST_SOURCES
     src/CrashRecorder.cpp
     src/EventSystem.cpp
     src/HostCore.cpp
+    src/HostFaceRefresh.cpp
     src/LogicLoader.cpp
     src/Main.cpp
     src/PipeServer.cpp
@@ -55,6 +56,7 @@ set(LOGIC_SOURCES
     src/AppearanceManager.cpp
     src/BlueprintManager.cpp
     src/FaceCamera.cpp
+    src/FaceState.cpp
     src/Studio.cpp
     src/LootManager.cpp
     src/ScriptStats.cpp
@@ -98,6 +100,8 @@ set_target_properties(SkyrimMCPPlugin PROPERTIES OUTPUT_NAME "SkyrimMCPPlugin")
 
 skylink_version_resource(LOGIC_RC SkyLinkLogic "SkyLink AI command handlers (reloadable)")
 add_library(SkyLinkLogic SHARED ${LOGIC_SOURCES} "${LOGIC_RC}")
+# FaceState.cpp finds the Documents folder (SHGetKnownFolderPath).
+target_link_libraries(SkyLinkLogic PRIVATE shell32 ole32)
 skylink_dll(SkyLinkLogic)
 set_target_properties(SkyLinkLogic PROPERTIES OUTPUT_NAME "SkyLinkLogic")
 

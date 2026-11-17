@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
 #include "Studio.h"
+#include "FaceState.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
 #include "UtilityManager.h"
@@ -338,6 +339,9 @@ namespace SkyrimMCP::Protocol {
             if (mode == "snapshot") return GameThread(id, []() { return FaceCamera::SculptSnapshot(); });
                         if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
             return MakeResponse(id, false, {}, "mode must be prepare, enter, aim, snapshot or exit").dump() + "\n";
+        };
+        registry["reapply_face_state"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return FaceState::Reapply(); });
         };
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);

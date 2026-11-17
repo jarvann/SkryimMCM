@@ -1,4 +1,5 @@
 #include "EventSystem.h"
+#include "HostFaceRefresh.h"
 #include "CrashRecorder.h"
 #include "Helpers.h"
 
@@ -229,6 +230,17 @@ namespace SkyrimMCP {
 
     RE::BSEventNotifyControl EventSystem::ProcessEvent(const RE::TESCellFullyLoadedEvent* event, RE::BSTEventSource<RE::TESCellFullyLoadedEvent>*) {
         if (!event || !event->cell) return RE::BSEventNotifyControl::kContinue;
+
+        // FEAT-249: the player's 3D reloads with her cell, and the game and RaceMenu put back their own copies of the
+        // face; put back what SkyLink keeps (the brow colour) once that has happened.
+        {
+            static std::atomic<RE::FormID> lastFaceCell{ 0 };
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* cell = player ? player->GetParentCell() : nullptr;
+            if (cell && event->cell == cell && lastFaceCell.exchange(cell->GetFormID()) != cell->GetFormID()) {
+                HostFaceRefresh::Schedule("cell changed");
+            }
+        }
 
         // cell_loaded is muted (dozens per fast travel), so the crash recorder notes only
         // the player's own cell, and only when it changes.

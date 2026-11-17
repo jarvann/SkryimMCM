@@ -10,6 +10,7 @@
 #include "CrashRecorder.h"
 #include "EventSystem.h"
 #include "HostCore.h"
+#include "HostFaceRefresh.h"
 #include "PipeServer.h"
 #include "SkseInterfaceProxy.h"
 
@@ -70,6 +71,7 @@ namespace {
                 SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note,
                     a_msg->data ? "Save loaded" : "Save load failed");
                 RecordPlayerCell();
+                if (a_msg->data) SkyrimMCP::HostFaceRefresh::Schedule("save loaded");
                 break;
 
             case SKSE::MessagingInterface::kSaveGame:
