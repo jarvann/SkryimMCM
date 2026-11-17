@@ -2907,6 +2907,10 @@
             {
               "datetime": "2026-11-18T13:00",
               "note": "Built on feature/FEAT-251-setface-sidebyside."
+            },
+            {
+              "datetime": "2026-11-18T14:55",
+              "note": "In game (build 72): SetFace changed hair (KSSMP Lavender -> Feather), lips (#B00030 -> #7A2A6E), blush (0.50 -> 0.25), smile and eyelash sliders in one call, backup first, tint and RaceMenu store refreshed. FaceSideBySide not yet tested."
             }
           ],
           "targetRelease": "1.3"
@@ -2967,6 +2971,21 @@
             {
               "datetime": "2026-11-18T14:40",
               "note": "From the in-game agent's report. Fixed on bugfix/BUG-053-hair-picker-feedback. The KS Hairdos Wigs BSA holds wearable wigs (armour), not menu hair, so the BSA path still needs a menu hair that lives in an archive to confirm."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-054",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "SetFace dry run omits head parts; preset head-part type is a list position; added reads as not applied",
+          "description": "From the in-game SetFace test (passed: Feather hair, plum lips, blush 0.25, smile and lash sliders in one call). The dry run now lists the head parts it would set; GetFacePreset shows a preset's head-part entries with listPosition instead of type (it is RaceMenu's save order: the same part read type 11 then 7); SetHeadPart reports replaced and applied instead of added (which meant a new slot).",
+          "history": [
+            {
+              "datetime": "2026-11-18T14:55",
+              "note": "From the in-game agent's report. Fixed on bugfix/BUG-054-setface-nits."
             }
           ],
           "targetRelease": "1.3"
@@ -3175,6 +3194,10 @@
             {
               "datetime": "2026-11-17T00:00",
               "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
+            },
+            {
+              "datetime": "2026-11-18T14:55",
+              "note": "In game (build 72): FindHairstyles(long, fringe) read 1,400 hair meshes, 428 matches, quick; silhouettes correct. BSA path not exercised (the KS wigs are armour, not menu hair)."
             }
           ],
           "targetRelease": "1.4"
