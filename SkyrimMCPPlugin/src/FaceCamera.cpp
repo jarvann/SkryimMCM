@@ -93,6 +93,13 @@ namespace SkyrimMCP {
         json Prepare(int expression, float strength) {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
+            // A walking character turns and bobs between frames, so the shot misses the face (FEAT-241).
+            // The caller waits; only the player can stop.
+            RE::NiPoint3 velocity;
+            player->GetLinearVelocity(velocity);
+            if (const float speed = velocity.Length(); speed > 5.0f || player->IsMoving()) {
+                return {{"moving", true}, {"speed", speed}};
+            }
             // Forcing the default idle with a weapon or spell out leaves the hands stuck readied (BUG-029):
             // sheathe first and let the caller wait for the animation, then call Prepare again.
             if (auto* state = player->AsActorState(); state && state->IsWeaponDrawn()) {

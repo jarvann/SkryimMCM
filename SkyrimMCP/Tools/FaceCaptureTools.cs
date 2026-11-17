@@ -37,6 +37,7 @@ public class FaceCaptureTools : ToolBase
 
     [McpServerTool]
     [Description("Take a framed screenshot of the player's face, the same way every time, and return a cropped preview image. " +
+        "Waits (up to 4 s) while the player is walking, then refuses: only the player can stop. " +
         "First puts the character in a neutral pose (sheathes a drawn weapon or spell, default idle, neutral expression; neutralPose=false " +
         "skips it), then freezes time, puts " +
         "the camera in front of the face, aimed from the way the head faces (aimFromHead), hides the HUD, takes the shot and puts " +
@@ -68,12 +69,15 @@ public class FaceCaptureTools : ToolBase
             distance = MinDistance;
         }
 
+        // The game resets the brow colour on cell changes and loads: put the stored one back first.
+        var browColor = await SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
+
         JsonNode? pose = null;
         var sheathed = false;
         if (neutralPose)
         {
             // With a weapon or spell out, prepare only sheathes it (forcing the idle then leaves the hands stuck).
-            for (var attempt = 0; attempt < 4; attempt++)
+            for (var attempt = 0; attempt < 8; attempt++)
             {
                 pose = await _pipe.SendRequestAsync("face_camera", new JsonObject
                 {
@@ -81,10 +85,13 @@ public class FaceCaptureTools : ToolBase
                     ["expression"] = expressionIndex,
                     ["strength"] = Math.Clamp(strength, 0, 1),
                 });
-                if (pose?["sheathing"]?.GetValue<bool>() != true) break;
-                sheathed = true;
-                await Task.Delay(1000);
+                var moving = pose?["moving"]?.GetValue<bool>() == true;
+                if (pose?["sheathing"]?.GetValue<bool>() != true && !moving) break;
+                if (!moving) sheathed = true;
+                await Task.Delay(500);
             }
+            if (pose?["moving"]?.GetValue<bool>() == true)
+                return Error("The character kept moving for 4 seconds: the player needs to stand still, then capture again.");
             if (pose?["sheathing"]?.GetValue<bool>() == true)
                 return Error("The weapon or spell is still out after 4 seconds: sheathe it (R) and capture again.");
             await Task.Delay(700);  // let the idle and the face settle before time stops
@@ -128,6 +135,7 @@ public class FaceCaptureTools : ToolBase
                     hideHair,
                     crop,
                     pose,
+                    browColor,
                     expression = expressionIndex >= 0 ? $"{expression} {Math.Clamp(strength, 0, 1):0.##}" : null,
                     eyes = enter?["eyes"],
                     blinkWaits = blinkWaits > 0 ? blinkWaits : (int?)null,

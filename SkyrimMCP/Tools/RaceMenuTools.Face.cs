@@ -584,15 +584,16 @@ public partial class RaceMenuTools
         return new { headPartsFrom = source, headParts = restored?.DeepClone(), tints, note = "Check the face with a screenshot." };
     }
 
-    // Brow colour set this session (BUG-030): re-applied after every tint refresh, since Game.UpdateHairColor
-    // puts the hair colour back on the brows.
-    private static string? _browColor;
+    // The brow colour is stored per character (FaceState, FEAT-241) and re-applied after every tint refresh and
+    // before captures, since Game.UpdateHairColor and 3D reloads put the hair colour back on the brows.
 
     [McpServerTool]
     [Description("Colour the player's eyebrows separately from the hair (by default the brows take the hair colour, so darkening " +
         "them otherwise means darkening the hair). color #RRGGBB, or 'hair' to go back to the hair colour. Sets the brow head " +
         "part's shader tint directly, and also stores it as a RaceMenu (NiOverride) override so it can survive a save and load. " +
-        "The face tools re-apply it after each change; changing the brow head part (SetHeadPart) needs it set again. Reports " +
+        "SkyLink stores it for this character and re-applies it after each face edit and before each capture (the game puts the " +
+        "hair colour back on the brows on every cell change or load, so in normal play it can revert until the next face tool " +
+        "call). Changing the brow head part (SetHeadPart) needs it set again. Reports " +
         "each brow mesh's material: only hair-tint materials can be coloured; a brow whose colour is baked into its texture " +
         "can't, and a different brow head part is the way to change it. Very light or thin brow textures stay faint even with a " +
         "dark colour. Check with CaptureFace(hideHair: true).")]
@@ -629,33 +630,30 @@ public partial class RaceMenuTools
         }
 
         JsonNode? applied;
+        var key = SkyrimMCP.Face.FaceState.Key(appearance);
+        var browColor = reset ? null : "#" + hex;
+        SkyrimMCP.Face.FaceState.SetBrowColor(key, browColor);
         if (reset)
         {
-            _browColor = null;
             await Papyrus("Game", "UpdateHairColor");
             applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6 });
         }
         else
         {
-            _browColor = "#" + hex;
-            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = _browColor });
+            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = browColor });
         }
         if (applied?["error"] is JsonNode error) return new { error = error.ToString(), persisted };
         await NotifyInGame(reset ? "Brows follow the hair colour again" : "Brow colour set");
         return new
         {
-            color = reset ? "hair" : _browColor,
+            color = reset ? "hair" : browColor,
+            storedFor = key,
             applied = applied?.DeepClone(),
             niOverride = persisted,
             next = "CaptureFace(hideHair: true) shows the brows clearly.",
         };
     }
 
-    /// <summary>Puts the session's brow colour back after Game.UpdateHairColor reset it.</summary>
-    private async Task ReapplyBrowColor()
-    {
-        if (_browColor == null) return;
-        try { await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = _browColor }); }
-        catch (Exception) { /* the brow colour is cosmetic: never fail a face edit over it */ }
-    }
+    /// <summary>Puts the character's stored brow colour back after Game.UpdateHairColor reset it.</summary>
+    private Task ReapplyBrowColor() => SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
 }

@@ -265,6 +265,12 @@ def colours(rgb, L):
                 px.append(p)
     lab["iris"] = np.median(srgb_to_lab(np.concatenate(px)), axis=0)
 
+    sides = []
+    for idx in (50, 280):
+        p = sample_disc(rgb, L[idx][0], L[idx][1], radius * 2)
+        sides.append(float(np.median(srgb_to_lab(p), axis=0)[0]))
+    lighting = {"skin_L": float(lab["skin"][0]), "side_balance (image-left cheek L - image-right cheek L)": sides[0] - sides[1],
+                "warning": "lit from one side: colours and shading differ from an evenly lit capture" if abs(sides[0] - sides[1]) > 12 else None}
     skin = lab["skin"]
     hue = lambda v: math.degrees(math.atan2(v[2], v[1])) % 360
     # The image's overall cast: the mean a*/b* of the whole face area. Strong casts (sepia, purple light)
@@ -286,6 +292,7 @@ def colours(rgb, L):
             "iris_chroma": float(math.hypot(lab["iris"][1], lab["iris"][2])),
             "skin_hue_deg": hue(skin),
         },
+        "lighting": lighting,
         "cast": {"a": cast[0], "b": cast[1],
                  "warning": "strong colour cast: compare relative values, not hex" if math.hypot(*cast) > 25 else None},
     }

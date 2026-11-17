@@ -477,6 +477,7 @@ namespace SkyrimMCP::PlayerQueries {
         if (!base) return {{"error", "Actor base not available"}};
 
         json result;
+        result["name"] = player->GetName() ? player->GetName() : "";
         result["race"] = base->GetRace() ? base->GetRace()->GetName() : "unknown";
         result["raceFormId"] = base->GetRace() ? std::format("{:08X}", base->GetRace()->GetFormID()) : "";
         result["sex"] = base->GetSex() == RE::SEX::kMale ? "male" : "female";
