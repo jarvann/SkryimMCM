@@ -11,7 +11,8 @@ namespace SkyrimMCP {
     // only exists from the next frame), take the screenshot, then Exit to put everything back.
     namespace FaceCamera {
         // Neutral pose before a capture: back to the default idle (IdleForceDefaultState) and a neutral
-        // expression. Leave the animation a moment to settle before Enter freezes time.
+        // expression. Leave the animation a moment to settle before Enter freezes time. With a weapon or
+        // spell out it only starts sheathing and returns {"sheathing": true}: wait, then call it again.
         json Prepare();
 
         // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair.

@@ -2356,6 +2356,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-029",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "CaptureFace with a weapon or spell drawn leaves the hands stuck readied",
+          "description": "The neutral-pose step forces the default idle (IdleForceDefaultState); with a spell readied the hands stayed stuck. Prepare now sheathes first (DrawWeaponMagicHands(false)) and returns sheathing; CaptureFace waits and retries up to 4 seconds, then refuses. The result says it sheathed. Test: ready a spell, CaptureFace, the hands lower and the capture is normal.",
+          "history": [
+            {
+              "datetime": "2026-11-17T13:30",
+              "note": "Reported in the in-game agent face_builder_skill_draft_2026-11-17.md (item 4). Fixed on bugfix/BUG-029-capture-drawn-weapons."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-230",
           "type": "feature",
           "status": "planned",

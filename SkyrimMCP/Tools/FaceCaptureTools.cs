@@ -30,7 +30,8 @@ public class FaceCaptureTools : ToolBase
 
     [McpServerTool]
     [Description("Take a framed screenshot of the player's face, the same way every time, and return a cropped preview image. " +
-        "First puts her in a neutral pose (default idle, neutral expression; neutralPose=false skips it), then freezes time, puts " +
+        "First puts the character in a neutral pose (sheathes a drawn weapon or spell, default idle, neutral expression; neutralPose=false " +
+        "skips it), then freezes time, puts " +
         "the camera in front of the face, aimed from the way the head faces (aimFromHead), hides the HUD, takes the shot and puts " +
         "the camera back. view: front (default), three-quarter, three-quarter-left, profile, profile-left; or angle in degrees " +
         "(0 front, 90 the character's right, -90 their left). distance from the head (default 32; below 28 the camera can end up " +
@@ -55,9 +56,19 @@ public class FaceCaptureTools : ToolBase
         }
 
         JsonNode? pose = null;
+        var sheathed = false;
         if (neutralPose)
         {
-            pose = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "prepare" });
+            // With a weapon or spell out, prepare only sheathes it (forcing the idle then leaves the hands stuck).
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                pose = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "prepare" });
+                if (pose?["sheathing"]?.GetValue<bool>() != true) break;
+                sheathed = true;
+                await Task.Delay(1000);
+            }
+            if (pose?["sheathing"]?.GetValue<bool>() == true)
+                return Error("The weapon or spell is still out after 4 seconds: sheathe it (R) and capture again.");
             await Task.Delay(700);  // let the idle and the face settle before time stops
         }
 
@@ -90,6 +101,7 @@ public class FaceCaptureTools : ToolBase
                     hideHair,
                     crop,
                     pose,
+                    sheathed = sheathed ? "A weapon or spell was out: it was sheathed first (draw it again yourself)." : null,
                     camera = aim,
                     distanceNote,
                     warning = aim?["aimed"]?.GetValue<bool>() == false
