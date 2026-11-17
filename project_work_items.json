@@ -2776,6 +2776,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-045",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Makeup reverted to old tints after a studio trip; probe noise too tight; combined reference averaged a turned photo",
+          "description": "In game (build 58): after four probes, a combined reference and StudioReturn, four tints were back to the character's old makeup (skin #B9B3AA, lower eye socket, navy lips #070C3D, blush) while sliders, head parts and sculpt matched v11; earlier trips had been followed by preset loads, which may have hidden it. Cause not proven (a cell change rebuilding the face from older tint data is the likeliest). Studio trips now save the live face before each move (_studio_before_go, _studio_before_return) and, after arriving, compare the tints and load the snapshot back if any changed, reporting which. ProbeSlider noise default 3% (an unrelated +2.2% made CME_NoseLength look active). SetFaceReference with every picture flagged now chooses per measure: pictures whose flag skews that measure (turned: widths and spacing; tilted: heights, lengths, opening, lids; smile/open mouth: mouth, lips, chin, opening, lids) are left out of it.",
+          "history": [
+            {
+              "datetime": "2026-11-18T06:00",
+              "note": "Found by the in-game agent with DiffFacePresets after the session. ProbeSlider itself passed: CME_EyesInOut +15.8% eye spacing; EFM_Eyes_Size found as the first slider that moves the lower lid (+5.4%); EFM_Eyeground_Height inert; baseline reused. Fixed on bugfix/BUG-045-tint-revert-probe-reference."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-044",
           "type": "bug",
           "status": "implemented-untested",

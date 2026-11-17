@@ -114,6 +114,56 @@ public partial class RaceMenuTools
         catch (Exception) { return null; }
     }
 
+    /// <summary>
+    /// BUG-045: saves the live face as a work preset before a cell change (studio trip), so its makeup can be checked
+    /// and put back afterwards: once, after a trip, four tints came back as the character's old makeup.
+    /// </summary>
+    internal async Task<string> SnapshotFace(string name)
+    {
+        var clean = $"{WorkFolder}/{name}";
+        await SaveLivePreset(clean);
+        return clean;
+    }
+
+    /// <summary>Compares the live tints with a snapshot and, if any changed, loads the snapshot back. Returns what changed.</summary>
+    internal async Task<JsonObject> RestoreTintsIfChanged(string snapshot)
+    {
+        var path = PresetPath(snapshot);
+        if (path == null || !File.Exists(path)) return new JsonObject { ["checked"] = false, ["note"] = "no snapshot" };
+        var before = TintMap(ReadJslot(path));
+        var live = await SaveLivePreset($"{WorkFolder}/_current");
+        var now = TintMap(ReadJslot(live.Path));
+        var changed = new JsonArray();
+        foreach (var (index, color) in before)
+        {
+            now.TryGetValue(index, out var current);
+            if (current != color) changed.Add(new JsonObject { ["index"] = index, ["before"] = $"{color:X8}", ["after"] = $"{current:X8}" });
+        }
+        if (changed.Count == 0) return new JsonObject { ["checked"] = true, ["changed"] = 0 };
+        var outcome = await LoadPresetsTabPreset(snapshot, path);
+        return new JsonObject
+        {
+            ["checked"] = true,
+            ["changed"] = changed.Count,
+            ["tints"] = changed,
+            ["restored"] = outcome.Loaded,
+            ["note"] = "Makeup tints changed across the cell change; the face from before the move was loaded back.",
+        };
+    }
+
+    private static Dictionary<int, uint> TintMap(JsonObject preset) =>
+        (preset["tintInfo"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Where(t => t["index"] != null)
+            .GroupBy(t => t["index"]!.GetValue<int>())
+            .ToDictionary(g => g.Key, g => (uint)(g.First()["color"]?.GetValue<long>() ?? 0));
+
+    private static string? PresetPath(string clean)
+    {
+        var (game, _) = SkyLinkSettings.SkyrimPath();
+        return game == null ? null
+            : Path.Combine(game, "Data", "SKSE", "Plugins", "CharGen", "Presets", clean.Replace('/', Path.DirectorySeparatorChar) + ".jslot");
+    }
+
     private sealed record LoadOutcome(bool Loaded, JsonNode? HeadParts, string Tints);
 
     private static JsonArray PresetHeadParts(JsonObject preset) => new((preset["headParts"] as JsonArray ?? new JsonArray())
