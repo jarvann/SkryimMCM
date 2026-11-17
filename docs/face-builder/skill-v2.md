@@ -1,13 +1,13 @@
-# Face builder skill, v2
+# Face builder skill, v2.1
 
-Written 2026-11-17 by the test agent, after a full day of building and testing against SkyLink builds 29 to 57. It replaces the v1 draft. It is the procedure another agent should follow to move a Skyrim character's face toward a reference picture, or toward what the player describes, using the SkyLink face tools.
+Written 2026-11-17 by the test agent, after a full day of building and testing against SkyLink builds 29 to 75. It replaces the v1 draft. v2.1 adds the lessons from control passes 4 and 5 and the tools added in builds 58 to 75. It is the procedure another agent should follow to move a Skyrim character's face toward a reference picture, or toward what the player describes, using the SkyLink face tools.
 
 Scope of evidence: one player character (Arya Adahar, Breton female, High Poly Head, full-head sculpt), one rendered reference, and one control build from photographs of a real person on a neutral head. Treat slider values as examples and the rules as the skill.
 
 ## What the method can and cannot do
 
-- **It can** match the measurable proportions of a face. On Arya, every proportion outside the eyes ended within 4% of the reference. On the control build, 10 of 17 proportions matched a photo after two passes from a neutral head.
-- **It cannot, by measurement alone, produce a likeness.** The control build matched the numbers and still did not look like the person. Proportions capture bone structure. Likeness also needs soft tissue (cheek fullness, smile lines, lid shape) and colouring, and those are judged by eye.
+- **It can** match the measurable proportions of a face. On Arya, every proportion outside the eyes ended within 4% of the reference. On the control build, every proportion was within 5% of the photo after four passes from a neutral head, most within 3%.
+- **It cannot, by measurement alone, produce a likeness.** The control build matched the numbers and still did not look like the person; at pass 4 it passed every proportion and the player's verdict on the picture was "not great". Proportions capture bone structure. Likeness also needs soft tissue (cheek fullness, smile lines, lid shape) and colouring, and those are judged by eye.
 - **It cannot move what no slider moves.** That needs the sculpt brush. Note that the lower eyelid was first judged unreachable by sliders on the strength of a measure later shown not to track it; see rule 11.
 - **The player's taste outranks the reference.** The final Arya result came from the player's own notes, not from the reference numbers.
 
@@ -16,10 +16,11 @@ Scope of evidence: one player character (Arya Adahar, Breton female, High Poly H
 | Purpose | Tools |
 |---|---|
 | Read | `GetFacePreset`, `GetHairTint`, `GetHairAndSkinColor`, `DiffFacePresets`, `SliderNotes` |
-| Edit shape | `SetFaceSliders`, `ResetFace` |
+| Edit shape | `SetFaceSliders`, `SetFace` (sliders, tints and head parts in one load), `SculptFace`, `ResetFace` |
 | Edit colour | `SetFaceTint`, `SetBrowColor`, `SetHairColor` (with `exact: true`), `SetSkinTone` |
-| Head parts | `ListHeadPartChoices`, `SetHeadPart`, `RemoveHeadPart` |
-| See and measure | `CaptureFace`, `MeasureFace`, `SetFaceReference`, `ListFaceReferences` |
+| Head parts | `ListHeadPartChoices`, `FindHairstyles`, `SetHeadPart`, `RemoveHeadPart` |
+| See and measure | `CaptureFace`, `MeasureFace`, `FaceSideBySide`, `SetFaceReference`, `ListFaceReferences`, `ProbeSlider`, `ProbeSliders` |
+| Experimental | `MeasureProfile` (depth), `MeasureBody`, `SetBodyReference` |
 | Controlled light | `StudioGo`, `StudioLights`, `StudioStatus`, `StudioReturn` |
 | Save and restore | `SaveRaceMenuPreset`, `LoadRaceMenuPreset`, `RepairFace`, `SaveGame` |
 
@@ -40,6 +41,12 @@ These are the things that went wrong today when they were not followed.
 
 11. **Judge the lower eyelid by eye, in a close-up.** The lower-lid measures do not follow the real lid edge: a sculpt that visibly lowered the lid left both numbers unchanged. Sliders marked inert for the lower lid on that evidence may not be. The upper-lid measure did respond to real changes.
 12. **Probe with three samples.** With two, head-pitch drift made an inert slider look as if it moved three vertical measures by about 4%.
+13. **Remove the player's own light sources before studio work.** A Candlelight spell added to the studio lights and washed out every capture (skin brightness about 72 against a normal 63 to 65). `hideEffects` hides the spell's particles, not its light. Ask the player to dispel it, and check the lighting block: skin brightness above about 68 or a "washed out" warning means something else is lit.
+14. **Judge likeness at rest or with a gentle closed smile.** The strong open smile (`smile` 0.6, `mouthOpen` 0.3) is for measuring against a smiling photo only. Shown to the player it reads as a grimace. Use `smile` at about 0.35 with the mouth closed, plus a three-quarter view at rest.
+15. **Do not push a slider far past its range to close a small gap.** Mouth width at 1.4 closed a 3% gap and stretched the lower face. Pulled back to 1.0 it measured 6% narrow and looked right. Past about 1.0, prefer the worse number.
+16. **A passing score is not a result.** Before reporting a build, look at the picture the player will see and say plainly whether it looks like the target. Do not let the table stand in for that judgement.
+17. **Ignore lid-edge rows when the eyes are small in the picture, and in probes.** On a smiling photo they read far off and dominate the failures; in `ProbeSliders` they moved 4 to 10% for sliders that cannot touch the eyes.
+18. **Keep the player's hands off the mouse during captures.** A moved mouse gives an off-centre frame or "No face found". Retake; do not compare a capture whose framing is not "ok".
 
 ## Procedure A: tune an existing face toward a reference
 
@@ -62,7 +69,7 @@ These are the things that went wrong today when they were not followed.
 4. Tune the measures a neutral capture can be compared on: eye spacing, eye width, nose length and width, brow height, jaw width, face shape.
 5. If the picture is smiling, compare smile to smile for mouth, lips, chin and eye opening: `MeasureFace(expression: "smile", strength: 0.6, mouthOpen: 0.3)` matched a broad open smile well. Strength 1 squints more than a real smile.
 6. Set colouring by eye from a colour picture: `SetHairColor("<hex>", exact: true)`, `SetBrowColor`, eye part, skin.
-7. Shape the soft tissue by eye: cheek fullness, jaw softness.
+7. Shape the soft tissue by eye: cheek fullness, jaw softness. Sliders first (`CME_CheeksBlow`, `EFM_Cheek_Width`, `EFM_Jaw_Shape`), then `SculptFace("cheeks", "out" or "forward", 0.05, radius: 0.6)` in steps, judged in a three-quarter capture. Expect a refinement, not a transformation.
 8. Save the build as its own preset. Restore the player's face with `LoadRaceMenuPreset`, re-apply the brow colour, return from the studio, and verify with `DiffFacePresets`.
 
 Photos of a real person give a resemblance in proportions and colouring, not a portrait. Say so to the player before starting.
@@ -155,32 +162,41 @@ The player then gave six notes of their own (less pink around the eyes and nose,
 
 A useful check from that build: two photos of the same person taken about 24 years apart agreed on eye width (0.213, 0.212), eye spacing (1.307, 1.320), nose length (0.295, 0.294) and iris size (0.468, 0.472).
 
+**Control build, passes 4 and 5.** Pass 4 (combined reference, smile to smile): eye spacing -2%, eye width -2%, nose length -2%, jaw width +1%, lip height +2%, chin height -3%, brow height -2%, mouth width -3%, face shape +3%, nose width +5%. The picture was poor: overexposed by a Candlelight spell, shown in the strong open smile, mouth width overdriven to 1.4, no soft-tissue work. Pass 5 fixed the light, pulled the mouth to 1.0, added three cheek sculpt steps (out 0.05, forward 0.05, out 0.06) and was judged with a gentle smile. Result: a plausible face of the same type, still not a likeness. Most of the improvement came from light and pose, not the sculpt.
+
 ## Added late in the day
 
 - **`ProbeSlider(slider, value)`** (build 58). Sets, measures, puts the slider back, reports what moved and writes a slider note. Use it before committing to any slider. It found `EFM_Eyes_Size` in one call: it opens both lids and narrows eye spacing.
 - **`SculptFace(region, direction, amount, radius)`** (build 60, lashes from build 62). Moves the mesh where no slider reaches. Amounts are in eye widths. Steps under about 0.03 are invisible; 0.15 on the lower lids showed white under the iris. It moves lashes, the tear duct and the lid strip with the lid, and leaves the eyeballs. The lid edge stayed smooth. Undo by loading the preset.
+- **`SculptFace` on a head with no sculpt** works from build 67. At the default radius 0.3 a cheek stroke moved only 21 head vertices; use 0.6 for cheeks. Overlay head parts on the cheek (a scar mask) follow the stroke.
+- **`FaceSideBySide(reference)`** (build 74): reference and capture at the same face size with the largest gaps printed underneath. Show this to the player instead of a table.
+- **`ProbeSliders({...})`** (build 74): several probes in one call, all put back and recorded. Read the proportion rows; ignore lid-edge rows (rule 17).
+- **`SetFace`** (build 74): sliders, tints and head parts in one preset load.
+- **`FindHairstyles`** (build 73): filters hair by length, fringe and shape from the meshes, with a contact sheet.
+- **`MeasureBody("live")`** (build 75, experimental): joint-based ratios repeated within about 2% across two calls (shoulders 0.17 of height, legs 0.49, hips 0.64 of shoulders). Silhouette widths did not repeat (waist 1.36 then 1.02 of shoulder width) and should not be used yet.
+- **`MeasureProfile`** (build 75, experimental): failed on first test with a non-finite number error. Use side captures until fixed.
 - **Combined references** (build 56): `SetFaceReference(<picture>, name, morePictures: [...])` takes colour from the picture whose colour is usable and, from build 60, leaves each picture out of the measures its pose skews.
 
 ## Still missing
 
-1. **A lid measure that follows the real lid edge.** Calibration captures at known sculpt steps exist for this.
-2. **Soft-tissue shaping tested on a real build.** The sculpt brush exists; cheeks, smile lines and chin have not been tried with it.
-3. **Hair picker.** Search or tag hairstyles; names say nothing about shape and there are hundreds.
-4. **Profile measurement.** Nose and chin projection and forehead slope from a side capture.
-5. **One reference from several pictures,** taking the median and dropping flagged measures (`morePictures` exists as of build 56; untested).
-6. **One combined edit call** for sliders, tints and head parts, to cut reloads.
-7. **Side-by-side sheet** of reference and capture with the table, for the player.
-8. **Body capture and measurement** for full-figure references.
+1. **A lid measure that works on small or smiling eyes.** The lid-edge measures (build 66) follow the edge on large game renders but are noisy between captures.
+2. **Likeness.** Proportions, colouring and light are solved; soft tissue is reachable but weak. What separates a matching build from a recognisable one is still unmeasured: cheek and lid volume, smile shape, hairstyle.
+3. **Profile measurement.** `MeasureProfile` exists and fails; untested beyond that.
+4. **Body silhouette widths.** Joint ratios work; chest, waist and hip widths are unreliable with long hair, skirts and arms at the sides.
+5. **A light check in the tools.** `StudioGo` or `CaptureFace` should warn when a player light spell is active.
+6. **Illustration and full-figure controls.** Not yet run.
 
 ## Files and presets
 
-- Presets, in `CharGen\Presets\<player folder>\`: `Arya_Look_v11` (result), `Arya_Look_v10`, `Arya_Look_v9`, `Arya_Look_v4` (earliest restore point), `Control_Photo_pass1` to `pass3`.
+- Presets, in `CharGen\Presets\<player folder>\`: `Arya_Look_v11` (result), `Arya_Look_v10`, `Arya_Look_v9`, `Arya_Look_v4` (earliest restore point), `Control_Photo_pass1` to `pass5`.
 - Save: `Arya_Look_v10_before_control_builds`.
 - References on the PC, in `_Claude\face refs\`: `control_photo.jpg`, `control_photo_95_colour.jpg`, `control_illustration.png`. The Arya reference is `Downloads\Arya_reference_model.png` and `_Claude\Arya_reference_model.png`.
-- Registered references: `default` (Arya render), `photo`, `photo95`.
+- Registered references: `default` (Arya render), `photo`, `photo95`, `photo_combined` (sepia photo plus the colour portrait).
+- Side-by-side sheets: `Documents\My Games\Skyrim Special Edition\SkyLinkAI\face_sheets\`.
 - Earlier documents: `face_management_notes_2026-11-16.md` (file formats, mesh facts, sculpt findings) and `face_builder_build_brief_2026-11-16.md`.
 
-## Dev notes
+## Dev notes (build 76)
 
-- Build 66 adds `lower_lid_edge` and `upper_lid_edge` to `MeasureFace` (FEAT-250): lid edges found in the picture itself, calibrated on the sculpt steps above. They follow a sculpted lower lid where the landmark lid measures did not; the left lower lid under-reads, so check it by eye.
-- Brow colour is restored after loads and cell changes by the host DLL from build 63 (deployed with the game closed).
+- `MeasureProfile` returns null for a measure with no face vertex under its landmarks instead of failing (BUG-055).
+- Lid-edge measures need four times the noise floor in probes and four times the tolerance in comparisons; body silhouette widths are reported under `silhouette_unproven` and not compared.
+- Brow colour after a game load is restored by the host DLL (BUG-050's longer retry still needs a deploy with Skyrim closed).

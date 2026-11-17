@@ -81,5 +81,5 @@ Total: about 190-300 human hours, or 28-41 hours of Claude session time and 20-3
 
 ## Field notes
 
-- [skill-v2.md](face-builder/skill-v2.md): the procedure after the first full day (builds 29-57): rules, procedures for tuning a face and for building one from a picture, measurement reference, slider effects, colour facts, results and what is still missing. Supersedes v1.
+- [skill-v2.md](face-builder/skill-v2.md): v2.1, the procedure after builds 29-75: rules, procedures for tuning a face and for building one from a picture, measurement reference, slider effects, colour facts, results and what is still missing. Supersedes v1.
 - [skill-draft-v1.md](face-builder/skill-draft-v1.md): the in-game agent's procedure, measurement method (MediaPipe Face Landmarker, 13 ratios, 5% noise floor) and slider responses from the first fitting pass, 2026-11-17. [face_measure.py](face-builder/face_measure.py) is its measurement script.
