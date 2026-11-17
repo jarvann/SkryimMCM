@@ -858,6 +858,7 @@ public partial class RaceMenuTools
         if (keepSculpt && keepSliders) return new { error = "Nothing to reset: keepSculpt and keepSliders are both true." };
         object? reset = null;
         string? keptNames = null;
+        var removedNames = new List<string>();
         var (outcome, backup, file) = await RoundTrip(preset =>
         {
             var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
@@ -887,7 +888,7 @@ public partial class RaceMenuTools
                 {
                     var name = entry["name"]?.GetValue<string>() ?? "";
                     if (keepWords.Any(w => name.Contains(w, StringComparison.OrdinalIgnoreCase))) kept.Add(entry.DeepClone());
-                    else extendedRemoved++;
+                    else { extendedRemoved++; removedNames.Add(name); }
                 }
                 morphs["custom"] = kept;
                 keptNames = string.Join(", ", kept.OfType<JsonObject>().Select(e => e["name"]?.GetValue<string>()));
@@ -897,8 +898,14 @@ public partial class RaceMenuTools
                 sculptHosts = (morphs["sculpt"] as JsonArray)?.Count ?? 0;
                 morphs["sculpt"] = new JsonArray();
             }
-            reset = new { vanillaMorphsChanged = vanillaChanged, extendedSlidersRemoved = extendedRemoved, sculptedMeshesCleared = sculptHosts,
-                          extendedSlidersKept = string.IsNullOrEmpty(keptNames) ? null : keptNames };
+            // BUG-058: say which sliders were kept and removed, so a dry run shows whether a feature-hiding slider survives.
+            reset = new
+            {
+                vanillaMorphsChanged = vanillaChanged, extendedSlidersRemoved = extendedRemoved, sculptedMeshesCleared = sculptHosts,
+                extendedSlidersKept = string.IsNullOrEmpty(keptNames) ? $"none (no name contains '{keep}')" : keptNames,
+                removedSliders = dryRun ? removedNames : null,
+                note = "If a feature appears after the reset (a scar a slider was hiding), add a word from its slider's name to keep.",
+            };
             return true;
         }, dryRun);
 

@@ -153,6 +153,10 @@ public class FaceMeasureTools : ToolBase
         var clean = measured.Where(x => !x.Flagged).ToList();
         var used = clean.Count > 0 ? clean : measured;
         var measurement = used.Count == 1 ? (JsonObject)used[0].M.DeepClone() : Median(used.Select(x => x.M).ToList());
+        // BUG-058: the picture-based lid edges are tuned on game renders; on photos (smiles, mascara, other lighting) they read
+        // nonsense (1.57/1.74 lower against 0.60 on the build, at a 14-pixel iris), so a reference doesn't keep them.
+        if (!image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase) && measurement["eyes"] is JsonObject eyesGroup)
+            foreach (var key in eyesGroup.Select(kv => kv.Key).Where(k => k.Contains("lid_edge")).ToList()) eyesGroup.Remove(key);
         // BUG-045: when every picture has some flag, choose per measure: leave out the pictures whose flag skews that
         // measure (a turned head skews widths, a tilt heights, a smile the mouth, lips, chin and eyes), so a turned
         // photo doesn't pull the width ratios of a frontal one.

@@ -261,6 +261,14 @@ namespace SkyrimMCP::AppearanceManager {
                 for (auto* form : forms) {
                     if (!form) continue;
                     if (pass == 0 && !form->flags.all(RE::BGSColorForm::Flag::kPlayable)) continue;
+                    // BUG-058: colour forms for lips, skin, eyes and paint are playable too in some load orders; they
+                    // aren't hair colours (LipsRedguardMale03 came up as an alternative for strawberry blonde).
+                    if (const char* ed = form->GetFormEditorID(); ed && ed[0]) {
+                        const auto low = Lower(ed);
+                        if (low.find("lip") != std::string::npos || low.find("skin") != std::string::npos ||
+                            low.find("eye") != std::string::npos || low.find("paint") != std::string::npos ||
+                            low.find("dirt") != std::string::npos) continue;
+                    }
                     ranked.emplace_back(HairDistance(FromColor(form->color), storedTarget), form);
                 }
             }
