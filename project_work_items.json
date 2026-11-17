@@ -2312,9 +2312,13 @@
             {
               "datetime": "2026-11-17T04:00",
               "note": "Builds 31-32 confirmed in game: ears restored (RepairFace and after LoadRaceMenuPreset), live face identical to the preset afterwards, skin colour normal. Remaining: a brief purple flash during the load; build 33 rebuilds the tint straight after the load and the descriptions say the flash is normal."
+            },
+            {
+              "datetime": "2026-11-17T05:45",
+              "note": "Player (2026-11-16): ship in 1.3, marked experimental. Merge into develop next session."
             }
           ],
-          "targetRelease": "1.4"
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-229",
@@ -2343,9 +2347,13 @@
             {
               "datetime": "2026-11-17T05:30",
               "note": "In game (b13_34): two CaptureFace() calls in a row matched (same head position within 0.05 units, facing 63.40 vs 63.46 degrees, neutral expression, aimedFrom head, alignment 1.0); the defaults frame the face well. Only the hair differed between shots (physics still moving at the freeze); hideHair:true gives pixel-stable captures. Not merged: waiting on the player's 1.3 or 1.4 decision."
+            },
+            {
+              "datetime": "2026-11-17T05:45",
+              "note": "Player (2026-11-16): ship in 1.3, marked experimental. Merge into develop next session."
             }
           ],
-          "targetRelease": "1.4"
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-230",
