@@ -2778,7 +2778,7 @@
         {
           "id": "BUG-045",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Makeup reverted to old tints after a studio trip; probe noise too tight; combined reference averaged a turned photo",
           "description": "In game (build 58): after four probes, a combined reference and StudioReturn, four tints were back to the character's old makeup (skin #B9B3AA, lower eye socket, navy lips #070C3D, blush) while sliders, head parts and sculpt matched v11; earlier trips had been followed by preset loads, which may have hidden it. Cause not proven (a cell change rebuilding the face from older tint data is the likeliest). Studio trips now save the live face before each move (_studio_before_go, _studio_before_return) and, after arriving, compare the tints and load the snapshot back if any changed, reporting which. ProbeSlider noise default 3% (an unrelated +2.2% made CME_NoseLength look active). SetFaceReference with every picture flagged now chooses per measure: pictures whose flag skews that measure (turned: widths and spacing; tilted: heights, lengths, opening, lids; smile/open mouth: mouth, lips, chin, opening, lids) are left out of it.",
@@ -2786,6 +2786,10 @@
             {
               "datetime": "2026-11-18T06:00",
               "note": "Found by the in-game agent with DiffFacePresets after the session. ProbeSlider itself passed: CME_EyesInOut +15.8% eye spacing; EFM_Eyes_Size found as the first slider that moves the lower lid (+5.4%); EFM_Eyeground_Height inert; baseline reused. Fixed on bugfix/BUG-045-tint-revert-probe-reference."
+            },
+            {
+              "datetime": "2026-11-18T11:00",
+              "note": "In game (build 66): the combined reference took the seven pose-sensitive measures from the frontal photo alone (perMeasure), face width/height back to 0.856, colour from the '95 photo."
             }
           ],
           "targetRelease": "1.3"
@@ -2903,6 +2907,21 @@
             {
               "datetime": "2026-11-18T10:40",
               "note": "Diagnosed from SkyrimMCPPlugin.log (Face state refresh lines). Fixed on bugfix/BUG-050-brow-reapply-later; the brow colour is also re-applied by every face tool and before captures meanwhile."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-051",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "SculptFace fails on a face without a sculpt; lid edges from small photo eyes",
+          "description": "In game (build 66, photo pass 4): SculptFace(cheeks, out, 0.08) failed twice with a blank error on the control build (ResetFace had cleared its sculpt): every vertex row was new, written as ints, and read back with GetValue<double>, which throws for a non-JsonElement value. Rows are now written as longs and read with a numeric helper, and SculptFace returns any error as text. The new lid edges read nonsense on the photo reference (1.57/1.74 lower, 1.02/0.66 upper, against 0.60 on the build): they are now only measured when the iris radius is at least 10 px, so a small-eyed reference has none and they aren't compared.",
+          "history": [
+            {
+              "datetime": "2026-11-18T11:00",
+              "note": "Found by the in-game agent on photo pass 4 (all proportions within 5%, most within 3%). Fixed on bugfix/BUG-051-sculpt-new-rows."
             }
           ],
           "targetRelease": "1.3"
