@@ -22,7 +22,7 @@ public class BodyTools : ToolBase
         "to a picture of a whole standing person (crop it to the person if the picture is wide or busy). Use it in the studio: outdoors, " +
         "low light or a follower in frame gave nonsense, and below a confidence floor it now refuses. Returns shoulder width, " +
         "hip to shoulder width, torso, legs, arms and head-and-neck against height, and silhouette widths at chest, waist and hips " +
-        "against the shoulders (unproven: hair, clothes and arms count; not compared), with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
+        "against the shoulders (unproven: hair, clothes and arms count; not compared; arm length isn't compared either), with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
         "weren't seen and the numbers are guesses). With reference (SetBodyReference), the gaps. Body morph tools (SetBodyMorph) " +
         "change these; compare captures in the same pose.")]
     public async Task<CallToolResult> MeasureBody(string image = "live", string? reference = null, double distance = 200, double heightOffset = -60)
@@ -64,6 +64,8 @@ public class BodyTools : ToolBase
                 var gaps = new JsonArray();
                 foreach (var (key, rv) in refM["ratios"] as JsonObject ?? new JsonObject())
                 {
+                    // Arm length isn't stable yet (0.22 to 0.30 of height on the same body): shown, not compared.
+                    if (key.StartsWith("arm")) continue;
                     var a = (rv as JsonValue)?.GetValue<double>();
                     var b = (measurement?["ratios"]?[key] as JsonValue)?.GetValue<double>();
                     if (a == null || b == null || a.Value <= 0 || b.Value <= 0) continue;
