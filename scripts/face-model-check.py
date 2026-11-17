@@ -365,10 +365,16 @@ def colours(rgb, L):
     face = rgb[max(0, int(ys.min())):int(ys.max()) + 1, max(0, int(xs.min())):int(xs.max()) + 1].reshape(-1, 3)
     face_lab = srgb_to_lab(face[:: max(1, len(face) // 20000)])
     cast = [float(np.mean(face_lab[:, 1])), float(np.mean(face_lab[:, 2]))]
+    # A sepia or black-and-white picture has almost no colour variation across the face (seen: a*/b* spread 0.8/1.9 on a
+    # sepia photo, 5.1/5.1 on a colour render, 3.5/3.7 on a game capture): its colour ratios mean nothing.
+    spread = [float(np.std(face_lab[:, 1])), float(np.std(face_lab[:, 2]))]
+    monochrome = max(spread) < 3.0
     return {
         "hex": {k: lab_to_hex(v) for k, v in lab.items()},
         "relative": rel,
         "lighting": lighting,
+        "usable": not monochrome,
+        "spread": spread,
         "cast": {"a": cast[0], "b": cast[1],
                  "warning": "strong colour cast: compare relative values, not hex" if math.hypot(*cast) > 25 else None},
     }

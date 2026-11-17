@@ -2704,6 +2704,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-042",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Sepia reference: no warning, meaningless colour rows",
+          "description": "In game (build 53): SetFaceReference on a sepia photo returned no colour-cast warning (a sepia cast is weak) and colour ratios that mean nothing (brow lightness 0.983, blush 0.002, lip redness 0.123). Measurements now report colour.usable and the a*/b* spread across the face; under 3 on both counts as monochrome or sepia (measured: sepia photo 0.8/1.9, colour render 5.1/5.1, game capture 3.5/3.7, purple illustration 16/16), adds a warning, and the comparison skips colour (not compared: the reference is monochrome or sepia).",
+          "history": [
+            {
+              "datetime": "2026-11-18T02:30",
+              "note": "Reported by the in-game agent setting up the photo control build. Threshold checked offline on the three control images and a capture. Fixed on bugfix/BUG-042-monochrome-reference."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-245",
           "type": "feature",
           "status": "implemented-untested",

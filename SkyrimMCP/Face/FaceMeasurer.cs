@@ -518,18 +518,26 @@ public sealed class FaceMeasurer : IDisposable
         var width = x1 - x0 + 1;
         var total = Math.Max(1L, (long)width * (y1 - y0 + 1));
         var step = Math.Max(1, (int)(total / 20000));
-        double castA = 0, castB = 0;
+        double castA = 0, castB = 0, castA2 = 0, castB2 = 0;
         var n = 0;
         for (long idx = 0; idx < total; idx += step)
         {
             var p = img.Pixel(x0 + (int)(idx % width), y0 + (int)(idx / width));
             var l = Color.SrgbToLab(p[0], p[1], p[2]);
-            castA += l[1]; castB += l[2]; n++;
+            castA += l[1]; castB += l[2]; castA2 += l[1] * l[1]; castB2 += l[2] * l[2]; n++;
         }
         castA /= Math.Max(1, n); castB /= Math.Max(1, n);
+        // BUG-042: a sepia or black-and-white picture has almost no colour variation across the face (a*/b* spread
+        // 0.8/1.9 on a sepia photo, 5.1/5.1 on a colour render, 3.5/3.7 on a game capture): its colour ratios mean nothing.
+        var spreadA = Math.Sqrt(Math.Max(0, castA2 / Math.Max(1, n) - castA * castA));
+        var spreadB = Math.Sqrt(Math.Max(0, castB2 / Math.Max(1, n) - castB * castB));
+        var monochrome = Math.Max(spreadA, spreadB) < 3.0;
+        if (monochrome) warnings.Add("monochrome or sepia picture: its colours can't be compared (use it for shape only)");
 
         return new Dictionary<string, object>
         {
+            ["usable"] = !monochrome,
+            ["spread"] = new[] { R(spreadA), R(spreadB) },
             ["hex"] = lab.ToDictionary(kv => kv.Key, kv => Color.LabToHex(kv.Value)),
             ["relative"] = rel,
             ["lighting"] = lighting,
