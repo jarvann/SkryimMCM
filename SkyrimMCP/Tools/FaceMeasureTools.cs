@@ -12,6 +12,7 @@ namespace SkyrimMCP.Tools;
 /// compares it with a registered reference, so the AI can tell by number which features still differ.
 /// </summary>
 [McpServerToolType]
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class FaceMeasureTools : ToolBase
 {
     public FaceMeasureTools(IPipeClient pipe) : base(pipe) { }
@@ -34,7 +35,7 @@ public class FaceMeasureTools : ToolBase
     [McpServerTool]
     [Description("Measure a face and, if a reference is registered (SetFaceReference), compare it. image: 'live' (default) takes " +
         "CaptureFace shots of the player without returning images (view, hideHair as CaptureFace; samples = how many captures, " +
-        "the median is used), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
+        "the median is used; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
         "brow height, nose, mouth, lips, jaw, chin, face shape, iris size), lid gaps (upper_lid_gap / iris_radius under 1 means " +
         "the lid covers the top of the iris; over 1, white shows above it: a stare), head pose (yaw, pitch, roll) and " +
         "expression flags (smile, open mouth: those skew mouth and eye numbers), colours of skin, cheeks, lips, brows and iris " +
@@ -43,7 +44,7 @@ public class FaceMeasureTools : ToolBase
         "(default 3% for proportions; about 3-5 Lab units for colours), worst first. Measure the reference with " +
         "SetFaceReference too: numbers from another tool (e.g. MediaPipe in a notebook) differ by a few percent.")]
     public async Task<CallToolResult> MeasureFace(string image = "live", string? reference = "default", int samples = 1,
-        double tolerance = 3, string view = "front", bool hideHair = false)
+        double tolerance = 3, string view = "front", bool hideHair = false, string expression = "neutral", double strength = 0.7)
     {
         if (!OperatingSystem.IsWindows()) return Error("Face measurement needs Windows.");
         samples = Math.Clamp(samples, 1, 5);
@@ -54,7 +55,7 @@ public class FaceMeasureTools : ToolBase
         {
             for (var i = 0; i < samples; i++)
             {
-                var (file, error) = await CaptureLive(view, hideHair);
+                var (file, error) = await CaptureLive(view, hideHair, expression, strength);
                 if (error != null) return Error(error);
                 var m = await MeasureFile(file!);
                 if (m == null) return Error($"No face found in the capture {file}: check it with CaptureFace.");
@@ -104,7 +105,7 @@ public class FaceMeasureTools : ToolBase
         string path;
         if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase))
         {
-            var (file, error) = await CaptureLive("front", false);
+            var (file, error) = await CaptureLive("front", false, "neutral", 0);
             if (error != null) return Error(error);
             path = file!;
         }
@@ -157,9 +158,10 @@ public class FaceMeasureTools : ToolBase
 
     // ---- helpers ----------------------------------------------------------------------------------
 
-    private async Task<(string? File, string? Error)> CaptureLive(string view, bool hideHair)
+    private async Task<(string? File, string? Error)> CaptureLive(string view, bool hideHair, string expression, double strength)
     {
-        var shot = await new FaceCaptureTools(_pipe).CaptureFace(view: view, hideHair: hideHair, showImage: false);
+        var shot = await new FaceCaptureTools(_pipe).CaptureFace(view: view, hideHair: hideHair, showImage: false,
+            expression: expression, strength: strength);
         string? preview = null, full = null;
         foreach (var block in shot.Content.OfType<TextContentBlock>())
         {
@@ -176,7 +178,6 @@ public class FaceMeasureTools : ToolBase
 
     private static async Task<JsonObject?> MeasureFile(string path)
     {
-        if (!OperatingSystem.IsWindows()) return null;
         var result = await Task.Run(() => FaceMeasurer.Shared.Measure(path));
         return result == null ? null : JsonSerializer.SerializeToNode(result) as JsonObject;
     }

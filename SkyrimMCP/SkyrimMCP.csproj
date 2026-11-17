@@ -31,4 +31,11 @@
     <None Include="Models\*.onnx;Models\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- ONNX Runtime's package ships .lib import libraries next to its DLLs: not needed at run time. -->
+  <Target Name="DropNativeImportLibs" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.lib'" />
+    </ItemGroup>
+  </Target>
+
 </Project>
