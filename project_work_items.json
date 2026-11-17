@@ -2957,6 +2957,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-053",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "Hair picker: no source shown, unreadable meshes unnamed, side parts read as fringes; faces missed off-centre in wide pictures",
+          "description": "From the first in-game FindHairstyles test (1,400 hair meshes read, 428 long with a fringe, sheet correct): each entry now says whether its mesh is loose or in a BSA; unreadable meshes are listed (up to 40) with the reason (no path, not found, found but not readable); the fringe measure only counts the lower half of the forehead band in its middle third (hair swept along the hairline or a side part made Ella read 0.64 with a mostly clear forehead; cache entries are re-measured). The face detector now slides a square across wide pictures and keeps the best face instead of looking only in the middle (needed for the archer reference; scripts/face-model-check.py too).",
+          "history": [
+            {
+              "datetime": "2026-11-18T14:40",
+              "note": "From the in-game agent's report. Fixed on bugfix/BUG-053-hair-picker-feedback. The KS Hairdos Wigs BSA holds wearable wigs (armour), not menu hair, so the BSA path still needs a menu hair that lives in an archive to confirm."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",

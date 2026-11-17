@@ -44,7 +44,13 @@ public class HairTools : ToolBase
             }));
             HairCatalog.SaveCache();
 
-            var unreadable = measured.Count(m => m.Shape == null);
+            var unreadableList = measured.Where(m => m.Shape == null).Select(m =>
+            {
+                var model = m.Entry["model"]?.GetValue<string>();
+                var source = model == null ? null : MeshFiles.Source(model);
+                return $"{m.Entry["editorId"]}: {(model == null ? "no mesh path" : source == null ? "mesh not found: " + model : $"found ({source}) but not readable: " + model)}";
+            }).OrderBy(x => x).ToList();
+            var unreadable = unreadableList.Count;
             var matches = measured.Where(m => m.Shape != null).Where(m =>
             {
                 var s = m.Shape!;
@@ -76,6 +82,7 @@ public class HairTools : ToolBase
                 ["editorId"] = m.Entry["editorId"]?.DeepClone(),
                 ["name"] = m.Entry["name"]?.DeepClone(),
                 ["mod"] = m.Entry["mod"]?.DeepClone(),
+                ["source"] = MeshFiles.Source(m.Entry["model"]!.GetValue<string>()),
                 ["length"] = m.Shape!.Length,
                 ["lengthRatio"] = m.Shape.LengthRatio,
                 ["fringe"] = m.Shape.Fringe,
@@ -93,6 +100,7 @@ public class HairTools : ToolBase
                     ["page"] = page,
                     ["pages"] = (all.Count + pageSize - 1) / pageSize,
                     ["notReadable"] = unreadable > 0 ? $"{unreadable} hair meshes weren't found or couldn't be read" : null,
+                    ["notReadableList"] = unreadable > 0 ? new JsonArray(unreadableList.Take(40).Select(x => (JsonNode?)JsonValue.Create(x)).ToArray()) : null,
                     ["entries"] = rows,
                     ["measures"] = "length: head heights below the top of the head; fringe: share of the forehead covered (0-1); behind: share of the hair behind the head; width: hair width over head width; swept: how lopsided (0 even, 1 all to one side)",
                     ["apply"] = "SetHeadPart(type: 'hair', part: '<editorId>')",

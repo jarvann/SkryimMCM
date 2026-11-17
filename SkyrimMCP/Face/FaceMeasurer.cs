@@ -182,13 +182,19 @@ public sealed class FaceMeasurer : IDisposable
         // A wide frame (32:9) leaves the face too small once letterboxed: fall back to the middle square.
         var det = DetectSquare(img);
         if (det != null || img.W <= img.H * 1.2) return det;
-        var x0 = (img.W - img.H) / 2;
-        det = DetectSquare(img.Crop(x0, 0, img.H, img.H));
-        return det == null ? null : det with
+        // Slide a square the height of the picture across it (middle first) and keep the most confident face: on a wide
+        // picture the face may be anywhere (an archer standing at the left of a 32:9 wallpaper).
+        var middle = (img.W - img.H) / 2;
+        var starts = new SortedSet<int> { middle, img.W - img.H };
+        for (var x = 0; x <= img.W - img.H; x += Math.Max(1, img.H / 2)) starts.Add(x);
+        Detection? best = null;
+        foreach (var x0 in starts.OrderBy(x => Math.Abs(x - middle)))
         {
-            CX = det.CX + x0,
-            Keypoints = det.Keypoints.Select(p => (p.X + x0, p.Y)).ToArray(),
-        };
+            var d = DetectSquare(img.Crop(x0, 0, img.H, img.H));
+            if (d == null || (best != null && d.Score <= best.Score)) continue;
+            best = d with { CX = d.CX + x0, Keypoints = d.Keypoints.Select(p => (p.X + x0, p.Y)).ToArray() };
+        }
+        return best;
     }
 
     // ---- landmarks --------------------------------------------------------------------------------

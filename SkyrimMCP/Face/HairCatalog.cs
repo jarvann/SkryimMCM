@@ -49,9 +49,9 @@ public static class HairCatalog
         if (path != null)
         {
             var info = new FileInfo(path);
-            stamp = $"{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
+            stamp = $"v2:{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
         }
-        else if (MeshFiles.Source(model) == "bsa") stamp = $"bsa:{head.Top:0.0}:{head.Bottom:0.0}";
+        else if (MeshFiles.Source(model) == "bsa") stamp = $"v2:bsa:{head.Top:0.0}:{head.Bottom:0.0}";
         else return null;
         lock (CacheLock)
         {
@@ -106,14 +106,17 @@ public static class HairCatalog
             _ => "very long",
         };
         // Fringe: how much of the forehead (the band above the brows, in front of the face) the hair covers.
+        // BUG-053: only the lower half of the forehead, in its middle, counts: a side part or hair swept along the hairline
+        // covered the upper band and read as a fringe (Ella: 0.64 with a mostly clear forehead).
         var browZ = h.Bottom + 0.6f * h.Height;
         var hairline = h.Bottom + 0.85f * h.Height;
+        var fringeTop = browZ + 0.5f * (hairline - browZ);
         var front = h.Front - 0.35f * (h.Front - h.Back);  // the forehead sits behind the nose tip
         var cells = new HashSet<(int, int)>();
         foreach (var v in p)
-            if (v.Y >= front && v.Z >= browZ && v.Z <= hairline && Math.Abs(v.X) <= h.HalfWidth * 0.6f)
-                cells.Add(((int)Math.Floor(v.X), (int)Math.Floor(v.Z * 2)));
-        var cellTotal = Math.Max(1, (int)Math.Ceiling(h.HalfWidth * 1.2f) * (int)Math.Ceiling((hairline - browZ) * 2));
+            if (v.Y >= front && v.Z >= browZ && v.Z <= fringeTop && Math.Abs(v.X) <= h.HalfWidth * 0.45f)
+                cells.Add(((int)Math.Floor(v.X * 2), (int)Math.Floor(v.Z * 2)));
+        var cellTotal = Math.Max(1, (int)Math.Ceiling(h.HalfWidth * 0.9f * 2) * (int)Math.Ceiling((fringeTop - browZ) * 2));
         var fringe = Math.Min(1.0, (double)cells.Count / cellTotal);
         // Behind: share of the hair behind the head between neck and crown (buns, ponytails, hair down the back).
         var behind = p.Count(v => v.Y < h.Back - 1 && v.Z > h.Bottom - 5) / (double)p.Count;
