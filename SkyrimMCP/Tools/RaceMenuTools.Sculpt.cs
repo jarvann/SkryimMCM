@@ -44,9 +44,9 @@ public partial class RaceMenuTools
         "lower_lids, upper_lids, outer_eye_corners, inner_eye_corners, brows, nose_tip, nose_bridge, nostrils, upper_lip, lower_lip, " +
         "mouth_corners, chin, jaw, cheeks, cheekbones (both sides at once, mirrored). direction: up, down, in (toward the middle of " +
         "the face), out, forward (toward the viewer) or back. amount: in eye widths, the same unit as MeasureFace's lid measures " +
-        "(0.01 = 1% of an eye width; at most 0.25 a call). radius: how far the move spreads around the region, in eye widths " +
+        "(0.01 = 1% of an eye width; the measurement sees from about 0.03; at most 0.25 a call). radius: how far the move spreads around the region, in eye widths " +
         "(default 0.3), fading smoothly. Takes a front capture (no image returned) to find the region, moves the vertices of every " +
-        "head part there except eyes and hair (lashes and brows follow the lids), and loads the result like SetFaceSliders, with " +
+        "head part there except the eyeballs and hair (lashes, tear ducts and brows follow), and loads the result like SetFaceSliders, with " +
         "the same session backup. Small steps, then MeasureFace(samples: 3) under the studio light; undo with the opposite " +
         "direction or LoadRaceMenuPreset. dryRun shows what would move without changing the face.")]
     public async Task<object> SculptFace(string region, string direction, double amount, double radius = 0.3, bool dryRun = false)
@@ -102,16 +102,33 @@ public partial class RaceMenuTools
         // 3. Candidate vertices near the region, on the camera side (vertices behind the surface also project there).
         var candidates = new List<(JsonObject Host, int Index, double Weight, double PxX, double Dist)>();
         double pxPerUnit = 0;
+        var notes = new List<string>();
         foreach (var host in hosts.OfType<JsonObject>())
         {
             var type = host["type"]?.GetValue<int>() ?? -1;
-            if (type is 2 or 3) continue;  // eyes and hair
+            if (type == 3) continue;  // hair
             if (host["xyd"] is not JsonArray xyd) continue;
+            // BUG-047: an eye mesh also carries the lower lashes, the tear duct and a lid strip; those must follow the
+            // lids. Leave out only the eyeballs: the largest connected pieces of its chargen TRI.
+            HashSet<int>? skip = null;
+            if (type == 2)
+            {
+                var hostPath = host["host"]?.GetValue<string>() ?? "";
+                var pieces = TriFile.Pieces(hostPath);
+                if (pieces == null || pieces.Count < 2)
+                {
+                    notes.Add($"{hostPath}: TRI file not found as a loose file, so the eye mesh (with its lower lashes) was left out.");
+                    continue;
+                }
+                var eyeball = pieces[0].Length;
+                skip = pieces.Where(p => p.Length == eyeball).SelectMany(p => p).ToHashSet();
+            }
             if (type == 1 && host["jacobian"] is JsonArray jac)
                 pxPerUnit = jac.OfType<JsonArray>().Select(a => Math.Sqrt(Math.Pow(a[0]!.GetValue<double>() * sourceW, 2) + Math.Pow(a[1]!.GetValue<double>() * sourceH, 2)))
                     .OrderByDescending(v => v).Take(2).Average();
             for (var v = 0; v + 2 < xyd.Count; v += 3)
             {
+                if (skip != null && skip.Contains(v / 3)) continue;
                 var x = xyd[v]!.GetValue<double>();
                 var y = xyd[v + 1]!.GetValue<double>();
                 if (x < 0 || y < 0) continue;
@@ -224,7 +241,9 @@ public partial class RaceMenuTools
             backup,
             restoreWith = _sessionBackup != null ? $"LoadRaceMenuPreset('{_sessionBackup}')" : null,
             file,
-            next = "MeasureFace(samples: 3) under the studio light; look at a side view for forward/back moves.",
+            notes = notes.Count > 0 ? notes : null,
+            next = "MeasureFace(samples: 3) under the studio light; look at a side view for forward/back moves. Moves under " +
+                   "about 0.03 eye widths are below what the measurement can see.",
             error = !dryRun && !loaded ? "CharGen.LoadCharacterPreset returned false: the face is unchanged." : null,
         };
     }

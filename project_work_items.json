@@ -2806,6 +2806,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-047",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SculptFace leaves the lower lashes and tear duct behind",
+          "description": "In game (build 60): lower_lids down 0.15 moved the lid smoothly and in the right direction, but a grey band (lower lashes) stayed across the eyeball and a pale piece (tear duct) floated at the inner corner: on this head they are part of the eye mesh (EyesFemaleChargen.tri), which the brush skipped. The brush now reads the mesh's chargen TRI (FRTRI003: 64-byte header, positions, triangles; loose files from MO2 overwrite/mods or Data\\\\meshes), splits it into connected pieces (checked: 38, 38, 14, 14, 11, 11, 10, 10, 8, 8, 7, 7 for the eyes) and moves every piece except the largest (the eyeballs). Without the loose file the eye mesh is left out with a note. Also: 0.01 eye widths (about 1.5 px) is below what MeasureFace sees; the description now says the measurement sees from about 0.03.",
+          "history": [
+            {
+              "datetime": "2026-11-18T07:20",
+              "note": "Found in game by the in-game agent. Fixed on bugfix/BUG-047-sculpt-lashes; TRI parsing checked offline on the eye file."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-044",
           "type": "bug",
           "status": "implemented-untested",
