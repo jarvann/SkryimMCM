@@ -367,7 +367,8 @@ namespace SkyrimMCP::Protocol {
             std::string refId = params.value("refId", "");
             std::string color = params.value("color", "");
             if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump() + "\n";
-            return GameThread(id, [refId, color]() { return GameInterface::SetHairColor(refId, color); });
+            bool exact = params.value("exact", false);
+            return GameThread(id, [refId, color, exact]() { return GameInterface::SetHairColor(refId, color, exact); });
         };
         registry["set_skin_tone"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");

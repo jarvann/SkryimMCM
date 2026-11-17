@@ -26,7 +26,8 @@ namespace SkyrimMCP {
         // color: a hair colour form ID, a name or editor ID, "#RRGGBB" or "r,g,b".
         // An RGB value picks the closest existing hair colour form, so the change survives
         // saving and loading.
-        json SetHairColor(const std::string& refId, const std::string& color);
+        // exact: the player only, the exact colour via RaceMenu's own hair colour form (FEAT-247).
+        json SetHairColor(const std::string& refId, const std::string& color, bool exact = false);
 
         // color: "#RRGGBB" or "r,g,b". refresh rebuilds the actor's 3D (needed for the face).
         json SetSkinTone(const std::string& refId, const std::string& color, bool refresh);

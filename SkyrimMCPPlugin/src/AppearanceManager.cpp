@@ -166,12 +166,44 @@ namespace SkyrimMCP::AppearanceManager {
         return {{"colors", colors}, {"count", colors.size()}};
     }
 
-    json SetHairColor(const std::string& refId, const std::string& color) {
+    json SetHairColor(const std::string& refId, const std::string& color, bool exact) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};
         auto* base = actor->GetActorBase();
         if (!base) return {{"error", "Actor has no base record"}};
         if (color.empty()) return {{"error", "Missing color"}};
+
+        // FEAT-247: the exact colour, the way RaceMenu does it: RaceMenu has a hair colour form of its own, which it
+        // saves and restores with the character, so its colour can be anything. Only for the player.
+        if (exact) {
+            auto wanted = ParseRgb(color);
+            if (!wanted) wanted = NamedColor(color);
+            if (!wanted) return {{"error", "exact needs #RRGGBB, r,g,b or a colour word"}};
+            if (!actor->IsPlayerRef()) return {{"error", "exact works for the player only (it uses RaceMenu's own hair colour)"}};
+            auto* dataHandler = RE::TESDataHandler::GetSingleton();
+            if (!dataHandler) return {{"error", "Data handler not available"}};
+            RE::BGSColorForm* raceMenuForm = nullptr;
+            for (auto* form : dataHandler->GetFormArray<RE::BGSColorForm>()) {
+                auto* file = form ? form->GetFile(0) : nullptr;
+                if (file && Lower(file->fileName).find("racemenu") != std::string::npos) { raceMenuForm = form; break; }
+            }
+            if (!raceMenuForm) return {{"error", "RaceMenu's hair colour form wasn't found (is RaceMenu installed?): use SetHairColor without exact"}};
+            json previous = (base->headRelatedData && base->headRelatedData->hairColor)
+                                ? DescribeColorForm(base->headRelatedData->hairColor) : json(nullptr);
+            // The game draws hair at twice the stored colour, so store half of what should show.
+            raceMenuForm->color.red = static_cast<std::uint8_t>(wanted->r / 2);
+            raceMenuForm->color.green = static_cast<std::uint8_t>(wanted->g / 2);
+            raceMenuForm->color.blue = static_cast<std::uint8_t>(wanted->b / 2);
+            base->SetHairColor(raceMenuForm);
+            base->AddChange(RE::TESNPC::ChangeFlags::kFace);
+            actor->UpdateHairColor();
+            return {{"actor", ActorLabel(actor)},
+                    {"previous", previous},
+                    {"hairColor", DescribeColorForm(raceMenuForm)},
+                    {"requested", Hex(*wanted) + " on screen"},
+                    {"matchedBy", "exact (RaceMenu's own hair colour form)"},
+                    {"note", "Exact colour in RaceMenu's hair colour form, which RaceMenu keeps with the character. Check it after a save and load."}};
+        }
 
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
         if (!dataHandler) return {{"error", "Data handler not available"}};

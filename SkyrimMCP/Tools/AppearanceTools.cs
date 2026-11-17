@@ -40,12 +40,24 @@ public class AppearanceTools : ToolBase
         "hair colour to half of it is used (matched by eye-like colour difference), which survives saving and loading; match says how " +
         "close it is and alternatives lists the next three; " +
         "the reply shows what was requested and what was used. Reports the previous colour so it can be put back. " +
-        "If RaceMenu is installed, its own hair colour setting may override this.")]
-    public async Task<object> SetHairColor(string color, string? refId = null)
+        "If RaceMenu is installed, its own hair colour setting may override this. exact=true (player only, needs RaceMenu): the exact " +
+        "colour asked for, kept in RaceMenu's own hair colour form the way RaceMenu's colour picker does, instead of the nearest existing one.")]
+    public async Task<object> SetHairColor(string color, string? refId = null, bool exact = false)
     {
-        var parms = new JsonObject { ["color"] = color };
+        var parms = new JsonObject { ["color"] = color, ["exact"] = exact };
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         var data = await _pipe.SendRequestAsync("set_hair_color", parms);
+        if (string.IsNullOrEmpty(refId) && data?["error"] == null)
+        {
+            // Hair and brows as the game draws them (twice the stored colour), then the stored brow colour back.
+            try
+            {
+                await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 3, ["fromHairColor"] = true });
+                await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
+                await SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
+            }
+            catch (Exception) { /* cosmetic */ }
+        }
         await NotifyInGame("Hair colour changed");
         return DeserializeResponse(data);
     }

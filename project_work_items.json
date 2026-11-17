@@ -2706,7 +2706,7 @@
         {
           "id": "BUG-042",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Sepia reference: no warning, meaningless colour rows",
           "description": "In game (build 53): SetFaceReference on a sepia photo returned no colour-cast warning (a sepia cast is weak) and colour ratios that mean nothing (brow lightness 0.983, blush 0.002, lip redness 0.123). Measurements now report colour.usable and the a*/b* spread across the face; under 3 on both counts as monochrome or sepia (measured: sepia photo 0.8/1.9, colour render 5.1/5.1, game capture 3.5/3.7, purple illustration 16/16), adds a warning, and the comparison skips colour (not compared: the reference is monochrome or sepia).",
@@ -2714,6 +2714,10 @@
             {
               "datetime": "2026-11-18T02:30",
               "note": "Reported by the in-game agent setting up the photo control build. Threshold checked offline on the three control images and a capture. Fixed on bugfix/BUG-042-monochrome-reference."
+            },
+            {
+              "datetime": "2026-11-18T03:45",
+              "note": "In game (build 56): the sepia reference gives colour: not compared. But a pale studio capture was also flagged (BUG-044)."
             }
           ],
           "targetRelease": "1.3"
@@ -2721,7 +2725,7 @@
         {
           "id": "BUG-043",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Studio: node already has a parent; preset loads drop the hair colour; closed-mouth smile",
           "description": "In game (build 54, photo control pass): StudioGo arrived but reported Lights not turned on: The node already has a parent, and StudioReturn reported Marker not deleted yet with the same text (the pipe reply was put into the result without a copy, after the call itself had worked; the trip record then stayed). Copies now. LoadRaceMenuPreset left the hair colour as it was (no hair colour form passed, deliberately, since skee writes into the form it is given); the agent restored Arya with LoadCharacterPreset(player, preset, FE0C9801). Loading a saved look now passes RaceMenu's own custom hair colour form (found by its plugin in list_hair_colors); face-edit round trips still pass none. The game smile keeps the lips closed where the photo is open-mouthed: CaptureFace and MeasureFace take mouthOpen 0-1 (phoneme BigAah), cleared afterwards. Also seen: head pitch -3.3 to +3.1 deg between studio measurements with nothing changed; ResetFace revealed a scar head part.",
@@ -2729,6 +2733,10 @@
             {
               "datetime": "2026-11-18T03:00",
               "note": "Found in game by the in-game agent. ResetFace passed (8 vanilla morphs changed, 132 extended sliders removed, 6 sculpted meshes cleared). Fixed on bugfix/BUG-043-studio-parent-hair-load. After the build, StudioStatus finishes the stuck return (marker FF004A3D)."
+            },
+            {
+              "datetime": "2026-11-18T03:45",
+              "note": "In game (build 56): mouthOpen 0.3 with smile 0.6 showed teeth (mouth open 0.091); mouth width -17% to -3% and lip height +14% to 0% vs the photo. StudioGo lights on at arrival, StudioReturn cleanup deleted the marker, LoadRaceMenuPreset restored the hair colour from FE0C9801."
             }
           ],
           "targetRelease": "1.3"
@@ -2744,6 +2752,36 @@
             {
               "datetime": "2026-11-18T03:20",
               "note": "Built on feature/FEAT-246-multi-picture-reference."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "FEAT-247",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetHairColor exact: any colour, the way RaceMenu does it",
+          "description": "No hair colour in the load order is near strawberry blonde or a mid auburn, so the nearest form rendered grey-brown (Chestnut for #4A3020). SetHairColor(color, exact: true), player only: writes half the requested on-screen colour into RaceMenu's own hair colour form (the one its colour picker uses and keeps with the character, FE0C9801 here), assigns it, and sets the hair and brow shaders as the game draws them, then the stored brow colour. Every SetHairColor on the player now does that shader step too.",
+          "history": [
+            {
+              "datetime": "2026-11-18T03:45",
+              "note": "Built on feature/FEAT-247-exact-hair-colour. Persistence across save and load relies on RaceMenu keeping its form's colour, as it did for the original #5E442E: to be checked in game."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-044",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Studio capture flagged sepia; scar shown after ResetFace; stale load note",
+          "description": "In game (build 56): a pale face under white studio light was flagged monochrome (spread 2.73/2.93). A picture now counts as monochrome only when the a*/b* spread is under 3 and its hue is single (circular hue spread under 6 deg: sepia photo 3.5, game captures 13-18). ResetFace removed the slider that keeps a scar mod's scar hidden (AFB_ScarSliderHP.esp; RemoveHeadPart(scar) then removed the no-scar placeholder, not the scar): ResetFace now keeps extended sliders whose name contains a keep word (default scar). LoadRaceMenuPreset's note no longer says the hair colour isn't changed.",
+          "history": [
+            {
+              "datetime": "2026-11-18T03:45",
+              "note": "Found in game by the in-game agent on the second photo pass. Fixed on feature/FEAT-247-exact-hair-colour; checked the monochrome rule offline on the sepia photo, the reference and three recent captures."
             }
           ],
           "targetRelease": "1.3"
