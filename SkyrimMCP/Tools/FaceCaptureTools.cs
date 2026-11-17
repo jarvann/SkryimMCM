@@ -129,7 +129,9 @@ public class FaceCaptureTools : ToolBase
 
             crop ??= AutoCrop(enter?["screen"]);
             var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage);
-            var framing = CheckFraming(shot);
+            // The face detector only finds faces turned less than about 50 degrees, so a profile can't be checked.
+            var framing = Math.Abs(angleDeg) <= 50 ? CheckFraming(shot)
+                : "not checked: the face detector only finds faces turned less than about 50 degrees; look at the image";
             shot.Content.Insert(0, new TextContentBlock
             {
                 Text = JsonSerializer.Serialize(new
