@@ -55,6 +55,7 @@ set(LOGIC_SOURCES
     src/AppearanceManager.cpp
     src/BlueprintManager.cpp
     src/FaceCamera.cpp
+    src/Studio.cpp
     src/LootManager.cpp
     src/ScriptStats.cpp
     src/Protocol.cpp

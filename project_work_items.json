@@ -2545,6 +2545,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-244",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Face studio: fixed lights for captures, trip to an interior and back",
+          "description": "Colour tuned by number kept overshooting because every capture had different light (tavern, haze, snow, noon). StudioLights(preset, intensity): key (front-right), fill (front-left) and rim lights around the player's head as engine-level NiPointLights attached to her 3D root and added to the shadow scene: nothing placed in the world or saved; found again by name after a logic DLL reload; gone on a cell change. Presets neutral, warm, daylight, soft, off. StudioGo(cell = QASmoke, preset): places a persistent XMarker with her position and facing (Mark), CenterOnCell to the interior, waits for arrival, turns the lights on; state in SkyLinkAI\\\\studio.json. StudioReturn: removes the lights, MoveTo the marker (matching its rotation), waits, deletes the marker (Recall). CaptureFace and MeasureFace report the studio preset and cell. Test first: StudioLights(neutral) where she stands, CaptureFace: lit evenly while frozen; then StudioGo / StudioReturn.",
+          "history": [
+            {
+              "datetime": "2026-11-17T22:50",
+              "note": "Player asked for it after the agent overshot lips, blush and skin in two bad lights. Built on feature/FEAT-244-face-studio."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-230",
           "type": "feature",
           "status": "complete",

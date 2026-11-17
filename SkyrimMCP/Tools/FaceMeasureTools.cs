@@ -105,6 +105,7 @@ public class FaceMeasureTools : ToolBase
         {
             ["images"] = new JsonArray(files.Select(f => (JsonNode?)JsonValue.Create(f)).ToArray()),
             ["samples"] = measured.Count,
+            ["studio"] = _lastStudio?.DeepClone(),
             ["retaken"] = rejected.Count > 0 ? rejected : null,
             ["comparison"] = comparison,
             ["reference"] = referenceNote,
@@ -176,6 +177,8 @@ public class FaceMeasureTools : ToolBase
 
     // ---- helpers ----------------------------------------------------------------------------------
 
+    private JsonNode? _lastStudio;
+
     private async Task<(string? File, string? Error)> CaptureLive(string view, bool hideHair, string expression, double strength)
     {
         var shot = await new FaceCaptureTools(_pipe).CaptureFace(view: view, hideHair: hideHair, showImage: false,
@@ -187,6 +190,7 @@ public class FaceMeasureTools : ToolBase
             try { node = JsonNode.Parse(block.Text); } catch (JsonException) { continue; }
             if (node?["error"] is JsonNode error) return (null, "CaptureFace: " + error);
             preview ??= node?["preview"]?["file"]?.GetValue<string>();
+            _lastStudio ??= node?["studio"]?.DeepClone();
             full ??= node?["file"]?.GetValue<string>();
         }
         if (shot.IsError == true) return (null, "CaptureFace failed: " + string.Join(" ", shot.Content.OfType<TextContentBlock>().Select(b => b.Text)));
