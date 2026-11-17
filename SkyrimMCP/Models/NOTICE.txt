@@ -5,3 +5,8 @@ converted from TensorFlow Lite to ONNX with tf2onnx by scripts/face-model-conver
 Source: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
 Model card: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker
 Copyright Google LLC. Licensed under the Apache License, Version 2.0 (LICENSE-Apache-2.0.txt).
+
+pose_landmarks.onnx is MediaPipe's Pose Landmarker (pose_landmarker_full.task, float16, version 1:
+pose_landmarks_detector.tflite), converted the same way. Source:
+https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+Copyright Google LLC. Licensed under the Apache License, Version 2.0 (LICENSE-Apache-2.0.txt).

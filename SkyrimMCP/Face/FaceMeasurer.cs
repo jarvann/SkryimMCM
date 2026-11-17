@@ -78,6 +78,14 @@ public sealed class FaceMeasurer : IDisposable
         return found == null ? null : (found.Points, image.W, image.H);
     }
 
+    /// <summary>The face box in pixels (centre, size) for the body measurer (FEAT-255); null when no face is found.</summary>
+    internal (double CX, double CY, double Size)? FaceBox(RgbImage image)
+    {
+        Detection? det;
+        lock (_lock) det = Detect(image);
+        return det == null ? null : (det.CX, det.CY, Math.Max(det.W, det.H));
+    }
+
     /// <summary>
     /// Quick framing check (detector only, no landmarks): where the face is in the picture, as fractions of its
     /// width and height. Null when no face is found.
