@@ -201,7 +201,8 @@ public partial class RaceMenuTools
             await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 3, ["fromHairColor"] = true });
             await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
             await ReapplyBrowColor();
-            return "Face tint rebuilt (Game.UpdateTintMaskColors; hair and brow shaders set as the game draws them).";
+            var store = await SkyrimMCP.Face.FaceState.RaceMenuSaveTints(_pipe);
+            return "Face tint rebuilt (Game.UpdateTintMaskColors; hair and brow shaders set as the game draws them). " + store + ".";
         }
         catch (McpException ex)
         {

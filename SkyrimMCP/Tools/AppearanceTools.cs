@@ -57,6 +57,8 @@ public class AppearanceTools : ToolBase
                 await SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
             }
             catch (Exception) { /* cosmetic */ }
+            // RaceMenu would put its stored hair colour back on the next load (BUG-046).
+            await SkyrimMCP.Face.FaceState.RaceMenuSaveTints(_pipe);
         }
         await NotifyInGame("Hair colour changed");
         return DeserializeResponse(data);
@@ -76,6 +78,8 @@ public class AppearanceTools : ToolBase
         var parms = new JsonObject { ["color"] = color, ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         var data = await _pipe.SendRequestAsync("set_skin_tone", parms);
+        // The player's skin tone is also tint layer 0, which RaceMenu would put back on the next load (BUG-046).
+        if (string.IsNullOrEmpty(refId) && data?["error"] == null) await SkyrimMCP.Face.FaceState.RaceMenuSaveTints(_pipe);
         await NotifyInGame("Skin tone changed");
         return DeserializeResponse(data);
     }
