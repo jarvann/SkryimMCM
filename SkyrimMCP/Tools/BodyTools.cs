@@ -48,8 +48,8 @@ public class BodyTools : ToolBase
             var measurement = JsonSerializer.SerializeToNode(m) as JsonObject;
             // BUG-056: below this the numbers are guesses (outdoors at dusk with a follower beside her: shoulders 1.7 of
             // height, a negative head height); refuse rather than return them as measurements.
-            var keyVisibility = measurement?["confidence"]?["lowest_key_visibility"]?.GetValue<double>() ?? 0;
-            var presence = measurement?["confidence"]?["presence"]?.GetValue<double>() ?? 0;
+            var keyVisibility = (measurement?["confidence"]?["lowest_key_visibility"] as JsonValue)?.GetValue<double>() ?? 0;
+            var presence = (measurement?["confidence"]?["presence"] as JsonValue)?.GetValue<double>() ?? 0;
             if (keyVisibility < 0.5 || presence < 0.6)
                 return ErrorJson(new JsonObject
                 {
@@ -64,8 +64,8 @@ public class BodyTools : ToolBase
                 var gaps = new JsonArray();
                 foreach (var (key, rv) in refM["ratios"] as JsonObject ?? new JsonObject())
                 {
-                    var a = rv?.GetValue<double>();
-                    var b = measurement?["ratios"]?[key]?.GetValue<double>();
+                    var a = (rv as JsonValue)?.GetValue<double>();
+                    var b = (measurement?["ratios"]?[key] as JsonValue)?.GetValue<double>();
                     if (a == null || b == null || a.Value <= 0 || b.Value <= 0) continue;
                     var pct = (b.Value - a.Value) / Math.Abs(a.Value) * 100;
                     gaps.Add(new JsonObject { ["measure"] = key, ["reference"] = a, ["now"] = b, ["gap"] = $"{pct:+0;-0}%", ["ok"] = Math.Abs(pct) <= 4 });

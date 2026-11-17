@@ -2488,7 +2488,7 @@
         {
           "id": "FEAT-241",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "CaptureFace waits while the player moves; brow colour kept per character; lighting report",
           "description": "From the in-game agent's daylight pass (2026-11-17): two outdoor shots missed the face while the player was walking; the brow colour was back to the hair colour (#BB875C) after a cell change; colours read differently front-lit and back-lit. Prepare now returns moving (velocity over 5 units/s or IsMoving) and CaptureFace waits up to 4 s, then refuses. SetBrowColor stores the colour per character (name|race) in SkyLinkAI\\\\face_state.json; it is re-applied after every face edit and before every capture (in normal play the game still puts the hair colour back on a cell change or load, until the next face tool call). get_appearance returns the player's name. MeasureFace reports lighting (skin lightness, left-right cheek balance, one-sided-light warning) and flags a capture lit very differently from the reference.",
@@ -2496,6 +2496,10 @@
             {
               "datetime": "2026-11-17T20:30",
               "note": "Built on feature/FEAT-241-capture-guards-brow-persist."
+            },
+            {
+              "datetime": "2026-11-18T17:20",
+              "note": "In game (build 77): CaptureFace refused after 4 s while walking, no screenshot."
             }
           ],
           "targetRelease": "1.3"
@@ -3111,6 +3115,25 @@
             {
               "datetime": "2026-11-18T16:30",
               "note": "From the in-game agent's build 76 tests. Fixed on bugfix/BUG-056-camera-check-body-floor."
+            },
+            {
+              "datetime": "2026-11-18T17:20",
+              "note": "In game (build 77): MeasureBody low-confidence refusal passed; the camera check passes with a menu open (BUG-057)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-057",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "CaptureFace takes a picture of the map when a menu is open",
+          "description": "In game (build 77): with the map open CaptureFace screenshotted the map, the camera check passed (the camera was in place) and only the framing line caught it, blaming movement. The face camera's enter step now refuses while the game is paused by a menu (UI::GameIsPaused: map, inventory, journal...) with a menu-open message; MeasureFace, MeasureProfile, MeasureBody and the sculpt brush inherit it. MeasureBody's unmeasurable values are null instead of -1. Passed in the same test: CaptureFace refused while walking (4 s), MeasureBody refused at low confidence.",
+          "history": [
+            {
+              "datetime": "2026-11-18T17:20",
+              "note": "From the in-game agent. Fixed on bugfix/BUG-057-capture-menu-open."
             }
           ],
           "targetRelease": "1.3"
