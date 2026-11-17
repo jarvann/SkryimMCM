@@ -34,8 +34,9 @@ namespace SkyrimMCP {
             // portrait is the classic strong key and soft fill.
             if (name == "neutral") return { { "key", 40, 65, 15, white, 1.2f }, { "fill", -40, 65, 15, white, 1.1f }, { "rim", 180, 60, 35, white, 0.4f } };
             if (name == "portrait") return { { "key", 40, 60, 15, white, 1.6f }, { "fill", -40, 70, 0, white, 0.7f }, { "rim", 180, 60, 35, white, 0.5f } };
-            if (name == "warm") return { { "key", 40, 60, 15, { 1.0f, 0.85f, 0.68f }, 1.6f }, { "fill", -40, 70, 0, { 1.0f, 0.9f, 0.8f }, 0.7f }, { "rim", 180, 60, 35, { 1.0f, 0.85f, 0.7f }, 0.4f } };
-            if (name == "daylight") return { { "key", 40, 60, 25, { 1.0f, 0.97f, 0.9f }, 2.0f }, { "fill", -40, 70, 0, { 0.8f, 0.88f, 1.0f }, 0.8f }, { "rim", 180, 60, 35, white, 0.6f } };
+            // warm and daylight are even on both sides too (BUG-040: warm tripped the one-sided-light warning).
+            if (name == "warm") return { { "key", 40, 65, 15, { 1.0f, 0.85f, 0.68f }, 1.2f }, { "fill", -40, 65, 15, { 1.0f, 0.88f, 0.75f }, 1.1f }, { "rim", 180, 60, 35, { 1.0f, 0.85f, 0.7f }, 0.4f } };
+            if (name == "daylight") return { { "key", 40, 65, 25, { 1.0f, 0.97f, 0.9f }, 1.3f }, { "fill", -40, 65, 15, { 0.85f, 0.9f, 1.0f }, 1.1f }, { "rim", 180, 60, 35, white, 0.5f } };
             if (name == "soft") return { { "key", 35, 70, 10, white, 1.1f }, { "fill", -35, 70, 10, white, 1.1f }, { "rim", 180, 60, 35, white, 0.3f } };
             return {};
         }
