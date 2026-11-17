@@ -85,6 +85,9 @@ namespace SkyrimMCP::AppearanceManager {
             if (name && name[0]) c["name"] = name;
             if (editorId && editorId[0]) c["editorId"] = editorId;
             c["rgb"] = Hex(FromColor(form->color));
+            // BUG-035: hair and brows are drawn at twice the stored colour (seen in game: #5E442E drawn #BC885C).
+            const auto stored = FromColor(form->color);
+            c["onScreen"] = Hex({std::min(255, stored.r * 2), std::min(255, stored.g * 2), std::min(255, stored.b * 2)});
             c["playable"] = form->flags.all(RE::BGSColorForm::Flag::kPlayable);
             if (auto* file = form->GetFile(0)) c["mod"] = file->fileName;
             return c;
@@ -196,12 +199,15 @@ namespace SkyrimMCP::AppearanceManager {
                 return {{"error", "Unknown colour '" + color + "'. Use a hair colour form ID or name (ListHairColors), "
                                   "#RRGGBB, r,g,b, or a colour word such as black, brown, auburn, red, blonde, grey or white."}};
             }
+            // The requested colour is what should show on screen; the game draws hair at twice the stored
+            // colour, so look for a form near half of it (BUG-035: "auburn" #7E2E2E came out light copper-pink).
+            const Rgb storedTarget{ wantedRgb->r / 2, wantedRgb->g / 2, wantedRgb->b / 2 };
             int best = INT_MAX;
             for (int pass = 0; pass < 2 && !chosen; ++pass) {  // playable forms first, then any
                 for (auto* form : forms) {
                     if (!form) continue;
                     if (pass == 0 && !form->flags.all(RE::BGSColorForm::Flag::kPlayable)) continue;
-                    const int d = DistanceSq(FromColor(form->color), *wantedRgb);
+                    const int d = DistanceSq(FromColor(form->color), storedTarget);
                     if (d < best) { best = d; chosen = form; }
                 }
             }
@@ -223,10 +229,9 @@ namespace SkyrimMCP::AppearanceManager {
         result["hairColor"] = DescribeColorForm(chosen);
         result["matchedBy"] = matchedBy;
         if (wantedRgb) {
-            result["requested"] = Hex(*wantedRgb);
-            result["note"] = distance == 0 ? "Exact match."
-                : "The closest existing hair colour was used, so the change stays after saving and loading. "
-                  "ListHairColors shows every option.";
+            result["requested"] = Hex(*wantedRgb) + " on screen";
+            result["note"] = std::string(distance == 0 ? "Exact match. " : "The closest existing hair colour was used, so the change stays after saving and loading. ") +
+                "Hair is drawn at twice the stored colour (onScreen), so the stored value is about half the request. ListHairColors shows every option.";
         }
         if (!actor->IsPlayerRef()) {
             result["npcNote"] = "NPC hair usually follows at once; if not, it updates when the NPC's 3D reloads (leave and re-enter the cell).";

@@ -23,7 +23,8 @@ public class AppearanceTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("List the hair colours in the load order (colour forms) with FormID, name or editor ID, RGB and source mod. " +
+    [Description("List the hair colours in the load order (colour forms) with FormID, name or editor ID, RGB, onScreen (the game draws hair " +
+        "and brows at twice the stored colour, so onScreen is what you see) and source mod. " +
         "Playable colours only unless includeNonPlayable is true. Paged: page (default 1), pageSize (default 50).")]
     public async Task<object> ListHairColors(bool includeNonPlayable = false, int page = 1, int pageSize = 50)
     {
@@ -35,7 +36,8 @@ public class AppearanceTools : ToolBase
     [Description("Set an actor's hair colour without RaceMenu. Defaults to the player; pass refId for an NPC. " +
         "color: a hair colour FormID or name from ListHairColors, #RRGGBB, 'r,g,b', or a word (black, dark brown, brown, light brown, " +
         "auburn, red, ginger, copper, blonde, dark blonde, strawberry blonde, platinum, grey, silver, white, blue, green, purple, pink). " +
-        "An RGB value or word picks the closest existing hair colour, so the change survives saving and loading; " +
+        "An RGB value or word is the colour wanted ON SCREEN: the game draws hair at twice the stored colour, so the closest existing " +
+        "hair colour to half of it is used, which survives saving and loading; " +
         "the reply shows what was requested and what was used. Reports the previous colour so it can be put back. " +
         "If RaceMenu is installed, its own hair colour setting may override this.")]
     public async Task<object> SetHairColor(string color, string? refId = null)
