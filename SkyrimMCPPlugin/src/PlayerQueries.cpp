@@ -535,6 +535,7 @@ namespace SkyrimMCP::PlayerQueries {
                                                                                           : std::format("other ({})", t);
                 if (const char* editorId = part->GetFormEditorID(); editorId && editorId[0]) hp["editorId"] = editorId;
                 if (auto* file = part->GetFile(0)) hp["mod"] = file->fileName;
+                if (const char* model = part->GetModel(); model && model[0]) hp["model"] = model;
                 if (t >= 0 && t < kTypes) {
                     auto& list = choices[t];
                     if (list.empty()) list = AppearanceManager::HeadPartChoices(base, t, "editorId");
