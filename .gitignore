@@ -40,3 +40,4 @@ nexus_comments_*.md
 
 # Build logs written by scripts/deploy-from-wsl.sh inside the build worktree
 .build-logs/
+__pycache__/
