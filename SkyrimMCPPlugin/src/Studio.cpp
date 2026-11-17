@@ -15,7 +15,6 @@ namespace SkyrimMCP {
     namespace {
         // Studio lights are found again by this name prefix (the logic DLL can be reloaded between calls).
         constexpr std::string_view kLightPrefix = "SkyLinkStudio_";
-        std::string s_preset;  // empty: no studio lights
         RE::FormID s_marker = 0;  // the marked spot, so a caller that lost the Go reply (a loading-screen timeout) can find it
 
         struct LightSpec {
@@ -84,7 +83,6 @@ namespace SkyrimMCP {
             if (!scene) return {{"error", "The renderer's light list isn't available"}};
 
             const int removed = RemoveLights(root);
-            s_preset.clear();
             if (preset == "off" || preset.empty()) return {{"removed", removed}, {"preset", "off"}};
 
             const auto specs = Preset(preset);
@@ -104,7 +102,9 @@ namespace SkyrimMCP {
 
                 RE::NiPointer<RE::NiPointLight> light{ RE::NiPointLight::Create() };
                 if (!light) return {{"error", "Couldn't create a light"}};
-                light->name = std::format("{}{}", kLightPrefix, spec.name);
+                // The preset is in the name, so Status reads it from the lights themselves (BUG-039: the preset kept
+                // in a variable came back empty after face edits while the lights were still there).
+                light->name = std::format("{}{}_{}", kLightPrefix, preset, spec.name);
                 auto& data = light->GetLightRuntimeData();
                 data.ambient = RE::NiColor{ 0.0f, 0.0f, 0.0f };
                 data.diffuse = spec.color;
@@ -135,7 +135,6 @@ namespace SkyrimMCP {
                 placed.push_back({{"light", spec.name}, {"world", {world.x, world.y, world.z}}, {"fade", data.fade},
                                   {"color", {spec.color.red, spec.color.green, spec.color.blue}}});
             }
-            s_preset = preset;
             return {{"preset", preset}, {"intensity", intensity}, {"removed", removed}, {"lights", placed}};
         }
 
@@ -152,7 +151,6 @@ namespace SkyrimMCP {
             marker->data.angle = player->data.angle;  // MoveTo back matches the marker's rotation
 
             RemoveLights(Root(player));
-            s_preset.clear();
             const char* cellName = player->GetParentCell() ? player->GetParentCell()->GetFormEditorID() : nullptr;
             s_marker = marker->GetFormID();
             json result = {{"markerId", std::format("{:08X}", marker->GetFormID())},
@@ -174,7 +172,6 @@ namespace SkyrimMCP {
             auto* marker = RE::TESForm::LookupByID<RE::TESObjectREFR>(markerId);
             if (!player || !marker) return {{"error", std::format("Marker {:08X} not found", markerId)}};
             const int removed = RemoveLights(Root(player));
-            s_preset.clear();
             player->MoveTo(marker);
             return {{"returning", std::format("{:08X}", markerId)}, {"lightsRemoved", removed}};
         }
@@ -229,15 +226,20 @@ namespace SkyrimMCP {
             auto* player = RE::PlayerCharacter::GetSingleton();
             auto* root = Root(player);
             int lights = 0;
+            std::string preset;
             if (root) {
                 for (auto& child : root->GetChildren()) {
-                    if (child && std::string_view(child->name.c_str()).starts_with(kLightPrefix)) ++lights;
+                    const std::string_view name = child ? std::string_view(child->name.c_str()) : std::string_view{};
+                    if (!name.starts_with(kLightPrefix)) continue;
+                    ++lights;
+                    const auto rest = name.substr(kLightPrefix.size());
+                    if (const auto cut = rest.find('_'); cut != std::string_view::npos) preset = std::string(rest.substr(0, cut));
                 }
             }
             auto* cell = player ? player->GetParentCell() : nullptr;
             const char* cellId = cell ? cell->GetFormEditorID() : nullptr;
             return {{"lights", lights},
-                    {"preset", s_preset.empty() ? json(nullptr) : json(s_preset)},
+                    {"preset", lights > 0 && !preset.empty() ? json(preset) : json(nullptr)},
                     {"cell", cellId ? cellId : ""},
                     {"interior", cell && cell->IsInteriorCell()},
                     {"markerId", s_marker ? json(std::format("{:08X}", s_marker)) : json(nullptr)}};

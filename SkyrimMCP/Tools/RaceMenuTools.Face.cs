@@ -123,6 +123,10 @@ public partial class RaceMenuTools
         try
         {
             await Papyrus("Game", "UpdateTintMaskColors");
+            // BUG-039: twice in game the makeup was missing after an edit (pale lips, no blush) until RepairFace ran,
+            // as if the first rebuild came before RaceMenu had finished applying the layers. Rebuild again shortly after.
+            await Task.Delay(400);
+            await Papyrus("Game", "UpdateTintMaskColors");
             // BUG-034: not Game.UpdateHairColor, which looks to leave the hair rendering at the stored colour (half as bright
             // as the game draws it: the hair went brown until the next cell change). Set the hair and brow shaders
             // to what the game itself uses, then put back a brow colour set with SetBrowColor.
