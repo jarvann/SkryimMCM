@@ -2555,6 +2555,10 @@
             {
               "datetime": "2026-11-17T22:50",
               "note": "Player asked for it after the agent overshot lips, blush and skin in two bad lights. Built on feature/FEAT-244-face-studio."
+            },
+            {
+              "datetime": "2026-11-18T00:10",
+              "note": "In game (build 47), lights only: StudioLights(neutral) outdoors, CaptureFace frozen shot evenly lit, no hair shadow; studio preset and cell reported in CaptureFace and MeasureFace. Under it the grey face read as pale neutral skin (skin #ADA5A3 vs eye white #AEADAE), not a tint fault. StudioGo/StudioReturn not run yet (needs a save). Lid height and depth still moved between scenes (0.231 vs 0.212, 0.142 vs 0.129): tune eyes only from captures in the same studio light."
             }
           ],
           "targetRelease": "1.3"
@@ -2600,7 +2604,7 @@
         {
           "id": "BUG-036",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "StudioLights fails with empty FormID",
           "description": "Build 45/46: every studio call except return and cleanup failed with empty FormID: the handler parsed the optional markerId before choosing the mode, and ParseFormId throws on an empty string. It now parses it only when given.",
@@ -2608,6 +2612,10 @@
             {
               "datetime": "2026-11-17T23:40",
               "note": "Found in game by the in-game agent. Fixed on bugfix/BUG-036-studio-empty-formid."
+            },
+            {
+              "datetime": "2026-11-18T00:10",
+              "note": "In game (build 47): StudioLights(neutral) returned key, fill and rim; no empty FormID."
             }
           ],
           "targetRelease": "1.3"
