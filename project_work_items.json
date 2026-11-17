@@ -2276,7 +2276,7 @@
         {
           "id": "FEAT-238",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetBrowColor: eyebrow colour independent of the hair",
           "description": "Brows take the hair colour, so they couldn't be darkened without darkening the hair (the one visible gap no face tool could close). SetBrowColor(color | hair) puts a NiOverride node override (key 7, tint colour) on the brow head part node, persisted with the game; Game.UpdateHairColor resets it, so the face tools re-apply node overrides after every tint refresh. Test: SetBrowColor(#2A1E18) darkens the brows only; SetFaceSliders afterwards keeps them dark; SetBrowColor(hair) puts them back.",
@@ -2284,6 +2284,10 @@
             {
               "datetime": "2026-11-17T13:45",
               "note": "Requested in face_builder_skill_draft_2026-11-17.md (item 6). Built on feature/FEAT-238-brow-color. Unverified: that the tint-colour key acts on the brow's hair-tint shader."
+            },
+            {
+              "datetime": "2026-11-17T19:40",
+              "note": "Superseded by BUG-030's native tint, which passed in game (build 37)."
             }
           ],
           "targetRelease": "1.3"
@@ -2373,7 +2377,7 @@
         {
           "id": "BUG-029",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "CaptureFace with a weapon or spell drawn leaves the hands stuck readied",
           "description": "The neutral-pose step forces the default idle (IdleForceDefaultState); with a spell readied the hands stayed stuck. Prepare now sheathes first (DrawWeaponMagicHands(false)) and returns sheathing; CaptureFace waits and retries up to 4 seconds, then refuses. The result says it sheathed. Test: ready a spell, CaptureFace, the hands lower and the capture is normal.",
@@ -2381,6 +2385,10 @@
             {
               "datetime": "2026-11-17T13:30",
               "note": "Reported in the in-game agent face_builder_skill_draft_2026-11-17.md (item 4). Fixed on bugfix/BUG-029-capture-drawn-weapons."
+            },
+            {
+              "datetime": "2026-11-17T19:40",
+              "note": "In game (build 37): with a spell readied, CaptureFace sheathed it first ('sheathed' message) and the capture completed."
             }
           ],
           "targetRelease": "1.3"
@@ -2388,7 +2396,7 @@
         {
           "id": "BUG-030",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetBrowColor had no visible effect",
           "description": "Build 35: SetBrowColor(#2A1E18) returned the brow node (EMBrow_08D_HF) but the brows still rendered hair-coloured, and the NiOverride read-back came back empty. skee applies key 7 to hair-tint materials (ShaderUtilities.cpp), so the override path should work, but it did not in game. Fix: a native head_part_tint action sets BSLightingShaderMaterialHairTint::tintColor on the brow geometries directly and reports each mesh's material, so a brow with its colour baked in the texture is reported instead of silently ignored. The NiOverride override is still written for persistence across save and load; the face tools re-apply the colour after every tint refresh (within the server session). Test: SetBrowColor(#2A1E18), CaptureFace(hideHair: true): brows dark; SetFaceSliders: still dark; SetBrowColor(hair): back.",
@@ -2396,6 +2404,10 @@
             {
               "datetime": "2026-11-17T18:30",
               "note": "Found in game on build 35 (in-game agent). Fixed on bugfix/BUG-030-brow-color."
+            },
+            {
+              "datetime": "2026-11-17T19:40",
+              "note": "In game (build 37): applied.set true, EMBrow_08D_HF material 6 (hair tint), tint #BB875C -> #3B2A20, brows visibly darker; still dark after SetFaceSliders. The brow part is thin, so it stays faint at portrait distance: a thicker brow head part is the next step."
             }
           ],
           "targetRelease": "1.3"
@@ -2403,7 +2415,7 @@
         {
           "id": "BUG-031",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "SetFaceSliders flags real sliders at 0 as unknown",
           "description": "Sliders packed in BSAs (CME_ChinWidth, CME_BrowUpDown) have no loose sliders ini, so a real slider at 0 got the same note as a made-up name. The known-name list now also takes every extended-slider name saved in any CharGen .jslot (except SkyLink's own _SkyLink working presets, which can hold a typo). Suggested by the in-game agent, who found 13 CME_ names that way. Test: CME_ChinWidth at 0 gets no note; CME_NotARealSlider is listed in notInSliderFiles.",
@@ -2411,6 +2423,10 @@
             {
               "datetime": "2026-11-17T18:40",
               "note": "Still firing on build 35. Fixed on bugfix/BUG-031-zero-slider-names."
+            },
+            {
+              "datetime": "2026-11-17T19:40",
+              "note": "In game (build 37): CME_BrowUpDown and CME_ChinWidth accepted with no note; CME_NotARealSlider gets 'Unknown name'."
             }
           ],
           "targetRelease": "1.3"
@@ -2418,7 +2434,7 @@
         {
           "id": "FEAT-239",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "CaptureFace: wait out blinks, report gaze, optional image",
           "description": "Eye opening read 0.402, 0.403 then 0.382 on an unchanged face (in-game agent, 2026-11-17): a blink or lid caught at the freeze. Enter now refuses while the blink stage is BlinkDown/BlinkUp/BlinkDownAndWait and CaptureFace retries every 120 ms (up to 8 times). The result reports the blink stage and eye heading/pitch offsets, so a capture with the eyes looking away can be spotted. showImage=false returns only the paths, so probing doesn't fill the agent's context with images.",
@@ -2426,6 +2442,10 @@
             {
               "datetime": "2026-11-17T18:50",
               "note": "Requested in skill draft v1.1 (items 3 and 4). Built on feature/FEAT-239-capture-blink-lock."
+            },
+            {
+              "datetime": "2026-11-17T19:40",
+              "note": "In game (build 37): showImage:false returns only the paths; eyes.blinkStage 0 and gaze offsets reported; no blink caught."
             }
           ],
           "targetRelease": "1.3"
