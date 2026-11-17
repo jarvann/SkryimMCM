@@ -62,7 +62,8 @@ namespace SkyrimMCP {
         // BUG-030: reads, and with a "#RRGGBB" colour sets, the shader tint of the player's head parts of one
         // type (6 = eyebrows) on the loaded 3D. Brows and hair use a hair-tint material whose colour is the
         // hair colour; setting it directly colours the brows alone. Not saved: the caller re-applies it.
-        json HeadPartTint(int partType, const std::string& color);
+        // fromHairColor: set it to what the game itself renders, twice the stored hair colour (BUG-034).
+        json HeadPartTint(int partType, const std::string& color, bool fromHairColor);
     }
 
 }
