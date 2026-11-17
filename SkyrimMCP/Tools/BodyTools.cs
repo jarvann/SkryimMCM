@@ -19,7 +19,8 @@ public class BodyTools : ToolBase
     [McpServerTool]
     [Description("Measure body proportions (experimental): image 'live' takes a full-body capture of the player (the face camera " +
         "pulled back: distance default 200, heightOffset -60 aims at the hips; neutral pose, no image returned), or a full path " +
-        "to a picture of a whole standing person (crop it to the person if the picture is wide or busy). Returns shoulder width, " +
+        "to a picture of a whole standing person (crop it to the person if the picture is wide or busy). Use it in the studio: outdoors, " +
+        "low light or a follower in frame gave nonsense, and below a confidence floor it now refuses. Returns shoulder width, " +
         "hip to shoulder width, torso, legs, arms and head-and-neck against height, and silhouette widths at chest, waist and hips " +
         "against the shoulders (unproven: hair, clothes and arms count; not compared), with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
         "weren't seen and the numbers are guesses). With reference (SetBodyReference), the gaps. Body morph tools (SetBodyMorph) " +
@@ -45,6 +46,18 @@ public class BodyTools : ToolBase
             var m = await Task.Run(() => BodyMeasurer.Shared.Measure(path));
             if (m == null) return Error("No body found in " + path + ". The whole standing person should be in the picture.");
             var measurement = JsonSerializer.SerializeToNode(m) as JsonObject;
+            // BUG-056: below this the numbers are guesses (outdoors at dusk with a follower beside her: shoulders 1.7 of
+            // height, a negative head height); refuse rather than return them as measurements.
+            var keyVisibility = measurement?["confidence"]?["lowest_key_visibility"]?.GetValue<double>() ?? 0;
+            var presence = measurement?["confidence"]?["presence"]?.GetValue<double>() ?? 0;
+            if (keyVisibility < 0.5 || presence < 0.6)
+                return ErrorJson(new JsonObject
+                {
+                    ["error"] = $"Body not measured reliably (key visibility {keyVisibility:0.00}, presence {presence:0.00}): measure in the studio " +
+                                "(StudioGo), with nobody else in frame and the whole body in the picture.",
+                    ["image"] = path,
+                    ["unreliable"] = measurement,
+                });
             JsonObject? comparison = null;
             if (!string.IsNullOrWhiteSpace(reference) && LoadRefs()[reference.Trim()]?["measurement"] is JsonObject refM)
             {
@@ -91,6 +104,8 @@ public class BodyTools : ToolBase
         catch (Exception) { }
         return new JsonObject();
     }
+
+    private static CallToolResult ErrorJson(JsonObject body) => new() { Content = [new TextContentBlock { Text = body.ToJsonString() }], IsError = true };
 
     private static CallToolResult Json(JsonObject body) => new() { Content = [new TextContentBlock { Text = body.ToJsonString() }] };
 

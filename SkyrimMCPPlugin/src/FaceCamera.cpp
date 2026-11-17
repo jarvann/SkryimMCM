@@ -19,7 +19,9 @@ namespace SkyrimMCP {
         bool s_wasFreeCamera = false;
         bool s_wasFrozen = false;
         bool s_hidHud = false;
-        bool s_expressionSet = false;  // Prepare set an expression: Enter keeps it, Exit clears it
+        bool s_expressionSet = false;
+        RE::NiPoint3 s_aimedAt{};      // where Aim put the camera, for Check (BUG-056)
+        bool s_aimed = false;  // Prepare set an expression: Enter keeps it, Exit clears it
         std::vector<std::string> s_hiddenNodes;
         std::vector<RE::NiPointer<RE::NiAVObject>> s_hiddenEffects;  // particles culled for this capture only
 
@@ -278,6 +280,8 @@ namespace SkyrimMCP {
             while (yaw < 0) yaw += 2 * pi;
 
             state->translation = position;
+            s_aimedAt = position;
+            s_aimed = true;
             // Which rotation component is yaw isn't documented: try one, check where the camera looks,
             // and swap if it's wrong.
             state->rotation.x = 0.0f;
@@ -417,6 +421,19 @@ namespace SkyrimMCP {
             return {{"hosts", hosts}, {"yFlipped", yUp}};
         }
 
+        json Check() {
+            // BUG-056: once a capture came back as the ordinary third-person view: confirm the free camera is still on and
+            // where Aim put it, right before the screenshot.
+            auto* camera = RE::PlayerCamera::GetSingleton();
+            const bool free = camera && camera->IsInFreeCameraMode() && camera->currentState;
+            float offset = -1.0f;
+            if (free && s_aimed) {
+                auto* state = static_cast<RE::FreeCameraState*>(camera->currentState.get());
+                offset = (state->translation - s_aimedAt).Length();
+            }
+            return {{"freeCamera", free}, {"offsetFromAim", offset}, {"ok", free && s_aimed && offset >= 0.0f && offset < 2.0f}};
+        }
+
         json Exit() {
             auto* camera = RE::PlayerCamera::GetSingleton();
             auto* player = RE::PlayerCharacter::GetSingleton();
@@ -455,6 +472,7 @@ namespace SkyrimMCP {
                 result["expressionCleared"] = true;
             }
             s_active = false;
+            s_aimed = false;
             result["freeCamera"] = camera && camera->IsInFreeCameraMode();
             return result;
         }

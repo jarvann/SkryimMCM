@@ -38,6 +38,9 @@ namespace SkyrimMCP {
         // one mesh unit along each axis moves on screen. Call between Aim and Exit.
         json SculptSnapshot();
 
+        // Whether the free camera is still on and where Aim put it (call right before the screenshot).
+        json Check();
+
         // Restores hair, HUD and camera mode.
         json Exit();
     }
