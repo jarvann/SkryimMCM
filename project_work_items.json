@@ -2453,17 +2453,21 @@
         {
           "id": "FEAT-230",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
-          "title": "Face builder M3: measurement (CompareFace)",
+          "title": "Face builder M4: measurement (MeasureFace, SetFaceReference, ListFaceReferences)",
           "description": "Face-landmark detection on a capture and on a reference image (candidate: MediaPipe Face Mesh, server-side, not in the plugin; check it on game renders first). Landmarks become scale-free ratios (eye width/face width, eye spacing, eye opening, corner tilt, brow-to-eye, nose length, mouth width, jaw/cheek, chin height). CompareFace returns both tables and the differences, largest first.",
           "history": [
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-17T19:30",
+              "note": "Built on feature/FEAT-230-measure-face. MediaPipe Face Landmarker (float16 v1, Apache 2.0) converted to ONNX (scripts/face-model-convert.sh), run with ONNX Runtime 1.31.1 in the server (SkyrimMCP/Face/FaceMeasurer.cs, a port of scripts/face-model-check.py). Weighted-NMS detection with a centre-square fallback for wide screens (a 32:9 frame defeated both MediaPipe and the plain detector), 27-crop averaging (measurement spread down about 3x; ratios within 1-2% of MediaPipe's on the same image). Adds lid gaps in iris radii (the stare the ratios missed), head pose and smile/open-mouth flags, colours relative to the skin (brow darkness, lip redness, blush, iris lightness and hue, skin hue) and a colour-cast warning. Reference vs Arya_Look_v4 (Python): 9/15 shape within 3%; lower lid gap -20% (the reference's extra opening is at the bottom, not the top), brows 8% high and far lighter, nose +6%, no blush, lips not red enough, skin too yellow."
             }
           ],
-          "targetRelease": "1.4"
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-231",

@@ -1,0 +1,7 @@
+face_detector.onnx and face_landmarks.onnx are Google's MediaPipe Face Landmarker models
+(face_landmarker.task, float16, version 1: face_detector.tflite and face_landmarks_detector.tflite),
+converted from TensorFlow Lite to ONNX with tf2onnx by scripts/face-model-convert.sh. No weights were changed.
+
+Source: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+Model card: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker
+Copyright Google LLC. Licensed under the Apache License, Version 2.0 (LICENSE-Apache-2.0.txt).
