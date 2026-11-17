@@ -209,6 +209,109 @@ public class FaceMeasureTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("One picture to judge a likeness by: the registered reference and the player's face (a fresh capture, or image: a " +
+        "file) side by side, cropped to the same face size, with the largest measured gaps written underneath. Saved as a JPEG in " +
+        "SkyLinkAI\\face_sheets and returned as an image. expression, strength, mouthOpen as CaptureFace (match a smiling reference).")]
+    public async Task<CallToolResult> FaceSideBySide(string reference = "default", string image = "live", string expression = "neutral",
+        double strength = 0.7, double mouthOpen = 0)
+    {
+        try
+        {
+            var stored = LoadReferences()[reference.Trim()] as JsonObject;
+            var refPath = stored?["image"]?.GetValue<string>();
+            if (refPath == null || !File.Exists(refPath)) return Error($"No reference '{reference}' with a picture on disk (SetFaceReference first).");
+            string capPath;
+            if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase))
+            {
+                var (file, error) = await CaptureLive("front", false, expression, strength, mouthOpen);
+                if (error != null) return Error(error);
+                capPath = file!;
+            }
+            else capPath = image.Trim().Trim('"');
+            var now = await MeasureFile(capPath);
+            if (now == null) return Error("No face found in " + capPath);
+            var comparison = stored!["measurement"] is JsonObject refM ? Compare(refM, now, 3, reference.Trim()) : null;
+
+            var lines = new List<string>();
+            if (comparison != null)
+            {
+                lines.Add($"Shape {comparison["shape"]}   Colour {comparison["colour"]}");
+                foreach (var row in (comparison["shapeGaps"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                             .Where(r => r["ok"]?.GetValue<bool>() == false).Take(6))
+                    lines.Add($"{row["measure"]}: {row["gap"]} ({row["direction"]})");
+                foreach (var row in (comparison["colourGaps"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                             .Where(r => r["ok"]?.GetValue<bool>() == false).Take(4))
+                    lines.Add($"{row["measure"]}: {row["direction"]}");
+            }
+            var sheet = SideBySide(refPath, capPath, lines,
+                Path.Combine(SkyLinkSettings.Folder, "face_sheets", $"{reference.Trim()}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
+            if (sheet == null) return Error("No face found in one of the pictures.");
+            return new CallToolResult
+            {
+                Content =
+                [
+                    new TextContentBlock { Text = new JsonObject { ["sheet"] = sheet, ["reference"] = refPath, ["capture"] = capPath, ["comparison"] = comparison }.ToJsonString() },
+                    new ImageContentBlock { Data = Convert.ToBase64String(await File.ReadAllBytesAsync(sheet)), MimeType = "image/jpeg" },
+                ],
+            };
+        }
+        catch (Exception ex) { return Error("FaceSideBySide: " + ex.Message); }
+    }
+
+    // Two faces cropped to the same face height (forehead top to chin, landmarks 10 and 152), side by side, notes below.
+    private static string? SideBySide(string leftPath, string rightPath, List<string> lines, string outPath)
+    {
+        const int size = 480, pad = 10, lineH = 18;
+        var crops = new List<System.Drawing.Bitmap>();
+        foreach (var path in new[] { leftPath, rightPath })
+        {
+            var found = FaceMeasurer.Shared.FindLandmarks(path);
+            if (found == null) { foreach (var c in crops) c.Dispose(); return null; }
+            var (L, _, _) = found.Value;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            for (var i = 0; i < 478; i++)
+            {
+                minX = Math.Min(minX, L[i, 0]); maxX = Math.Max(maxX, L[i, 0]);
+                minY = Math.Min(minY, L[i, 1]); maxY = Math.Max(maxY, L[i, 1]);
+            }
+            var faceH = Math.Sqrt(Math.Pow(L[10, 0] - L[152, 0], 2) + Math.Pow(L[10, 1] - L[152, 1], 2));
+            var side = faceH * 1.7;
+            double cx = (minX + maxX) / 2, cy = (minY + maxY) / 2 - faceH * 0.05;
+            using var src = new System.Drawing.Bitmap(path);
+            var crop = new System.Drawing.Bitmap(size, size);
+            using (var g = System.Drawing.Graphics.FromImage(crop))
+            {
+                g.Clear(System.Drawing.Color.Black);
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(src, new System.Drawing.Rectangle(0, 0, size, size),
+                    new System.Drawing.RectangleF((float)(cx - side / 2), (float)(cy - side / 2), (float)side, (float)side), System.Drawing.GraphicsUnit.Pixel);
+            }
+            crops.Add(crop);
+        }
+        var height = size + pad * 3 + lineH * Math.Max(1, lines.Count) + 20;
+        using var sheet = new System.Drawing.Bitmap(size * 2 + pad * 3, height);
+        using (var g = System.Drawing.Graphics.FromImage(sheet))
+        {
+            g.Clear(System.Drawing.Color.FromArgb(245, 243, 238));
+            g.DrawImage(crops[0], pad, pad + 20);
+            g.DrawImage(crops[1], pad * 2 + size, pad + 20);
+            using var title = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold);
+            using var font = new System.Drawing.Font("Segoe UI", 9.5f);
+            g.DrawString("Reference", title, System.Drawing.Brushes.Black, pad, 2);
+            g.DrawString("Now", title, System.Drawing.Brushes.Black, pad * 2 + size, 2);
+            var y = pad * 2 + size + 20;
+            foreach (var line in lines) { g.DrawString(line, font, System.Drawing.Brushes.Black, pad, y); y += lineH; }
+        }
+        foreach (var c in crops) c.Dispose();
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        var jpeg = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+        using var parameters = new System.Drawing.Imaging.EncoderParameters(1);
+        parameters.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 88L);
+        sheet.Save(outPath, jpeg, parameters);
+        return outPath;
+    }
+
+    [McpServerTool]
     [Description("List the registered face references (SetFaceReference): name, picture, when measured, and flags.")]
     public Task<CallToolResult> ListFaceReferences()
     {

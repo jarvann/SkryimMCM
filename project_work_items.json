@@ -2897,6 +2897,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-251",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetFace (one load for sliders, tints, head parts) and FaceSideBySide",
+          "description": "From the in-game agent's list (one combined edit call; a side-by-side sheet for the player). SetFace(sliders, tints, headParts, dryRun): slider edits (shared with SetFaceSliders through ApplySliders) and tint edits (index to #RRGGBB, #RRGGBB@alpha or @alpha) in one preset round trip, then head parts by type through set_head_part and one tint refresh; tint input is validated before anything is applied. FaceSideBySide(reference, image = live, expression...): the reference picture and a capture cropped to the same face height (landmarks 10-152), side by side, with the shape and colour scores and the largest gaps written underneath; saved to SkyLinkAI\\\\face_sheets and returned as an image.",
+          "history": [
+            {
+              "datetime": "2026-11-18T13:00",
+              "note": "Built on feature/FEAT-251-setface-sidebyside."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",
