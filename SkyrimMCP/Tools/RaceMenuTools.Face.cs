@@ -350,7 +350,7 @@ public partial class RaceMenuTools
 
     /// <summary>
     /// Slider names the loose RaceMenu slider files define (meshes\actors\character\FaceGenMorphs\*\sliders\*.ini:
-    /// "Name = 128, Slider, MorphDown, MorphUp"). Sliders packed in BSAs aren't included.
+    /// "Name = 128, Slider, MorphDown, MorphUp"), plus every extended-slider name saved in a CharGen preset.
     /// </summary>
     private static HashSet<string> KnownSliderNames()
     {
@@ -372,6 +372,30 @@ public partial class RaceMenuTools
                         var name = line[..eq].Trim();
                         if (name.Length > 0 && name.All(c => char.IsLetterOrDigit(c) || c == '_')) names.Add(name);
                     }
+                }
+            }
+        }
+        catch { /* unreadable folder: fewer known names */ }
+
+        // Sliders packed in BSAs (CME_, NSK_...) have no loose ini, but every preset that set one names it
+        // (BUG-031): collect the extended-slider names from all .jslot files under CharGen.
+        var chargen = game == null ? null : Path.Combine(game, "Data", "SKSE", "Plugins", "CharGen");
+        try
+        {
+            if (chargen != null && Directory.Exists(chargen))
+            {
+                var work = Path.DirectorySeparatorChar + WorkFolder + Path.DirectorySeparatorChar;
+                foreach (var jslot in Directory.EnumerateFiles(chargen, "*.jslot", SearchOption.AllDirectories).Take(2000))
+                {
+                    // SkyLink's own working presets can hold a mistyped name sent to SetFaceSliders.
+                    if (jslot.Contains(work, StringComparison.OrdinalIgnoreCase)) continue;
+                    try
+                    {
+                        if (JsonNode.Parse(File.ReadAllText(jslot))?["morphs"]?["custom"] is not JsonArray custom) continue;
+                        foreach (var entry in custom.OfType<JsonObject>())
+                            if (entry["name"]?.GetValue<string>() is { Length: > 0 } name) names.Add(name);
+                    }
+                    catch { /* a broken preset: skip it */ }
                 }
             }
         }
@@ -434,16 +458,16 @@ public partial class RaceMenuTools
                 if (entry == null)
                 {
                     // RaceMenu doesn't save sliders at 0, so a missing name is usually a slider at 0. Only a
-                    // name no slider file defines is suspect (sliders packed in BSAs can't be checked).
+                    // name no slider file and no saved preset knows is suspect.
                     custom.Add(new JsonObject { ["name"] = name, ["value"] = value });
                     var known = KnownSliderNames();
                     var defined = known.Contains(name);
                     if (!defined && known.Count > 0) unknown.Add(name);
                     changes.Add(new { slider = name, kind = "extended", previous = 0.0, value,
                                       note = defined ? null
-                                           : (string?)"Was at 0 or isn't a slider: RaceMenu saves no sliders at 0, and no loose slider file " +
-                                             "defines this name (some come packed in BSAs). RaceMenu ignores names it doesn't know, so check " +
-                                             "the spelling if nothing changes." });
+                                           : (string?)"Unknown name: no loose slider file and no saved RaceMenu preset has it. It may still " +
+                                             "be a real slider at 0 from a BSA that no preset has used yet; RaceMenu ignores names it doesn't " +
+                                             "know, so check the spelling if nothing changes." });
                 }
                 else
                 {
