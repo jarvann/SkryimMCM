@@ -200,6 +200,11 @@ namespace SkyrimMCP {
             auto* main = RE::Main::GetSingleton();
             if (!camera || !player || !main) return {{"error", "Camera or player not available"}};
             if (!HeadNode(player)) return {{"error", "The player's head isn't loaded (third-person 3D missing)"}};
+            // BUG-057: with the map (or another pausing menu) open the screenshot is of the menu, and the camera check
+            // still passes, since the camera itself is in place.
+            if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
+                return {{"error", "A menu is open (the map, inventory, journal or another pausing menu): close it and capture again"}};
+            }
 
             // Don't freeze mid-blink (FEAT-239): a half-closed lid skews the eye measurements. The caller
             // waits a moment and calls Enter again; a blink lasts a fraction of a second.

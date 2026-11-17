@@ -99,11 +99,11 @@ public sealed class BodyMeasurer
             for (var c = 0; c < 256; c++) if (r.Mask[row * 256 + c] > 0.5f) { if (first < 0) first = c; last = c; }
             return first < 0 ? double.NaN : (last - first) / k;
         }
-        double R(double v) => double.IsFinite(v) ? Math.Round(v, 3) : -1;  // -1: not measurable (NaN can't be written as JSON)
+        double? R(double v) => double.IsFinite(v) ? Math.Round(v, 3) : null;  // null: not measurable (NaN can't be written as JSON)
         var key = new[] { 11, 12, 23, 24, 27, 28 };
         return new Dictionary<string, object?>
         {
-            ["ratios"] = new Dictionary<string, double>
+            ["ratios"] = new Dictionary<string, double?>
             {
                 ["shoulder_width / height"] = R(shoulders / height),
                 ["hip_width / shoulder_width"] = R(hips / shoulders),
@@ -114,13 +114,13 @@ public sealed class BodyMeasurer
             },
             // BUG-055: outline widths include long hair, skirts and arms touching the body (waist read 1.36 then 1.02 of
             // the shoulders on two identical captures): not compared, shown for reference only.
-            ["silhouette_unproven"] = new Dictionary<string, double>
+            ["silhouette_unproven"] = new Dictionary<string, double?>
             {
                 ["chest / shoulder_width"] = R(WidthAt(sh.Y + 0.25 * (hp.Y - sh.Y)) / shoulders),
                 ["waist / shoulder_width"] = R(WidthAt(sh.Y + 0.62 * (hp.Y - sh.Y)) / shoulders),
                 ["hips / shoulder_width"] = R(WidthAt(hp.Y) / shoulders),
             },
-            ["confidence"] = new Dictionary<string, double>
+            ["confidence"] = new Dictionary<string, double?>
             {
                 ["presence"] = R(r.Presence),
                 ["lowest_key_visibility"] = R(key.Min(i => r.Visibility[i])),
