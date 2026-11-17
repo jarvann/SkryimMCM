@@ -19,6 +19,19 @@ public class FaceCaptureTools : ToolBase
 
     private const double MinDistance = 28;
 
+    private bool _takeSnapshot;
+
+    /// <summary>The head vertices on screen from the last capture taken with <see cref="CaptureForSculpt"/>.</summary>
+    internal JsonNode? Snapshot { get; private set; }
+
+    /// <summary>A front capture without the image, plus the sculpt snapshot of the same frozen frame (FEAT-233).</summary>
+    internal async Task<CallToolResult> CaptureForSculpt(bool hideHair)
+    {
+        _takeSnapshot = true;
+        try { return await CaptureFace(view: "front", hideHair: hideHair, showImage: false); }
+        finally { _takeSnapshot = false; }
+    }
+
     // The game's expressions (SetExpressionOverride indices): the Dialogue set reads clearest in a still.
     private static readonly Dictionary<string, int> Expressions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -128,6 +141,9 @@ public class FaceCaptureTools : ToolBase
             });
             if (aim?["error"] is JsonNode aimError) return Error(aimError.ToString());
             await Task.Delay(300);
+            // FEAT-233: the sculpt brush asks for the head vertices on screen, taken in the same frozen frame.
+            if (_takeSnapshot)
+                Snapshot = (await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "snapshot" }))?.DeepClone();
 
             crop ??= AutoCrop(enter?["screen"]);
             var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage);

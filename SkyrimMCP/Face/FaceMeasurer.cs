@@ -69,6 +69,15 @@ public sealed class FaceMeasurer : IDisposable
         };
     }
 
+    /// <summary>The 478 landmarks (x, y in pixels of the picture, z) and the picture size; null when no face is found.</summary>
+    public (double[,] Points, int Width, int Height)? FindLandmarks(string path)
+    {
+        var image = RgbImage.Load(path);
+        Landmarks? found;
+        lock (_lock) found = FindLandmarks(image);
+        return found == null ? null : (found.Points, image.W, image.H);
+    }
+
     /// <summary>
     /// Quick framing check (detector only, no landmarks): where the face is in the picture, as fractions of its
     /// width and height. Null when no face is found.

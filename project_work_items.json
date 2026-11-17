@@ -2888,17 +2888,21 @@
         {
           "id": "FEAT-233",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
-          "title": "Face builder M6: sculpt-aware checks",
+          "title": "Face builder M7: sculpt brush (SculptFace)",
           "description": "Report when a face carries a full-head sculpt (sliders then interact with it); select eye-mesh pieces by connected component (the female eye TRI is six pieces per eye: eyeball, three lash pieces, tear duct, a thin strip); optional offline mesh rebuild (base + sculpt + morphs) to measure eyeball-to-lid and lash-to-lid clearance. Needs the extended sliders' morph sources.",
           "history": [
             {
               "datetime": "2026-11-16T23:00",
               "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-18T05:30",
+              "note": "Built on feature/FEAT-233-sculpt-brush. Sculpt data is per head part, keyed by the part's chargen TRI path (BGSHeadPart morphs[kChargenMorph]), offsets x10000 in mesh space (seen in Arya_Look_v11: FemaleHeadCharGen.tri, mouth, eyes, brows, High Poly Head masks). The plugin's face_camera snapshot projects every vertex of the player's dynamic head-part meshes (through the head bone's skin transform) onto the frozen capture frame with NiCamera::WorldPtToScreenPt3, plus each part's 3x3 jacobian (screen x, y, camera distance per mesh unit). SculptFace(region, direction, amount in eye widths, radius) takes such a capture, finds the region's MediaPipe landmarks in it, picks the vertices within radius on the camera side (distance band), weights them smoothly, inverts the jacobian to turn an up/down/in/out/forward/back move on the picture into mesh offsets, and adds them to the preset's sculpt data for every part except eyes and hair (lashes and brows follow). Regions: lids, eye corners, brows, nose tip/bridge/nostrils, lips, mouth corners, chin, jaw, cheeks, cheekbones."
             }
           ],
-          "targetRelease": "1.4"
+          "targetRelease": "1.3"
         },
         {
           "id": "FEAT-235",
