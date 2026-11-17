@@ -37,7 +37,7 @@ public class FaceMeasureTools : ToolBase
     [McpServerTool]
     [Description("Measure a face and, if a reference is registered (SetFaceReference), compare it. image: 'live' (default) takes " +
         "CaptureFace shots of the player without returning images (view, hideHair as CaptureFace; samples = how many captures, " +
-        "the median is used; a neutral front capture flagged as turned, smiling or open-mouthed is retaken, up to twice; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
+        "the median is used; expression/strength/mouthOpen as CaptureFace; a neutral front capture flagged as turned, smiling or open-mouthed is retaken, up to twice; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
         "brow height, nose, mouth, lips, jaw, chin, face shape, iris size), lid gaps (upper_lid_gap / iris_radius under 1 means " +
         "the lid covers the top of the iris; over 1, white shows above it: a stare), head pose (yaw, pitch, roll) and " +
         "expression flags (smile, open mouth: those skew mouth and eye numbers), colours of skin, cheeks, lips, brows and iris " +
@@ -48,7 +48,7 @@ public class FaceMeasureTools : ToolBase
         "(default 3% for proportions), worst first. Measure the reference with " +
         "SetFaceReference too: numbers from another tool (e.g. MediaPipe in a notebook) differ by a few percent.")]
     public async Task<CallToolResult> MeasureFace(string image = "live", string? reference = "default", int samples = 1,
-        double tolerance = 3, string view = "front", bool hideHair = false, string expression = "neutral", double strength = 0.7)
+        double tolerance = 3, string view = "front", bool hideHair = false, string expression = "neutral", double strength = 0.7, double mouthOpen = 0)
     {
         if (!OperatingSystem.IsWindows()) return Error("Face measurement needs Windows.");
         samples = Math.Clamp(samples, 1, 5);
@@ -60,11 +60,11 @@ public class FaceMeasureTools : ToolBase
         {
             // FEAT-243: a neutral capture that came back flagged (head turned, smile, open mouth: caught mid-animation)
             // is retaken, up to two extra captures in all.
-            var neutral = expression.Trim().Equals("neutral", StringComparison.OrdinalIgnoreCase);
+            var neutral = expression.Trim().Equals("neutral", StringComparison.OrdinalIgnoreCase) && mouthOpen <= 0;
             var retakes = 0;
             for (var i = 0; i < samples; i++)
             {
-                var (file, error) = await CaptureLive(view, hideHair, expression, strength);
+                var (file, error) = await CaptureLive(view, hideHair, expression, strength, mouthOpen);
                 if (error != null) return Error(error);
                 var m = await MeasureFile(file!);
                 if (m == null) return Error($"No face found in the capture {file}: check it with CaptureFace.");
@@ -124,7 +124,7 @@ public class FaceMeasureTools : ToolBase
         string path;
         if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase))
         {
-            var (file, error) = await CaptureLive("front", false, "neutral", 0);
+            var (file, error) = await CaptureLive("front", false, "neutral", 0, 0);
             if (error != null) return Error(error);
             path = file!;
         }
@@ -179,10 +179,10 @@ public class FaceMeasureTools : ToolBase
 
     private JsonNode? _lastStudio;
 
-    private async Task<(string? File, string? Error)> CaptureLive(string view, bool hideHair, string expression, double strength)
+    private async Task<(string? File, string? Error)> CaptureLive(string view, bool hideHair, string expression, double strength, double mouthOpen)
     {
         var shot = await new FaceCaptureTools(_pipe).CaptureFace(view: view, hideHair: hideHair, showImage: false,
-            expression: expression, strength: strength);
+            expression: expression, strength: strength, mouthOpen: mouthOpen);
         string? preview = null, full = null;
         foreach (var block in shot.Content.OfType<TextContentBlock>())
         {

@@ -329,7 +329,8 @@ namespace SkyrimMCP::Protocol {
             bool aimFromHead = params.value("aimFromHead", true);
             int expression = params.value("expression", -1);
             float strength = params.value("strength", 0.7f);
-            if (mode == "prepare") return GameThread(id, [=]() { return FaceCamera::Prepare(expression, strength); });
+            float mouthOpen = params.value("mouthOpen", 0.0f);
+            if (mode == "prepare") return GameThread(id, [=]() { return FaceCamera::Prepare(expression, strength, mouthOpen); });
             bool hideEffects = params.value("hideEffects", true);
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair, hideEffects); });
             if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });

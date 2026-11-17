@@ -82,18 +82,36 @@ public partial class RaceMenuTools
     /// valid-race list, so others (an ears part) are dropped; and the menu rebuilds the face-tint texture
     /// itself afterwards, which a script call doesn't, so the face shows purple.
     /// </summary>
-    private async Task<LoadOutcome> LoadPresetsTabPreset(string clean, string path)
+    private async Task<LoadOutcome> LoadPresetsTabPreset(string clean, string path, string? hairColorForm = null)
     {
         var parts = PresetHeadParts(ReadJslot(path));
-        // No hair colour form: skee writes the preset's hair RGB into the form it is given, and the
-        // player's hair colour form can be shared with NPCs.
-        var result = await Papyrus("CharGen", "LoadCharacterPreset", "player", PapyrusPresetName(clean), null);
+        // Face edits pass no hair colour form: skee writes the preset's hair RGB into the form it is given, and the
+        // player's hair colour form can be shared with NPCs. Loading a saved look passes RaceMenu's own custom
+        // hair colour form (BUG-043), so the look's hair colour comes back too.
+        var result = await Papyrus("CharGen", "LoadCharacterPreset", "player", PapyrusPresetName(clean),
+            hairColorForm == null ? null : JsonValue.Create(hairColorForm));
         if (result?.GetValueKind() != JsonValueKind.True) return new LoadOutcome(false, null, null);
         // Rebuild the tint at once to shorten the purple flash, then again after the head parts are back
         // (their 3D reset drops the tint again).
         await RefreshTints();
         var (restored, tints) = await RepairAfterLoad(parts);
         return new LoadOutcome(true, restored, tints);
+    }
+
+    /// <summary>
+    /// RaceMenu's own custom hair colour form (from its plugin), which skee writes a preset's hair colour into. Null when
+    /// it can't be found.
+    /// </summary>
+    private async Task<string?> RaceMenuHairColorForm()
+    {
+        try
+        {
+            var data = await _pipe.SendRequestAsync("list_hair_colors", new JsonObject { ["includeNonPlayable"] = true });
+            return (data?["colors"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                .FirstOrDefault(c => c["mod"]?.GetValue<string>()?.Contains("RaceMenu", StringComparison.OrdinalIgnoreCase) == true)
+                ?["formId"]?.GetValue<string>();
+        }
+        catch (Exception) { return null; }
     }
 
     private sealed record LoadOutcome(bool Loaded, JsonNode? HeadParts, string Tints);
