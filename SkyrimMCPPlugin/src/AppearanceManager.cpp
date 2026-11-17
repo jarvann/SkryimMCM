@@ -424,7 +424,7 @@ namespace SkyrimMCP::AppearanceManager {
             return {{"error", "order must be editorId, editorIdNoCase, name or loadOrder"}};
 
         auto list = HeadPartChoices(npc, t, ord);
-        count = std::clamp(count, 1, 200);
+        count = std::clamp(count, 1, 2000);
         if (!aroundFormId.empty()) {
             RE::FormID wanted = 0;
             try { wanted = Helpers::ParseFormId(aroundFormId); } catch (...) { return {{"error", "Invalid aroundFormId"}}; }
@@ -443,6 +443,8 @@ namespace SkyrimMCP::AppearanceManager {
             e["editorId"] = EditorIdOf(part);
             if (const char* name = part->GetName(); name && name[0]) e["name"] = name;
             if (auto* file = part->GetFile(0)) e["mod"] = file->fileName;
+            // FEAT-236: the mesh, so the hair catalogue can read its shape from disk.
+            if (const char* model = part->GetModel(); model && model[0]) e["model"] = model;
             entries.push_back(std::move(e));
         }
         return {{"type", type}, {"order", ord}, {"total", list.size()}, {"start", start}, {"entries", entries}};
