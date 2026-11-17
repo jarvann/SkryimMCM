@@ -54,6 +54,7 @@ set(LOGIC_SOURCES
     src/PlayerQueries.cpp
     src/AppearanceManager.cpp
     src/BlueprintManager.cpp
+    src/FaceCamera.cpp
     src/LootManager.cpp
     src/ScriptStats.cpp
     src/Protocol.cpp

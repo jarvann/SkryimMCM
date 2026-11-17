@@ -3,6 +3,7 @@
 #include "TaskQueue.h"
 #include "LootManager.h"
 #include "AppearanceManager.h"
+#include "FaceCamera.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
 #include "UtilityManager.h"
@@ -300,6 +301,20 @@ namespace SkyrimMCP::Protocol {
             int index = params.value("index", -1);
             bool refresh = params.value("refresh", false);
             return GameThread(id, [=]() { return AppearanceManager::SetHeadPart(refId, part, type, index, refresh); });
+        };
+        registry["face_camera"] = [](const std::string& id, const json& params) {
+            std::string mode = params.value("mode", "");
+            bool hideHud = params.value("hideHud", true);
+            bool hideHair = params.value("hideHair", false);
+            float angle = params.value("angleDeg", 0.0f);
+            float distance = params.value("distance", 40.0f);
+            float height = params.value("heightOffset", 0.0f);
+            bool aimFromHead = params.value("aimFromHead", true);
+            if (mode == "prepare") return GameThread(id, []() { return FaceCamera::Prepare(); });
+            if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair); });
+            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
+            if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
+            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim or exit").dump() + "\n";
         };
         registry["restore_head_parts"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
