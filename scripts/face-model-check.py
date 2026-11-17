@@ -223,7 +223,7 @@ def lab_to_hex(lab):
 
 # Sample spots: a landmark index, or a pair whose midpoint is sampled.
 COLOUR_SPOTS = {
-    "skin": [6, 197, 199, (4, 197)],                        # nose bridge and chin: no makeup, lit like the face
+    "skin": [199, 200, 208, 428, 6, 197],                   # chin, plus the upper nose bridge: no makeup; mostly chin, as the bridge catches highlights in sunlight
     "cheeks": [50, 280, (50, 205), (280, 425)],              # where blush goes
     "lips": [(0, 13), (14, 17), (37, 82), (267, 312), (84, 87), (314, 317)],
     "brows": [(63, 53), (105, 52), (66, 65), (293, 283), (334, 282), (296, 295)],
