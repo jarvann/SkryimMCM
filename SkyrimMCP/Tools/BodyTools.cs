@@ -21,7 +21,7 @@ public class BodyTools : ToolBase
         "pulled back: distance default 200, heightOffset -60 aims at the hips; neutral pose, no image returned), or a full path " +
         "to a picture of a whole standing person (crop it to the person if the picture is wide or busy). Returns shoulder width, " +
         "hip to shoulder width, torso, legs, arms and head-and-neck against height, and silhouette widths at chest, waist and hips " +
-        "against the shoulders, with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
+        "against the shoulders (unproven: hair, clothes and arms count; not compared), with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
         "weren't seen and the numbers are guesses). With reference (SetBodyReference), the gaps. Body morph tools (SetBodyMorph) " +
         "change these; compare captures in the same pose.")]
     public async Task<CallToolResult> MeasureBody(string image = "live", string? reference = null, double distance = 200, double heightOffset = -60)
@@ -53,7 +53,7 @@ public class BodyTools : ToolBase
                 {
                     var a = rv?.GetValue<double>();
                     var b = measurement?["ratios"]?[key]?.GetValue<double>();
-                    if (a == null || b == null || double.IsNaN(a.Value) || double.IsNaN(b.Value) || a == 0) continue;
+                    if (a == null || b == null || a.Value <= 0 || b.Value <= 0) continue;
                     var pct = (b.Value - a.Value) / Math.Abs(a.Value) * 100;
                     gaps.Add(new JsonObject { ["measure"] = key, ["reference"] = a, ["now"] = b, ["gap"] = $"{pct:+0;-0}%", ["ok"] = Math.Abs(pct) <= 4 });
                 }

@@ -429,9 +429,11 @@ public class FaceMeasureTools : ToolBase
                 else
                 {
                     var pct = (n.Value - r.Value) / Math.Abs(r.Value) * 100;
-                    ok = Math.Abs(pct) <= tolerance;
+                    // The picture-based lid edges move 5-10% between identical captures (BUG-055): four times the tolerance.
+                    var tol = key.Contains("lid_edge") ? tolerance * 4 : tolerance;
+                    ok = Math.Abs(pct) <= tol;
                     gap = $"{pct:+0;-0}%";
-                    size = pct / tolerance;
+                    size = pct / tol;
                 }
                 rows.Add((ok, Math.Abs(size), new JsonObject
                 {

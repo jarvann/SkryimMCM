@@ -2899,7 +2899,7 @@
         {
           "id": "FEAT-251",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetFace (one load for sliders, tints, head parts) and FaceSideBySide",
           "description": "From the in-game agent's list (one combined edit call; a side-by-side sheet for the player). SetFace(sliders, tints, headParts, dryRun): slider edits (shared with SetFaceSliders through ApplySliders) and tint edits (index to #RRGGBB, #RRGGBB@alpha or @alpha) in one preset round trip, then head parts by type through set_head_part and one tint refresh; tint input is validated before anything is applied. FaceSideBySide(reference, image = live, expression...): the reference picture and a capture cropped to the same face height (landmarks 10-152), side by side, with the shape and colour scores and the largest gaps written underneath; saved to SkyLinkAI\\\\face_sheets and returned as an image.",
@@ -2911,6 +2911,10 @@
             {
               "datetime": "2026-11-18T14:55",
               "note": "In game (build 72): SetFace changed hair (KSSMP Lavender -> Feather), lips (#B00030 -> #7A2A6E), blush (0.50 -> 0.25), smile and eyelash sliders in one call, backup first, tint and RaceMenu store refreshed. FaceSideBySide not yet tested."
+            },
+            {
+              "datetime": "2026-11-18T16:00",
+              "note": "In game (build 75): FaceSideBySide saved a sheet with both faces at the same size and the top gaps underneath; the agent's most useful single view."
             }
           ],
           "targetRelease": "1.3"
@@ -2926,6 +2930,10 @@
             {
               "datetime": "2026-11-18T13:20",
               "note": "Built on feature/FEAT-252-profile-from-mesh."
+            },
+            {
+              "datetime": "2026-11-18T16:00",
+              "note": "In game (build 75): failed on a NaN (BUG-055)."
             }
           ],
           "targetRelease": "1.3"
@@ -2933,7 +2941,7 @@
         {
           "id": "FEAT-253",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "ProbeSliders: probe a list of sliders in one call",
           "description": "From the in-game agent's list (probe a region in one call, cached per head). ProbeSliders(sliders: name to test value) runs ProbeSlider for each in turn, reusing the before-measurement, within a time budget (default 100 s), and returns the results so far plus the sliders still to do; every result goes to SliderNotes.",
@@ -2941,6 +2949,10 @@
             {
               "datetime": "2026-11-18T13:30",
               "note": "Built on feature/FEAT-253-probe-sliders."
+            },
+            {
+              "datetime": "2026-11-18T16:00",
+              "note": "In game (build 75): four sliders in one call, all put back and recorded; NSK_LipThickness lip height +13.7%, CME_NoseUpDown nose length -3.4%. Lid-edge noise handled in BUG-055."
             }
           ],
           "targetRelease": "1.3"
@@ -3001,6 +3013,25 @@
             {
               "datetime": "2026-11-18T15:30",
               "note": "Player gave the go for the pose model download. Built on feature/FEAT-255-body-measure-2 (scripts/body-model-check.py is the reference implementation)."
+            },
+            {
+              "datetime": "2026-11-18T16:00",
+              "note": "In game (build 75): joint ratios repeat across two captures; silhouette widths don't (BUG-055)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-055",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "MeasureProfile NaN; lid-edge noise in probes and comparisons; body silhouette widths unreliable",
+          "description": "In game (build 75): MeasureProfile failed (infinity/NaN can't be written as JSON): a landmark with no face vertex within 0.08 eye widths gave NaN. The search widens (0.08, 0.16, 0.3) and an unmeasurable value comes back null. ProbeSliders moved lower_lid_edge_right 5-10% on every probe, a nose slider too: lid-edge measures now need four times the noise floor in probes and four times the tolerance in MeasureFace comparisons. MeasureBody's joint ratios repeated well (shoulders 0.175/0.171, legs 0.490/0.489, hips/shoulders 0.647/0.642) but the silhouette widths didn't (waist 1.364 then 1.024): they are moved to silhouette_unproven and not compared; unmeasurable values are -1, not NaN.",
+          "history": [
+            {
+              "datetime": "2026-11-18T16:00",
+              "note": "From the in-game agent's build 75 tests (FaceSideBySide passed; ProbeSliders passed, NSK_LipThickness and CME_NoseUpDown correct). Fixed on bugfix/BUG-055-profile-nan-probe-noise-body."
             }
           ],
           "targetRelease": "1.3"

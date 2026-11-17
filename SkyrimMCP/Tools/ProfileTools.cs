@@ -74,8 +74,12 @@ public class ProfileTools : ToolBase
                 foreach (var id in ids)
                 {
                     var p = Px(id);
-                    var near = verts.Where(v => Dist((v.X, v.Y), p) < eyeWidthPx * 0.08).Select(v => v.D).ToList();
-                    if (near.Count > 0) ds.Add(near.Min());
+                    // BUG-055: widen the search if no vertex lies right under the landmark (a sparse part of the mesh).
+                    foreach (var reach in new[] { 0.08, 0.16, 0.3 })
+                    {
+                        var near = verts.Where(v => Dist((v.X, v.Y), p) < eyeWidthPx * reach).Select(v => v.D).ToList();
+                        if (near.Count > 0) { ds.Add(near.Min()); break; }
+                    }
                 }
                 return ds.Count > 0 ? ds.Average() : double.NaN;
             }
@@ -84,7 +88,12 @@ public class ProfileTools : ToolBase
                 .Select(a => Math.Sqrt(Math.Pow(a[0]!.GetValue<double>() * sw, 2) + Math.Pow(a[1]!.GetValue<double>() * sh, 2)))
                 .OrderByDescending(v => v).Take(2).Average();
             var eyeWidthUnits = eyeWidthPx / Math.Max(1e-6, jac);
-            double Out(double behind, double front) => Math.Round((behind - front) / eyeWidthUnits, 3);
+            // A measure with no vertices under its landmarks comes back null, not NaN (which can't be written as JSON).
+            JsonNode? Out(double behind, double front)
+            {
+                var v = (behind - front) / eyeWidthUnits;
+                return double.IsNaN(v) || double.IsInfinity(v) ? null : JsonValue.Create(Math.Round(v, 3));
+            }
 
             var corners = Depth(33, 133, 263, 362);
             var result = new JsonObject
@@ -103,7 +112,7 @@ public class ProfileTools : ToolBase
                 Content = [new TextContentBlock { Text = new JsonObject
                 {
                     ["unit"] = "eye widths toward the viewer (positive = stands out more)",
-                    ["eyeWidthUnits"] = Math.Round(eyeWidthUnits, 3),
+                    ["eyeWidthUnits"] = double.IsFinite(eyeWidthUnits) ? Math.Round(eyeWidthUnits, 3) : null,
                     ["profile"] = result,
                     ["capture"] = preview,
                 }.ToJsonString() }],
