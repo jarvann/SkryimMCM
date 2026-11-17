@@ -661,6 +661,65 @@ public partial class RaceMenuTools
     }
 
     [McpServerTool]
+    [Description("Start from a neutral head (FEAT-245): sets every face slider back to its default (the 19 vanilla morphs to 0, the " +
+        "vanilla nose/eyes/mouth presets to 0, every RaceMenu extended slider removed) and removes the sculpt, so slider responses " +
+        "are predictable when building a new face. Keeps head parts (hair, eyes, brows), makeup tints and colours. keepSculpt=true " +
+        "keeps the sculpt; keepSliders=true keeps the sliders (with keepSculpt=false: remove only the sculpt). Backs up first like " +
+        "every face edit; save a named preset before if you want to come back to this face. dryRun shows what would change.")]
+    public async Task<object> ResetFace(bool keepSculpt = false, bool keepSliders = false, bool dryRun = false)
+    {
+        if (keepSculpt && keepSliders) return new { error = "Nothing to reset: keepSculpt and keepSliders are both true." };
+        object? reset = null;
+        var (outcome, backup, file) = await RoundTrip(preset =>
+        {
+            var morphs = preset["morphs"] as JsonObject ?? new JsonObject();
+            preset["morphs"] = morphs;
+            var vanillaChanged = 0;
+            var extendedRemoved = 0;
+            var sculptHosts = 0;
+            if (!keepSliders)
+            {
+                var def = morphs["default"] as JsonObject ?? new JsonObject();
+                morphs["default"] = def;
+                var vanilla = new JsonArray();
+                var old = def["morphs"] as JsonArray ?? new JsonArray();
+                for (var i = 0; i < 19; i++)
+                {
+                    if (i < old.Count && Math.Abs(old[i]?.GetValue<double>() ?? 0) > 1e-6) vanillaChanged++;
+                    vanilla.Add(0.0);
+                }
+                def["morphs"] = vanilla;
+                if (def["presets"] is JsonArray presets)
+                    for (var i = 0; i < presets.Count; i++) presets[i] = 0L;
+                extendedRemoved = (morphs["custom"] as JsonArray)?.Count ?? 0;
+                morphs["custom"] = new JsonArray();
+            }
+            if (!keepSculpt)
+            {
+                sculptHosts = (morphs["sculpt"] as JsonArray)?.Count ?? 0;
+                morphs["sculpt"] = new JsonArray();
+            }
+            reset = new { vanillaMorphsChanged = vanillaChanged, extendedSlidersRemoved = extendedRemoved, sculptedMeshesCleared = sculptHosts };
+            return true;
+        }, dryRun);
+
+        var loaded = outcome?.Loaded == true;
+        if (loaded) await NotifyInGame("Face reset to a neutral head");
+        return new
+        {
+            applied = loaded,
+            reset,
+            headParts = outcome?.HeadParts?.DeepClone(),
+            tints = outcome?.Tints,
+            dryRun,
+            backup,
+            restoreWith = _sessionBackup != null ? $"LoadRaceMenuPreset('{_sessionBackup}')" : null,
+            file,
+            error = !dryRun && !loaded ? "CharGen.LoadCharacterPreset returned false: the face is unchanged." : null,
+        };
+    }
+
+    [McpServerTool]
     [Description("Record what a face slider does on this character's head, so later sessions don't probe it again: note 'inert' " +
         "(no measurable effect; 'inert (detail)' also counts), or the effect found (e.g. 'nose length -8% at 0.7'). Several at once: notes is a map of slider " +
         "name to note; an empty note removes the entry. Without notes, lists what is recorded. Stored per character (name and " +

@@ -2547,7 +2547,7 @@
         {
           "id": "FEAT-244",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Face studio: fixed lights for captures, trip to an interior and back",
           "description": "Colour tuned by number kept overshooting because every capture had different light (tavern, haze, snow, noon). StudioLights(preset, intensity): key (front-right), fill (front-left) and rim lights around the player's head as engine-level NiPointLights attached to her 3D root and added to the shadow scene: nothing placed in the world or saved; found again by name after a logic DLL reload; gone on a cell change. Presets neutral, warm, daylight, soft, off. StudioGo(cell = QASmoke, preset): places a persistent XMarker with her position and facing (Mark), CenterOnCell to the interior, waits for arrival, turns the lights on; state in SkyLinkAI\\\\studio.json. StudioReturn: removes the lights, MoveTo the marker (matching its rotation), waits, deletes the marker (Recall). CaptureFace and MeasureFace report the studio preset and cell. Test first: StudioLights(neutral) where she stands, CaptureFace: lit evenly while frozen; then StudioGo / StudioReturn.",
@@ -2559,6 +2559,10 @@
             {
               "datetime": "2026-11-18T00:10",
               "note": "In game (build 47), lights only: StudioLights(neutral) outdoors, CaptureFace frozen shot evenly lit, no hair shadow; studio preset and cell reported in CaptureFace and MeasureFace. Under it the grey face read as pale neutral skin (skin #ADA5A3 vs eye white #AEADAE), not a tint fault. StudioGo/StudioReturn not run yet (needs a save). Lid height and depth still moved between scenes (0.231 vs 0.212, 0.142 vs 0.129): tune eyes only from captures in the same studio light."
+            },
+            {
+              "datetime": "2026-11-18T01:30",
+              "note": "In game (builds 49-51): full trip worked: StudioGo to QASmoke with lights, stable measurements (two runs within about 1%), StudioReturn to the exact spot and facing (POIPineForest13, 48.08 deg). Arya result: _Cory/Arya_Look_v9, 10/17 shape within tolerance under neutral studio light; eyes 9-10% too closed, lower lid needs sculpt."
             }
           ],
           "targetRelease": "1.3"
@@ -2653,7 +2657,7 @@
         {
           "id": "BUG-039",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Studio preset lost after face edits; makeup missing after an edit",
           "description": "In game (build 49/50, in QASmoke): after every SetFaceSliders or SetFaceTint, CaptureFace reported studio.preset null although StudioLights then removed 3 lights (the lights were there, the preset kept in a plugin variable was not). The preset is now part of each light's name (SkyLinkStudio_<preset>_<light>) and Status reads it from the lights. Twice the makeup was missing after a load (tan face on arrival; pale lips and no blush after a slider edit) until RepairFace: the tint refresh now rebuilds the face tint a second time 400 ms after the first.",
@@ -2661,6 +2665,40 @@
             {
               "datetime": "2026-11-18T01:00",
               "note": "Found in game by the in-game agent during the v9 studio pass. Fixed on bugfix/BUG-039-studio-preset-tint-rebuild."
+            },
+            {
+              "datetime": "2026-11-18T01:30",
+              "note": "In game (build 51): makeup present on the first capture after the return; brow colour #4A2416 survived the cell change."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-040",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Studio calls error across the loading screen; warm preset one-sided",
+          "description": "In game (build 51): StudioReturn brought her back to the exact spot and facing (48.08 deg) with face and makeup intact, but returned An error occurred invoking studio_return with no text, as StudioGo had: waiting out the load inside one call ran into the client's tool timeout. Each call now waits at most 20 s, replies moving if the load is longer, and the new StudioStatus finishes the trip (face rebuild, lights, marker clean-up); every studio tool returns its error text instead of throwing. The warm preset (key 1.6, fill 0.7) tripped the one-sided-light warning (side balance 12.1): warm and daylight are now even like neutral. Neutral vs warm with the same tints: lightness ratios held (lip lightness 0.602/0.610, brow 0.649/0.631) but redness and warmth shifted 0.05-0.09 with the light colour, so colour is tuned under neutral only.",
+          "history": [
+            {
+              "datetime": "2026-11-18T01:30",
+              "note": "Found in game by the in-game agent. Fixed on feature/FEAT-245-reset-face-studio-quick."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "FEAT-245",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "ResetFace: neutral head for building a new face",
+          "description": "Asked for by the in-game agent before the control builds (photo, illustration): a face with a full-head sculpt and dozens of extended sliders reacts unpredictably. ResetFace(keepSculpt, keepSliders, dryRun): preset round trip with the 19 vanilla morphs at 0, vanilla presets at 0, the extended-slider list emptied and the sculpt removed (RaceMenu's loader erases morph and sculpt data before applying, checked in PresetInterface.cpp); head parts and tints kept. Note from the same source: a preset load also removes all node overrides, which is why the NiOverride brow colour never held.",
+          "history": [
+            {
+              "datetime": "2026-11-18T01:30",
+              "note": "Built on feature/FEAT-245-reset-face-studio-quick. The smile capture asked for alongside it already exists (CaptureFace expression, FEAT-240)."
             }
           ],
           "targetRelease": "1.3"
