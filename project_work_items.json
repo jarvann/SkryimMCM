@@ -2767,6 +2767,10 @@
             {
               "datetime": "2026-11-18T03:45",
               "note": "Built on feature/FEAT-247-exact-hair-colour. Persistence across save and load relies on RaceMenu keeping its form's colour, as it did for the original #5E442E: to be checked in game."
+            },
+            {
+              "datetime": "2026-11-18T04:15",
+              "note": "In game (build 57): SetHairColor(#C88A5A, exact) stored #64452D in RaceMenu's form, on screen #C88A5A. Save-and-load persistence still to check. Read as pale blonde under the white studio light: exact colours need judging in the light they will be seen in."
             }
           ],
           "targetRelease": "1.3"
@@ -2782,6 +2786,10 @@
             {
               "datetime": "2026-11-18T03:45",
               "note": "Found in game by the in-game agent on the second photo pass. Fixed on feature/FEAT-247-exact-hair-colour; checked the monochrome rule offline on the sepia photo, the reference and three recent captures."
+            },
+            {
+              "datetime": "2026-11-18T04:15",
+              "note": "In game (build 57): the stale LoadRaceMenuPreset note is gone; the sepia and scar parts not rechecked yet."
             }
           ],
           "targetRelease": "1.3"
