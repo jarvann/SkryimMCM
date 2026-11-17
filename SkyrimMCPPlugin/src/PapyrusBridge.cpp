@@ -409,13 +409,34 @@ namespace SkyrimMCP::PapyrusBridge {
         return {};
     }
 
+    static RE::BSScript::IFunction* FindMemberFunction(RE::BSScript::ObjectTypeInfo* a_type, const std::string& a_fn) {
+        for (auto* type = a_type; type; type = type->GetParent()) {
+            auto* funcs = type->GetMemberFuncIter();
+            for (std::uint32_t i = 0; funcs && i < type->GetNumMemberFuncs(); i++) {
+                auto* func = funcs[i].func.get();
+                if (func && NameEquals(func->GetName(), a_fn)) return func;
+            }
+        }
+        return nullptr;
+    }
+
     json CallPapyrusFunction(const std::string& className,
                               const std::string& functionName,
-                              const json& args) {
+                              const json& args,
+                              const std::string& target) {
         auto* vm = RE::SkyrimVM::GetSingleton();
         auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;
         if (!impl) {
             return {{"error", "Papyrus VM not available"}};
+        }
+
+        // BUG-048: with a target (a form ID or editor ID of a form the script is attached to, such as a quest), call a
+        // member function on that form's script instead of a global one.
+        RE::TESForm* targetForm = nullptr;
+        if (!target.empty()) {
+            try { targetForm = RE::TESForm::LookupByID(Helpers::ParseFormId(target)); } catch (...) { targetForm = nullptr; }
+            if (!targetForm) targetForm = RE::TESForm::LookupByEditorID(target);
+            if (!targetForm) return {{"error", "Target not found: " + target + " (a form ID like 0001A2B3, or an editor ID)"}};
         }
 
         if (!args.is_array()) {
@@ -429,8 +450,11 @@ namespace SkyrimMCP::PapyrusBridge {
                               ". Check the spelling, or that the mod providing it is installed."}};
         }
 
-        // 2. It must declare a global function with that name.
-        auto* func = FindGlobalFunction(typeInfo.get(), functionName);
+        // 2. It must declare a global function with that name (or, with a target, a member function).
+        auto* func = targetForm ? FindMemberFunction(typeInfo.get(), functionName) : FindGlobalFunction(typeInfo.get(), functionName);
+        if (!func && targetForm) {
+            return {{"error", "Member function not found: " + className + "." + functionName + ". Use get_script_functions to list what it has."}};
+        }
         if (!func) {
             if (HasMemberFunction(typeInfo.get(), functionName)) {
                 return {{"error", functionName + " is a member function of " + className +
@@ -491,11 +515,21 @@ namespace SkyrimMCP::PapyrusBridge {
         RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback(rawCallback);
 
         // Dispatch the call (from the pipe thread; see Protocol.cpp for why not TaskQueue)
-        bool dispatched = impl->DispatchStaticCall(
-            RE::BSFixedString(className),
-            RE::BSFixedString(functionName),
-            dynArgs.get(),
-            callback);
+        bool dispatched = false;
+        if (targetForm) {
+            auto* policy = impl->GetObjectHandlePolicy1();
+            const auto handle = policy ? policy->GetHandleForObject(targetForm->GetFormType(), targetForm) : 0;
+            if (!handle || handle == (policy ? policy->EmptyHandle() : 0)) {
+                return {{"error", "The target has no script handle (is the script attached to it?): " + target}};
+            }
+            dispatched = impl->DispatchMethodCall2(handle, RE::BSFixedString(className), RE::BSFixedString(functionName), dynArgs.get(), callback);
+        } else {
+            dispatched = impl->DispatchStaticCall(
+                RE::BSFixedString(className),
+                RE::BSFixedString(functionName),
+                dynArgs.get(),
+                callback);
+        }
 
         if (!dispatched) {
             return {{"error", "Failed to dispatch Papyrus call: " + signature}};
@@ -517,6 +551,7 @@ namespace SkyrimMCP::PapyrusBridge {
         result["className"] = className;
         result["functionName"] = functionName;
         result["signature"] = signature;
+        if (targetForm) result["target"] = std::format("{:08X}", targetForm->GetFormID());
         return result;
     }
 

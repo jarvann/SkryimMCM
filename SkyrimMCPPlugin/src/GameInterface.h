@@ -206,7 +206,7 @@ namespace SkyrimMCP {
         inline json GetPapyrusCatalog() { return PapyrusBridge::GetPapyrusCatalog(); }
         inline json ScanPapyrusSources() { return PapyrusBridge::ScanPapyrusSources(); }
         inline json GetScriptFunctions(const std::string& className) { return PapyrusBridge::GetScriptFunctions(className); }
-        inline json CallPapyrusFunction(const std::string& className, const std::string& functionName, const json& args) { return PapyrusBridge::CallPapyrusFunction(className, functionName, args); }
+        inline json CallPapyrusFunction(const std::string& className, const std::string& functionName, const json& args, const std::string& target = "") { return PapyrusBridge::CallPapyrusFunction(className, functionName, args, target); }
 
         // === UI (UIManager) ===
         inline json GetMenuState() { return UIManager::GetMenuState(); }

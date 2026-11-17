@@ -72,14 +72,17 @@ public class PapyrusTools : ToolBase
         "Get ConsoleUtil version: className='ConsoleUtil', functionName='GetVersion', args=[] " +
         "Execute console command: className='ConsoleUtil', functionName='ExecuteCommand', args=['tgm'] " +
         "Add experience: className='Experience', functionName='AddExperience', args=[100, true] " +
-        "LIMITATION: Functions taking Form, Actor or array arguments cannot be called yet (they are rejected, not sent).")]
-    public async Task<object> CallPapyrusFunction(string className, string functionName, string? args = null)
+        "LIMITATION: Functions taking Form, Actor or array arguments cannot be called yet (they are rejected, not sent). " +
+        "target: to call a member (non-global) function on the script attached to a form, the form's ID or editor ID, e.g. " +
+        "className='RaceMenu', functionName='SaveTints', target='RaceMenu' (RaceMenu's quest).")]
+    public async Task<object> CallPapyrusFunction(string className, string functionName, string? args = null, string? target = null)
     {
         var parms = new JsonObject
         {
             ["className"] = className,
             ["functionName"] = functionName
         };
+        if (!string.IsNullOrWhiteSpace(target)) parms["target"] = target.Trim();
 
         if (!string.IsNullOrEmpty(args))
         {
