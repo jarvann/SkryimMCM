@@ -19,6 +19,13 @@ public class FaceCaptureTools : ToolBase
 
     private const double MinDistance = 28;
 
+    // The game's expressions (SetExpressionOverride indices): the Dialogue set reads clearest in a still.
+    private static readonly Dictionary<string, int> Expressions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["neutral"] = -1, ["angry"] = 0, ["afraid"] = 1, ["happy"] = 2, ["smile"] = 2, ["sad"] = 3, ["surprised"] = 4,
+        ["puzzled"] = 5, ["disgusted"] = 6, ["mood-happy"] = 10, ["mood-sad"] = 11,
+    };
+
     private static readonly Dictionary<string, float> Views = new(StringComparer.OrdinalIgnoreCase)
     {
         ["front"] = 0f,
@@ -39,11 +46,16 @@ public class FaceCaptureTools : ToolBase
         "hides the hair for the shot so brows, forehead and ears show, and makes captures match pixel for pixel (hair physics can still be moving when time stops). crop 'x,y,width,height' in fractions of the frame; by " +
         "default a square on the middle of the screen. Waits out a blink before freezing. showImage=false returns only the file paths " +
         "(the preview is still written), to save context when probing; MeasureFace reads the preview. The game must be the active " +
-        "window. Compare captures only when they use the same view, distance and heightOffset.")]
+        "window. expression (neutral, happy/smile, sad, angry, surprised, puzzled, disgusted, afraid, mood-happy, mood-sad) with strength " +
+        "0-1 (default 0.7) holds that expression for the shot, to compare with a reference that isn't neutral (a smiling photo); " +
+        "it needs neutralPose (the default) and is cleared afterwards. Compare captures only when they use the same view, " +
+        "distance, heightOffset and expression.")]
     public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,
         double heightOffset = -3, bool hideHair = false, bool neutralPose = true, bool aimFromHead = true, string? crop = null,
-        int previewWidth = 1200, int waitSeconds = 10, bool showImage = true)
+        int previewWidth = 1200, int waitSeconds = 10, bool showImage = true, string expression = "neutral", double strength = 0.7)
     {
+        if (!Expressions.TryGetValue(expression.Trim(), out var expressionIndex))
+            return Error($"expression must be one of {string.Join(", ", Expressions.Keys)}");
         float angleDeg;
         if (angle.HasValue) angleDeg = (float)angle.Value;
         else if (!Views.TryGetValue(view.Trim(), out angleDeg))
@@ -63,7 +75,12 @@ public class FaceCaptureTools : ToolBase
             // With a weapon or spell out, prepare only sheathes it (forcing the idle then leaves the hands stuck).
             for (var attempt = 0; attempt < 4; attempt++)
             {
-                pose = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "prepare" });
+                pose = await _pipe.SendRequestAsync("face_camera", new JsonObject
+                {
+                    ["mode"] = "prepare",
+                    ["expression"] = expressionIndex,
+                    ["strength"] = Math.Clamp(strength, 0, 1),
+                });
                 if (pose?["sheathing"]?.GetValue<bool>() != true) break;
                 sheathed = true;
                 await Task.Delay(1000);
@@ -111,6 +128,7 @@ public class FaceCaptureTools : ToolBase
                     hideHair,
                     crop,
                     pose,
+                    expression = expressionIndex >= 0 ? $"{expression} {Math.Clamp(strength, 0, 1):0.##}" : null,
                     eyes = enter?["eyes"],
                     blinkWaits = blinkWaits > 0 ? blinkWaits : (int?)null,
                     sheathed = sheathed ? "A weapon or spell was out: it was sheathed first (draw it again yourself)." : null,

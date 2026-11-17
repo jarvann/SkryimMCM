@@ -310,7 +310,9 @@ namespace SkyrimMCP::Protocol {
             float distance = params.value("distance", 40.0f);
             float height = params.value("heightOffset", 0.0f);
             bool aimFromHead = params.value("aimFromHead", true);
-            if (mode == "prepare") return GameThread(id, []() { return FaceCamera::Prepare(); });
+            int expression = params.value("expression", -1);
+            float strength = params.value("strength", 0.7f);
+            if (mode == "prepare") return GameThread(id, [=]() { return FaceCamera::Prepare(expression, strength); });
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair); });
             if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
             if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
