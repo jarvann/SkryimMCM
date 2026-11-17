@@ -2734,6 +2734,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-246",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "One face reference from several pictures",
+          "description": "Asked for by the in-game agent after two photos of the same person, years apart, agreed on eye width (0.213/0.212), spacing (1.307/1.320), nose length (0.295/0.294) and iris size (0.468/0.472) but one was turned, tilted and colour-cast. SetFaceReference(image, morePictures): measures each, uses the median of each measure over the pictures without pose flags (all of them when every one is flagged), takes colour from the first picture whose colour is usable, and reports per picture whether it was used.",
+          "history": [
+            {
+              "datetime": "2026-11-18T03:20",
+              "note": "Built on feature/FEAT-246-multi-picture-reference."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-245",
           "type": "feature",
           "status": "complete",
