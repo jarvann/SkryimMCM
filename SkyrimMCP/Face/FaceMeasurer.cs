@@ -356,7 +356,9 @@ public sealed class FaceMeasurer : IDisposable
         foreach (var (side, iris, rimA, rimB) in new[] { ("right", 468, 469, 471), ("left", 473, 474, 476) })
         {
             var r = D(L, rimA, rimB) / 2;
-            if (r < 3) continue;
+            // BUG-051: small eyes (a photo reference: edges read 1.57/1.74 against 0.60 on the build) give no reliable
+            // edge; under 10 pixels of iris radius they are left out, so they aren't compared either.
+            if (r < 10) continue;
             double cx = L[iris, 0], cy = L[iris, 1];
             var lo = new List<double>();
             var up = new List<double>();
