@@ -486,6 +486,10 @@ namespace SkyrimMCP::PlayerQueries {
         // CharGen.LoadCharacterPreset takes the hair colour form (FEAT-228).
         result["hairColorFormId"] = (base->headRelatedData && base->headRelatedData->hairColor)
                                         ? json(std::format("{:08X}", base->headRelatedData->hairColor->GetFormID())) : json(nullptr);
+        if (base->headRelatedData && base->headRelatedData->hairColor) {
+            const auto& c = base->headRelatedData->hairColor->color;
+            result["hairColor"] = std::format("#{:02X}{:02X}{:02X}", c.red, c.green, c.blue);
+        }
 
         // Face morphs (19 values)
         if (base->faceData) {

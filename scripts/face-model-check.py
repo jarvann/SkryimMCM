@@ -171,7 +171,19 @@ def lid_gaps(L):
         c = L[iris][:2]
         up.append(float(np.dot(c - L[upper][:2], normal)) / r)
         low.append(float(np.dot(L[lower][:2] - c, normal)) / r)
-    return {"upper_lid_gap / iris_radius": sum(up) / 2, "lower_lid_gap / iris_radius": sum(low) / 2}
+    # Lid positions from the corner-to-corner line, in eye widths: these don't move when the eyes look up or
+    # down, unlike the gaps to the iris centre.
+    lid_up, lid_low = [], []
+    for outer, inner, upper, lower in ((33, 133, 159, 145), (263, 362, 386, 374)):
+        axis = L[inner][:2] - L[outer][:2]
+        width = np.linalg.norm(axis)
+        normal = np.array([-axis[1], axis[0]]) / width
+        if normal[1] < 0:
+            normal = -normal
+        lid_up.append(float(np.dot(L[outer][:2] - L[upper][:2], normal)) / width)
+        lid_low.append(float(np.dot(L[lower][:2] - L[outer][:2], normal)) / width)
+    return {"upper_lid_gap / iris_radius": sum(up) / 2, "lower_lid_gap / iris_radius": sum(low) / 2,
+            "upper_lid_height / eye_width": sum(lid_up) / 2, "lower_lid_depth / eye_width": sum(lid_low) / 2}
 
 
 PITCH_LEVEL = 13.0
@@ -223,8 +235,8 @@ def lab_to_hex(lab):
 
 # Sample spots: a landmark index, or a pair whose midpoint is sampled.
 COLOUR_SPOTS = {
-    "skin": [199, 200, 208, 428, 6, 197],                   # chin, plus the upper nose bridge: no makeup; mostly chin, as the bridge catches highlights in sunlight
-    "cheeks": [50, 280, (50, 205), (280, 425)],              # where blush goes
+    "skin": [199, 200, 208, 428],                           # chin: no makeup (blush bands can cross the nose), lit like the face
+    "cheeks": [50, 280, (50, 205), (280, 425), 101, 330, 118, 347, 205, 425],  # cheekbones to the apples: wherever blush sits
     "lips": [(0, 13), (14, 17), (37, 82), (267, 312), (84, 87), (314, 317)],
     "brows": [(63, 53), (105, 52), (66, 65), (293, 283), (334, 282), (296, 295)],
 }
@@ -319,7 +331,8 @@ def colours(rgb, L):
         "brow_lightness (brow / skin luminance)": Y(lin["brows"]) / Y(skin),
         "lip_redness (log2 R/G vs skin)": lg(lin["lips"][0] / lin["lips"][1]) - lg(skin[0] / skin[1]),
         "lip_lightness (lip / skin luminance)": Y(lin["lips"]) / Y(skin),
-        "blush (log2 R/G cheek vs skin)": lg(lin["cheeks"][0] / lin["cheeks"][1]) - lg(skin[0] / skin[1]),
+        # the reddest fifth of the cheek pixels, so a blush band is found wherever it sits on the cheek
+        "blush (log2 R/G cheek vs skin)": float(np.percentile(np.log2((linear(regions["cheeks"])[:, 0] + 1e-4) / (linear(regions["cheeks"])[:, 1] + 1e-4)), 80)) - lg(skin[0] / skin[1]),
         "iris_lightness (iris / skin luminance)": Y(lin["iris"]) / Y(skin),
     }
     # Against the white of the eye (a near-neutral white under the same light): the skin's and iris's own colour.

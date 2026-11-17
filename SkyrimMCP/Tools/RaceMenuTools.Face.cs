@@ -676,6 +676,26 @@ public partial class RaceMenuTools
         });
     }
 
+    [McpServerTool]
+    [Description("Read the colour the hair and brow meshes are rendering with right now (their hair-tint shader colour), next to " +
+        "the hair colour stored on the character (get_appearance hairColorFormId). Use it when the hair looks a different colour " +
+        "than before: the shader colour is what shows; the stored form is what the game puts back on a cell change or load. " +
+        "Read-only.")]
+    public async Task<object> GetHairTint()
+    {
+        var hair = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 3 });
+        var brows = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6 });
+        var appearance = await _pipe.SendRequestAsync("get_appearance");
+        return DeserializeResponse(new JsonObject
+        {
+            ["hairShader"] = hair?.DeepClone(),
+            ["browShader"] = brows?.DeepClone(),
+            ["storedHairColorFormId"] = appearance?["hairColorFormId"]?.DeepClone(),
+            ["storedHairColor"] = appearance?["hairColor"]?.DeepClone(),
+            ["storedBrowColor"] = SkyrimMCP.Face.FaceState.GetBrowColor(SkyrimMCP.Face.FaceState.Key(appearance)),
+        });
+    }
+
     /// <summary>Puts the character's stored brow colour back after Game.UpdateHairColor reset it.</summary>
     private Task ReapplyBrowColor() => SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
 }
