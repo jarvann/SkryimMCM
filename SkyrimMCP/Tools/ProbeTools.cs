@@ -27,11 +27,13 @@ public class ProbeTools : ToolBase
     [Description("Find out what a face slider does on this head: sets slider to value, measures the face (MeasureFace, live), puts " +
         "the slider back, and reports which proportions and lid measures moved, by how much and which way. Records the result " +
         "with SliderNotes ('inert' when nothing moved beyond noise). Use it before committing to a slider: one call per slider, " +
-        "about 20-40 seconds. Measure under the studio's neutral light (StudioGo or StudioLights) so lighting can't fake a change. " +
+        "about 30-50 seconds (samples defaults to 3: with 2, head-pitch drift between captures faked changes in vertical measures). " +
+        "Lower-lid measures don't follow the real lid edge on game renders (a visible sculpted move didn't register): judge the lower " +
+        "lid by eye in a close-up. Measure under the studio's neutral light (StudioGo or StudioLights) so lighting can't fake a change. " +
         "The face before the probe is measured once and reused for later probes while nothing else has changed the face. noise: " +
         "changes under this many percent count as no change (default 3: at 2 an unrelated measure crossing it by 0.2% made an " +
         "inert slider look active).")]
-    public async Task<CallToolResult> ProbeSlider(string slider, double value, int samples = 2, double noise = 3.0)
+    public async Task<CallToolResult> ProbeSlider(string slider, double value, int samples = 3, double noise = 3.0)
     {
         try
         {
