@@ -2791,6 +2791,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-046",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Makeup set through SkyLink reverts on every load and cell change",
+          "description": "In game (build 60): after loading a save, sliders, head parts, sculpt and the exact hair colour were right but four tint layers were back to the original makeup (the same values as after the earlier studio trip). Cause, from RaceMenu's own script (racemenu.psc): it keeps the player's tint layers and hair colour in quest-script arrays, saved only when its menu closes or a menu slider changes, and puts them back on OnGameReload and On3DLoaded (LoadTints), so any tint set outside its menu is undone by the next load or 3D reload. The script listens for the mod event RSM_RequestTintSave (SaveHair + SaveTints). SkyLink now sends it (ModEvent.Create/Send through the Papyrus bridge) after every face-tint refresh (every preset load and face edit), after SetHairColor and after SetSkinTone on the player, so RaceMenu stores the live makeup itself.",
+          "history": [
+            {
+              "datetime": "2026-11-18T06:40",
+              "note": "Found by the in-game agent after a save and load; cause confirmed from RaceMenu's script source. Fixed on bugfix/BUG-046-tints-persist."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-044",
           "type": "bug",
           "status": "implemented-untested",

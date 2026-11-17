@@ -73,6 +73,32 @@ public static class FaceState
         lock (Lock) return Load()[key]?["sliderNotes"]?.DeepClone() as JsonObject ?? new JsonObject();
     }
 
+    /// <summary>
+    /// BUG-046: RaceMenu keeps its own copy of the player's tint layers and hair colour in its quest script and puts
+    /// them back on every game load and every time her 3D loads (OnGameReload, On3DLoaded: LoadTints), so makeup set
+    /// outside its menu reverted. Its script listens for the mod event RSM_RequestTintSave (SaveHair, SaveTints), which
+    /// copies the live tints and hair colour into that store. Sent through SKSE's ModEvent script.
+    /// </summary>
+    public static async Task<string> RaceMenuSaveTints(IPipeClient pipe)
+    {
+        try
+        {
+            var handle = await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ModEvent", ["functionName"] = "Create", ["args"] = new JsonArray("RSM_RequestTintSave"),
+            });
+            if (handle?["error"] is JsonNode error) return "RaceMenu tint store not updated: " + error;
+            var id = handle?["result"]?.GetValue<int>() ?? 0;
+            if (id == 0) return "RaceMenu tint store not updated: ModEvent.Create returned 0";
+            await pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ModEvent", ["functionName"] = "Send", ["args"] = new JsonArray(id),
+            });
+            return "RaceMenu's own tint store updated (kept through saves, loads and cell changes)";
+        }
+        catch (Exception ex) { return "RaceMenu tint store not updated: " + ex.Message; }
+    }
+
     /// <summary>Puts the character's stored brow colour back on the loaded head. Returns the colour, or null if none is stored.</summary>
     public static async Task<string?> ReapplyBrowColor(IPipeClient pipe)
     {
