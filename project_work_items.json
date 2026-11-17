@@ -2912,6 +2912,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-252",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "MeasureProfile: feature depth from the head mesh",
+          "description": "The agent moved the mouth and nose the wrong way and only saw it in a side capture; a front picture can't show depth. MeasureProfile takes a front capture with the vertex snapshot (as the sculpt brush), finds landmarks, and reads the camera distance of the nearest face-mesh vertices under each: nose projection and bridge (vs the eye corners), upper and lower lip (vs the mouth corners), chin (vs the lower lip), brow ridge, cheek fullness (vs the jaw sides) and forehead slope, in eye widths toward the viewer, using the snapshot jacobian for units. Game face only (the mesh is the truth there).",
+          "history": [
+            {
+              "datetime": "2026-11-18T13:20",
+              "note": "Built on feature/FEAT-252-profile-from-mesh."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "implemented-untested",
