@@ -240,6 +240,7 @@ public partial class RaceMenuTools
                 region,
                 direction = dir,
                 amount,
+                radius = reachRadius,
                 eyeWidthPixels = Math.Round(eyeWidthPx, 1),
                 eyeWidthUnits = Math.Round(eyeWidthUnits, 3),
                 moved = summary,

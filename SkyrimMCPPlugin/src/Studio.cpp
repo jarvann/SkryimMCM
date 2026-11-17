@@ -167,7 +167,7 @@ namespace SkyrimMCP {
                 return {{"error", std::format("No cell with editor ID '{}' (the move didn't start; nothing was changed)", cellEditorId)}};
             }
             result["going"] = cellEditorId;
-            if (!dispelled.empty()) result["lightSpellsDispelled"] = dispelled;
+            result["lightSpellsDispelled"] = dispelled;  // always present (BUG-058), empty when none were on
             return result;
         }
 

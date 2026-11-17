@@ -83,6 +83,8 @@ public class StudioTools : ToolBase
             var finished = await Finish(state);
             await NotifyInGame("Studio: StudioReturn brings you back");
             finished["from"] = before?["cell"]?.DeepClone();
+            finished["lightSpellsDispelled"] = go?["lightSpellsDispelled"]?.DeepClone()
+                ?? (go == null ? JsonValue.Create("unknown (the move reply was lost)") : new JsonArray());
             finished["moveNote"] = goNote;
             return DeserializeResponse(finished);
         }
