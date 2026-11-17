@@ -11,6 +11,9 @@ namespace SkyrimMCP.Face;
 public static class FaceState
 {
     private static string FilePath => Path.Combine(SkyLinkSettings.Folder, "face_state.json");
+
+    /// <summary>Counts live face edits in this server session, so a cached measurement can tell it is out of date (FEAT-248).</summary>
+    public static int FaceEdits;
     private static readonly object Lock = new();
 
     /// <summary>The character key: name and race, from get_appearance.</summary>

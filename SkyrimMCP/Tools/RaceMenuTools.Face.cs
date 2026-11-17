@@ -368,6 +368,7 @@ public partial class RaceMenuTools
         var editedPath = Path.Combine(Path.GetDirectoryName(live.Path)!, "_edit.jslot");
         WriteJslot(editedPath, preset);
         var outcome = await LoadPresetsTabPreset($"{WorkFolder}/_edit", editedPath);
+        Interlocked.Increment(ref SkyrimMCP.Face.FaceState.FaceEdits);
         return (outcome, backupMade, editedPath);
     }
 

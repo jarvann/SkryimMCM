@@ -2795,6 +2795,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-248",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "ProbeSlider: what a slider does on this head, by measurement",
+          "description": "Asked for by the in-game agent from the first day; it probed every slider by hand and guessed three directions wrong. ProbeSlider(slider, value, samples = 2, noise = 2%): measures the live face (reusing the last measurement while no face edit has happened since, via a session edit counter), sets the slider, measures again, always puts the slider back, and reports the proportions and lid measures that moved over the noise, largest first, with direction. Writes the result to SliderNotes (inert, or the top changes). Warns when there is no studio light, or when the capture had lighting warnings or pose flags.",
+          "history": [
+            {
+              "datetime": "2026-11-18T04:40",
+              "note": "Built on feature/FEAT-248-probe-slider while the agent writes skill v2."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-245",
           "type": "feature",
           "status": "complete",
