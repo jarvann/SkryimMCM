@@ -108,13 +108,30 @@ public class StudioTools : ToolBase
 
     [McpServerTool]
     [Description("Bring the player back from the studio to the exact spot and facing StudioGo marked, remove the studio lights, and " +
-        "delete the marker once she is back.")]
-    public async Task<object> StudioReturn()
+        "delete the marker once she is back. markerId: only when no trip is on record (a lost StudioGo reply); without it, the " +
+        "reply lists the candidate markers.")]
+    public async Task<object> StudioReturn(string? markerId = null)
     {
         var state = LoadState();
-        var markerId = state["markerId"]?.GetValue<string>();
-        if (markerId == null) return new { error = "No studio trip on record: nothing to return from." };
-        var studioCell = state["studioCell"]?.GetValue<string>() ?? "";
+        markerId ??= state["markerId"]?.GetValue<string>();
+        if (markerId == null)
+        {
+            // A trip whose marker ID was lost (BUG-038): list the markers placed at run time so the right one can be chosen.
+            var status = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
+            markerId = status?["markerId"]?.GetValue<string>();
+            if (markerId == null)
+            {
+                var found = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "find" });
+                return DeserializeResponse(new JsonObject
+                {
+                    ["error"] = "No studio trip on record. Markers placed at run time, newest first, are listed below: check the cell " +
+                                "and position against where she was, then call StudioReturn(markerId).",
+                    ["candidates"] = found?["markers"]?.DeepClone(),
+                });
+            }
+        }
+        var studioCell = state["studioCell"]?.GetValue<string>()
+            ?? (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" }))?["cell"]?.GetValue<string>() ?? "";
         string? backNote = null;
         try
         {

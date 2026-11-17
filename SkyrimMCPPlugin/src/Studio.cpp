@@ -2,6 +2,7 @@
 #include "Helpers.h"
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <numbers>
@@ -188,6 +189,40 @@ namespace SkyrimMCP {
             marker->SetDelete(true);
             if (s_marker == markerId) s_marker = 0;
             return {{"deleted", true}};
+        }
+
+        json FindMarkers() {
+            // Markers placed at run time (FF-prefixed references to XMarker), newest first: a studio trip whose Go reply
+            // was lost left one at the starting spot (BUG-038).
+            std::vector<RE::TESObjectREFR*> found;
+            {
+                const auto& [all, lock] = RE::TESForm::GetAllForms();
+                RE::BSReadLockGuard guard(lock);
+                if (all) {
+                    for (auto& [id, form] : *all) {
+                        if (!form || (id >> 24) != 0xFF || form->GetFormType() != RE::FormType::Reference) continue;
+                        auto* ref = static_cast<RE::TESObjectREFR*>(form);
+                        auto* base = ref->GetBaseObject();
+                        if (base && base->GetFormID() == 0x0000003B && !ref->IsDeleted() && !ref->IsDisabled()) found.push_back(ref);
+                    }
+                }
+            }
+            std::sort(found.begin(), found.end(), [](auto* a, auto* b) { return a->GetFormID() > b->GetFormID(); });
+            json list = json::array();
+            for (std::size_t i = 0; i < found.size() && i < 5; i++) {
+                auto* ref = found[i];
+                auto* cell = ref->GetParentCell();
+                const char* cellId = cell ? cell->GetFormEditorID() : nullptr;
+                auto* space = ref->GetWorldspace();
+                const char* spaceId = space ? space->GetFormEditorID() : nullptr;
+                const auto pos = ref->GetPosition();
+                list.push_back({{"markerId", std::format("{:08X}", ref->GetFormID())},
+                                {"cell", cellId ? cellId : ""},
+                                {"worldspace", spaceId ? spaceId : ""},
+                                {"position", {pos.x, pos.y, pos.z}},
+                                {"facingDeg", ref->GetAngleZ() * 180.0f / std::numbers::pi_v<float>}});
+            }
+            return {{"markers", list}};
         }
 
         json Status() {
