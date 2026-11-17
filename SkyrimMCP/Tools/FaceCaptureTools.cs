@@ -35,7 +35,7 @@ public class FaceCaptureTools : ToolBase
         "the camera back. view: front (default), three-quarter, three-quarter-left, profile, profile-left; or angle in degrees " +
         "(0 front, 90 the character's right, -90 their left). distance from the head (default 32; below 28 the camera can end up " +
         "inside the head, so it is raised to 28), heightOffset from the head node (default -3, a straight-on portrait). hideHair " +
-        "hides the hair for the shot so brows, forehead and ears show. crop 'x,y,width,height' in fractions of the frame; by " +
+        "hides the hair for the shot so brows, forehead and ears show, and makes captures match pixel for pixel (hair physics can still be moving when time stops). crop 'x,y,width,height' in fractions of the frame; by " +
         "default a square on the middle of the screen. The game must be the active window. Compare captures only when they use " +
         "the same view, distance and heightOffset.")]
     public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,

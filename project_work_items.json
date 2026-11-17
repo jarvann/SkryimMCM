@@ -2319,7 +2319,7 @@
         {
           "id": "FEAT-229",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Face builder M2: repeatable face capture (CaptureFace)",
           "description": "Fixed neutral pose with the idle paused and head tracking off, camera at set positions (front, three-quarter, profile), screenshot, crop to the head and return a ~1200-1568 px image plus the full-size path; same framing every call. Option to hide hair and headgear. Restore pose and camera afterwards. Builds on FEAT-234's preview. Test: two captures a minute apart with no change are near-identical.",
@@ -2339,6 +2339,10 @@
             {
               "datetime": "2026-11-17T04:45",
               "note": "In game (b13_33): aiming worked (rotation.y = yaw, alignment 1.0), hair hiding and restore worked, framing small and low, and two identical captures differed (idle frame, head turn, smile). Build 34: neutral pose first (IdleForceDefaultState, face animation reset), expression reset again once frozen, camera placed from the head bone's forward axis, defaults distance 32 / heightOffset -3, minimum distance 28."
+            },
+            {
+              "datetime": "2026-11-17T05:30",
+              "note": "In game (b13_34): two CaptureFace() calls in a row matched (same head position within 0.05 units, facing 63.40 vs 63.46 degrees, neutral expression, aimedFrom head, alignment 1.0); the defaults frame the face well. Only the hair differed between shots (physics still moving at the freeze); hideHair:true gives pixel-stable captures. Not merged: waiting on the player's 1.3 or 1.4 decision."
             }
           ],
           "targetRelease": "1.4"
