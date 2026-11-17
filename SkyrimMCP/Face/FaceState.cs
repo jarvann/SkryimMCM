@@ -42,6 +42,34 @@ public static class FaceState
         }
     }
 
+    /// <summary>
+    /// Notes on what a slider does on this character's head (FEAT-243): "inert", or the measured effect. Kept so
+    /// later sessions skip sliders already shown to do nothing. A null note removes the entry.
+    /// </summary>
+    public static JsonObject SetSliderNote(string? key, string slider, string? note)
+    {
+        if (key == null) return new JsonObject();
+        lock (Lock)
+        {
+            var all = Load();
+            var entry = all[key] as JsonObject ?? new JsonObject();
+            var notes = entry["sliderNotes"] as JsonObject ?? new JsonObject();
+            if (string.IsNullOrWhiteSpace(note)) notes.Remove(slider);
+            else notes[slider] = new JsonObject { ["note"] = note.Trim(), ["at"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm") };
+            entry["sliderNotes"] = notes;
+            all[key] = entry;
+            Directory.CreateDirectory(SkyLinkSettings.Folder);
+            File.WriteAllText(FilePath, all.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            return (JsonObject)notes.DeepClone();
+        }
+    }
+
+    public static JsonObject GetSliderNotes(string? key)
+    {
+        if (key == null) return new JsonObject();
+        lock (Lock) return Load()[key]?["sliderNotes"]?.DeepClone() as JsonObject ?? new JsonObject();
+    }
+
     /// <summary>Puts the character's stored brow colour back on the loaded head. Returns the colour, or null if none is stored.</summary>
     public static async Task<string?> ReapplyBrowColor(IPipeClient pipe)
     {

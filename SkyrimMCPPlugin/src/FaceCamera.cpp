@@ -136,6 +136,18 @@ namespace SkyrimMCP {
                 return {{"sheathing", true}};
             }
             const bool idleReset = player->NotifyAnimationGraph(RE::BSFixedString("IdleForceDefaultState"));
+            // FEAT-243: let go of whatever the head is tracking (a passer-by, a sound), so it turns back to face
+            // forward during the settle wait instead of being caught mid-turn.
+            int headTrackCleared = 0;
+            if (auto* process = player->GetActorRuntimeData().currentProcess; process && process->high) {
+                using Type = RE::HighProcessData::HEAD_TRACK_TYPES::HEAD_TRACK_TYPE;
+                for (std::uint32_t t = 0; t < Type::kTotal; t++) {
+                    if (process->high->headTrackTarget[t]) {
+                        process->high->ClearHeadtrackTarget(static_cast<Type>(t), false);
+                        ++headTrackCleared;
+                    }
+                }
+            }
             bool expressionReset = false;
             s_expressionSet = false;
             if (auto* face = player->GetFaceGenAnimationData()) {
@@ -149,7 +161,8 @@ namespace SkyrimMCP {
                     s_expressionSet = true;
                 }
             }
-            return {{"idleReset", idleReset}, {"expressionReset", expressionReset}, {"expression", s_expressionSet ? expression : -1}};
+            return {{"idleReset", idleReset}, {"expressionReset", expressionReset}, {"expression", s_expressionSet ? expression : -1},
+                    {"headTrackCleared", headTrackCleared}};
         }
 
         json Enter(bool hideHud, bool hideHair, bool hideEffects) {

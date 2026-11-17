@@ -37,7 +37,7 @@ public class FaceMeasureTools : ToolBase
     [McpServerTool]
     [Description("Measure a face and, if a reference is registered (SetFaceReference), compare it. image: 'live' (default) takes " +
         "CaptureFace shots of the player without returning images (view, hideHair as CaptureFace; samples = how many captures, " +
-        "the median is used; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
+        "the median is used; a neutral front capture flagged as turned, smiling or open-mouthed is retaken, up to twice; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
         "brow height, nose, mouth, lips, jaw, chin, face shape, iris size), lid gaps (upper_lid_gap / iris_radius under 1 means " +
         "the lid covers the top of the iris; over 1, white shows above it: a stare), head pose (yaw, pitch, roll) and " +
         "expression flags (smile, open mouth: those skew mouth and eye numbers), colours of skin, cheeks, lips, brows and iris " +
@@ -55,14 +55,27 @@ public class FaceMeasureTools : ToolBase
 
         var measured = new List<JsonObject>();
         var files = new List<string>();
+        var rejected = new JsonArray();
         if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase))
         {
+            // FEAT-243: a neutral capture that came back flagged (head turned, smile, open mouth: caught mid-animation)
+            // is retaken, up to two extra captures in all.
+            var neutral = expression.Trim().Equals("neutral", StringComparison.OrdinalIgnoreCase);
+            var retakes = 0;
             for (var i = 0; i < samples; i++)
             {
                 var (file, error) = await CaptureLive(view, hideHair, expression, strength);
                 if (error != null) return Error(error);
                 var m = await MeasureFile(file!);
                 if (m == null) return Error($"No face found in the capture {file}: check it with CaptureFace.");
+                var flagged = (m["pose"]?["flags"] as JsonArray)?.Count > 0;
+                if (neutral && flagged && retakes < 2 && view.Trim().Equals("front", StringComparison.OrdinalIgnoreCase))
+                {
+                    retakes++;
+                    rejected.Add(new JsonObject { ["image"] = file, ["flags"] = m["pose"]?["flags"]?.DeepClone() });
+                    i--;
+                    continue;
+                }
                 measured.Add(m);
                 files.Add(file!);
             }
@@ -92,6 +105,7 @@ public class FaceMeasureTools : ToolBase
         {
             ["images"] = new JsonArray(files.Select(f => (JsonNode?)JsonValue.Create(f)).ToArray()),
             ["samples"] = measured.Count,
+            ["retaken"] = rejected.Count > 0 ? rejected : null,
             ["comparison"] = comparison,
             ["reference"] = referenceNote,
             ["measurement"] = measurement,
