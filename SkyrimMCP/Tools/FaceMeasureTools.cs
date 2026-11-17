@@ -117,42 +117,69 @@ public class FaceMeasureTools : ToolBase
     [Description("Register a picture as the face to aim for: measures it once and keeps the result (Documents\\My Games\\Skyrim Special " +
         "Edition\\SkyLinkAI\\face_references.json), so every MeasureFace compares against it. image: a full path, or 'live' for the " +
         "player's current face (a before snapshot). name: 'default' unless you keep several. Read the returned pose flags: a turned " +
-        "head, a smile or an open mouth make some measurements unreliable as a target.")]
-    public async Task<CallToolResult> SetFaceReference(string image, string name = "default", string? note = null)
+        "head, a smile or an open mouth make some measurements unreliable as a target. morePictures: more pictures of the same " +
+        "person; the reference is then the median of each measure over the pictures without pose flags (all of them if every " +
+        "one is flagged), with colour from the first whose colour is usable.")]
+    public async Task<CallToolResult> SetFaceReference(string image, string name = "default", string? note = null, string[]? morePictures = null)
     {
         if (!OperatingSystem.IsWindows()) return Error("Face measurement needs Windows.");
-        string path;
+        var paths = new List<string>();
         if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase))
         {
             var (file, error) = await CaptureLive("front", false, "neutral", 0, 0);
             if (error != null) return Error(error);
-            path = file!;
+            paths.Add(file!);
         }
-        else
+        else paths.Add(image.Trim().Trim('"'));
+        paths.AddRange((morePictures ?? []).Select(p => p.Trim().Trim('"')).Where(p => p.Length > 0));
+        foreach (var path in paths)
+            if (!File.Exists(path)) return Error($"No file at {path}: pass full paths.");
+
+        // FEAT-246: several pictures of one person make one reference: the median of each measure over the pictures
+        // with no pose flags (a turned head, a smile), or over all of them when every one is flagged.
+        var measured = new List<(string Path, JsonObject M, bool Flagged)>();
+        var notFound = new JsonArray();
+        foreach (var path in paths)
         {
-            path = image.Trim().Trim('"');
-            if (!File.Exists(path)) return Error($"No file at {path}: pass a full path.");
+            var m = await MeasureFile(path);
+            if (m == null) { notFound.Add(path); continue; }
+            measured.Add((path, m, (m["pose"]?["flags"] as JsonArray)?.Count > 0));
         }
-        var m = await MeasureFile(path);
-        if (m == null) return Error($"No face found in {path}. A face under about 100 pixels wide may not be found: crop and enlarge it first.");
+        if (measured.Count == 0)
+            return Error("No face found in any picture. A face under about 100 pixels wide may not be found: crop and enlarge it first.");
+        var clean = measured.Where(x => !x.Flagged).ToList();
+        var used = clean.Count > 0 ? clean : measured;
+        var measurement = used.Count == 1 ? used[0].M : Median(used.Select(x => x.M).ToList());
+        // Colour only from pictures whose colour is usable (not sepia or black and white).
+        var colourSource = used.FirstOrDefault(x => x.M["colour"]?["usable"]?.GetValue<bool>() != false).M;
+        if (colourSource != null && used.Count > 1) measurement["colour"] = colourSource["colour"]?.DeepClone();
 
         var refs = LoadReferences();
         refs[name.Trim()] = new JsonObject
         {
-            ["image"] = path,
+            ["image"] = used[0].Path,
+            ["pictures"] = new JsonArray(used.Select(x => (JsonNode?)JsonValue.Create(x.Path)).ToArray()),
             ["note"] = note,
             ["measuredAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-            ["measurement"] = m,
+            ["measurement"] = measurement,
         };
         Directory.CreateDirectory(SkyLinkSettings.Folder);
         await File.WriteAllTextAsync(ReferenceFile, refs.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         return Json(new JsonObject
         {
             ["registered"] = name.Trim(),
-            ["image"] = path,
-            ["flags"] = m["pose"]?["flags"]?.DeepClone(),
-            ["colourCast"] = m["colour"]?["cast"]?.DeepClone(),
-            ["measurement"] = m.DeepClone(),
+            ["pictures"] = new JsonArray(measured.Select(x => (JsonNode?)new JsonObject
+            {
+                ["image"] = x.Path,
+                ["used"] = used.Contains(x),
+                ["flags"] = x.M["pose"]?["flags"]?.DeepClone(),
+                ["colourUsable"] = x.M["colour"]?["usable"]?.DeepClone(),
+            }).ToArray()),
+            ["noFaceFound"] = notFound.Count > 0 ? notFound : null,
+            ["colourFrom"] = colourSource == null ? "none usable" : used.Count > 1 ? used.First(x => x.M == colourSource).Path : null,
+            ["flags"] = measurement["pose"]?["flags"]?.DeepClone(),
+            ["colourCast"] = measurement["colour"]?["cast"]?.DeepClone(),
+            ["measurement"] = measurement.DeepClone(),
         });
     }
 
