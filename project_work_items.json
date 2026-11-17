@@ -2922,7 +2922,7 @@
         {
           "id": "FEAT-252",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "MeasureProfile: feature depth from the head mesh",
           "description": "The agent moved the mouth and nose the wrong way and only saw it in a side capture; a front picture can't show depth. MeasureProfile takes a front capture with the vertex snapshot (as the sculpt brush), finds landmarks, and reads the camera distance of the nearest face-mesh vertices under each: nose projection and bridge (vs the eye corners), upper and lower lip (vs the mouth corners), chin (vs the lower lip), brow ridge, cheek fullness (vs the jaw sides) and forehead slope, in eye widths toward the viewer, using the snapshot jacobian for units. Game face only (the mesh is the truth there).",
@@ -2934,6 +2934,10 @@
             {
               "datetime": "2026-11-18T16:00",
               "note": "In game (build 75): failed on a NaN (BUG-055)."
+            },
+            {
+              "datetime": "2026-11-18T16:30",
+              "note": "In game (build 76): all eight values returned (nose projection 0.811, bridge 0.458, upper lip 0.475, lower lip 0.281, chin -0.379, brow ridge 0.218, cheek fullness 0.435, forehead slope 0.054 eye widths)."
             }
           ],
           "targetRelease": "1.3"
@@ -3024,7 +3028,7 @@
         {
           "id": "BUG-055",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "MeasureProfile NaN; lid-edge noise in probes and comparisons; body silhouette widths unreliable",
           "description": "In game (build 75): MeasureProfile failed (infinity/NaN can't be written as JSON): a landmark with no face vertex within 0.08 eye widths gave NaN. The search widens (0.08, 0.16, 0.3) and an unmeasurable value comes back null. ProbeSliders moved lower_lid_edge_right 5-10% on every probe, a nose slider too: lid-edge measures now need four times the noise floor in probes and four times the tolerance in MeasureFace comparisons. MeasureBody's joint ratios repeated well (shoulders 0.175/0.171, legs 0.490/0.489, hips/shoulders 0.647/0.642) but the silhouette widths didn't (waist 1.364 then 1.024): they are moved to silhouette_unproven and not compared; unmeasurable values are -1, not NaN.",
@@ -3032,6 +3036,25 @@
             {
               "datetime": "2026-11-18T16:00",
               "note": "From the in-game agent's build 75 tests (FaceSideBySide passed; ProbeSliders passed, NSK_LipThickness and CME_NoseUpDown correct). Fixed on bugfix/BUG-055-profile-nan-probe-noise-body."
+            },
+            {
+              "datetime": "2026-11-18T16:30",
+              "note": "In game (build 76): MeasureProfile works; silhouette widths reported under silhouette_unproven."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-056",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "A capture came back as the gameplay view with framing ok; MeasureBody returns nonsense at low confidence",
+          "description": "In game (build 76): one CaptureFace returned the ordinary third-person view from behind her, with a follower in frame, and reported framing ok (a face at 0.61, 0.26, 0.17 of the frame, probably the follower's); the next capture was fine. The plugin now remembers where Aim put the camera and a new face_camera check mode reports whether the free camera is still on and still there; CaptureFace checks right before the screenshot, enters and aims once more if not, and refuses if it still isn't. For a front portrait at the default distance the framing check also expects her face at about (0.50, 0.41), 0.38 of the frame, and flags a face that is much smaller or off to the side. MeasureBody outdoors at dusk with a follower beside her gave shoulders 1.70 then 0.42 of height and a negative head height at key visibility 0.56/0.20: it now refuses below key visibility 0.5 or presence 0.6 (the numbers are returned as unreliable), and its description says to use the studio. MeasureProfile passed (all eight values).",
+          "history": [
+            {
+              "datetime": "2026-11-18T16:30",
+              "note": "From the in-game agent's build 76 tests. Fixed on bugfix/BUG-056-camera-check-body-floor."
             }
           ],
           "targetRelease": "1.3"

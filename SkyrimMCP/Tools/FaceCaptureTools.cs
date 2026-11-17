@@ -141,6 +141,22 @@ public class FaceCaptureTools : ToolBase
             });
             if (aim?["error"] is JsonNode aimError) return Error(aimError.ToString());
             await Task.Delay(300);
+            // BUG-056: confirm the camera is still where it was put; if not, enter and aim once more.
+            var check = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "check" });
+            if (check?["ok"]?.GetValue<bool>() != true)
+            {
+                await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair, ["hideEffects"] = hideEffects });
+                await Task.Delay(250);
+                aim = await _pipe.SendRequestAsync("face_camera", new JsonObject
+                {
+                    ["mode"] = "aim", ["angleDeg"] = angleDeg, ["distance"] = Math.Min(distance, 300), ["heightOffset"] = heightOffset, ["aimFromHead"] = aimFromHead,
+                });
+                await Task.Delay(300);
+                check = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "check" });
+                if (check?["ok"]?.GetValue<bool>() != true)
+                    return Error("The capture camera didn't stay in place (free camera " + (check?["freeCamera"]?.ToString() ?? "?") +
+                                 "): the player may have moved or a menu opened. Capture again.");
+            }
             // FEAT-233: the sculpt brush asks for the head vertices on screen, taken in the same frozen frame.
             if (_takeSnapshot)
                 Snapshot = (await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "snapshot" }))?.DeepClone();
@@ -148,7 +164,7 @@ public class FaceCaptureTools : ToolBase
             crop ??= AutoCrop(enter?["screen"]);
             var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage);
             // The face detector only finds faces turned less than about 50 degrees, so a profile can't be checked.
-            var framing = Math.Abs(angleDeg) <= 50 ? CheckFraming(shot)
+            var framing = Math.Abs(angleDeg) <= 50 ? CheckFraming(shot, Math.Abs(angleDeg) <= 10 && distance <= 40)
                 : "not checked: the face detector only finds faces turned less than about 50 degrees; look at the image";
             shot.Content.Insert(0, new TextContentBlock
             {
@@ -198,7 +214,7 @@ public class FaceCaptureTools : ToolBase
     }
 
     // FEAT-242: a capture that missed the face (the player moved, the scene changed) is reported, not silently returned.
-    private static string? CheckFraming(CallToolResult shot)
+    private static string? CheckFraming(CallToolResult shot, bool portrait)
     {
         if (!OperatingSystem.IsWindows()) return null;
         string? preview = null;
@@ -215,6 +231,10 @@ public class FaceCaptureTools : ToolBase
             var (x, y, size) = face.Value;
             if (Math.Abs(x - 0.5) > 0.2 || Math.Abs(y - 0.5) > 0.25)
                 return $"The face is off centre (at {x:0.00}, {y:0.00} of the frame): capture again before comparing.";
+            // A front portrait at the default distance puts her face at about (0.50, 0.41), 0.38 of the frame; another face
+            // in the frame (a follower behind her, seen when the camera didn't move) is smaller and elsewhere (BUG-056).
+            if (portrait && (size < 0.25 || size > 0.6 || Math.Abs(x - 0.5) > 0.12))
+                return $"The face found isn't framed like a portrait (at {x:0.00}, {y:0.00}, {size:0.00} of the frame; expected about 0.50, 0.41, 0.38): it may be someone else's or the camera didn't move. Capture again.";
             return $"ok (face at {x:0.00}, {y:0.00}, {size:0.00} of the frame)";
         }
         catch (Exception ex) { return "Framing not checked: " + ex.Message; }
