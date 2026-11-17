@@ -78,3 +78,7 @@ Total: about 190-300 human hours, or 28-41 hours of Claude session time and 20-3
 3. **Tint texture for written presets:** `CharGen.LoadCharacter` needs `Textures\CharGen\Exported\<name>.dds`. Either composite it offline from the tint masks or let the game write it (SaveCharacter after live changes).
 4. **Render fidelity:** the offline render only has to be good enough for landmarks and proportions, not for looks. Lighting and skin shading stay simple.
 5. **Slider sets in BSAs:** a BSA (v105, LZ4) reader is a well-known format but adds work to M3.
+
+## Field notes
+
+- [skill-draft-v1.md](face-builder/skill-draft-v1.md): the in-game agent's procedure, measurement method (MediaPipe Face Landmarker, 13 ratios, 5% noise floor) and slider responses from the first fitting pass, 2026-11-17. [face_measure.py](face-builder/face_measure.py) is its measurement script.
