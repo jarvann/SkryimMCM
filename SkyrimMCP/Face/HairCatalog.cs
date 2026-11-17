@@ -30,11 +30,11 @@ public static class HairCatalog
 
     public static HeadBox Head(string? faceModel)
     {
-        var path = faceModel == null ? null : MeshFiles.Find(faceModel);
-        if (path == null) return HeadBox.Default;
+        var bytes = faceModel == null ? null : MeshFiles.Read(faceModel);
+        if (bytes == null) return HeadBox.Default;
         try
         {
-            var p = NifShape.Positions(path);
+            var p = NifShape.Positions(bytes);
             if (p.Count < 50) return HeadBox.Default;
             return new HeadBox(p.Max(v => v.Z), p.Min(v => v.Z), p.Max(v => v.Y), p.Min(v => v.Y), p.Max(v => Math.Abs(v.X)));
         }
@@ -45,9 +45,14 @@ public static class HairCatalog
     public static Shape? Measure(string model, HeadBox head)
     {
         var path = MeshFiles.Find(model);
-        if (path == null) return null;
-        var info = new FileInfo(path);
-        var stamp = $"{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
+        string stamp;
+        if (path != null)
+        {
+            var info = new FileInfo(path);
+            stamp = $"{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
+        }
+        else if (MeshFiles.Source(model) == "bsa") stamp = $"bsa:{head.Top:0.0}:{head.Bottom:0.0}";
+        else return null;
         lock (CacheLock)
         {
             _cache ??= LoadCache();
@@ -55,7 +60,12 @@ public static class HairCatalog
                 return hit["shape"].Deserialize<Shape>();
         }
         Shape shape;
-        try { shape = Compute(NifShape.Positions(path), head); }
+        try
+        {
+            var bytes = MeshFiles.Read(model);
+            if (bytes == null) return null;
+            shape = Compute(NifShape.Positions(bytes), head);
+        }
         catch (Exception) { return null; }
         lock (CacheLock)
         {
@@ -124,11 +134,11 @@ public static class HairCatalog
         var rows = (hairs.Count + columns - 1) / columns;
         var head = HeadBox.Default;
         List<(float X, float Y, float Z)> headPoints = new();
-        if (faceModel != null && MeshFiles.Find(faceModel) is string facePath)
+        if (faceModel != null && MeshFiles.Read(faceModel) is byte[] faceBytes)
         {
             try
             {
-                headPoints = NifShape.Positions(facePath);
+                headPoints = NifShape.Positions(faceBytes);
                 if (headPoints.Count > 50)
                     head = new HeadBox(headPoints.Max(v => v.Z), headPoints.Min(v => v.Z), headPoints.Max(v => v.Y), headPoints.Min(v => v.Y), headPoints.Max(v => Math.Abs(v.X)));
             }
@@ -173,8 +183,8 @@ public static class HairCatalog
                 }
             }
             List<(float X, float Y, float Z)> hairPoints;
-            var path = MeshFiles.Find(hairs[i].Model);
-            try { hairPoints = path == null ? new() : NifShape.Positions(path); } catch (Exception) { hairPoints = new(); }
+            var bytes = MeshFiles.Read(hairs[i].Model);
+            try { hairPoints = bytes == null ? new() : NifShape.Positions(bytes); } catch (Exception) { hairPoints = new(); }
             var step = Math.Max(1, hairPoints.Count / 9000);
             // Front view: hair behind the face light, then the face, then hair in front of it dark, so a fringe shows.
             Plot(hairPoints, backHairBrush, step, front: true, side: false, keep: v => v.Y < midY);
@@ -184,7 +194,7 @@ public static class HairCatalog
             Plot(hairPoints, hairBrush, step, front: false, side: true);
             Plot(headPoints, headBrush, 2, front: false, side: true);
             var label = hairs[i].Label.Length > 46 ? hairs[i].Label[..46] : hairs[i].Label;
-            g.DrawString(path == null ? label + "\n(not a loose file)" : label, font, Brushes.Black, new RectangleF(ox + pad, oy + pad + viewH, tileW - pad * 2, labelH));
+            g.DrawString(bytes == null ? label + "\n(mesh not found)" : label, font, Brushes.Black, new RectangleF(ox + pad, oy + pad + viewH, tileW - pad * 2, labelH));
         }
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
         var jpeg = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);

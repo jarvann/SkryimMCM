@@ -21,8 +21,7 @@ public class HairTools : ToolBase
         "fringe (true: hair covers the forehead above the brows; false: forehead clear), behind (true: much of the hair is behind " +
         "the head, as buns, ponytails or long backs), nameContains (editor ID, name or mod). sort: length, fringe or name. page " +
         "and pageSize (default 12, max 16) step through the matches. Each entry's index is the hair's number in the character " +
-        "menu; apply one with SetHeadPart(type: 'hair', part: <editorId>). Meshes packed in BSA archives can't be read yet and " +
-        "are listed as such. The first call measures every mesh (can take a minute); later calls use a cache.")]
+        "menu; apply one with SetHeadPart(type: 'hair', part: <editorId>). Meshes are read loose or from BSA archives. The first call measures every mesh (can take a minute); later calls use a cache.")]
     public async Task<CallToolResult> FindHairstyles(string? length = null, bool? fringe = null, bool? behind = null,
         string? nameContains = null, string sort = "length", int page = 1, int pageSize = 12, bool showImage = true)
     {
@@ -93,7 +92,7 @@ public class HairTools : ToolBase
                     ["matches"] = all.Count,
                     ["page"] = page,
                     ["pages"] = (all.Count + pageSize - 1) / pageSize,
-                    ["notReadable"] = unreadable > 0 ? $"{unreadable} hair meshes are packed in BSA archives or missing, so they weren't measured" : null,
+                    ["notReadable"] = unreadable > 0 ? $"{unreadable} hair meshes weren't found or couldn't be read" : null,
                     ["entries"] = rows,
                     ["measures"] = "length: head heights below the top of the head; fringe: share of the forehead covered (0-1); behind: share of the hair behind the head; width: hair width over head width; swept: how lopsided (0 even, 1 all to one side)",
                     ["apply"] = "SetHeadPart(type: 'hair', part: '<editorId>')",

@@ -10,9 +10,10 @@ namespace SkyrimMCP.Face;
 /// </summary>
 public static class NifShape
 {
-    public static List<(float X, float Y, float Z)> Positions(string path)
+    public static List<(float X, float Y, float Z)> Positions(string path) => Positions(File.ReadAllBytes(path));
+
+    public static List<(float X, float Y, float Z)> Positions(byte[] b)
     {
-        var b = File.ReadAllBytes(path);
         var o = Array.IndexOf(b, (byte)'\n') + 1;
         if (o <= 0 || !Encoding.ASCII.GetString(b, 0, Math.Min(o, 40)).StartsWith("Gamebryo File Format")) throw new InvalidDataException("not a NIF");
         o += 4 + 1;  // version, endian
@@ -48,7 +49,7 @@ public static class NifShape
             try
             {
                 if (type is "BSDynamicTriShape" or "BSTriShape") ReadTriShape(b, start, type == "BSDynamicTriShape", bsVersion, dynamic, stat);
-                else if (type == "NiSkinPartition" && bsVersion == 100) ReadPartition(b, start, partition);
+                else if (type == "NiSkinPartition" && bsVersion == 100) ReadPartition(b, start, partition, bsVersion);
             }
             catch (Exception) { /* an odd block: skip it */ }
             start += (int)blockSize[i];
@@ -75,7 +76,9 @@ public static class NifShape
         var vertices = BitConverter.ToUInt16(b, p); p += 2;
         var dataSize = BitConverter.ToUInt32(b, p); p += 4;
         var vertexSize = (int)(desc & 0xF) * 4;
-        var fullPrecision = ((desc >> 44) & (1UL << 10)) != 0;
+        // Skyrim SE (BS version 100) always stores full-precision positions, whatever the flag says (checked on a wig
+        // whose flags lack VF_FULLPREC); only Fallout 4 uses half floats.
+        var fullPrecision = bsVersion == 100 || ((desc >> 44) & (1UL << 10)) != 0;
 
         (float, float, float) Move(float x, float y, float z)
         {
@@ -118,14 +121,14 @@ public static class NifShape
         stat.AddRange(local);
     }
 
-    private static void ReadPartition(byte[] b, int p, List<(float, float, float)> into)
+    private static void ReadPartition(byte[] b, int p, List<(float, float, float)> into, uint bsVersion)
     {
         p += 4;  // partitions
         var dataSize = BitConverter.ToInt32(b, p); p += 4;
         var vertexSize = BitConverter.ToInt32(b, p); p += 4;
         var desc = BitConverter.ToUInt64(b, p); p += 8;
         if (dataSize <= 0 || vertexSize <= 0) return;
-        var fullPrecision = ((desc >> 44) & (1UL << 10)) != 0;
+        var fullPrecision = bsVersion == 100 || ((desc >> 44) & (1UL << 10)) != 0;
         for (var v = 0; v < dataSize / vertexSize; v++)
         {
             var q = p + v * vertexSize;
