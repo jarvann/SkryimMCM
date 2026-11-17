@@ -92,6 +92,12 @@ namespace SkyrimMCP {
         json Prepare() {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
+            // Forcing the default idle with a weapon or spell out leaves the hands stuck readied (BUG-029):
+            // sheathe first and let the caller wait for the animation, then call Prepare again.
+            if (auto* state = player->AsActorState(); state && state->IsWeaponDrawn()) {
+                if (state->GetWeaponState() == RE::WEAPON_STATE::kDrawn) player->DrawWeaponMagicHands(false);
+                return {{"sheathing", true}};
+            }
             const bool idleReset = player->NotifyAnimationGraph(RE::BSFixedString("IdleForceDefaultState"));
             bool expressionReset = false;
             if (auto* face = player->GetFaceGenAnimationData()) {
