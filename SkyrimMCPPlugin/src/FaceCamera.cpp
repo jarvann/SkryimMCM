@@ -237,7 +237,11 @@ namespace SkyrimMCP {
             if (aimFromHead) fromHead = HeadHeading(head, bodyFacing, facing);
             if (!fromHead) facing = bodyFacing;
             const float around = facing + angleDeg * pi / 180.0f;
-            const RE::NiPoint3 target = head->world.translate + RE::NiPoint3{ 0.0f, 0.0f, heightOffset };
+            // BUG-041: the head node sits behind the face (about the middle of the skull), which is fine head-on but
+            // leaves a side view framed on the back of the head. Aim at a point toward the face, more so the further
+            // round the camera goes (none head-on, so front captures are unchanged).
+            const float toFace = 8.0f * std::abs(std::sin(angleDeg * pi / 180.0f));
+            const RE::NiPoint3 target = head->world.translate + RE::NiPoint3{ std::sin(facing) * toFace, std::cos(facing) * toFace, heightOffset };
             const RE::NiPoint3 position = target + RE::NiPoint3{ std::sin(around), std::cos(around), 0.0f } * distance;
             RE::NiPoint3 look = target - position;
             look.Unitize();
@@ -271,6 +275,7 @@ namespace SkyrimMCP {
                     {"facingDeg", facing * 180.0f / pi},
                     {"bodyFacingDeg", bodyFacing * 180.0f / pi},
                     {"aimedFrom", fromHead ? "head" : "body"},
+                    {"towardFace", toFace},
                     {"angleDeg", angleDeg},
                     {"distance", distance},
                     {"rotationLayout", layout},
