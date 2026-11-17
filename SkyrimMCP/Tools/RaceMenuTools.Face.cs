@@ -125,7 +125,7 @@ public partial class RaceMenuTools
             await Papyrus("Game", "UpdateTintMaskColors");
             await Papyrus("Game", "UpdateHairColor");
             // UpdateHairColor also recolours the brows: put back a brow colour set with SetBrowColor.
-            try { await Papyrus("NiOverride", "ApplyNodeOverrides", "player"); } catch (McpException) { }
+            await ReapplyBrowColor();
             return "Face tint rebuilt (Game.UpdateTintMaskColors, Game.UpdateHairColor).";
         }
         catch (McpException ex)
@@ -560,13 +560,26 @@ public partial class RaceMenuTools
         return new { headPartsFrom = source, headParts = restored?.DeepClone(), tints, note = "Check the face with a screenshot." };
     }
 
+    // Brow colour set this session (BUG-030): re-applied after every tint refresh, since Game.UpdateHairColor
+    // puts the hair colour back on the brows.
+    private static string? _browColor;
+
     [McpServerTool]
     [Description("Colour the player's eyebrows separately from the hair (by default the brows take the hair colour, so darkening " +
-        "them otherwise means darkening the hair). color #RRGGBB, or 'hair' to go back to the hair colour. Stored as a RaceMenu " +
-        "(NiOverride) override on the brow head part and saved with the game. Changing the brow head part later (SetHeadPart) " +
-        "needs the colour set again. Take a capture to judge it: the brow texture's own shading still shows through.")]
+        "them otherwise means darkening the hair). color #RRGGBB, or 'hair' to go back to the hair colour. Sets the brow head " +
+        "part's shader tint directly, and also stores it as a RaceMenu (NiOverride) override so it can survive a save and load. " +
+        "The face tools re-apply it after each change; changing the brow head part (SetHeadPart) needs it set again. Reports " +
+        "each brow mesh's material: only hair-tint materials can be coloured; a brow whose colour is baked into its texture " +
+        "can't, and a different brow head part is the way to change it. Very light or thin brow textures stay faint even with a " +
+        "dark colour. Check with CaptureFace(hideHair: true).")]
     public async Task<object> SetBrowColor(string color)
     {
+        var reset = color.Trim().Equals("hair", StringComparison.OrdinalIgnoreCase);
+        var hex = color.Trim().TrimStart('#').ToUpperInvariant();
+        var rgb = 0;
+        if (!reset && (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out rgb)))
+            return new { error = "color must be #RRGGBB or 'hair'" };
+
         var appearance = await _pipe.SendRequestAsync("get_appearance");
         var isFemale = appearance?["sex"]?.GetValue<string>() == "female";
         var brows = (appearance?["headParts"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
@@ -575,37 +588,50 @@ public partial class RaceMenuTools
             .Where(id => !string.IsNullOrEmpty(id))
             .Cast<string>()
             .ToList();
-        if (brows.Count == 0) return new { error = "No eyebrow head part with an editor ID found on the player (get_appearance headParts)." };
 
-        var reset = color.Trim().Equals("hair", StringComparison.OrdinalIgnoreCase);
-        var rgb = 0;
-        if (!reset)
-        {
-            var hex = color.Trim().TrimStart('#');
-            if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out rgb))
-                return new { error = "color must be #RRGGBB or 'hair'" };
-        }
-
-        var results = new List<object>();
+        // RaceMenu's override, for persistence across save and load (in game it didn't change the colour by itself).
+        var persisted = new List<object>();
         foreach (var node in brows)
         {
-            if (reset)
+            try
             {
-                await Papyrus("NiOverride", "RemoveNodeOverride", "player", isFemale, node, KeyTintColor, -1);
-                results.Add(new { node, color = "hair" });
-                continue;
+                if (reset) await Papyrus("NiOverride", "RemoveNodeOverride", "player", isFemale, node, KeyTintColor, -1);
+                else await Papyrus("NiOverride", "AddNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1, rgb, true);
+                var stored = reset ? null
+                    : (await Papyrus("NiOverride", "GetNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1))?.GetValue<int>();
+                persisted.Add(new { node, stored = stored.HasValue ? $"#{stored.Value & 0xFFFFFF:X6}" : null });
             }
-            await Papyrus("NiOverride", "AddNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1, rgb, true);
-            var stored = (await Papyrus("NiOverride", "GetNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1))?.GetValue<int>();
-            results.Add(new { node, color = $"#{rgb:X6}", stored = stored.HasValue ? $"#{stored.Value & 0xFFFFFF:X6}" : null });
+            catch (McpException ex) { persisted.Add(new { node, error = ex.Message }); }
         }
-        if (reset) await Papyrus("Game", "UpdateHairColor");
+
+        JsonNode? applied;
+        if (reset)
+        {
+            _browColor = null;
+            await Papyrus("Game", "UpdateHairColor");
+            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6 });
+        }
         else
         {
-            try { await Papyrus("NiOverride", "ApplyNodeOverrides", "player"); }
-            catch (McpException) { /* AddNodeOverrideInt already applied it to the loaded head */ }
+            _browColor = "#" + hex;
+            applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = _browColor });
         }
+        if (applied?["error"] is JsonNode error) return new { error = error.ToString(), persisted };
         await NotifyInGame(reset ? "Brows follow the hair colour again" : "Brow colour set");
-        return new { brows = results, female = isFemale, next = "CaptureFace(hideHair: true) shows the brows clearly." };
+        return new
+        {
+            color = reset ? "hair" : _browColor,
+            applied = applied?.DeepClone(),
+            niOverride = persisted,
+            next = "CaptureFace(hideHair: true) shows the brows clearly.",
+        };
+    }
+
+    /// <summary>Puts the session's brow colour back after Game.UpdateHairColor reset it.</summary>
+    private async Task ReapplyBrowColor()
+    {
+        if (_browColor == null) return;
+        try { await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = _browColor }); }
+        catch (Exception) { /* the brow colour is cosmetic: never fail a face edit over it */ }
     }
 }

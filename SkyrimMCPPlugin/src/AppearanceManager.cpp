@@ -476,6 +476,67 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
+    json HeadPartTint(int partType, const std::string& color) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* npc = player ? player->GetActorBase() : nullptr;
+        auto* root = player ? player->Get3D(false) : nullptr;
+        if (!npc || !root) return {{"error", "The player's 3D isn't loaded"}};
+
+        std::optional<RE::NiColor> wanted;
+        if (!color.empty()) {
+            std::string hex = color[0] == '#' ? color.substr(1) : color;
+            unsigned rgb = 0;
+            if (hex.size() != 6 || std::sscanf(hex.c_str(), "%6x", &rgb) != 1) return {{"error", "color must be #RRGGBB"}};
+            wanted = RE::NiColor(((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f);
+        }
+        auto hex = [](const RE::NiColor& c) {
+            auto b = [](float v) { return static_cast<int>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
+            return std::format("#{:02X}{:02X}{:02X}", b(c.red), b(c.green), b(c.blue));
+        };
+
+        json parts = json::array();
+        for (int i = 0; npc->headParts && i < npc->numHeadParts; i++) {
+            auto* part = npc->headParts[i];
+            if (!part || static_cast<int>(std::to_underlying(part->type.get())) != partType) continue;
+            const char* name = part->GetFormEditorID();
+            json entry = {{"part", name ? name : ""}, {"formId", std::format("{:08X}", part->GetFormID())}};
+            auto* node = (name && name[0]) ? root->GetObjectByName(RE::BSFixedString(name)) : nullptr;
+            if (!node) {
+                entry["problem"] = "no node with this name in the loaded head";
+                parts.push_back(entry);
+                continue;
+            }
+            json geometries = json::array();
+            RE::BSVisit::TraverseScenegraphGeometries(node, [&](RE::BSGeometry* geo) {
+                json g = {{"geometry", geo->name.c_str()}};
+                auto* shader = geo->lightingShaderProp_cast();
+                auto* material = shader ? static_cast<RE::BSLightingShaderMaterialBase*>(shader->material) : nullptr;
+                if (!material) {
+                    g["problem"] = "no lighting shader";
+                } else {
+                    const auto feature = material->GetFeature();
+                    g["material"] = static_cast<int>(feature);
+                    if (feature == RE::BSShaderMaterial::Feature::kHairTint) {
+                        auto* tint = static_cast<RE::BSLightingShaderMaterialHairTint*>(material);
+                        g["tintBefore"] = hex(tint->tintColor);
+                        if (wanted) {
+                            tint->tintColor = *wanted;
+                            g["tint"] = hex(tint->tintColor);
+                        }
+                    } else {
+                        g["problem"] = "not a hair-tint material: its colour comes from the texture, so it can't be tinted";
+                    }
+                }
+                geometries.push_back(g);
+                return RE::BSVisitControl::kContinue;
+            });
+            entry["geometries"] = geometries;
+            parts.push_back(entry);
+        }
+        if (parts.empty()) return {{"error", std::format("The player has no head part of type {}", partType)}};
+        return {{"parts", parts}, {"set", wanted.has_value()}};
+    }
+
     json RestoreHeadParts(const std::string& refId, const std::vector<std::string>& parts, bool refresh) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};
