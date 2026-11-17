@@ -13,6 +13,9 @@
     <Version>1.2.1</Version>
     <!-- Run as "dotnet SkyrimMCP.dll"; no SkyrimMCP.exe apphost (SmartScreen and antivirus flag unsigned .exe files). -->
     <UseAppHost>false</UseAppHost>
+    <!-- Windows x64 only: keeps the ONNX Runtime native DLL for win-x64 and drops the other platforms'. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +23,12 @@
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
     <!-- Screenshot previews (Windows GDI+; the server is Windows-only anyway). -->
     <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+    <!-- Face measurement (FEAT-230): MediaPipe's face models run with ONNX Runtime (CPU). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Models\*.onnx;Models\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
