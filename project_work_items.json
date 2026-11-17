@@ -2844,6 +2844,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-249",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Brow colour (and other SkyLink face state) restored after loads and cell changes",
+          "description": "RaceMenu keeps makeup and hair through loads (BUG-048) but has no slot for a separate brow colour, so the brows came back hair-coloured on every load and 3D reload until a face tool ran. Host DLL: after kPostLoadGame and when the player's cell changes (TESCellFullyLoadedEvent for her cell), a short detached host thread waits 3 s and again 6 s (after RaceMenu's own LoadTints/UpdateTints) and sends reapply_face_state through HostCore, coalescing repeated triggers. Logic DLL: reapply_face_state reads face_state.json from the Documents folder (SHGetKnownFolderPath, the server's path), finds the player's name|race entry and sets the stored brow colour on the brow shader. Host DLL change: needs the game closed to deploy and a restart.",
+          "history": [
+            {
+              "datetime": "2026-11-18T08:40",
+              "note": "Built on feature/FEAT-249-face-state-on-load; the player asked for it and will restart the game later."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-044",
           "type": "bug",
           "status": "implemented-untested",
