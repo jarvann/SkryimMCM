@@ -8,7 +8,7 @@ Scope of evidence: one player character (Arya Adahar, Breton female, High Poly H
 
 - **It can** match the measurable proportions of a face. On Arya, every proportion outside the eyes ended within 4% of the reference. On the control build, 10 of 17 proportions matched a photo after two passes from a neutral head.
 - **It cannot, by measurement alone, produce a likeness.** The control build matched the numbers and still did not look like the person. Proportions capture bone structure. Likeness also needs soft tissue (cheek fullness, smile lines, lid shape) and colouring, and those are judged by eye.
-- **It cannot move what no slider moves.** On Arya's head the lower eyelid responded to none of five sliders. That needs a sculpt tool.
+- **It cannot move what no slider moves.** That needs the sculpt brush. Note that the lower eyelid was first judged unreachable by sliders on the strength of a measure later shown not to track it; see rule 11.
 - **The player's taste outranks the reference.** The final Arya result came from the player's own notes, not from the reference numbers.
 
 ## Tools
@@ -37,6 +37,9 @@ These are the things that went wrong today when they were not followed.
 8. **Keep a named preset at every accepted stage, and a game save before anything risky.** After restoring, prove it with `DiffFacePresets("live", "<preset>")`: all sections should be empty.
 9. **Ask before changing the player's own choices.** The player had chosen slim brows and grey eyes; the reference wanted heavy brows and hazel eyes. Those stayed.
 10. **Say when you got something wrong.** An eye-spacing change went the wrong way and the player liked the result anyway; it was still reported and then corrected on request.
+
+11. **Judge the lower eyelid by eye, in a close-up.** The lower-lid measures do not follow the real lid edge: a sculpt that visibly lowered the lid left both numbers unchanged. Sliders marked inert for the lower lid on that evidence may not be. The upper-lid measure did respond to real changes.
+12. **Probe with three samples.** With two, head-pitch drift made an inert slider look as if it moved three vertical measures by about 4%.
 
 ## Procedure A: tune an existing face toward a reference
 
@@ -103,7 +106,9 @@ Positive and negative are as the tools report them. Directions are for these hea
 | `NSK_EyeAngle` | Outer corner tilt. |
 | `CME_JawUpDown` | Back of the jaw. Set to -0.4 at the player's request; effect not confirmed from captures. |
 
-Inert on this head: `CME_NoseLength`, `EFM_Eyes_Height`, `EFM_Iris_Width`, `EFM_Lip_Upper_Thickness`, `EFM_Lip_Lower_Thickness`, `EFM_Eyes_Lower_Height`, `EFM_Eyes_Lower_Shape`, `EFM_Eyelid_Lower`, `CME_LowerEyesHeight`, `SPG_ECEEyebagShape`, `EFM_Eyes_AO_Depth`, and the vanilla `browsUpDown` at -0.5.
+`EFM_Eyes_Size`: opens both lids and narrows eye spacing (probe 0.01 to 0.8: eye spacing -7%, upper lid gap +6%, eye width +4%).
+
+Inert on this head (the lower-eye entries were judged by the unreliable lower-lid measure and should be rechecked by eye): `CME_NoseLength`, `EFM_Eyeground_Height`, `EFM_Eyes_Height`, `EFM_Iris_Width`, `EFM_Lip_Upper_Thickness`, `EFM_Lip_Lower_Thickness`, `EFM_Eyes_Lower_Height`, `EFM_Eyes_Lower_Shape`, `EFM_Eyelid_Lower`, `CME_LowerEyesHeight`, `SPG_ECEEyebagShape`, `EFM_Eyes_AO_Depth`, and the vanilla `browsUpDown` at -0.5.
 
 ### On the neutral head
 
@@ -125,6 +130,7 @@ Inert on this head: `CME_NoseLength`, `EFM_Eyes_Height`, `EFM_Iris_Width`, `EFM_
 - **Brows follow the hair colour unless set.** `SetBrowColor` stores a colour per character and re-applies it after edits. Every preset load wipes RaceMenu's own per-part overrides.
 - **Makeup tints respond weakly and unevenly.** Lips at full strength still read as a soft rose. Blush went 0.10, 0.20, 0.29 at 65%, 80% and 100%.
 - **The skin tint layer barely changes how the skin measures.** A pale character stays pale. If skin is changed, change the face layer and the body tone together.
+- **What survives a save and load.** RaceMenu keeps its own copy of the player's makeup and hair colour and puts it back on every load and cell change. Edits made outside its menu were being undone until build 62, which calls RaceMenu's own save functions after every face edit. From build 62, makeup and hair persist. Brow colour persists only with build 63's game-restart part installed; before that it reverts to the hair colour on load until any face tool runs. After any change to how looks are stored, test it: save, load, then `DiffFacePresets("live", "<preset>")`.
 - **Dirt and blood mods** put dirt on the face as magic effects, not overlays. Remove the effects before measuring colour.
 - **Cold-weather breath** crosses the lower face outdoors and corrupts mouth and lid measures. The capture now hides it.
 
@@ -149,10 +155,16 @@ The player then gave six notes of their own (less pink around the eyes and nose,
 
 A useful check from that build: two photos of the same person taken about 24 years apart agreed on eye width (0.213, 0.212), eye spacing (1.307, 1.320), nose length (0.295, 0.294) and iris size (0.468, 0.472).
 
+## Added late in the day
+
+- **`ProbeSlider(slider, value)`** (build 58). Sets, measures, puts the slider back, reports what moved and writes a slider note. Use it before committing to any slider. It found `EFM_Eyes_Size` in one call: it opens both lids and narrows eye spacing.
+- **`SculptFace(region, direction, amount, radius)`** (build 60, lashes from build 62). Moves the mesh where no slider reaches. Amounts are in eye widths. Steps under about 0.03 are invisible; 0.15 on the lower lids showed white under the iris. It moves lashes, the tear duct and the lid strip with the lid, and leaves the eyeballs. The lid edge stayed smooth. Undo by loading the preset.
+- **Combined references** (build 56): `SetFaceReference(<picture>, name, morePictures: [...])` takes colour from the picture whose colour is usable and, from build 60, leaves each picture out of the measures its pose skews.
+
 ## Still missing
 
-1. **Sculpt brush.** For the lower eyelid, and for cheek, smile and lid shape on any build. This is the largest remaining gap.
-2. **`ProbeSlider`.** Set, capture, measure, restore, and report what moved, over a region, cached per head. All probing today was by hand.
+1. **A lid measure that follows the real lid edge.** Calibration captures at known sculpt steps exist for this.
+2. **Soft-tissue shaping tested on a real build.** The sculpt brush exists; cheeks, smile lines and chin have not been tried with it.
 3. **Hair picker.** Search or tag hairstyles; names say nothing about shape and there are hundreds.
 4. **Profile measurement.** Nose and chin projection and forehead slope from a side capture.
 5. **One reference from several pictures,** taking the median and dropping flagged measures (`morePictures` exists as of build 56; untested).
@@ -170,5 +182,5 @@ A useful check from that build: two photos of the same person taken about 24 yea
 
 ## Dev notes
 
-- Build 58 adds `ProbeSlider(slider, value)` (item 2 above, one slider per call): it measures, sets, measures, puts the slider back, reports what moved and writes the result to `SliderNotes`.
-- The monochrome check covers black-and-white pictures as well as sepia (a greyscale copy of the reference reads spread 0/0, unusable).
+- Build 66 adds `lower_lid_edge` and `upper_lid_edge` to `MeasureFace` (FEAT-250): lid edges found in the picture itself, calibrated on the sculpt steps above. They follow a sculpted lower lid where the landmark lid measures did not; the left lower lid under-reads, so check it by eye.
+- Brow colour is restored after loads and cell changes by the host DLL from build 63 (deployed with the game closed).
