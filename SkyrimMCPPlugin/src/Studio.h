@@ -27,6 +27,9 @@ namespace SkyrimMCP {
         // Deletes the marker once the player is back (call after the load has finished).
         json Cleanup(std::uint32_t markerId);
 
+        // XMarkers placed at run time, newest first (to recover a studio trip whose marker ID was lost).
+        json FindMarkers();
+
         // Lights on, preset, marked spot, current cell.
         json Status();
     }

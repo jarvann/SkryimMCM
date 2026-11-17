@@ -316,7 +316,8 @@ namespace SkyrimMCP::Protocol {
             if (mode == "return") return GameThread(id, [=]() { return Studio::Return(marker); });
             if (mode == "cleanup") return GameThread(id, [=]() { return Studio::Cleanup(marker); });
             if (mode == "status") return GameThread(id, []() { return Studio::Status(); });
-            return MakeResponse(id, false, {}, "mode must be lights, go, return, cleanup or status").dump() + "\n";
+            if (mode == "find") return GameThread(id, []() { return Studio::FindMarkers(); });
+            return MakeResponse(id, false, {}, "mode must be lights, go, return, cleanup, find or status").dump() + "\n";
         };
         registry["face_camera"] = [](const std::string& id, const json& params) {
             std::string mode = params.value("mode", "");
