@@ -40,7 +40,9 @@ public class FaceMeasureTools : ToolBase
         "the median is used; expression/strength/mouthOpen as CaptureFace; a neutral front capture flagged as turned, smiling or open-mouthed is retaken, up to twice; expression and strength as CaptureFace, to match a smiling reference), or a full path to any picture with a face. Returns: 13 proportions (eye width/opening/spacing/tilt, " +
         "brow height, nose, mouth, lips, jaw, chin, face shape, iris size), lid gaps (upper_lid_gap / iris_radius under 1 means " +
         "the lid covers the top of the iris; over 1, white shows above it: a stare; the lower-lid measures are not reliable on game " +
-        "renders: the landmark model doesn't follow the real lower lid edge, so judge the lower lid by eye), head pose (yaw, pitch, roll) and " +
+        "renders: the landmark model doesn't follow the real lower lid edge; use lower_lid_edge and upper_lid_edge instead, found in the " +
+        "picture itself: the distance from the iris centre to where the eye white meets the skin (lower) and to the lash line (upper), " +
+        "in iris radii, per eye and averaged; the left lower lid under-reads, so check it by eye), head pose (yaw, pitch, roll) and " +
         "expression flags (smile, open mouth: those skew mouth and eye numbers), colours of skin, cheeks, lips, brows and iris " +
         "(hex, and light-independent ratios between parts of the face: brow and lip lightness and iris lightness against the skin, " +
         "lip redness and blush as log2 red/green against the skin, and, when the eye is big enough in the picture, skin and iris " +

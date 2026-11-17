@@ -63,7 +63,7 @@ public sealed class FaceMeasurer : IDisposable
             ["confidence"] = new Dictionary<string, double> { ["detector"] = R(found.DetectorScore), ["landmarks"] = R(found.LandmarkScore) },
             ["pose"] = PoseAndExpression(L),
             ["ratios"] = Ratios(L).ToDictionary(kv => kv.Key, kv => R(kv.Value)),
-            ["eyes"] = LidGaps(L).ToDictionary(kv => kv.Key, kv => R(kv.Value)),
+            ["eyes"] = LidGaps(L).Concat(LidEdges(image, L)).ToDictionary(kv => kv.Key, kv => R(kv.Value)),
             ["colour"] = Colours(image, L),
             ["imageSize"] = $"{image.W}x{image.H}",
         };
@@ -338,6 +338,94 @@ public sealed class FaceMeasurer : IDisposable
             ["upper_lid_gap / iris_radius"] = up / 2, ["lower_lid_gap / iris_radius"] = low / 2,
             ["upper_lid_height / eye_width"] = lidUp / 2, ["lower_lid_depth / eye_width"] = lidLow / 2,
         };
+    }
+
+    /// <summary>
+    /// FEAT-250: the lid edges found in the picture itself, in iris radii from the iris centre. The landmark lids don't
+    /// follow a real lower-lid move on game renders (BUG-049). Down each of 7 columns across the iris (median): the
+    /// lower edge is where the brightness comes back to skin level below the eye white; the upper edge is where the
+    /// dark lash line starts above it. Calibrated on sculpt steps of 0.05 eye widths: the right lower lid read 0.92,
+    /// 1.06, 1.26, 1.40 and both upper lids rose in order; the left lower lid under-read (0.91 to 1.01), so both eyes
+    /// are reported as well as the mean.
+    /// </summary>
+    private static Dictionary<string, double> LidEdges(RgbImage img, double[,] L)
+    {
+        var result = new Dictionary<string, double>();
+        var lowers = new List<double>();
+        var uppers = new List<double>();
+        foreach (var (side, iris, rimA, rimB) in new[] { ("right", 468, 469, 471), ("left", 473, 474, 476) })
+        {
+            var r = D(L, rimA, rimB) / 2;
+            if (r < 3) continue;
+            double cx = L[iris, 0], cy = L[iris, 1];
+            var lo = new List<double>();
+            var up = new List<double>();
+            for (var c = 0; c < 7; c++)
+            {
+                var x = cx + (-0.5 + c / 6.0) * r;
+                var (l, u) = LidColumn(img, x, cy, r);
+                if (l is double lv) lo.Add(lv);
+                if (u is double uv) up.Add(uv);
+            }
+            if (lo.Count > 0) { var m = MedianOf(lo); result[$"lower_lid_edge_{side} / iris_radius"] = m; lowers.Add(m); }
+            if (up.Count > 0) { var m = MedianOf(up); result[$"upper_lid_edge_{side} / iris_radius"] = m; uppers.Add(m); }
+        }
+        if (lowers.Count > 0) result["lower_lid_edge / iris_radius"] = lowers.Average();
+        if (uppers.Count > 0) result["upper_lid_edge / iris_radius"] = uppers.Average();
+        return result;
+    }
+
+    private static double MedianOf(List<double> v)
+    {
+        var s = v.OrderBy(x => x).ToArray();
+        return s.Length % 2 == 1 ? s[s.Length / 2] : (s[s.Length / 2 - 1] + s[s.Length / 2]) / 2;
+    }
+
+    private static (double? Lower, double? Upper) LidColumn(RgbImage img, double cx, double cy, double r)
+    {
+        var hw = Math.Max(1, (int)(r * 0.08));
+        double Lum(double k)
+        {
+            var y = (int)Math.Round(cy + k * r);
+            if (y < 0 || y >= img.H) return double.NaN;
+            double sum = 0;
+            var n = 0;
+            for (var x = (int)cx - hw; x <= (int)cx + hw; x++)
+            {
+                if (x < 0 || x >= img.W) continue;
+                var p = img.Pixel(x, y);
+                sum += (p[0] + p[1] + p[2]) / 3;
+                n++;
+            }
+            return n > 0 ? sum / n : double.NaN;
+        }
+        var step = 1.0 / r;
+        var ks = new List<double>();
+        for (var k = 0.4; k < 2.4; k += step) ks.Add(k);
+        var down = ks.Select(Lum).ToArray();
+        var upw = ks.Select(k => Lum(-k)).ToArray();
+        double SkinLevel(int sign)
+        {
+            var v = new List<double>();
+            for (var k = 2.0; k < 2.4; k += step) { var l = Lum(sign * k); if (!double.IsNaN(l)) v.Add(l); }
+            return v.Count > 0 ? MedianOf(v) : double.NaN;
+        }
+        var skinLo = SkinLevel(1);
+        var skinHi = SkinLevel(-1);
+        double? lower = null, upper = null;
+        if (!double.IsNaN(skinLo))
+        {
+            var start = Array.FindIndex(down, v => v > 0.75 * skinLo);  // past the dark iris ring
+            for (var i = Math.Max(0, start + 1); start >= 0 && i < ks.Count - 1; i++)
+                if (down[i] >= 0.94 * skinLo && down[i + 1] >= 0.94 * skinLo) { lower = ks[i]; break; }
+        }
+        if (!double.IsNaN(skinHi))
+        {
+            var start = Array.FindIndex(upw, v => v > 0.75 * skinHi);
+            for (var i = Math.Max(0, start + 1); start >= 0 && i < ks.Count - 1; i++)
+                if (upw[i] < 0.7 * skinHi && upw[i + 1] < 0.7 * skinHi) { upper = ks[i]; break; }  // the dark lash line
+        }
+        return (lower, upper);
     }
 
     /// <summary>Head angles from the 3D landmarks and simple expression signs: a turned head or a smile skews the ratios.</summary>
