@@ -5,6 +5,8 @@
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cctype>
 #include <climits>
 #include <cstdio>
@@ -75,6 +77,24 @@ namespace SkyrimMCP::AppearanceManager {
             const int dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
             // Weighted toward green like the eye, so "closest" looks closest.
             return 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+        }
+
+        // BUG-037: hair colours are matched in Lab with lightness weighted down, so a dark auburn finds a dark red
+        // rather than a plain brown of the same brightness (plain RGB distance lost the red).
+        std::array<double, 3> ToLab(const Rgb& c) {
+            auto lin = [](int v) { const double x = v / 255.0; return x <= 0.04045 ? x / 12.92 : std::pow((x + 0.055) / 1.055, 2.4); };
+            const double r = lin(c.r), g = lin(c.g), b = lin(c.b);
+            const double X = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047;
+            const double Y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b;
+            const double Z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883;
+            auto f = [](double t) { constexpr double e = 6.0 / 29; return t > e * e * e ? std::cbrt(t) : t / (3 * e * e) + 4.0 / 29; };
+            return { 116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z)) };
+        }
+
+        double HairDistance(const Rgb& a, const Rgb& b) {
+            const auto la = ToLab(a), lb = ToLab(b);
+            const double dl = (la[0] - lb[0]) * 0.5, da = la[1] - lb[1], db = la[2] - lb[2];
+            return dl * dl + da * da + db * db;
         }
 
         json DescribeColorForm(RE::BGSColorForm* form) {
@@ -192,6 +212,8 @@ namespace SkyrimMCP::AppearanceManager {
         //    existing form keeps the change in the save; a form made at runtime would not load.
         std::optional<Rgb> wantedRgb;
         int distance = 0;
+        std::string matchQuality;
+        json alternatives = json::array();
         if (!chosen) {
             wantedRgb = ParseRgb(color);
             if (!wantedRgb) wantedRgb = NamedColor(color);
@@ -202,17 +224,23 @@ namespace SkyrimMCP::AppearanceManager {
             // The requested colour is what should show on screen; the game draws hair at twice the stored
             // colour, so look for a form near half of it (BUG-035: "auburn" #7E2E2E came out light copper-pink).
             const Rgb storedTarget{ wantedRgb->r / 2, wantedRgb->g / 2, wantedRgb->b / 2 };
-            int best = INT_MAX;
-            for (int pass = 0; pass < 2 && !chosen; ++pass) {  // playable forms first, then any
+            std::vector<std::pair<double, RE::BGSColorForm*>> ranked;
+            for (int pass = 0; pass < 2 && ranked.empty(); ++pass) {  // playable forms first, then any
                 for (auto* form : forms) {
                     if (!form) continue;
                     if (pass == 0 && !form->flags.all(RE::BGSColorForm::Flag::kPlayable)) continue;
-                    const int d = DistanceSq(FromColor(form->color), storedTarget);
-                    if (d < best) { best = d; chosen = form; }
+                    ranked.emplace_back(HairDistance(FromColor(form->color), storedTarget), form);
                 }
             }
-            if (!chosen) return {{"error", "No hair colour forms are loaded"}};
-            distance = best;
+            if (ranked.empty()) return {{"error", "No hair colour forms are loaded"}};
+            std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+            chosen = ranked[0].second;
+            distance = static_cast<int>(ranked[0].first);
+            // How close the best match is (Lab difference, lightness half-weighted), and the next options, since
+            // a load order often has nothing near a given shade.
+            const double gap = std::sqrt(ranked[0].first);
+            matchQuality = gap < 3 ? "close" : gap < 8 ? "approximate" : "far: no hair colour in the load order is near this shade";
+            for (std::size_t i = 1; i < ranked.size() && i < 4; i++) alternatives.push_back(DescribeColorForm(ranked[i].second));
             matchedBy = "closestRgb";
         }
 
@@ -230,6 +258,8 @@ namespace SkyrimMCP::AppearanceManager {
         result["matchedBy"] = matchedBy;
         if (wantedRgb) {
             result["requested"] = Hex(*wantedRgb) + " on screen";
+            result["match"] = matchQuality;
+            if (!alternatives.empty()) result["alternatives"] = alternatives;
             result["note"] = std::string(distance == 0 ? "Exact match. " : "The closest existing hair colour was used, so the change stays after saving and loading. ") +
                 "Hair is drawn at twice the stored colour (onScreen), so the stored value is about half the request. ListHairColors shows every option.";
         }

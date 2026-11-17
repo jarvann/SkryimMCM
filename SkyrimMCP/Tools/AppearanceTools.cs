@@ -37,7 +37,8 @@ public class AppearanceTools : ToolBase
         "color: a hair colour FormID or name from ListHairColors, #RRGGBB, 'r,g,b', or a word (black, dark brown, brown, light brown, " +
         "auburn, red, ginger, copper, blonde, dark blonde, strawberry blonde, platinum, grey, silver, white, blue, green, purple, pink). " +
         "An RGB value or word is the colour wanted ON SCREEN: the game draws hair at twice the stored colour, so the closest existing " +
-        "hair colour to half of it is used, which survives saving and loading; " +
+        "hair colour to half of it is used (matched by eye-like colour difference), which survives saving and loading; match says how " +
+        "close it is and alternatives lists the next three; " +
         "the reply shows what was requested and what was used. Reports the previous colour so it can be put back. " +
         "If RaceMenu is installed, its own hair colour setting may override this.")]
     public async Task<object> SetHairColor(string color, string? refId = null)
