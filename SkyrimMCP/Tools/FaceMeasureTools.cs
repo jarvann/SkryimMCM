@@ -149,7 +149,28 @@ public class FaceMeasureTools : ToolBase
             return Error("No face found in any picture. A face under about 100 pixels wide may not be found: crop and enlarge it first.");
         var clean = measured.Where(x => !x.Flagged).ToList();
         var used = clean.Count > 0 ? clean : measured;
-        var measurement = used.Count == 1 ? used[0].M : Median(used.Select(x => x.M).ToList());
+        var measurement = used.Count == 1 ? (JsonObject)used[0].M.DeepClone() : Median(used.Select(x => x.M).ToList());
+        // BUG-045: when every picture has some flag, choose per measure: leave out the pictures whose flag skews that
+        // measure (a turned head skews widths, a tilt heights, a smile the mouth, lips, chin and eyes), so a turned
+        // photo doesn't pull the width ratios of a frontal one.
+        var perMeasure = new JsonObject();
+        if (clean.Count == 0 && measured.Count > 1)
+        {
+            foreach (var group in new[] { "ratios", "eyes" })
+            {
+                if (measurement[group] is not JsonObject target) continue;
+                foreach (var key in target.Select(kv => kv.Key).ToList())
+                {
+                    var eligible = measured.Where(x => !Skews(x.M, key)).ToList();
+                    if (eligible.Count == 0 || eligible.Count == measured.Count) continue;
+                    var values = eligible.Select(x => x.M[group]?[key]?.GetValue<double>()).OfType<double>().OrderBy(v => v).ToArray();
+                    if (values.Length == 0) continue;
+                    var mid = values.Length / 2;
+                    target[key] = Math.Round(values.Length % 2 == 1 ? values[mid] : (values[mid - 1] + values[mid]) / 2, 3);
+                    perMeasure[key] = new JsonArray(eligible.Select(x => (JsonNode?)JsonValue.Create(Path.GetFileName(x.Path))).ToArray());
+                }
+            }
+        }
         // Colour only from pictures whose colour is usable (not sepia or black and white).
         var colourSource = used.FirstOrDefault(x => x.M["colour"]?["usable"]?.GetValue<bool>() != false).M;
         if (colourSource != null && used.Count > 1) measurement["colour"] = colourSource["colour"]?.DeepClone();
@@ -176,6 +197,7 @@ public class FaceMeasureTools : ToolBase
                 ["colourUsable"] = x.M["colour"]?["usable"]?.DeepClone(),
             }).ToArray()),
             ["noFaceFound"] = notFound.Count > 0 ? notFound : null,
+            ["perMeasure"] = perMeasure.Count > 0 ? perMeasure : null,
             ["colourFrom"] = colourSource == null ? "none usable" : used.Count > 1 ? used.First(x => x.M == colourSource).Path : null,
             ["flags"] = measurement["pose"]?["flags"]?.DeepClone(),
             ["colourCast"] = measurement["colour"]?["cast"]?.DeepClone(),
@@ -229,6 +251,18 @@ public class FaceMeasureTools : ToolBase
     {
         var result = await Task.Run(() => FaceMeasurer.Shared.Measure(path));
         return result == null ? null : JsonSerializer.SerializeToNode(result) as JsonObject;
+    }
+
+    // Whether a picture's pose flags make one measure unreliable.
+    private static bool Skews(JsonObject m, string key)
+    {
+        var flags = (m["pose"]?["flags"] as JsonArray ?? new JsonArray()).Select(f => f?.ToString() ?? "").ToList();
+        bool Has(string word) => flags.Any(f => f.Contains(word, StringComparison.OrdinalIgnoreCase));
+        if (Has("turned") && (key.Contains("width") || key.Contains("spacing"))) return true;
+        if (Has("tilted") && (key.Contains("height") || key.Contains("length") || key.Contains("opening") || key.Contains("lid"))) return true;
+        if ((Has("smiling") || Has("mouth open")) &&
+            (key.Contains("mouth") || key.Contains("lip") || key.Contains("chin") || key.Contains("opening") || key.Contains("lid"))) return true;
+        return false;
     }
 
     private static JsonObject LoadReferences()

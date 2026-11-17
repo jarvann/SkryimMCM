@@ -52,6 +52,7 @@ public class StudioTools : ToolBase
             if (LoadState()["markerId"] is JsonNode existing)
                 return new { error = $"Already in the studio (marker {existing}): StudioReturn first." };
             var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
+            var faceSnapshot = await new RaceMenuTools(_pipe).SnapshotFace("_studio_before_go");
             // The move can start the loading screen before the reply comes back; the marker is kept in the plugin
             // and read back from the status.
             JsonNode? go = null;
@@ -69,6 +70,7 @@ public class StudioTools : ToolBase
                 ["markedCell"] = go?["markedCell"]?.DeepClone() ?? before?["cell"]?.DeepClone(),
                 ["markedPosition"] = go?["markedPosition"]?.DeepClone(),
                 ["studioCell"] = cell.Trim(),
+                ["faceSnapshot"] = faceSnapshot,
                 ["pending"] = "arrive",
                 ["preset"] = preset.Trim().ToLowerInvariant(),
                 ["intensity"] = intensity,
@@ -111,6 +113,8 @@ public class StudioTools : ToolBase
                 });
             }
             var studioCell = state["studioCell"]?.GetValue<string>() ?? status?["cell"]?.GetValue<string>() ?? "";
+            // The face as it is now, edits made in the studio included, to check the makeup against after the move.
+            state["faceSnapshot"] = await new RaceMenuTools(_pipe).SnapshotFace("_studio_before_return");
             string? backNote = null;
             try
             {
@@ -172,6 +176,11 @@ public class StudioTools : ToolBase
         var result = new JsonObject();
         var face = await RepairFaceAfterMove();
         result["face"] = face == null ? null : JsonSerializer.SerializeToNode(face);
+        if (state["faceSnapshot"]?.GetValue<string>() is { } snapshot)
+        {
+            try { result["makeup"] = await new RaceMenuTools(_pipe).RestoreTintsIfChanged(snapshot); }
+            catch (Exception ex) { result["makeup"] = "Makeup not checked: " + ex.Message + ". DiffFacePresets against the last preset."; }
+        }
         var pending = state["pending"]?.GetValue<string>();
         if (pending == "arrive")
         {
