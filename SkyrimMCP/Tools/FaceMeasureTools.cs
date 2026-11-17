@@ -19,17 +19,19 @@ public class FaceMeasureTools : ToolBase
 
     private static string ReferenceFile => Path.Combine(SkyLinkSettings.Folder, "face_references.json");
 
-    // Colour differences (Lab units, degrees for hues) treated as matched.
+    // Colour differences treated as matched (FEAT-242: ratios and log2 ratios of linear RGB; degrees for the hue).
     private static readonly Dictionary<string, double> ColourTolerance = new()
     {
-        ["brow_darkness (skin L - brow L)"] = 4,
-        ["lip_redness (lip a - skin a)"] = 3,
-        ["lip_lightness (lip L - skin L)"] = 4,
-        ["blush (cheek a - skin a)"] = 3,
-        ["iris_lightness (iris L - skin L)"] = 5,
-        ["iris_hue_deg"] = 15,
-        ["iris_chroma"] = 4,
-        ["skin_hue_deg"] = 10,
+        ["skin_hue_deg (lighting-dependent)"] = 10,
+        ["brow_lightness (brow / skin luminance)"] = 0.08,
+        ["lip_redness (log2 R/G vs skin)"] = 0.12,
+        ["lip_lightness (lip / skin luminance)"] = 0.08,
+        ["blush (log2 R/G cheek vs skin)"] = 0.1,
+        ["iris_lightness (iris / skin luminance)"] = 0.05,
+        ["skin_warmth (log2 R/B vs eye white)"] = 0.1,
+        ["skin_pink (log2 R/G vs eye white)"] = 0.08,
+        ["iris_warmth (log2 R/B vs eye white)"] = 0.15,
+        ["iris_green (log2 G/(R+B)/2 vs eye white)"] = 0.1,
     };
 
     [McpServerTool]
@@ -39,9 +41,11 @@ public class FaceMeasureTools : ToolBase
         "brow height, nose, mouth, lips, jaw, chin, face shape, iris size), lid gaps (upper_lid_gap / iris_radius under 1 means " +
         "the lid covers the top of the iris; over 1, white shows above it: a stare), head pose (yaw, pitch, roll) and " +
         "expression flags (smile, open mouth: those skew mouth and eye numbers), colours of skin, cheeks, lips, brows and iris " +
-        "(hex, and relative to the skin so room lighting mostly cancels: brow darkness, lip redness, blush, iris lightness and " +
-        "hue, skin hue), and a colour-cast warning. With a reference: each measurement's gap, 'ok' when within tolerance " +
-        "(default 3% for proportions; about 3-5 Lab units for colours), worst first. Measure the reference with " +
+        "(hex, and light-independent ratios between parts of the face: brow and lip lightness and iris lightness against the skin, " +
+        "lip redness and blush as log2 red/green against the skin, and, when the eye is big enough in the picture, skin and iris " +
+        "colour against the white of the eye), lighting warnings (one-sided light, clipped highlights, haze) and a colour-cast " +
+        "warning. With a reference: each measurement's gap, 'ok' when within tolerance " +
+        "(default 3% for proportions), worst first. Measure the reference with " +
         "SetFaceReference too: numbers from another tool (e.g. MediaPipe in a notebook) differ by a few percent.")]
     public async Task<CallToolResult> MeasureFace(string image = "live", string? reference = "default", int samples = 1,
         double tolerance = 3, string view = "front", bool hideHair = false, string expression = "neutral", double strength = 0.7)
@@ -260,12 +264,13 @@ public class FaceMeasureTools : ToolBase
                 var n = now["colour"]?["relative"]?[key]?.GetValue<double>();
                 if (r == null || n == null) continue;
                 var diff = n.Value - r.Value;
-                if (key.EndsWith("hue_deg")) diff = (diff + 540) % 360 - 180;
-                var tol = ColourTolerance.GetValueOrDefault(key, 4);
+                if (key.Contains("hue_deg")) diff = (diff + 540) % 360 - 180;
+                var tol = ColourTolerance.GetValueOrDefault(key, 0.1);
                 var ok = Math.Abs(diff) <= tol;
                 colourRows.Add((ok, Math.Abs(diff) / tol, new JsonObject
                 {
-                    ["measure"] = key, ["reference"] = r.Value, ["now"] = n.Value, ["diff"] = Math.Round(diff, 1), ["ok"] = ok,
+                    ["measure"] = key, ["reference"] = r.Value, ["now"] = n.Value, ["diff"] = Math.Round(diff, 3), ["ok"] = ok,
+                    ["direction"] = ok ? null : (diff > 0 ? "too high" : "too low"),
                 }));
             }
         }
@@ -282,12 +287,13 @@ public class FaceMeasureTools : ToolBase
         if (Math.Abs(yawDiff ?? 0) > 6 || Math.Abs(pitchDiff ?? 0) > 6)
             flags.Add($"head angle differs from the reference (yaw {yawDiff:+0;-0}, pitch {pitchDiff:+0;-0} degrees): capture at a matching angle (CaptureFace angle, heightOffset)");
 
-        if (now["colour"]?["lighting"]?["warning"] is JsonNode lightWarning)
-            flags.Add($"now: {lightWarning}");
+        foreach (var (label, m) in new[] { ("reference", reference), ("now", now) })
+            foreach (var w in m["colour"]?["lighting"]?["warnings"] as JsonArray ?? new JsonArray())
+                flags.Add($"{label}: {w}");
         var refL = reference["colour"]?["lighting"]?["skin_L"]?.GetValue<double>();
         var nowL = now["colour"]?["lighting"]?["skin_L"]?.GetValue<double>();
         if (refL != null && nowL != null && Math.Abs(nowL.Value - refL.Value) > 20)
-            flags.Add($"lighting much {(nowL > refL ? "brighter" : "darker")} than the reference (skin lightness {nowL:0} vs {refL:0}): trust the relative colours over the hex values");
+            flags.Add($"lighting much {(nowL > refL ? "brighter" : "darker")} than the reference (skin lightness {nowL:0} vs {refL:0}): trust the relative colours over the hex values and the lighting-dependent skin hue");
 
         var shapeOk = rows.Count(r => r.Ok);
         var colourOk = colourRows.Count(r => r.Ok);

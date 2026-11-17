@@ -20,7 +20,8 @@ namespace SkyrimMCP {
 
         // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair. Mid-blink it
         // returns {"blinking": true} without entering: wait a moment and call it again.
-        json Enter(bool hideHud, bool hideHair);
+        // hideEffects culls particle effects on the character (cold-weather breath) for the shot.
+        json Enter(bool hideHud, bool hideHair, bool hideEffects);
 
         // Places the camera angleDeg around the head (0 = in front, 90 = on the character's right,
         // -90 = on their left), distance units away, heightOffset above the head node, looking at the head.

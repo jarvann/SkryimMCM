@@ -69,6 +69,18 @@ public sealed class FaceMeasurer : IDisposable
         };
     }
 
+    /// <summary>
+    /// Quick framing check (detector only, no landmarks): where the face is in the picture, as fractions of its
+    /// width and height. Null when no face is found.
+    /// </summary>
+    public (double CenterX, double CenterY, double Size)? LocateFace(string path)
+    {
+        var image = RgbImage.Load(path);
+        Detection? det;
+        lock (_lock) det = Detect(image);
+        return det == null ? null : (det.CX / image.W, det.CY / image.H, Math.Max(det.W / image.W, det.H / image.H));
+    }
+
     private static double R(double v) => Math.Round(v, 3);
 
     // ---- detection --------------------------------------------------------------------------------
@@ -336,30 +348,135 @@ public sealed class FaceMeasurer : IDisposable
         ["brows"] = [(63, 53), (105, 52), (66, 65), (293, 283), (334, 282), (296, 295)],
     };
 
-    private static Dictionary<string, object> Colours(RgbImage img, double[,] L)
+    private static double[] Linear(double[] p)
     {
-        var eyeW = (D(L, 33, 133) + D(L, 362, 263)) / 2;
-        var radius = Math.Max(1.0, eyeW * 0.06);
-        var lab = new Dictionary<string, double[]>();
-        foreach (var (name, spots) in ColourSpots)
+        static double Lin(double v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4); }
+        return [Lin(p[0]), Lin(p[1]), Lin(p[2])];
+    }
+
+    private static double Luminance(double[] lin) => 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+
+    private static double[] Median(List<double[]> values)
+    {
+        if (values.Count == 0) return [0, 0, 0];
+        return Enumerable.Range(0, 3).Select(c =>
         {
-            var samples = new List<double[]>();
-            foreach (var (a, b) in spots)
-                img.SampleDisc((L[a, 0] + L[b, 0]) / 2, (L[a, 1] + L[b, 1]) / 2, radius, samples);
-            lab[name] = MedianLab(samples);
-        }
-        // Iris: points at 60% of the radius on the lower half and the sides (lids and lashes shade the top).
-        var irisSamples = new List<double[]>();
+            var sorted = values.Select(v => v[c]).OrderBy(v => v).ToArray();
+            var m = sorted.Length / 2;
+            return sorted.Length % 2 == 1 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+        }).ToArray();
+    }
+
+    private static double[] MedianLab(List<double[]> rgbSamples) =>
+        rgbSamples.Count == 0 ? [0, 0, 0] : Median(rgbSamples.Select(p => Color.SrgbToLab(p[0], p[1], p[2])).ToList());
+
+    private static List<double[]> IrisPixels(RgbImage img, double[,] L)
+    {
+        // Points at 60% of the radius on the lower half and the sides (lids and lashes shade the top).
+        var samples = new List<double[]>();
         foreach (var (iris, rimA, rimB) in new[] { (468, 469, 471), (473, 474, 476) })
         {
             var r = D(L, rimA, rimB) / 2;
             foreach (var deg in new[] { 0, 45, 90, 135, 180 })
             {
                 var t = deg * Math.PI / 180;
-                img.SampleDisc(L[iris, 0] + 0.6 * r * Math.Cos(t), L[iris, 1] + 0.6 * r * Math.Sin(t), Math.Max(1.0, r * 0.15), irisSamples);
+                img.SampleDisc(L[iris, 0] + 0.6 * r * Math.Cos(t), L[iris, 1] + 0.6 * r * Math.Sin(t), Math.Max(1.0, r * 0.15), samples);
             }
         }
-        lab["iris"] = MedianLab(irisSamples);
+        return samples;
+    }
+
+    /// <summary>
+    /// The white of the eye on both sides of each iris, a third of the way to the corner, brightest half kept
+    /// (lashes and the lid shadow darken parts of it). Null when the iris radius is under 5 pixels: in a small
+    /// picture the white is a pixel or two.
+    /// </summary>
+    private static List<double[]>? ScleraPixels(RgbImage img, double[,] L)
+    {
+        var samples = new List<double[]>();
+        foreach (var (iris, rimA, rimB, c1, c2) in new[] { (468, 469, 471, 33, 133), (473, 474, 476, 263, 362) })
+        {
+            var r = D(L, rimA, rimB) / 2;
+            if (r < 5) return null;
+            foreach (var corner in new[] { c1, c2 })
+            {
+                double vx = L[corner, 0] - L[iris, 0], vy = L[corner, 1] - L[iris, 1];
+                var dist = Math.Sqrt(vx * vx + vy * vy);
+                if (dist <= r * 1.2) continue;
+                var k = (r + (dist - r) * 0.3) / dist;
+                img.SampleDisc(L[iris, 0] + vx * k, L[iris, 1] + vy * k, Math.Max(1.0, r * 0.18), samples);
+            }
+        }
+        if (samples.Count == 0) return null;
+        var lums = samples.Select(p => Luminance(Linear(p))).OrderBy(v => v).ToArray();
+        var median = lums[lums.Length / 2];
+        return samples.Where(p => Luminance(Linear(p)) >= median).ToList();
+    }
+
+    private static Dictionary<string, object> Colours(RgbImage img, double[,] L)
+    {
+        var eyeW = (D(L, 33, 133) + D(L, 362, 263)) / 2;
+        var radius = Math.Max(1.0, eyeW * 0.06);
+        var regions = new Dictionary<string, List<double[]>>();
+        foreach (var (name, spots) in ColourSpots)
+        {
+            var samples = new List<double[]>();
+            foreach (var (a, b) in spots)
+                img.SampleDisc((L[a, 0] + L[b, 0]) / 2, (L[a, 1] + L[b, 1]) / 2, radius, samples);
+            regions[name] = samples;
+        }
+        regions["iris"] = IrisPixels(img, L);
+        if (ScleraPixels(img, L) is { } sclera) regions["eye_white"] = sclera;
+
+        var lab = regions.ToDictionary(kv => kv.Key, kv => MedianLab(kv.Value));
+        var lin = regions.ToDictionary(kv => kv.Key, kv => Median(kv.Value.Select(Linear).ToList()).Select(v => v + 1e-4).ToArray());
+        var skin = lin["skin"];
+        static double Lg(double v) => Math.Log2(v);
+
+        // Light-independent colour (FEAT-242): ratios of linear RGB between two parts of the same face cancel the
+        // light's brightness and colour, since both parts are lit alike. log2: 0 = same as the skin, 1 = twice.
+        var rel = new Dictionary<string, double>
+        {
+            ["skin_hue_deg (lighting-dependent)"] = R((Math.Atan2(lab["skin"][2], lab["skin"][1]) * 180 / Math.PI + 360) % 360),
+            ["brow_lightness (brow / skin luminance)"] = R(Luminance(lin["brows"]) / Luminance(skin)),
+            ["lip_redness (log2 R/G vs skin)"] = R(Lg(lin["lips"][0] / lin["lips"][1]) - Lg(skin[0] / skin[1])),
+            ["lip_lightness (lip / skin luminance)"] = R(Luminance(lin["lips"]) / Luminance(skin)),
+            ["blush (log2 R/G cheek vs skin)"] = R(Lg(lin["cheeks"][0] / lin["cheeks"][1]) - Lg(skin[0] / skin[1])),
+            ["iris_lightness (iris / skin luminance)"] = R(Luminance(lin["iris"]) / Luminance(skin)),
+        };
+        // Against the white of the eye (a near-neutral white under the same light): the skin's and the iris's own colour.
+        if (lin.TryGetValue("eye_white", out var w))
+        {
+            var iris = lin["iris"];
+            rel["skin_warmth (log2 R/B vs eye white)"] = R(Lg(skin[0] / w[0]) - Lg(skin[2] / w[2]));
+            rel["skin_pink (log2 R/G vs eye white)"] = R(Lg(skin[0] / w[0]) - Lg(skin[1] / w[1]));
+            rel["iris_warmth (log2 R/B vs eye white)"] = R(Lg(iris[0] / w[0]) - Lg(iris[2] / w[2]));
+            rel["iris_green (log2 G/(R+B)/2 vs eye white)"] = R(Lg(iris[1] / w[1]) - (Lg(iris[0] / w[0]) + Lg(iris[2] / w[2])) / 2);
+        }
+
+        // Exposure: clipped pixels can't be compared; a washed-out (hazy) picture shrinks every colour difference.
+        var clipped = new[] { "skin", "cheeks", "lips" }.ToDictionary(k => k, k =>
+            regions[k].Count == 0 ? 0.0 : R(regions[k].Count(p => Math.Max(p[0], Math.Max(p[1], p[2])) >= 250) / (double)regions[k].Count));
+        var sides = new double[2];
+        foreach (var (i, idx) in new[] { (0, 50), (1, 280) })
+        {
+            var px = new List<double[]>();
+            img.SampleDisc(L[idx, 0], L[idx, 1], radius * 2, px);
+            sides[i] = MedianLab(px)[0];
+        }
+        var contrast = (Luminance(skin) - Luminance(lin["iris"])) / Luminance(skin);
+        var warnings = new List<string>();
+        if (Math.Abs(sides[0] - sides[1]) > 12) warnings.Add("lit from one side: shading differs from an evenly lit capture");
+        if (clipped.Values.Max() > 0.05) warnings.Add("overexposed: some skin or lip pixels are clipped to white");
+        if (contrast < 0.5) warnings.Add("washed out (haze or fog): colour differences read smaller than they are");
+        var lighting = new Dictionary<string, object>
+        {
+            ["skin_L"] = R(lab["skin"][0]),
+            ["side_balance (image-left cheek L - image-right cheek L)"] = R(sides[0] - sides[1]),
+            ["clipped"] = clipped,
+            ["contrast (skin vs iris)"] = R(contrast),
+            ["warnings"] = warnings,
+        };
 
         // The face area's overall cast (mean a*, b*): strong casts (sepia, purple light) shift every absolute colour.
         double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
@@ -370,54 +487,23 @@ public sealed class FaceMeasurer : IDisposable
         }
         int x0 = Math.Max(0, (int)minX), y0 = Math.Max(0, (int)minY);
         int x1 = Math.Min(img.W - 1, (int)maxX), y1 = Math.Min(img.H - 1, (int)maxY);
-        var total = Math.Max(1L, (long)(x1 - x0 + 1) * (y1 - y0 + 1));
+        var width = x1 - x0 + 1;
+        var total = Math.Max(1L, (long)width * (y1 - y0 + 1));
         var step = Math.Max(1, (int)(total / 20000));
         double castA = 0, castB = 0;
         var n = 0;
-        var w = x1 - x0 + 1;
         for (long idx = 0; idx < total; idx += step)
         {
-            int x = x0 + (int)(idx % w), y = y0 + (int)(idx / w);
-            var p = img.Pixel(x, y);
+            var p = img.Pixel(x0 + (int)(idx % width), y0 + (int)(idx / width));
             var l = Color.SrgbToLab(p[0], p[1], p[2]);
             castA += l[1]; castB += l[2]; n++;
         }
         castA /= Math.Max(1, n); castB /= Math.Max(1, n);
 
-        // Lighting, so captures in different light can be told apart: skin lightness, and the image-left minus
-        // image-right cheek lightness (near 0 = even light; large = lit from one side).
-        var sides = new double[2];
-        foreach (var (i, idx) in new[] { (0, 50), (1, 280) })
-        {
-            var px = new List<double[]>();
-            img.SampleDisc(L[idx, 0], L[idx, 1], radius * 2, px);
-            sides[i] = MedianLab(px)[0];
-        }
-        // landmark 50 is the subject's right cheek, on the image's left in a frontal shot
-        var lighting = new Dictionary<string, object?>
-        {
-            ["skin_L"] = R(lab["skin"][0]),
-            ["side_balance (image-left cheek L - image-right cheek L)"] = R(sides[0] - sides[1]),
-            ["warning"] = Math.Abs(sides[0] - sides[1]) > 12 ? "lit from one side: colours and shading differ from an evenly lit capture" : null,
-        };
-
-        var skin = lab["skin"];
-        static double Hue(double[] v) => (Math.Atan2(v[2], v[1]) * 180 / Math.PI + 360) % 360;
         return new Dictionary<string, object>
         {
             ["hex"] = lab.ToDictionary(kv => kv.Key, kv => Color.LabToHex(kv.Value)),
-            ["lab"] = lab.ToDictionary(kv => kv.Key, kv => kv.Value.Select(v => Math.Round(v, 1)).ToArray()),
-            ["relative"] = new Dictionary<string, double>
-            {
-                ["brow_darkness (skin L - brow L)"] = R(skin[0] - lab["brows"][0]),
-                ["lip_redness (lip a - skin a)"] = R(lab["lips"][1] - skin[1]),
-                ["lip_lightness (lip L - skin L)"] = R(lab["lips"][0] - skin[0]),
-                ["blush (cheek a - skin a)"] = R(lab["cheeks"][1] - skin[1]),
-                ["iris_lightness (iris L - skin L)"] = R(lab["iris"][0] - skin[0]),
-                ["iris_hue_deg"] = R(Hue(lab["iris"])),
-                ["iris_chroma"] = R(Math.Sqrt(lab["iris"][1] * lab["iris"][1] + lab["iris"][2] * lab["iris"][2])),
-                ["skin_hue_deg"] = R(Hue(skin)),
-            },
+            ["relative"] = rel,
             ["lighting"] = lighting,
             ["cast"] = new Dictionary<string, object?>
             {
@@ -425,18 +511,6 @@ public sealed class FaceMeasurer : IDisposable
                 ["warning"] = Math.Sqrt(castA * castA + castB * castB) > 25 ? "strong colour cast: compare relative values, not hex" : null,
             },
         };
-    }
-
-    private static double[] MedianLab(List<double[]> rgbSamples)
-    {
-        if (rgbSamples.Count == 0) return [0, 0, 0];
-        var labs = rgbSamples.Select(p => Color.SrgbToLab(p[0], p[1], p[2])).ToList();
-        return Enumerable.Range(0, 3).Select(c =>
-        {
-            var sorted = labs.Select(l => l[c]).OrderBy(v => v).ToArray();
-            var m = sorted.Length / 2;
-            return sorted.Length % 2 == 1 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
-        }).ToArray();
     }
 
     // ---- colour maths -----------------------------------------------------------------------------

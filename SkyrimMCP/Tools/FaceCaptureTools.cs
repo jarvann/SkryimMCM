@@ -47,13 +47,15 @@ public class FaceCaptureTools : ToolBase
         "hides the hair for the shot so brows, forehead and ears show, and makes captures match pixel for pixel (hair physics can still be moving when time stops). crop 'x,y,width,height' in fractions of the frame; by " +
         "default a square on the middle of the screen. Waits out a blink before freezing. showImage=false returns only the file paths " +
         "(the preview is still written), to save context when probing; MeasureFace reads the preview. The game must be the active " +
-        "window. expression (neutral, happy/smile, sad, angry, surprised, puzzled, disgusted, afraid, mood-happy, mood-sad) with strength " +
+        "window. hideEffects (default true) hides particle effects on the character, such as cold-weather breath across the mouth. " +
+        "framing in the result says whether the face was found in the middle of the shot. expression (neutral, happy/smile, sad, angry, surprised, puzzled, disgusted, afraid, mood-happy, mood-sad) with strength " +
         "0-1 (default 0.7) holds that expression for the shot, to compare with a reference that isn't neutral (a smiling photo); " +
         "it needs neutralPose (the default) and is cleared afterwards. Compare captures only when they use the same view, " +
         "distance, heightOffset and expression.")]
     public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,
         double heightOffset = -3, bool hideHair = false, bool neutralPose = true, bool aimFromHead = true, string? crop = null,
-        int previewWidth = 1200, int waitSeconds = 10, bool showImage = true, string expression = "neutral", double strength = 0.7)
+        int previewWidth = 1200, int waitSeconds = 10, bool showImage = true, string expression = "neutral", double strength = 0.7,
+        bool hideEffects = true)
     {
         if (!Expressions.TryGetValue(expression.Trim(), out var expressionIndex))
             return Error($"expression must be one of {string.Join(", ", Expressions.Keys)}");
@@ -102,7 +104,7 @@ public class FaceCaptureTools : ToolBase
         var blinkWaits = 0;
         for (; blinkWaits < 8; blinkWaits++)
         {
-            enter = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair });
+            enter = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair, ["hideEffects"] = hideEffects });
             if (enter?["blinking"]?.GetValue<bool>() != true) break;
             await Task.Delay(120);
         }
@@ -124,6 +126,7 @@ public class FaceCaptureTools : ToolBase
 
             crop ??= AutoCrop(enter?["screen"]);
             var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage);
+            var framing = CheckFraming(shot);
             shot.Content.Insert(0, new TextContentBlock
             {
                 Text = JsonSerializer.Serialize(new
@@ -136,6 +139,8 @@ public class FaceCaptureTools : ToolBase
                     crop,
                     pose,
                     browColor,
+                    effectsHidden = enter?["effectsHidden"],
+                    framing,
                     expression = expressionIndex >= 0 ? $"{expression} {Math.Clamp(strength, 0, 1):0.##}" : null,
                     eyes = enter?["eyes"],
                     blinkWaits = blinkWaits > 0 ? blinkWaits : (int?)null,
@@ -163,6 +168,29 @@ public class FaceCaptureTools : ToolBase
     {
         var data = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "exit" });
         return DeserializeResponse(data);
+    }
+
+    // FEAT-242: a capture that missed the face (the player moved, the scene changed) is reported, not silently returned.
+    private static string? CheckFraming(CallToolResult shot)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        string? preview = null;
+        foreach (var block in shot.Content.OfType<TextContentBlock>())
+        {
+            try { preview ??= JsonNode.Parse(block.Text)?["preview"]?["file"]?.GetValue<string>(); }
+            catch (JsonException) { }
+        }
+        if (preview == null || !File.Exists(preview)) return null;
+        try
+        {
+            var face = SkyrimMCP.Face.FaceMeasurer.Shared.LocateFace(preview);
+            if (face == null) return "No face found in this capture: it probably missed (the character moved or turned). Capture again.";
+            var (x, y, size) = face.Value;
+            if (Math.Abs(x - 0.5) > 0.2 || Math.Abs(y - 0.5) > 0.25)
+                return $"The face is off centre (at {x:0.00}, {y:0.00} of the frame): capture again before comparing.";
+            return $"ok (face at {x:0.00}, {y:0.00}, {size:0.00} of the frame)";
+        }
+        catch (Exception ex) { return "Framing not checked: " + ex.Message; }
     }
 
     // A square on the middle of the screen, 90% of its height: the head sits in the centre at the default distance.
