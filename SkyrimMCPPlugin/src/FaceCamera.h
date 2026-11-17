@@ -19,6 +19,9 @@ namespace SkyrimMCP {
         // mouthOpen 0-1 opens the jaw (phoneme BigAah), for an open-mouthed smile.
         json Prepare(int expression, float strength, float mouthOpen);
 
+        // Light spells active on the player (Candlelight and the like), by name; dispel=true ends them.
+        json LightEffects(bool dispel);
+
         // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair. Mid-blink it
         // returns {"blinking": true} without entering: wait a moment and call it again.
         // hideEffects culls particle effects on the character (cold-weather breath) for the shot.

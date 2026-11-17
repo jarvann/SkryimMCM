@@ -45,11 +45,11 @@ public partial class RaceMenuTools
         "mouth_corners, chin, jaw, cheeks, cheekbones (both sides at once, mirrored). direction: up, down, in (toward the middle of " +
         "the face), out, forward (toward the viewer) or back. amount: in eye widths, the same unit as MeasureFace's lid measures " +
         "(0.01 = 1% of an eye width; the measurement sees from about 0.03; at most 0.25 a call). radius: how far the move spreads around the region, in eye widths " +
-        "(default 0.3), fading smoothly. Takes a front capture (no image returned) to find the region, moves the vertices of every " +
+        "(default 0.6 for cheeks, cheekbones, jaw and chin, 0.3 elsewhere), fading smoothly. Takes a front capture (no image returned) to find the region, moves the vertices of every " +
         "head part there except the eyeballs and hair (lashes, tear ducts and brows follow), and loads the result like SetFaceSliders, with " +
         "the same session backup. Small steps, then MeasureFace(samples: 3) under the studio light; undo with the opposite " +
         "direction or LoadRaceMenuPreset. dryRun shows what would move without changing the face.")]
-    public async Task<object> SculptFace(string region, string direction, double amount, double radius = 0.3, bool dryRun = false)
+    public async Task<object> SculptFace(string region, string direction, double amount, double? radius = null, bool dryRun = false)
     {
         try
         {
@@ -59,7 +59,11 @@ public partial class RaceMenuTools
             var dir = direction.Trim().ToLowerInvariant();
             if (!SculptDirections.Contains(dir)) return new { error = $"direction must be one of {string.Join(", ", SculptDirections)}" };
             if (amount <= 0 || amount > 0.25) return new { error = "amount must be above 0 and at most 0.25 eye widths a call" };
-            radius = Math.Clamp(radius, 0.05, 1.5);
+            // BUG-052: broad regions need a wider reach (cheeks at 0.3 moved only 21 head vertices, at 0.6 43 to 50).
+        var wide = region.Trim().ToLowerInvariant() is "cheeks" or "cheekbones" or "jaw" or "chin";
+        var reachRadius = Math.Clamp(radius ?? (wide ? 0.6 : 0.3), 0.05, 1.5);
+        // The eye mesh (lashes, tear duct) only follows the lids and eye corners; other strokes leave it alone.
+        var eyeRegion = region.Trim().ToLowerInvariant().Contains("lid") || region.Trim().ToLowerInvariant().Contains("eye_corner");
             if (await RaceMenuOpenError() is string open) return new { error = open };
     
             // 1. A front capture with the vertex snapshot of the same frozen frame.
@@ -99,7 +103,7 @@ public partial class RaceMenuTools
             var eyeWidthPx = (Dist(Px(33), Px(133)) + Dist(Px(362), Px(263))) / 2;
             var centreX = Px(168).X;
             var regionPts = landmarkIds.Select(Px).ToArray();
-            var reach = radius * eyeWidthPx;
+            var reach = reachRadius * eyeWidthPx;
     
             // 3. Candidate vertices near the region, on the camera side (vertices behind the surface also project there).
             var candidates = new List<(JsonObject Host, int Index, double Weight, double PxX, double Dist)>();
@@ -109,6 +113,7 @@ public partial class RaceMenuTools
             {
                 var type = host["type"]?.GetValue<int>() ?? -1;
                 if (type == 3) continue;  // hair
+            if (type == 2 && !eyeRegion) continue;  // eye mesh: only for the lids and eye corners
                 if (host["xyd"] is not JsonArray xyd) continue;
                 // BUG-047: an eye mesh also carries the lower lashes, the tear duct and a lid strip; those must follow the
                 // lids. Leave out only the eyeballs: the largest connected pieces of its chargen TRI.

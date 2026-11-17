@@ -118,6 +118,27 @@ namespace SkyrimMCP {
     }
 
     namespace FaceCamera {
+        json LightEffects(bool dispel) {
+            // BUG-052: a light spell on the player (Candlelight) washes out the face in captures and adds to the studio
+            // lights (skin lightness about 72 with it, 63 without). Lists the active light effects; dispels them if asked.
+            json found = json::array();
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* target = player ? player->AsMagicTarget() : nullptr;
+            auto* list = target ? target->GetActiveEffectList() : nullptr;
+            if (!list) return found;
+            std::vector<RE::ActiveEffect*> lights;
+            for (auto* effect : *list) {
+                auto* base = effect ? effect->GetBaseObject() : nullptr;
+                if (!base || base->GetArchetype() != RE::EffectSetting::Archetype::kLight) continue;
+                if (effect->flags.any(RE::ActiveEffect::Flag::kInactive, RE::ActiveEffect::Flag::kDispelled)) continue;
+                found.push_back(base->GetName() ? base->GetName() : "light effect");
+                lights.push_back(effect);
+            }
+            if (dispel) for (auto* effect : lights) effect->Dispel(true);
+            return found;
+        }
+
+
 
         json Prepare(int expression, float strength, float mouthOpen) {
             auto* player = RE::PlayerCharacter::GetSingleton();
@@ -168,7 +189,7 @@ namespace SkyrimMCP {
                 }
             }
             return {{"idleReset", idleReset}, {"expressionReset", expressionReset}, {"expression", s_expressionSet ? expression : -1},
-                    {"headTrackCleared", headTrackCleared}};
+                    {"headTrackCleared", headTrackCleared}, {"lightEffects", LightEffects(false)}};
         }
 
         json Enter(bool hideHud, bool hideHair, bool hideEffects) {
