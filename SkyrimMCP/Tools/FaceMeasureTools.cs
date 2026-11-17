@@ -274,7 +274,9 @@ public class FaceMeasureTools : ToolBase
             }
         }
         var colourRows = new List<(bool Ok, double Size, JsonObject Row)>();
-        if (reference["colour"]?["relative"] is JsonObject refColour)
+        bool Usable(JsonObject m) => m["colour"]?["usable"]?.GetValue<bool>() != false;
+        var colourUsable = Usable(reference) && Usable(now);
+        if (colourUsable && reference["colour"]?["relative"] is JsonObject refColour)
         {
             foreach (var (key, refValue) in refColour)
             {
@@ -319,7 +321,8 @@ public class FaceMeasureTools : ToolBase
         {
             ["reference"] = name,
             ["shape"] = $"{shapeOk}/{rows.Count} within tolerance",
-            ["colour"] = $"{colourOk}/{colourRows.Count} within tolerance",
+            ["colour"] = colourUsable ? $"{colourOk}/{colourRows.Count} within tolerance"
+                : $"not compared: the {(Usable(reference) ? "capture" : "reference")} is monochrome or sepia",
             ["flags"] = flags,
             ["shapeGaps"] = new JsonArray(rows.OrderBy(r => r.Ok).ThenByDescending(r => r.Size).Select(r => (JsonNode?)r.Row).ToArray()),
             ["colourGaps"] = new JsonArray(colourRows.OrderBy(r => r.Ok).ThenByDescending(r => r.Size).Select(r => (JsonNode?)r.Row).ToArray()),
