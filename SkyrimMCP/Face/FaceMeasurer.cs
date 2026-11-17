@@ -330,7 +330,7 @@ public sealed class FaceMeasurer : IDisposable
     // Sample spots: a landmark, or a pair whose midpoint is sampled.
     private static readonly Dictionary<string, (int A, int B)[]> ColourSpots = new()
     {
-        ["skin"] = [(6, 6), (197, 197), (199, 199), (4, 197)],  // nose bridge and chin: no makeup, lit like the face
+        ["skin"] = [(199, 199), (200, 200), (208, 208), (428, 428), (6, 6), (197, 197)],  // chin, plus the upper nose bridge: no makeup; mostly chin, as the bridge catches highlights in sunlight
         ["cheeks"] = [(50, 50), (280, 280), (50, 205), (280, 425)],  // where blush goes
         ["lips"] = [(0, 13), (14, 17), (37, 82), (267, 312), (84, 87), (314, 317)],
         ["brows"] = [(63, 53), (105, 52), (66, 65), (293, 283), (334, 282), (296, 295)],
