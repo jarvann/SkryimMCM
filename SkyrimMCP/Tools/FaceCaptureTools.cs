@@ -73,6 +73,9 @@ public class FaceCaptureTools : ToolBase
 
         // The game resets the brow colour on cell changes and loads: put the stored one back first.
         var browColor = await SkyrimMCP.Face.FaceState.ReapplyBrowColor(_pipe);
+        JsonNode? studio = null;
+        try { studio = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" }); }
+        catch (Exception) { /* older plugin: no studio */ }
 
         JsonNode? pose = null;
         var sheathed = false;
@@ -139,6 +142,7 @@ public class FaceCaptureTools : ToolBase
                     crop,
                     pose,
                     browColor,
+                    studio = studio == null ? null : new { preset = studio["preset"]?.ToString(), cell = studio["cell"]?.ToString() },
                     effectsHidden = enter?["effectsHidden"],
                     framing,
                     expression = expressionIndex >= 0 ? $"{expression} {Math.Clamp(strength, 0, 1):0.##}" : null,

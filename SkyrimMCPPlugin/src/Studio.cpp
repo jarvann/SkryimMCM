@@ -1,0 +1,200 @@
+#include "Studio.h"
+#include "Helpers.h"
+#include <RE/Skyrim.h>
+#include <SKSE/SKSE.h>
+#include <cmath>
+#include <format>
+#include <numbers>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace SkyrimMCP {
+
+    namespace {
+        // Studio lights are found again by this name prefix (the logic DLL can be reloaded between calls).
+        constexpr std::string_view kLightPrefix = "SkyLinkStudio_";
+        std::string s_preset;  // empty: no studio lights
+
+        struct LightSpec {
+            const char* name;
+            float yawDeg;   // around the head: 0 = in front of the face, + = the character's right
+            float forward;  // distance from the head
+            float up;       // above the head node
+            RE::NiColor color;
+            float fade;     // brightness
+        };
+
+        constexpr float kRadius = 260.0f;
+
+        std::vector<LightSpec> Preset(const std::string& name) {
+            const RE::NiColor white{ 1.0f, 1.0f, 1.0f };
+            if (name == "neutral") return { { "key", 40, 60, 15, white, 1.6f }, { "fill", -40, 70, 0, white, 0.7f }, { "rim", 180, 60, 35, white, 0.5f } };
+            if (name == "warm") return { { "key", 40, 60, 15, { 1.0f, 0.85f, 0.68f }, 1.6f }, { "fill", -40, 70, 0, { 1.0f, 0.9f, 0.8f }, 0.7f }, { "rim", 180, 60, 35, { 1.0f, 0.85f, 0.7f }, 0.4f } };
+            if (name == "daylight") return { { "key", 40, 60, 25, { 1.0f, 0.97f, 0.9f }, 2.0f }, { "fill", -40, 70, 0, { 0.8f, 0.88f, 1.0f }, 0.8f }, { "rim", 180, 60, 35, white, 0.6f } };
+            if (name == "soft") return { { "key", 35, 70, 10, white, 1.1f }, { "fill", -35, 70, 10, white, 1.1f }, { "rim", 180, 60, 35, white, 0.3f } };
+            return {};
+        }
+
+        RE::NiNode* Root(RE::Actor* a_actor) {
+            auto* root = a_actor ? a_actor->Get3D(false) : nullptr;
+            return root ? root->AsNode() : nullptr;
+        }
+
+        RE::ShadowSceneNode* SceneLights() { return RE::BSShaderManager::State::GetSingleton().shadowSceneNode[0]; }
+
+        int RemoveLights(RE::NiNode* a_root) {
+            if (!a_root) return 0;
+            std::vector<RE::NiAVObject*> found;
+            for (auto& child : a_root->GetChildren()) {
+                if (child && std::string_view(child->name.c_str()).starts_with(kLightPrefix)) found.push_back(child.get());
+            }
+            auto* scene = SceneLights();
+            for (auto* object : found) {
+                if (auto* light = netimmerse_cast<RE::NiLight*>(object); light && scene) scene->RemoveLight(light);
+                a_root->DetachChild2(object);
+            }
+            return static_cast<int>(found.size());
+        }
+
+        RE::NiPoint3 ToLocal(RE::NiAVObject* a_root, const RE::NiPoint3& a_world) {
+            const auto d = a_world - a_root->world.translate;
+            const auto& r = a_root->world.rotate;
+            // world = R * local * scale  =>  local = R^T * d / scale  (columns of R are the local axes)
+            RE::NiPoint3 local{ r.entry[0][0] * d.x + r.entry[1][0] * d.y + r.entry[2][0] * d.z,
+                                r.entry[0][1] * d.x + r.entry[1][1] * d.y + r.entry[2][1] * d.z,
+                                r.entry[0][2] * d.x + r.entry[1][2] * d.y + r.entry[2][2] * d.z };
+            const float scale = a_root->world.scale > 0.0f ? a_root->world.scale : 1.0f;
+            return local / scale;
+        }
+    }
+
+    namespace Studio {
+
+        json Lights(const std::string& preset, float intensity) {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* root = Root(player);
+            if (!root) return {{"error", "The player's 3D isn't loaded"}};
+            auto* scene = SceneLights();
+            if (!scene) return {{"error", "The renderer's light list isn't available"}};
+
+            const int removed = RemoveLights(root);
+            s_preset.clear();
+            if (preset == "off" || preset.empty()) return {{"removed", removed}, {"preset", "off"}};
+
+            const auto specs = Preset(preset);
+            if (specs.empty()) return {{"error", "preset must be neutral, warm, daylight, soft or off"}};
+            auto* head = root->GetObjectByName(RE::BSFixedString("NPC Head [Head]"));
+            if (!head) return {{"error", "The player's head isn't loaded"}};
+
+            // Light positions are worked out in world space from the way the body faces, then stored in the
+            // root's own space, so the lights stay put relative to her.
+            constexpr float pi = std::numbers::pi_v<float>;
+            const float facing = player->GetAngleZ();
+            json placed = json::array();
+            for (const auto& spec : specs) {
+                const float around = facing + spec.yawDeg * pi / 180.0f;
+                const RE::NiPoint3 world = head->world.translate +
+                    RE::NiPoint3{ std::sin(around) * spec.forward, std::cos(around) * spec.forward, spec.up };
+
+                RE::NiPointer<RE::NiPointLight> light{ RE::NiPointLight::Create() };
+                if (!light) return {{"error", "Couldn't create a light"}};
+                light->name = std::format("{}{}", kLightPrefix, spec.name);
+                auto& data = light->GetLightRuntimeData();
+                data.ambient = RE::NiColor{ 0.0f, 0.0f, 0.0f };
+                data.diffuse = spec.color;
+                data.radius = RE::NiPoint3{ kRadius, kRadius, kRadius };
+                data.fade = spec.fade * std::clamp(intensity, 0.1f, 4.0f);
+                light->SetLightAttenuation(kRadius);
+                light->local.translate = ToLocal(root, world);
+                root->AttachChild(light.get(), true);
+                RE::NiUpdateData update{};
+                light->Update(update);
+
+                RE::ShadowSceneNode::LIGHT_CREATE_PARAMS params{};
+                params.dynamic = true;
+                params.shadowLight = false;
+                params.portalStrict = false;
+                params.affectLand = true;
+                params.affectWater = true;
+                params.neverFades = true;
+                params.fov = pi;
+                params.falloff = 1.0f;
+                params.nearDistance = 5.0f;
+                params.depthBias = 0.0f;
+                params.sceneGraphIndex = 0;
+                params.restrictedNode = nullptr;
+                params.lensFlareData = nullptr;
+                scene->AddLight(light.get(), params);
+
+                placed.push_back({{"light", spec.name}, {"world", {world.x, world.y, world.z}}, {"fade", data.fade},
+                                  {"color", {spec.color.red, spec.color.green, spec.color.blue}}});
+            }
+            s_preset = preset;
+            return {{"preset", preset}, {"intensity", intensity}, {"removed", removed}, {"lights", placed}};
+        }
+
+        json Go(const std::string& cellEditorId) {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (!player) return {{"error", "Player not available"}};
+            if (player->IsInCombat()) return {{"error", "In combat: the studio has to wait"}};
+            auto* xmarker = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000003B);
+            if (!xmarker) return {{"error", "XMarker (Skyrim.esm 00003B) not found"}};
+
+            auto marker = player->PlaceObjectAtMe(xmarker, true);
+            if (!marker) return {{"error", "Couldn't place the marker"}};
+            marker->SetPosition(player->GetPosition());
+            marker->data.angle = player->data.angle;  // MoveTo back matches the marker's rotation
+
+            RemoveLights(Root(player));
+            s_preset.clear();
+            const char* cellName = player->GetParentCell() ? player->GetParentCell()->GetFormEditorID() : nullptr;
+            json result = {{"markerId", std::format("{:08X}", marker->GetFormID())},
+                           {"markedCell", cellName ? cellName : ""},
+                           {"markedPosition", {player->GetPosition().x, player->GetPosition().y, player->GetPosition().z}},
+                           {"markedFacingDeg", player->GetAngleZ() * 180.0f / std::numbers::pi_v<float>}};
+            if (!player->CenterOnCell(cellEditorId.c_str())) {
+                marker->Disable();
+                marker->SetDelete(true);
+                return {{"error", std::format("No cell with editor ID '{}' (the move didn't start; nothing was changed)", cellEditorId)}};
+            }
+            result["going"] = cellEditorId;
+            return result;
+        }
+
+        json Return(RE::FormID markerId) {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* marker = RE::TESForm::LookupByID<RE::TESObjectREFR>(markerId);
+            if (!player || !marker) return {{"error", std::format("Marker {:08X} not found", markerId)}};
+            const int removed = RemoveLights(Root(player));
+            s_preset.clear();
+            player->MoveTo(marker);
+            return {{"returning", std::format("{:08X}", markerId)}, {"lightsRemoved", removed}};
+        }
+
+        json Cleanup(RE::FormID markerId) {
+            auto* marker = RE::TESForm::LookupByID<RE::TESObjectREFR>(markerId);
+            if (!marker) return {{"deleted", false}, {"note", "marker already gone"}};
+            marker->Disable();
+            marker->SetDelete(true);
+            return {{"deleted", true}};
+        }
+
+        json Status() {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* root = Root(player);
+            int lights = 0;
+            if (root) {
+                for (auto& child : root->GetChildren()) {
+                    if (child && std::string_view(child->name.c_str()).starts_with(kLightPrefix)) ++lights;
+                }
+            }
+            auto* cell = player ? player->GetParentCell() : nullptr;
+            const char* cellId = cell ? cell->GetFormEditorID() : nullptr;
+            return {{"lights", lights},
+                    {"preset", s_preset.empty() ? json(nullptr) : json(s_preset)},
+                    {"cell", cellId ? cellId : ""},
+                    {"interior", cell && cell->IsInteriorCell()}};
+        }
+    }
+}

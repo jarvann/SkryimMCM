@@ -4,6 +4,7 @@
 #include "LootManager.h"
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
+#include "Studio.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
 #include "UtilityManager.h"
@@ -301,6 +302,19 @@ namespace SkyrimMCP::Protocol {
             int index = params.value("index", -1);
             bool refresh = params.value("refresh", false);
             return GameThread(id, [=]() { return AppearanceManager::SetHeadPart(refId, part, type, index, refresh); });
+        };
+        registry["studio"] = [](const std::string& id, const json& params) {
+            std::string mode = params.value("mode", "status");
+            std::string preset = params.value("preset", "neutral");
+            float intensity = params.value("intensity", 1.0f);
+            std::string cell = params.value("cell", "");
+            const auto marker = static_cast<std::uint32_t>(Helpers::ParseFormId(params.value("markerId", std::string{})));
+            if (mode == "lights") return GameThread(id, [=]() { return Studio::Lights(preset, intensity); });
+            if (mode == "go") return GameThread(id, [=]() { return Studio::Go(cell); });
+            if (mode == "return") return GameThread(id, [=]() { return Studio::Return(marker); });
+            if (mode == "cleanup") return GameThread(id, [=]() { return Studio::Cleanup(marker); });
+            if (mode == "status") return GameThread(id, []() { return Studio::Status(); });
+            return MakeResponse(id, false, {}, "mode must be lights, go, return, cleanup or status").dump() + "\n";
         };
         registry["face_camera"] = [](const std::string& id, const json& params) {
             std::string mode = params.value("mode", "");
