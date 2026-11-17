@@ -282,6 +282,13 @@ public class FaceMeasureTools : ToolBase
         if (Math.Abs(yawDiff ?? 0) > 6 || Math.Abs(pitchDiff ?? 0) > 6)
             flags.Add($"head angle differs from the reference (yaw {yawDiff:+0;-0}, pitch {pitchDiff:+0;-0} degrees): capture at a matching angle (CaptureFace angle, heightOffset)");
 
+        if (now["colour"]?["lighting"]?["warning"] is JsonNode lightWarning)
+            flags.Add($"now: {lightWarning}");
+        var refL = reference["colour"]?["lighting"]?["skin_L"]?.GetValue<double>();
+        var nowL = now["colour"]?["lighting"]?["skin_L"]?.GetValue<double>();
+        if (refL != null && nowL != null && Math.Abs(nowL.Value - refL.Value) > 20)
+            flags.Add($"lighting much {(nowL > refL ? "brighter" : "darker")} than the reference (skin lightness {nowL:0} vs {refL:0}): trust the relative colours over the hex values");
+
         var shapeOk = rows.Count(r => r.Ok);
         var colourOk = colourRows.Count(r => r.Ok);
         return new JsonObject

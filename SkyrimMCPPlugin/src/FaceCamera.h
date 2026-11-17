@@ -13,6 +13,7 @@ namespace SkyrimMCP {
         // Neutral pose before a capture: back to the default idle (IdleForceDefaultState) and a neutral
         // expression. Leave the animation a moment to settle before Enter freezes time. With a weapon or
         // spell out it only starts sheathing and returns {"sheathing": true}: wait, then call it again.
+        // While the player moves it does nothing and returns {"moving": true}.
         // expression: 0-16 (the game's expression list, e.g. 2 = DialogueHappy) held at strength 0-1 through
         // the capture and cleared by Exit; -1 = neutral.
         json Prepare(int expression, float strength);

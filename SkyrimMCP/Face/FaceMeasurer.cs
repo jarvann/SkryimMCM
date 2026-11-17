@@ -384,6 +384,23 @@ public sealed class FaceMeasurer : IDisposable
         }
         castA /= Math.Max(1, n); castB /= Math.Max(1, n);
 
+        // Lighting, so captures in different light can be told apart: skin lightness, and the image-left minus
+        // image-right cheek lightness (near 0 = even light; large = lit from one side).
+        var sides = new double[2];
+        foreach (var (i, idx) in new[] { (0, 50), (1, 280) })
+        {
+            var px = new List<double[]>();
+            img.SampleDisc(L[idx, 0], L[idx, 1], radius * 2, px);
+            sides[i] = MedianLab(px)[0];
+        }
+        // landmark 50 is the subject's right cheek, on the image's left in a frontal shot
+        var lighting = new Dictionary<string, object?>
+        {
+            ["skin_L"] = R(lab["skin"][0]),
+            ["side_balance (image-left cheek L - image-right cheek L)"] = R(sides[0] - sides[1]),
+            ["warning"] = Math.Abs(sides[0] - sides[1]) > 12 ? "lit from one side: colours and shading differ from an evenly lit capture" : null,
+        };
+
         var skin = lab["skin"];
         static double Hue(double[] v) => (Math.Atan2(v[2], v[1]) * 180 / Math.PI + 360) % 360;
         return new Dictionary<string, object>
@@ -401,6 +418,7 @@ public sealed class FaceMeasurer : IDisposable
                 ["iris_chroma"] = R(Math.Sqrt(lab["iris"][1] * lab["iris"][1] + lab["iris"][2] * lab["iris"][2])),
                 ["skin_hue_deg"] = R(Hue(skin)),
             },
+            ["lighting"] = lighting,
             ["cast"] = new Dictionary<string, object?>
             {
                 ["a"] = R(castA), ["b"] = R(castB),
