@@ -37,11 +37,12 @@ public class FaceCaptureTools : ToolBase
         "(0 front, 90 the character's right, -90 their left). distance from the head (default 32; below 28 the camera can end up " +
         "inside the head, so it is raised to 28), heightOffset from the head node (default -3, a straight-on portrait). hideHair " +
         "hides the hair for the shot so brows, forehead and ears show, and makes captures match pixel for pixel (hair physics can still be moving when time stops). crop 'x,y,width,height' in fractions of the frame; by " +
-        "default a square on the middle of the screen. The game must be the active window. Compare captures only when they use " +
-        "the same view, distance and heightOffset.")]
+        "default a square on the middle of the screen. Waits out a blink before freezing. showImage=false returns only the file paths " +
+        "(the preview is still written), to save context when probing; MeasureFace reads the preview. The game must be the active " +
+        "window. Compare captures only when they use the same view, distance and heightOffset.")]
     public async Task<CallToolResult> CaptureFace(string view = "front", double? angle = null, double distance = 32,
         double heightOffset = -3, bool hideHair = false, bool neutralPose = true, bool aimFromHead = true, string? crop = null,
-        int previewWidth = 1200, int waitSeconds = 10)
+        int previewWidth = 1200, int waitSeconds = 10, bool showImage = true)
     {
         float angleDeg;
         if (angle.HasValue) angleDeg = (float)angle.Value;
@@ -72,8 +73,17 @@ public class FaceCaptureTools : ToolBase
             await Task.Delay(700);  // let the idle and the face settle before time stops
         }
 
-        var enter = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair });
+        // Enter refuses mid-blink (a half-closed lid skews the eye measurements): try again shortly.
+        JsonNode? enter = null;
+        var blinkWaits = 0;
+        for (; blinkWaits < 8; blinkWaits++)
+        {
+            enter = await _pipe.SendRequestAsync("face_camera", new JsonObject { ["mode"] = "enter", ["hideHud"] = true, ["hideHair"] = hideHair });
+            if (enter?["blinking"]?.GetValue<bool>() != true) break;
+            await Task.Delay(120);
+        }
         if (enter?["error"] is JsonNode enterError) return Error(enterError.ToString());
+        if (enter?["blinking"]?.GetValue<bool>() == true) return Error("The eyes kept blinking for a second: try again.");
         try
         {
             await Task.Delay(250);  // the free-camera state exists from the next frame
@@ -89,7 +99,7 @@ public class FaceCaptureTools : ToolBase
             await Task.Delay(300);
 
             crop ??= AutoCrop(enter?["screen"]);
-            var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage: true);
+            var shot = await new UtilityTools(_pipe).TakeScreenshot(waitSeconds, previewWidth, crop, showImage);
             shot.Content.Insert(0, new TextContentBlock
             {
                 Text = JsonSerializer.Serialize(new
@@ -101,6 +111,8 @@ public class FaceCaptureTools : ToolBase
                     hideHair,
                     crop,
                     pose,
+                    eyes = enter?["eyes"],
+                    blinkWaits = blinkWaits > 0 ? blinkWaits : (int?)null,
                     sheathed = sheathed ? "A weapon or spell was out: it was sheathed first (draw it again yourself)." : null,
                     camera = aim,
                     distanceNote,

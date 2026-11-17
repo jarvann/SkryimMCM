@@ -15,7 +15,8 @@ namespace SkyrimMCP {
         // spell out it only starts sheathing and returns {"sheathing": true}: wait, then call it again.
         json Prepare();
 
-        // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair.
+        // Free camera with time frozen (like "tfc 1"); optionally hides the HUD and the hair. Mid-blink it
+        // returns {"blinking": true} without entering: wait a moment and call it again.
         json Enter(bool hideHud, bool hideHair);
 
         // Places the camera angleDeg around the head (0 = in front, 90 = on the character's right,
