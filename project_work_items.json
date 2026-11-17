@@ -2386,6 +2386,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-239",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "CaptureFace: wait out blinks, report gaze, optional image",
+          "description": "Eye opening read 0.402, 0.403 then 0.382 on an unchanged face (in-game agent, 2026-11-17): a blink or lid caught at the freeze. Enter now refuses while the blink stage is BlinkDown/BlinkUp/BlinkDownAndWait and CaptureFace retries every 120 ms (up to 8 times). The result reports the blink stage and eye heading/pitch offsets, so a capture with the eyes looking away can be spotted. showImage=false returns only the paths, so probing doesn't fill the agent's context with images.",
+          "history": [
+            {
+              "datetime": "2026-11-17T18:50",
+              "note": "Requested in skill draft v1.1 (items 3 and 4). Built on feature/FEAT-239-capture-blink-lock."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "FEAT-230",
           "type": "feature",
           "status": "planned",

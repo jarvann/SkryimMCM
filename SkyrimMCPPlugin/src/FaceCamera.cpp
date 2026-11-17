@@ -115,6 +115,19 @@ namespace SkyrimMCP {
             if (!camera || !player || !main) return {{"error", "Camera or player not available"}};
             if (!HeadNode(player)) return {{"error", "The player's head isn't loaded (third-person 3D missing)"}};
 
+            // Don't freeze mid-blink (FEAT-239): a half-closed lid skews the eye measurements. The caller
+            // waits a moment and calls Enter again; a blink lasts a fraction of a second.
+            if (!s_active) {
+                if (auto* face = player->GetFaceGenAnimationData()) {
+                    using Stage = RE::BSFaceGenAnimationData::EyesBlinkingStage;
+                    const auto stage = face->eyesBlinkingStage;
+                    if (stage == Stage::BlinkDown || stage == Stage::BlinkUp || stage == Stage::BlinkDownAndWait1 ||
+                        stage == Stage::BlinkDownAndWait2) {
+                        return {{"blinking", true}, {"stage", static_cast<int>(stage)}};
+                    }
+                }
+            }
+
             if (!s_active) {
                 s_wasFreeCamera = camera->IsInFreeCameraMode();
                 s_wasFrozen = main->GetRuntimeData().freezeTime;
@@ -136,6 +149,11 @@ namespace SkyrimMCP {
             s_active = true;
 
             json result = {{"freeCamera", true}, {"hudHidden", s_hidHud}, {"hiddenNodes", s_hiddenNodes}};
+            if (auto* face = player->GetFaceGenAnimationData()) {
+                result["eyes"] = {{"blinkStage", static_cast<int>(face->eyesBlinkingStage)},
+                                  {"headingOffset", face->eyesHeadingOffset},
+                                  {"pitchOffset", face->eyesPitchOffset}};
+            }
             if (auto* prefs = RE::INIPrefSettingCollection::GetSingleton()) {
                 auto* w = prefs->GetSetting("iSize W:Display");
                 auto* h = prefs->GetSetting("iSize H:Display");
