@@ -1,10 +1,13 @@
 #include "FaceCamera.h"
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <numbers>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace SkyrimMCP {
@@ -18,6 +21,7 @@ namespace SkyrimMCP {
         bool s_hidHud = false;
         bool s_expressionSet = false;  // Prepare set an expression: Enter keeps it, Exit clears it
         std::vector<std::string> s_hiddenNodes;
+        std::vector<RE::NiPointer<RE::NiAVObject>> s_hiddenEffects;  // particles culled for this capture only
 
         RE::NiAVObject* HeadNode(RE::Actor* a_actor) {
             auto* root = a_actor ? a_actor->Get3D(false) : nullptr;
@@ -88,6 +92,31 @@ namespace SkyrimMCP {
         }
     }
 
+    namespace {
+        // Breath vapour and other particle effects on the character (FEAT-242): cold-weather breath drifts across
+        // the mouth and skews the lip and smile measurements. Culls particle systems and nodes named like breath
+        // in the player's 3D; Exit shows them again. Held by pointer: only for the seconds of one capture.
+        int HideEffects(RE::Actor* a_actor) {
+            auto* root = a_actor ? a_actor->Get3D(false) : nullptr;
+            if (!root) return 0;
+            int hidden = 0;
+            RE::BSVisit::TraverseScenegraphObjects(root, [&](RE::NiAVObject* a_object) {
+                if (!a_object || a_object->GetAppCulled()) return RE::BSVisit::BSVisitControl::kContinue;
+                std::string name = a_object->name.c_str() ? a_object->name.c_str() : "";
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                const auto* rtti = a_object->GetRTTI();
+                const std::string_view type = rtti && rtti->GetName() ? rtti->GetName() : "";
+                if (name.find("breath") != std::string::npos || type.find("ParticleSystem") != std::string_view::npos) {
+                    a_object->SetAppCulled(true);
+                    s_hiddenEffects.emplace_back(a_object);
+                    ++hidden;
+                }
+                return RE::BSVisit::BSVisitControl::kContinue;
+            });
+            return hidden;
+        }
+    }
+
     namespace FaceCamera {
 
         json Prepare(int expression, float strength) {
@@ -123,7 +152,7 @@ namespace SkyrimMCP {
             return {{"idleReset", idleReset}, {"expressionReset", expressionReset}, {"expression", s_expressionSet ? expression : -1}};
         }
 
-        json Enter(bool hideHud, bool hideHair) {
+        json Enter(bool hideHud, bool hideHair, bool hideEffects) {
             auto* camera = RE::PlayerCamera::GetSingleton();
             auto* player = RE::PlayerCharacter::GetSingleton();
             auto* main = RE::Main::GetSingleton();
@@ -157,13 +186,14 @@ namespace SkyrimMCP {
                 s_hidHud = true;
             }
             if (hideHair) HideHair(player);
+            const int effectsHidden = hideEffects ? HideEffects(player) : 0;
             if (auto* face = player->GetFaceGenAnimationData(); face && !s_expressionSet) {
                 face->ClearExpressionOverride();
                 face->Reset(0.0f, true, true, true, false);
             }
             s_active = true;
 
-            json result = {{"freeCamera", true}, {"hudHidden", s_hidHud}, {"hiddenNodes", s_hiddenNodes}};
+            json result = {{"freeCamera", true}, {"hudHidden", s_hidHud}, {"hiddenNodes", s_hiddenNodes}, {"effectsHidden", effectsHidden}};
             if (auto* face = player->GetFaceGenAnimationData()) {
                 result["eyes"] = {{"blinkStage", static_cast<int>(face->eyesBlinkingStage)},
                                   {"headingOffset", face->eyesHeadingOffset},
@@ -252,6 +282,11 @@ namespace SkyrimMCP {
             }
             result["nodesShown"] = shown;
             s_hiddenNodes.clear();
+            for (auto& effect : s_hiddenEffects) {
+                if (effect) effect->SetAppCulled(false);
+            }
+            result["effectsShown"] = s_hiddenEffects.size();
+            s_hiddenEffects.clear();
 
             if (s_hidHud) {
                 if (auto* ui = RE::UI::GetSingleton()) ui->ShowMenus(true);

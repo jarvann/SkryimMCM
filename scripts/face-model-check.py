@@ -242,19 +242,23 @@ def sample_disc(rgb, x, y, r):
     return px if len(px) else None
 
 
-def colours(rgb, L):
-    eye_w = (math.hypot(*(L[33][:2] - L[133][:2])) + math.hypot(*(L[362][:2] - L[263][:2]))) / 2
-    radius = max(1.0, eye_w * 0.06)
-    lab = {}
-    for name, spots in COLOUR_SPOTS.items():
-        px = []
-        for s in spots:
-            x, y = ((L[s[0]][:2] + L[s[1]][:2]) / 2) if isinstance(s, tuple) else L[s][:2]
-            p = sample_disc(rgb, x, y, radius)
-            if p is not None:
-                px.append(p)
-        lab[name] = np.median(srgb_to_lab(np.concatenate(px)), axis=0)
-    # iris: points at 60% of the radius on the lower half and the sides (lids and lashes shade the top)
+def linear(px):
+    c = np.asarray(px, dtype=np.float64) / 255.0
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def spot_pixels(rgb, L, spots, radius):
+    px = []
+    for s in spots:
+        x, y = ((L[s[0]][:2] + L[s[1]][:2]) / 2) if isinstance(s, tuple) else L[s][:2]
+        p = sample_disc(rgb, x, y, radius)
+        if p is not None:
+            px.append(p)
+    return np.concatenate(px) if px else np.zeros((1, 3))
+
+
+def iris_pixels(rgb, L):
+    # points at 60% of the radius on the lower half and the sides (lids and lashes shade the top)
     px = []
     for iris, rim in ((468, (469, 471)), (473, (474, 476))):
         r = math.hypot(*(L[rim[0]][:2] - L[rim[1]][:2])) / 2
@@ -263,35 +267,94 @@ def colours(rgb, L):
             p = sample_disc(rgb, L[iris][0] + 0.6 * r * math.cos(t), L[iris][1] + 0.6 * r * math.sin(t), max(1.0, r * 0.15))
             if p is not None:
                 px.append(p)
-    lab["iris"] = np.median(srgb_to_lab(np.concatenate(px)), axis=0)
+    return np.concatenate(px)
 
+
+def sclera_pixels(rgb, L):
+    # the white of the eye on both sides of each iris, a third of the way to the corner; the brightest half
+    # is kept, since lashes and the lid shadow darken parts of it. Needs an iris at least 5 pixels across
+    # the radius: in a small picture the white is a pixel or two and can't be sampled.
+    px = []
+    for iris, rim, corners in ((468, (469, 471), (33, 133)), (473, (474, 476), (263, 362))):
+        r = math.hypot(*(L[rim[0]][:2] - L[rim[1]][:2])) / 2
+        if r < 5:
+            return None
+        c = L[iris][:2]
+        for corner in corners:
+            v = L[corner][:2] - c
+            dist = np.linalg.norm(v)
+            if dist <= r * 1.2:
+                continue
+            p = c + v / dist * (r + (dist - r) * 0.3)
+            q = sample_disc(rgb, p[0], p[1], max(1.0, r * 0.18))
+            if q is not None:
+                px.append(q)
+    if not px:
+        return None
+    px = np.concatenate(px)
+    lum = linear(px) @ np.array([0.2126, 0.7152, 0.0722])
+    return px[lum >= np.median(lum)]
+
+
+def colours(rgb, L):
+    eye_w = (math.hypot(*(L[33][:2] - L[133][:2])) + math.hypot(*(L[362][:2] - L[263][:2]))) / 2
+    radius = max(1.0, eye_w * 0.06)
+    regions = {name: spot_pixels(rgb, L, spots, radius) for name, spots in COLOUR_SPOTS.items()}
+    regions["iris"] = iris_pixels(rgb, L)
+    sclera = sclera_pixels(rgb, L)
+    if sclera is not None:
+        regions["eye_white"] = sclera
+
+    lab = {k: np.median(srgb_to_lab(v), axis=0) for k, v in regions.items()}
+    lin = {k: np.median(linear(v), axis=0) + 1e-4 for k, v in regions.items()}
+    Y = lambda v: float(v @ np.array([0.2126, 0.7152, 0.0722]))
+    skin = lin["skin"]
+    lg = lambda x: math.log2(x)
+
+    # Light-independent colour (FEAT-242): ratios of linear RGB between two parts of the same face cancel the
+    # light's brightness and colour (both parts are lit alike); log2, so 0 = same as the skin and 1 = twice.
+    # redness = how much more red than green a part reflects compared with the skin.
+    rel = {
+        "skin_hue_deg (lighting-dependent)": math.degrees(math.atan2(lab["skin"][2], lab["skin"][1])) % 360,
+        "brow_lightness (brow / skin luminance)": Y(lin["brows"]) / Y(skin),
+        "lip_redness (log2 R/G vs skin)": lg(lin["lips"][0] / lin["lips"][1]) - lg(skin[0] / skin[1]),
+        "lip_lightness (lip / skin luminance)": Y(lin["lips"]) / Y(skin),
+        "blush (log2 R/G cheek vs skin)": lg(lin["cheeks"][0] / lin["cheeks"][1]) - lg(skin[0] / skin[1]),
+        "iris_lightness (iris / skin luminance)": Y(lin["iris"]) / Y(skin),
+    }
+    # Against the white of the eye (a near-neutral white under the same light): the skin's and iris's own colour.
+    if "eye_white" in lin:
+        w = lin["eye_white"]
+        rel["skin_warmth (log2 R/B vs eye white)"] = lg(skin[0] / w[0]) - lg(skin[2] / w[2])
+        rel["skin_pink (log2 R/G vs eye white)"] = lg(skin[0] / w[0]) - lg(skin[1] / w[1])
+        iris = lin["iris"]
+        rel["iris_warmth (log2 R/B vs eye white)"] = lg(iris[0] / w[0]) - lg(iris[2] / w[2])
+        rel["iris_green (log2 G/(R+B)/2 vs eye white)"] = lg(iris[1] / w[1]) - (lg(iris[0] / w[0]) + lg(iris[2] / w[2])) / 2
+
+    # Exposure: clipped pixels can't be compared; a washed-out (hazy) picture shrinks every colour difference.
+    clipped = {k: float(np.mean(np.max(v, axis=1) >= 250)) for k, v in regions.items() if k in ("skin", "cheeks", "lips")}
     sides = []
     for idx in (50, 280):
         p = sample_disc(rgb, L[idx][0], L[idx][1], radius * 2)
         sides.append(float(np.median(srgb_to_lab(p), axis=0)[0]))
+    contrast = (Y(skin) - Y(lin["iris"])) / Y(skin)
+    warnings = []
+    if abs(sides[0] - sides[1]) > 12:
+        warnings.append("lit from one side: shading differs from an evenly lit capture")
+    if max(clipped.values()) > 0.05:
+        warnings.append("overexposed: some skin or lip pixels are clipped to white")
+    if contrast < 0.5:
+        warnings.append("washed out (haze or fog): colour differences read smaller than they are")
     lighting = {"skin_L": float(lab["skin"][0]), "side_balance (image-left cheek L - image-right cheek L)": sides[0] - sides[1],
-                "warning": "lit from one side: colours and shading differ from an evenly lit capture" if abs(sides[0] - sides[1]) > 12 else None}
-    skin = lab["skin"]
-    hue = lambda v: math.degrees(math.atan2(v[2], v[1])) % 360
-    # The image's overall cast: the mean a*/b* of the whole face area. Strong casts (sepia, purple light)
-    # shift every absolute colour; the "relative" numbers mostly cancel them.
+                "clipped": clipped, "contrast (skin vs iris)": contrast, "warnings": warnings}
+
     xs, ys = L[:, 0], L[:, 1]
     face = rgb[max(0, int(ys.min())):int(ys.max()) + 1, max(0, int(xs.min())):int(xs.max()) + 1].reshape(-1, 3)
     face_lab = srgb_to_lab(face[:: max(1, len(face) // 20000)])
     cast = [float(np.mean(face_lab[:, 1])), float(np.mean(face_lab[:, 2]))]
     return {
         "hex": {k: lab_to_hex(v) for k, v in lab.items()},
-        "lab": {k: [float(x) for x in v] for k, v in lab.items()},
-        "relative": {
-            "brow_darkness (skin L - brow L)": float(skin[0] - lab["brows"][0]),
-            "lip_redness (lip a - skin a)": float(lab["lips"][1] - skin[1]),
-            "lip_lightness (lip L - skin L)": float(lab["lips"][0] - skin[0]),
-            "blush (cheek a - skin a)": float(lab["cheeks"][1] - skin[1]),
-            "iris_lightness (iris L - skin L)": float(lab["iris"][0] - skin[0]),
-            "iris_hue_deg": hue(lab["iris"]),
-            "iris_chroma": float(math.hypot(lab["iris"][1], lab["iris"][2])),
-            "skin_hue_deg": hue(skin),
-        },
+        "relative": rel,
         "lighting": lighting,
         "cast": {"a": cast[0], "b": cast[1],
                  "warning": "strong colour cast: compare relative values, not hex" if math.hypot(*cast) > 25 else None},
