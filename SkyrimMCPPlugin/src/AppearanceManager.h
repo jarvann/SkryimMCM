@@ -58,6 +58,11 @@ namespace SkyrimMCP {
         // character doesn't have. RaceMenu's script preset loader drops parts with no sex flag or no
         // valid-race list (seen in game: an ears part), so the round trip re-adds them.
         json RestoreHeadParts(const std::string& refId, const std::vector<std::string>& parts, bool refresh);
+
+        // BUG-030: reads, and with a "#RRGGBB" colour sets, the shader tint of the player's head parts of one
+        // type (6 = eyebrows) on the loaded 3D. Brows and hair use a hair-tint material whose colour is the
+        // hair colour; setting it directly colours the brows alone. Not saved: the caller re-applies it.
+        json HeadPartTint(int partType, const std::string& color);
     }
 
 }

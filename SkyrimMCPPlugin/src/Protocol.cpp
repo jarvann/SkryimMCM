@@ -316,6 +316,11 @@ namespace SkyrimMCP::Protocol {
             if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
             return MakeResponse(id, false, {}, "mode must be prepare, enter, aim or exit").dump() + "\n";
         };
+        registry["head_part_tint"] = [](const std::string& id, const json& params) {
+            int type = params.value("type", 6);
+            std::string color = params.value("color", "");
+            return GameThread(id, [=]() { return AppearanceManager::HeadPartTint(type, color); });
+        };
         registry["restore_head_parts"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
             std::vector<std::string> parts;
