@@ -237,7 +237,8 @@ public class PlayerTools : ToolBase
         "dryRun defaults to TRUE: first show the player what would change, then call again with dryRun=false once they agree. " +
         "sections (comma-separated, default 'inventory,equipment,gold'). Only missing items are added (blueprint count minus what " +
         "the player has); nothing is ever removed, and gold only goes up unless exactGold=true. Then the blueprint's equipped " +
-        "armor, weapons and spells are equipped. Items are found by plugin name and local ID, so a different load order works; " +
+        "armor and weapons are equipped (an item to equip that she lacks is added, even with only the equipment section; spells she " +
+        "doesn't know are skipped, since spells aren't restored; worn items not in the blueprint stay on). Items are found by plugin name and local ID, so a different load order works; " +
         "items from plugins that aren't loaded, items created in game, and blueprints from before 1.3 whose form IDs now point at " +
         "a different item are listed as unresolved. Player-made enchantments are not restored (the plain item is added).")]
     public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false)
