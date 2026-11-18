@@ -239,8 +239,11 @@ namespace SkyrimMCP::BlueprintManager {
             report["equipment"] = equipReport;
         }
 
-        report["note"] = dryRun ? "Nothing was changed. Call again with dryRun=false to apply. Items marked added would be added to equip them."
-                                : "Only missing items were added (and one of each item to be equipped); nothing was removed or unequipped.";
+        if (sections.contains("inventory") || sections.contains("equipment") || sections.contains("gold")) {
+            report["note"] = dryRun ? std::string("Nothing was changed. Call again with dryRun=false to apply.") +
+                                          (sections.contains("equipment") ? " Items marked added would be added to equip them." : "")
+                                    : "Only missing items were added (and one of each item to be equipped); nothing was removed or unequipped.";
+        }
         return report;
     }
 

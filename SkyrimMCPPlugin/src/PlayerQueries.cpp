@@ -606,19 +606,23 @@ namespace SkyrimMCP::PlayerQueries {
             const char* name = quest->GetName();
             if (!name || !name[0]) continue;  // unnamed quests are scripts and controllers, not journal entries
             const bool done = quest->IsCompleted();
-            const bool live = quest->IsRunning();
+            // BUG-084: "running" alone listed 6,651 quests (nearly every quest in the load order). Count a quest as started
+            // only when it is in the journal, past stage 0, or has shown an objective.
+            bool shownObjective = false;
+            for (auto& obj : quest->objectives) {
+                if (obj && obj->initialized && static_cast<int>(obj->state.get()) != 0) { shownObjective = true; break; }
+            }
+            const bool live = !done && quest->IsRunning() && (quest->IsActive() || quest->GetCurrentStageID() > 0 || shownObjective);
             if (!done && !live) continue;
             const auto t = static_cast<int>(quest->GetType());
             json q = {{"formId", std::format("{:08X}", quest->GetFormID())}, {"name", Helpers::Utf8(name)},
                       {"type", t >= 0 && t < static_cast<int>(std::size(kTypes)) ? kTypes[t] : "other"},
-                      {"stage", quest->GetCurrentStageID()}, {"inJournal", quest->IsActive()}};
+                      {"stage", quest->GetCurrentStageID()}};
+            if (!done) q["inJournal"] = quest->IsActive();  // completed quests are never "active", even in the Completed tab
             if (const char* edid = quest->GetFormEditorID(); edid && edid[0]) q["editorId"] = Helpers::Utf8(edid);
-            // The stages the game lists as executed, and every objective the player has seen, with its state.
-            json stages = json::array();
-            if (quest->executedStages) {
-                for (auto& stage : *quest->executedStages) stages.push_back(stage.data.index);
-            }
-            q["stagesDone"] = stages;
+            // Every objective the player has seen, with its state: with the current stage, this is the record of the path
+            // taken. (The engine's executed-stage list read back only 0s, so stages done aren't exported until a reliable
+            // source is found: FEAT-262.)
             static const char* kStates[] = {"dormant", "shown", "completed", "completed", "failed", "failed"};
             json objectives = json::array();
             for (auto& obj : quest->objectives) {
