@@ -153,6 +153,26 @@ namespace SkyrimMCP::Helpers {
         PlayerFreeState out;
         auto* ui = RE::UI::GetSingleton();
         if (ui && ui->GameIsPaused()) out.blockers.push_back("a menu is open (the map, inventory, a container, crafting or another pausing menu): close it");
+        // BUG-079: with a mod that keeps menus from pausing (Skyrim Souls and similar) the pause flag stays off, so check the
+        // menus by name too. Container, barter and gift menus show the world as it is: they block moves but not captures
+        // (a capture with a container open came out fine).
+        if (ui && !ui->GameIsPaused()) {
+            static constexpr const char* kMenus[] = {"TweenMenu", "InventoryMenu", "MagicMenu", "MapMenu", "Journal Menu",
+                "StatsMenu", "Book Menu", "Lockpicking Menu", "Sleep/Wait Menu", "Training Menu", "Crafting Menu", "RaceSex Menu",
+                "MessageBoxMenu", "FavoritesMenu", "Console", "LevelUp Menu", "Tutorial Menu", "Credits Menu", "Kinect Menu"};
+            for (const char* name : kMenus) {
+                if (ui->IsMenuOpen(name)) {
+                    out.blockers.push_back(std::string("a menu is open (") + name + "): close it");
+                    break;
+                }
+            }
+            for (const char* name : {"ContainerMenu", "BarterMenu", "GiftMenu"}) {
+                if (ui->IsMenuOpen(name)) {
+                    out.blockers.push_back(std::string("the ") + name + " is open: close it before she is moved");
+                    break;
+                }
+            }
+        }
         if (ui && ui->IsMenuOpen("Loading Menu")) out.blockers.push_back("the game is loading");
         if (ui && ui->IsMenuOpen("Dialogue Menu")) out.blockers.push_back("she is in a conversation: finish it");
         if (ui && !ui->IsSavingAllowed()) out.blockers.push_back("the game is saving or can't save right now");

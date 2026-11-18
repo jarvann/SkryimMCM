@@ -83,9 +83,18 @@ public class BodyTools : ToolBase
 
     [McpServerTool]
     [Description("Register a picture of a whole standing person as the body to aim for (experimental), so MeasureBody(reference) " +
-        "reports the gaps. image: a full path ('live' registers the player's current body).")]
-    public async Task<CallToolResult> SetBodyReference(string image, string name = "default")
+        "reports the gaps. image: a full path ('live' registers the player's current body). delete=true removes the reference called " +
+        "name (image is then ignored).")]
+    public async Task<CallToolResult> SetBodyReference(string image, string name = "default", bool delete = false)
     {
+        if (delete)
+        {
+            // A live reference goes stale when a body mod changes her preset; remove it rather than compare against it.
+            var all = LoadRefs();
+            if (!all.Remove(name.Trim())) return Error($"No body reference named '{name.Trim()}'. Registered: {string.Join(", ", all.Select(kv => kv.Key))}");
+            await File.WriteAllTextAsync(ReferenceFile, all.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            return Json(new JsonObject { ["deleted"] = name.Trim(), ["remaining"] = new JsonArray(all.Select(kv => (JsonNode?)JsonValue.Create(kv.Key)).ToArray()) });
+        }
         var measured = await MeasureBody(image);
         var text = measured.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
         if (measured.IsError == true || text == null) return measured;
