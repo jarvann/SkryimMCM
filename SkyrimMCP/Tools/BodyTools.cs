@@ -85,7 +85,7 @@ public class BodyTools : ToolBase
     [Description("Register a picture of a whole standing person as the body to aim for (experimental), so MeasureBody(reference) " +
         "reports the gaps. image: a full path ('live' registers the player's current body). delete=true removes the reference called " +
         "name (image is then ignored).")]
-    public async Task<CallToolResult> SetBodyReference(string image, string name = "default", bool delete = false)
+    public async Task<CallToolResult> SetBodyReference(string? image = null, string name = "default", bool delete = false)
     {
         if (delete)
         {
@@ -95,6 +95,8 @@ public class BodyTools : ToolBase
             await File.WriteAllTextAsync(ReferenceFile, all.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return Json(new JsonObject { ["deleted"] = name.Trim(), ["remaining"] = new JsonArray(all.Select(kv => (JsonNode?)JsonValue.Create(kv.Key)).ToArray()) });
         }
+        // BUG-079: image was required, so a delete (which has none) failed before the tool ran, with a blank error.
+        if (string.IsNullOrWhiteSpace(image)) return Error("image is needed to register a reference: a full path, or 'live' for her current body.");
         var measured = await MeasureBody(image);
         var text = measured.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
         if (measured.IsError == true || text == null) return measured;

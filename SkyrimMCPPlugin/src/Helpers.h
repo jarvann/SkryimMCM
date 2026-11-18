@@ -11,6 +11,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 
@@ -157,18 +158,25 @@ namespace SkyrimMCP::Helpers {
         // menus by name too. Container, barter and gift menus show the world as it is: they block moves but not captures
         // (a capture with a container open came out fine).
         if (ui && !ui->GameIsPaused()) {
-            static constexpr const char* kMenus[] = {"TweenMenu", "InventoryMenu", "MagicMenu", "MapMenu", "Journal Menu",
-                "StatsMenu", "Book Menu", "Lockpicking Menu", "Sleep/Wait Menu", "Training Menu", "Crafting Menu", "RaceSex Menu",
-                "MessageBoxMenu", "FavoritesMenu", "Console", "LevelUp Menu", "Tutorial Menu", "Credits Menu", "Kinect Menu"};
-            for (const char* name : kMenus) {
+            // Internal name, and what a player calls it.
+            static constexpr std::pair<const char*, const char*> kMenus[] = {
+                {"TweenMenu", "the Tab menu"}, {"InventoryMenu", "the inventory"}, {"MagicMenu", "the magic menu"},
+                {"MapMenu", "the map"}, {"Journal Menu", "the journal"}, {"StatsMenu", "the skills menu"},
+                {"Book Menu", "a book"}, {"Lockpicking Menu", "lockpicking"}, {"Sleep/Wait Menu", "the sleep or wait menu"},
+                {"Training Menu", "training"}, {"Crafting Menu", "a crafting station"}, {"RaceSex Menu", "the character menu"},
+                {"MessageBoxMenu", "a message box"}, {"FavoritesMenu", "favourites"}, {"Console", "the console"},
+                {"LevelUp Menu", "the level-up menu"}, {"Tutorial Menu", "a tutorial"}, {"Credits Menu", "the credits"}};
+            for (const auto& [name, friendly] : kMenus) {
                 if (ui->IsMenuOpen(name)) {
-                    out.blockers.push_back(std::string("a menu is open (") + name + "): close it");
+                    out.blockers.push_back(std::string(friendly) + " is open (" + name + "): close it");
                     break;
                 }
             }
-            for (const char* name : {"ContainerMenu", "BarterMenu", "GiftMenu"}) {
+            static constexpr std::pair<const char*, const char*> kWorldMenus[] = {
+                {"ContainerMenu", "a container"}, {"BarterMenu", "a trade"}, {"GiftMenu", "the gift menu"}};
+            for (const auto& [name, friendly] : kWorldMenus) {
                 if (ui->IsMenuOpen(name)) {
-                    out.blockers.push_back(std::string("the ") + name + " is open: close it before she is moved");
+                    out.blockers.push_back(std::string(friendly) + " is open (" + name + "): close it before she is moved");
                     break;
                 }
             }
