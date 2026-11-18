@@ -3485,7 +3485,7 @@
         {
           "id": "BUG-069",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Body tools don't recognise an OBody-managed body",
           "description": "In game: two OBody presets in a row changed 128 then 138 morphs, all under key OBody, with obody_processed 1.0 on her. GetBodyMorphs now reports managedBy OBody with a note that the values are the current preset (read, don't cache, change through OBody); SetBodyMorph warns that its value stacks on OBody's and shifts with presets; MeasureBody's description says live references only hold while the same preset is on. Not done: storing the OBody preset name with references and blueprints (needs a way to read the active preset).",
@@ -3497,6 +3497,10 @@
             {
               "datetime": "2026-11-19T13:30",
               "note": "In game (build 89): managedBy OBody and the write guidance pass. Polish: byKey object, actor-wide keys, cleared-name note."
+            },
+            {
+              "datetime": "2026-11-19T13:45",
+              "note": "In game (build 91): byKey object, actor-wide keys, cleared-name note, OBody notes all pass. Then: the unknown-name warning checks whether another key gives the morph a value (a repeated typo was unflagged); leftOutNoValue always a number."
             }
           ],
           "targetRelease": "1.3"
