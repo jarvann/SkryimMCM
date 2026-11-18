@@ -147,7 +147,8 @@ namespace SkyrimMCP {
             std::string name;
             if (auto* location = player ? player->GetCurrentLocation() : nullptr; location && location->GetName()) name = location->GetName();
             if (auto* world = player ? player->GetWorldspace() : nullptr; world && world->GetName() && world->GetName()[0]) {
-                name = name.empty() ? world->GetName() : name + " (" + world->GetName() + ")";
+                // Outside any named location: "Wilderness (Skyrim)" rather than the bare worldspace.
+                name = (name.empty() ? std::string("Wilderness") : name) + " (" + world->GetName() + ")";
             }
             return name.empty() ? json(nullptr) : json(name);
         }

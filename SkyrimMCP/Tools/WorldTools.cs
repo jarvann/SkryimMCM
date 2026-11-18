@@ -113,6 +113,7 @@ public class WorldTools : ToolBase
         var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
         var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
         var fromCell = before?["cellFormId"]?.ToString();
+        var followersBefore = await FollowerNames();
         string? markerId = null;
         string? oldMarker = null;
         try { if (File.Exists(backFile)) oldMarker = JsonNode.Parse(await File.ReadAllTextAsync(backFile))?["markerId"]?.ToString(); } catch (Exception) { }
@@ -129,7 +130,7 @@ public class WorldTools : ToolBase
                 await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker });
                 File.Delete(backFile);
             }
-            return await ArrivalReply("back", null, back);
+            return await ArrivalReply("back", null, back, followersBefore);
         }
 
         var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
@@ -144,7 +145,7 @@ public class WorldTools : ToolBase
             Directory.CreateDirectory(SkyLinkSettings.Folder);
             await File.WriteAllTextAsync(backFile, new JsonObject { ["markerId"] = markerId, ["from"] = before?["cellName"]?.DeepClone() }.ToJsonString());
         }
-        return await ArrivalReply(location, cellId, await WaitForArrival(fromCell));
+        return await ArrivalReply(location, cellId, await WaitForArrival(fromCell), followersBefore);
     }
 
     // BUG-071: waits out the frozen screen (the game thread doesn't answer during it); the new cell, or null after 20 s.
@@ -164,19 +165,38 @@ public class WorldTools : ToolBase
         return null;
     }
 
-    private async Task<object> ArrivalReply(string location, string? cellId, JsonNode? arrived)
+    // Followers by reference ID, with names (only followers in loaded cells are found).
+    private async Task<Dictionary<string, string>> FollowerNames()
     {
-        if (arrived == null)
-            return new { success = true, arrived = false, location, cellId,
-                         note = "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
-        // BUG-072: followers don't always come along; list the ones left far away.
-        var leftBehind = new List<object>();
+        var map = new Dictionary<string, string>();
         try
         {
             var followers = await _pipe.SendRequestAsync("get_followers");
             foreach (var f in (followers?["followers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
-                if ((f["distance"]?.GetValue<double>() ?? 0) > 3000)
-                    leftBehind.Add(new { name = f["name"]?.ToString(), refId = f["refId"]?.ToString(), distance = Math.Round(f["distance"]!.GetValue<double>()) });
+                if (f["refId"]?.ToString() is string id) map[id] = f["name"]?.ToString() ?? id;
+        }
+        catch (Exception) { }
+        return map;
+    }
+
+    private async Task<object> ArrivalReply(string location, string? cellId, JsonNode? arrived, Dictionary<string, string> followersBefore)
+    {
+        if (arrived == null)
+            return new { success = true, arrived = false, location, cellId,
+                         note = "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
+        // BUG-072: followers don't always come along, and once she is far away they aren't found at all: compare with the
+        // followers she had before the move.
+        await Task.Delay(1500);  // followers that do come along arrive just after her
+        var leftBehind = new List<object>();
+        try
+        {
+            var near = new Dictionary<string, double>();
+            var followers = await _pipe.SendRequestAsync("get_followers");
+            foreach (var f in (followers?["followers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                if (f["refId"]?.ToString() is string id) near[id] = f["distance"]?.GetValue<double>() ?? 0;
+            foreach (var (id, name) in followersBefore)
+                if (!near.TryGetValue(id, out var d) || d > 3000)
+                    leftBehind.Add(new { name, refId = id, distance = near.ContainsKey(id) ? Math.Round(d).ToString() : "not nearby" });
         }
         catch (Exception) { }
         return new
@@ -184,7 +204,8 @@ public class WorldTools : ToolBase
             success = true, arrived = true, location, cellId,
             cellName = arrived["cellName"]?.ToString(), cellFormId = arrived["cellFormId"]?.ToString(),
             followersLeftBehind = leftBehind.Count > 0 ? leftBehind : null,
-            followersNote = leftBehind.Count > 0 ? "MoveActorTo(actorFormId: <refId>, target: 'player') brings a follower to her." : null,
+            followersNote = leftBehind.Count > 0
+                ? "MoveActorTo(refId) brings a follower to her. Whether followers travel depends on how long she stays; they may still catch up." : null,
             back = location == "back" ? null : "Teleport('back') returns her to where she started.",
         };
     }
