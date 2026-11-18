@@ -3791,7 +3791,7 @@
         {
           "id": "BUG-079",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Menus that a mod keeps from pausing aren't seen by the safety checks; no way to delete a body reference",
           "description": "In game: with the Tab menu (TweenMenu) open, gameIsPaused was false on this load order (a mod keeps menus from pausing), so move, camera and face were all reported allowed; the map still pauses, which is why earlier menu tests passed. The player-free check now also looks for open menus by name when the game isn't paused: inventory, magic, map, journal, stats, book, lockpicking, sleep/wait, training, crafting, RaceMenu, message boxes, favourites, console and level-up refuse moves and captures; container, barter and gift menus refuse moves only (a capture with a container open was fine). Also: SetBodyReference(name, delete=true) removes a stale reference (arya_test, out of date after OBody preset changes). Live OStim checks passed: isInOStimScene true with one blocker, TakeScreenshot ran, CaptureFace and MoveActorTo on a follower in the scene were refused, the scene carried on.",
@@ -3803,6 +3803,10 @@
             {
               "datetime": "2026-11-19T21:10",
               "note": "In game (build 111): Tab menu refused move and camera with isPaused false; a container refused move and allowed camera. SetBodyReference delete failed with a blank error, game running or not: image was still required, so the call failed before the tool ran. image is now optional (needed only to register). Menus are named the way a player says them (the Tab menu, the inventory...) with the internal name in brackets."
+            },
+            {
+              "datetime": "2026-11-19T21:20",
+              "note": "In game (build 112): SetBodyReference delete returned deleted arya_test, remaining empty. Friendly menu names not yet seen."
             }
           ],
           "targetRelease": "1.3"
