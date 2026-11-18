@@ -48,6 +48,9 @@ public abstract class ToolBase
                 reasons.AddRange(blockers.Where(b => b.Contains("a menu is open") || b.Contains("mod's menu") ||
                                                      (b.Contains(" is open (") && !b.Contains("before she is moved"))));
             if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
+            // BUG-081: a mod's modal menu or a message box is waiting on the player (MCM Recorder, a start-up mod setting her
+            // up): don't rebuild her head underneath it.
+            if (kind == "face") reasons.AddRange(blockers.Where(b => b.Contains("mod's menu") || b.Contains("message box")));
         }
         if (reasons.Count == 0) return null;
         var text = "Not now: " + string.Join("; ", reasons.Distinct()) + ".";
