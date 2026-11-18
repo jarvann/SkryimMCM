@@ -118,7 +118,14 @@ public static class SkyrimOffsets
         { "honeyside", "riftenhoneyside" },
         { "proudspire_manor", "solitudeproudspiremanor" },
         { "vlindrel_hall", "markarthvlindrelhall" },
-        { "hjerim", "windhelm"},
+        { "hjerim", "windhelmhjerim" },
+        // Hearthfire homes (BUG-073: "lakeview manor" was refused; BYOHHouse1Exterior worked in game)
+        { "lakeview_manor", "byohhouse1exterior" },
+        { "lakeview", "byohhouse1exterior" },
+        { "windstad_manor", "byohhouse2exterior" },
+        { "windstad", "byohhouse2exterior" },
+        { "heljarchen_hall", "byohhouse3exterior" },
+        { "heljarchen", "byohhouse3exterior" },
     };
 
     /// <summary>
