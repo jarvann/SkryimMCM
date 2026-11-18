@@ -28,7 +28,21 @@ public class UtilityTools : ToolBase
     public async Task<object> GetGameSafety(string? action = null, string? refId = null)
     {
         var data = await _pipe.SendRequestAsync("get_game_safety");
-        if (string.IsNullOrWhiteSpace(action) || data is not JsonObject o) return DeserializeResponse(data);
+        if (data is not JsonObject o) return DeserializeResponse(data);
+        // BUG-076: the scene showed only when an action was named, and its posing read as "in the air".
+        var scene = await SafetyBlock("actor", refId);
+        o["isInOStimScene"] = scene != null;
+        if (scene != null)
+        {
+            var blockers = (o["moveBlockers"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "")
+                .Where(b => !b.Contains("in the air")).ToList();
+            blockers.Insert(0, "she is in an OStim scene: wait until it ends");
+            o["moveBlockers"] = new JsonArray(blockers.Select(b => (JsonNode?)JsonValue.Create(b)).ToArray());
+            o["canMovePlayer"] = false;
+        }
+        o["safeMeans"] = "safe: reads and simple changes can run. Moving her, captures and face edits have stricter rules: see " +
+                         "canMovePlayer, or pass action.";
+        if (string.IsNullOrWhiteSpace(action)) return DeserializeResponse(o);
         // FEAT-260: answer for one kind of action, the way that action's tools decide.
         var kind = action.Trim().ToLowerInvariant() switch
         {

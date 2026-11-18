@@ -34,6 +34,8 @@ public abstract class ToolBase
             var blockers = (safety?["moveBlockers"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").ToList();
             var notes = (safety?["notes"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").ToList();
             string[] stillWords = ["scripted scene", "controls are taken", "conversation", "combat", "kill move", "loading", "saving"];
+            // A scene poses her off the ground; "in the air, try again in a moment" would mislead (BUG-076).
+            if (reasons.Count > 0) blockers = blockers.Where(b => !b.Contains("in the air")).ToList();
             if (kind == "move") reasons.AddRange(blockers);
             else reasons.AddRange(blockers.Where(b => stillWords.Any(w => b.Contains(w, StringComparison.OrdinalIgnoreCase))));
             if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
