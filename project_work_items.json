@@ -3728,6 +3728,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-261",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Treat a running MCM Recorder playback as not safe",
+          "description": "MCM Recorder drives mods' settings menus step by step; between steps no menu may be open, so the checks would allow a face load or a move that could knock a step out. Look for a running state its script exposes (McmRecorder) and add it to the move, camera and face rules.",
+          "history": [
+            {
+              "datetime": "2026-11-19T22:30",
+              "note": "From the in-game agent."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "BUG-076",
           "type": "bug",
           "status": "complete",
@@ -3826,6 +3841,21 @@
             {
               "datetime": "2026-11-19T22:00",
               "note": "In game (build 113): nothing open stays clear (no false trigger from HUD, widgets or cursor); map alone and skills menu alone named; Tab then Map leaves only the map open. Skills over the Tab menu named the Tab menu underneath: the Tab menu is now checked last so the menu on top is named. The mod-menu rule (a picker without the Tab menu behind it) not seen."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-081",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "GetMenuState leaves out mods' menus; face edits allowed under a modal mod menu",
+          "description": "In game (build 114): with Skyrim Unbound / MCM Recorder's CustomMenu open on its own, the move check refused ('a mod's menu is open (CustomMenu)': pass), but GetMenuState listed openMenus [] and menuCount 0, and face edits were allowed under the modal menu and its message box. openMenus now includes any open menu that takes the cursor and isn't a permanent overlay; face edits refuse while a mod's menu or a message box is open. Not done: detecting MCM Recorder between its steps, when no menu is open (FEAT backlog).",
+          "history": [
+            {
+              "datetime": "2026-11-19T22:30",
+              "note": "From the in-game agent while setting up a new character; the face restore then matched the export exactly."
             }
           ],
           "targetRelease": "1.3"

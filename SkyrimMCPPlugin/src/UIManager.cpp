@@ -3,6 +3,9 @@
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
+#include <algorithm>
+#include <string>
+
 namespace SkyrimMCP::UIManager {
 
     using json = nlohmann::json;
@@ -28,6 +31,15 @@ namespace SkyrimMCP::UIManager {
             if (ui->IsMenuOpen(menu)) {
                 openMenus.push_back(menu);
             }
+        }
+        // BUG-081: a mod's own menu (CustomMenu, used by MCM Recorder, Skyrim Unbound, custom skill pickers...) that takes the
+        // cursor counts as open too; the summary said none were open while one had the cursor.
+        for (auto& [name, entry] : ui->menuMap) {
+            const auto& menu = entry.menu;
+            if (!menu || !menu->OnStack() || menu->AlwaysOpen() || !menu->UsesCursor()) continue;
+            const std::string n = name.c_str();
+            if (n == "Cursor Menu" || n == "HUD Menu" || n == "Fader Menu") continue;
+            if (std::find(openMenus.begin(), openMenus.end(), json(n)) == openMenus.end()) openMenus.push_back(n);
         }
         result["openMenus"] = openMenus;
         result["menuCount"] = openMenus.size();
