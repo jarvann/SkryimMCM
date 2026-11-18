@@ -3764,7 +3764,7 @@
         {
           "id": "BUG-078",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Mounted refusals also say get up from furniture; camera refusals give the furniture reason on a horse and no alternative",
           "description": "In game (build 108): seated CaptureFace refused and the neutralPose=false capture kept her seated (pass); mounted, move and a real Teleport were refused (pass). But riding is a sit state, so the furniture line fired with the mount line, and the camera refusal on a horse said a capture would pull her out of furniture. Mounted now shows only 'dismount first' (the furniture line is skipped while mounted), camera kinds refuse on a mount with that reason, and every camera refusal ends by pointing at TakeScreenshot, which doesn't touch the camera or her pose and isn't gated (usable during an OStim scene).",
@@ -3772,6 +3772,10 @@
             {
               "datetime": "2026-11-19T20:00",
               "note": "From the in-game agent's mounted and seated tests and Cory's question about screenshots in scenes."
+            },
+            {
+              "datetime": "2026-11-19T20:20",
+              "note": "In game (build 109): mounted move and camera refusals say only dismount first; camera adds the TakeScreenshot pointer. Then: the camera look-ahead said allowed with a pausing menu open while CaptureFace refuses; the camera rule now includes the menu."
             }
           ],
           "targetRelease": "1.3"
