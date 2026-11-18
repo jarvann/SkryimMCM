@@ -389,7 +389,8 @@ namespace SkyrimMCP::PapyrusBridge {
             auto holder = std::make_shared<RE::BSScript::Variable>();
             json diag;
             try {
-                diag = TaskQueue::RunOnGameThread([holder, form, a_paramName]() -> json {
+                const auto declaredRaw = a_type.GetRawType();
+                diag = TaskQueue::RunOnGameThread([holder, form, a_paramName, declaredRaw, expected]() -> json {
                     const auto typeId = static_cast<RE::VMTypeID>(form->GetFormType());
                     json d = {{"param", a_paramName}, {"form", std::format("{:08X}", form->GetFormID())}, {"typeId", typeId}};
                     auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
@@ -407,6 +408,13 @@ namespace SkyrimMCP::PapyrusBridge {
                     RE::BSTSmartPointer<RE::BSScript::Object> bound;
                     d["alreadyBound"] = typed && vm->FindBoundObject(handle, classPtr->GetName(), bound) && bound;
                     RE::BSScript::PackHandle(holder.get(), form, typeId);
+                    // BUG-066: the VM checks a dispatched call's argument types exactly ("received incompatible arguments!
+                    // Received types (Actor,string,int)" for a Form parameter); a script call gets the cast from the compiler.
+                    // Give the variable the declared parameter type; the object (and its handle) stay the same.
+                    if (auto obj = holder->GetObject(); obj && declaredRaw != holder->GetType().GetRawType()) {
+                        holder->SetObject(obj, declaredRaw);
+                        d["castTo"] = expected;
+                    }
                     d["packedIsObject"] = holder->IsObject();
                     if (auto obj = holder->GetObject()) {
                         d["objectClass"] = obj->GetTypeInfo() && obj->GetTypeInfo()->GetName() ? obj->GetTypeInfo()->GetName() : "(none)";

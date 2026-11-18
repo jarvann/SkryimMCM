@@ -217,13 +217,25 @@ public class CrashTools : ToolBase
         var lines = list.Skip(list.Count - take).Select(x =>
             $"{LocalTime(x.ms):HH:mm:ss.fff} {(x.kind < RecorderKinds.Length ? RecorderKinds[x.kind] : "?"),-7} t{x.thread} {x.text}").ToArray();
 
+        // BUG-063: on 1.7.104 a Quit to Desktop ends the process without any of the signals the recorder watches, so an
+        // unmarked session is judged by whether a crash report was written when it ended.
+        string? crashReport = null;
+        if (exitState == 0 && !running && list.Count > 0)
+        {
+            var end = LocalTime(list[^1].ms);
+            var report = FindCrashLogs(null).FirstOrDefault(f => f.LastWriteTime >= end.AddSeconds(-5) && f.LastWriteTime <= end.AddMinutes(5));
+            crashReport = report?.FullName;
+        }
         string exit = exitState switch
         {
             1 => "exited cleanly",
+            0 when !running && crashReport != null => $"crashed: a crash report was written when it ended ({crashReport})",
+            0 when !running && list.Count > 0 => "ended without a crash report: most likely a normal quit (this game version ends " +
+                "the process without a normal exit, so a quit isn't marked) or a forced close. A crash with Crash Logger installed " +
+                "leaves a report.",
             2 => "had started quitting to the desktop but did not reach a normal exit (a crash on exit, or the game ended itself abruptly)",
             _ when running => "still running",
-            _ => "did not exit cleanly: it crashed, or was closed by force (Task Manager, power loss). Builds before 1.3 could " +
-                 "also show a normal quit this way; check the last entries.",
+            _ => "did not exit cleanly: it crashed, or was closed by force (Task Manager, power loss)",
         };
 
         return new
