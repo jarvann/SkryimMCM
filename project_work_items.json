@@ -2914,7 +2914,7 @@
         {
           "id": "FEAT-249",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Brow colour (and other SkyLink face state) restored after loads and cell changes",
           "description": "RaceMenu keeps makeup and hair through loads (BUG-048) but has no slot for a separate brow colour, so the brows came back hair-coloured on every load and 3D reload until a face tool ran. Host DLL: after kPostLoadGame and when the player's cell changes (TESCellFullyLoadedEvent for her cell), a short detached host thread waits 3 s and again 6 s (after RaceMenu's own LoadTints/UpdateTints) and sends reapply_face_state through HostCore, coalescing repeated triggers. Logic DLL: reapply_face_state reads face_state.json from the Documents folder (SHGetKnownFolderPath, the server's path), finds the player's name|race entry and sets the stored brow colour on the brow shader. Host DLL change: needs the game closed to deploy and a restart.",
@@ -2922,6 +2922,10 @@
             {
               "datetime": "2026-11-18T08:40",
               "note": "Built on feature/FEAT-249-face-state-on-load; the player asked for it and will restart the game later."
+            },
+            {
+              "datetime": "2026-11-19T10:30",
+              "note": "Brow colour restored by the host after a cold-start load (with BUG-050)."
             }
           ],
           "targetRelease": "1.3"
@@ -3169,7 +3173,7 @@
         {
           "id": "BUG-058",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Group 2 gaps: photo lid edges, unreported kept sliders and light spells, odd colour candidates",
           "description": "From the in-game agent's group 2 run (7 pass). photo_combined still stored lid edges after re-registering: the photo's iris is 13.6 px (over the 10 px floor), so size wasn't the cause; the picture-based edges are tuned on game renders and read nonsense on photos (smiles, mascara): SetFaceReference now drops them unless the reference is live. ResetFace reports the kept sliders (or that none matched keep) and, in a dry run, the removed names. StudioGo always reports lightSpellsDispelled. SculptFace reports the radius it used. SetHairColor leaves lip, skin, eye, paint and dirt colour forms out of the candidates. Not a tool fault: the 29 Beyond Skyrim hairs (bstamriel paths) report mesh not found because their meshes aren't installed, loose or in any archive (checked every mesh BSA); three other hairs point at missing loose files and one has a doubled meshes prefix (mod data).",
@@ -3177,6 +3181,10 @@
             {
               "datetime": "2026-11-18T18:30",
               "note": "Fixed on bugfix/BUG-058-group2-gaps while the player was at dinner; the host DLL with BUG-050 was deployed with the game closed."
+            },
+            {
+              "datetime": "2026-11-19T10:30",
+              "note": "In game: ResetFace lists kept/removed sliders (keep rule itself unproven: her scar is a head part, not a slider); SculptFace reports radius 0.6 (68 vertices, 4 mouth vertices touched at 0.01)."
             }
           ],
           "targetRelease": "1.3"
@@ -3184,7 +3192,7 @@
         {
           "id": "BUG-050",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Brow colour restored on load but reverted again later",
           "description": "After a full game restart and load the brows were hair-coloured (#703420) although the log shows the host's refresh firing at +3 s and +6 s after kPostLoadGame and setting #4A2416 on EMBrow_08D_HF (tintBefore already #4A2416, so it had held until then). Something later re-tinted them, most likely RaceMenu's UpdateTints queueing a 3D update once its scripts ran. The host now re-applies at 3, 8, 15, 30 and 60 s after a load or cell change. Host DLL: deploy with the game closed.",
@@ -3196,6 +3204,10 @@
             {
               "datetime": "2026-11-18T18:30",
               "note": "Host DLL deployed 2026-11-18 with Skyrim closed (build 80); to be checked after the next load."
+            },
+            {
+              "datetime": "2026-11-19T10:30",
+              "note": "In game (cold start 2026-11-19): brow shader #4A2416 matched the stored colour about four minutes after the load, before any face tool ran."
             }
           ],
           "targetRelease": "1.3"
