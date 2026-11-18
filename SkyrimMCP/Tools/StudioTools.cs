@@ -65,6 +65,7 @@ public class StudioTools : ToolBase
             catch (Exception ex) when (LostAcrossLoad(ex)) { goNote = "The move reply was lost across the loading screen (" + ex.Message + ")."; }
             catch (Exception ex) { return new { error = ex.Message }; }  // BUG-074: a refusal (a menu open) is an answer, not a lost reply
 
+            MarkerRegistry.Add(go?["markerId"]?.ToString(), "studio trip start");
             var state = new JsonObject
             {
                 ["markerId"] = go?["markerId"]?.DeepClone(),
@@ -153,6 +154,7 @@ public class StudioTools : ToolBase
             {
                 // BUG-074: markers left by trips whose replies were lost; delete one the player agreed to.
                 var r = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = deleteMarker.Trim() });
+                MarkerRegistry.Remove(deleteMarker);
                 return DeserializeResponse(r);
             }
             var state = LoadState();
@@ -175,7 +177,25 @@ public class StudioTools : ToolBase
             JsonNode? strayMarkers = null;
             if (pending == null)
             {
-                try { strayMarkers = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "find" }))?.DeepClone(); }
+                try
+                {
+                    strayMarkers = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "find" }))?.DeepClone();
+                    string? backMarker = null;
+                    try
+                    {
+                        var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
+                        if (File.Exists(backFile)) backMarker = JsonNode.Parse(File.ReadAllText(backFile))?["markerId"]?.ToString();
+                    }
+                    catch (Exception) { }
+                    foreach (var m in (strayMarkers?["markers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                    {
+                        var id = m["markerId"]?.ToString();
+                        var mine = MarkerRegistry.Get(id);
+                        m["placedBy"] = mine != null ? "SkyLink" : "unknown (another mod, or SkyLink before 1.3)";
+                        if (mine != null) m["purpose"] = mine["purpose"]?.DeepClone();
+                        if (id != null && id.Equals(backMarker, StringComparison.OrdinalIgnoreCase)) m["inUse"] = "Teleport('back') returns here: keep";
+                    }
+                }
                 catch (Exception) { }
             }
             var done = pending switch
@@ -196,8 +216,9 @@ public class StudioTools : ToolBase
                 ["cleared"] = cleared,
                 ["strayMarkers"] = strayMarkers,
                 ["strayNote"] = strayMarkers == null ? null
-                    : "Run-time markers in the world (SkyLink's from lost trip replies or Teleport('back'), or another mod's). " +
-                      "With the player's agreement, StudioStatus(deleteMarker: <id>) deletes one. Don't delete the one Teleport('back') uses.",
+                    : "Run-time XMarkers in the world. placedBy says which SkyLink placed (recorded from 1.3); an unknown one may belong to " +
+                      "another mod, so leave it unless the player knows it. With the player's agreement, StudioStatus(deleteMarker: <id>) " +
+                      "deletes one. Keep the one marked inUse.",
             });
         }
         catch (Exception ex) { return new { error = "StudioStatus: " + ex.Message }; }
@@ -240,7 +261,11 @@ public class StudioTools : ToolBase
             state["pending"] = null;
             if (state["markerId"] == null)
             {
-                try { state["markerId"] = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" }))?["markerId"]?.DeepClone(); }
+                try
+                {
+                    state["markerId"] = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" }))?["markerId"]?.DeepClone();
+                    MarkerRegistry.Add(state["markerId"]?.ToString(), "studio trip start");
+                }
                 catch (Exception) { }
             }
             SaveState(state);
@@ -255,6 +280,7 @@ public class StudioTools : ToolBase
             try
             {
                 result["cleanup"] = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = state["markerId"]?.ToString() }))?.DeepClone();
+                MarkerRegistry.Remove(state["markerId"]?.ToString());
                 SaveState(new JsonObject());
                 result["returned"] = true;
                 result["to"] = state["markedCell"]?.DeepClone();

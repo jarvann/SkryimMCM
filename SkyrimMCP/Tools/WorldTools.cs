@@ -130,6 +130,7 @@ public class WorldTools : ToolBase
             if (back is JsonObject)
             {
                 await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker });
+                MarkerRegistry.Remove(oldMarker);
                 File.Delete(backFile);
             }
             return await ArrivalReply("back", null, back, followersBefore);
@@ -143,7 +144,13 @@ public class WorldTools : ToolBase
         {
             // Keep only the newest starting spot: "back" means the last trip.
             if (oldMarker != null && oldMarker != markerId)
-                try { await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker }); } catch (Exception) { }
+                try
+                {
+                    await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker });
+                    MarkerRegistry.Remove(oldMarker);
+                }
+                catch (Exception) { }
+            MarkerRegistry.Add(markerId, "Teleport starting spot");
             Directory.CreateDirectory(SkyLinkSettings.Folder);
             await File.WriteAllTextAsync(backFile, new JsonObject { ["markerId"] = markerId, ["from"] = before?["cellName"]?.DeepClone() }.ToJsonString());
         }
