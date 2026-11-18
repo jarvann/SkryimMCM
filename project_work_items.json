@@ -1639,6 +1639,10 @@
             {
               "datetime": "2026-11-19T12:15",
               "note": "Moved to 1.4: can't be tested without a GOG copy; waiting on a GOG user's report."
+            },
+            {
+              "datetime": "2026-11-19T17:45",
+              "note": "Cory bought Skyrim AE on GOG (2026-11-19): testable in the 1.4 round. GOG logs go under 'Skyrim Special Edition GOG' in My Games."
             }
           ],
           "targetRelease": "1.4"
