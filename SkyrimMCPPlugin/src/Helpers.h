@@ -164,9 +164,11 @@ namespace SkyrimMCP::Helpers {
         if (auto* controls = RE::ControlMap::GetSingleton(); controls && !controls->IsMovementControlsEnabled()) {
             out.blockers.push_back("her controls are taken by a script (a cutscene, an animation scene such as OStim, or a quest)");
         }
-        if (player->IsOnMount()) out.blockers.push_back("she is on a mount: dismount first");
+        const bool mounted = player->IsOnMount();
+        if (mounted) out.blockers.push_back("she is on a mount: dismount first");
         if (auto* state = player->AsActorState()) {
-            if (state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal) out.blockers.push_back("she is sitting, lying down or using furniture: get up first");
+            // Riding is a sit state too (BUG-078): on a horse, "dismount" is the only advice.
+            if (!mounted && state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal) out.blockers.push_back("she is sitting, lying down or using furniture: get up first");
             if (state->GetKnockState() != RE::KNOCK_STATE_ENUM::kNormal) out.blockers.push_back("she is knocked down or ragdolled");
             if (state->IsBleedingOut()) out.blockers.push_back("she is bleeding out");
             if (state->IsSwimming()) out.warnings.push_back("she is swimming");
