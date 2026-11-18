@@ -54,6 +54,10 @@ namespace SkyrimMCP::WorldManager {
         // BUG-070: coc to a cell that doesn't exist did nothing and the tool still reported success.
         // coc takes a cell's editor ID (and a few worldspace names), which the game keeps; any form with that editor ID
         // counts, so nothing coc accepts is refused.
+        // BUG-073: a teleport ran with the map open. Refuse while a menu pauses the game, as captures do (BUG-057).
+        if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
+            return {{"error", "A menu is open (the map, inventory, a container, crafting or another pausing menu): close it and teleport again"}};
+        }
         auto* target = RE::TESForm::LookupByEditorID(cellId);
         if (!target) {
             return {{"error", "No cell with the editor ID '" + cellId + "'. Find one with SearchForms(type: 'cell') or use a known location name."}};
