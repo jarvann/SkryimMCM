@@ -13,6 +13,30 @@ public class QuestTools : ToolBase
     public QuestTools(IPipeClient pipe) : base(pipe) { }
 
     [McpServerTool]
+    [Description("Set a quest's stage (formId, stage), then read it back and report whether the game applied it (applied, stageNow). " +
+        "The game refuses a stage it can't run, for example the final stage of a quest whose aliases (quest giver, reward items) " +
+        "were never filled because the quest never really started; the console reports no error in that case, so use this, not " +
+        "ExecuteConsoleCommand('setstage ...'). Setting a stage runs its script: rewards, world changes, follow-on quests. Ask " +
+        "the player and have them save first.")]
+    public async Task<object> SetQuestStage(string formId, int stage)
+    {
+        if (await SafetyBlock("face") is string gateReason) return new { error = gateReason };  // no scenes, menus, combat
+        var before = await _pipe.SendRequestAsync("get_quest_stages", new JsonObject { ["formId"] = formId });
+        var r = await _pipe.SendRequestAsync("set_quest_stage", new JsonObject { ["formId"] = formId, ["stage"] = stage });
+        await Task.Delay(500);
+        var after = await _pipe.SendRequestAsync("get_quest_stages", new JsonObject { ["formId"] = formId });
+        var now = after?["currentStage"]?.GetValue<int>();
+        return new
+        {
+            formId, requested = stage, stageBefore = before?["currentStage"]?.GetValue<int>(), stageNow = now,
+            applied = now == stage,
+            note = now == stage ? null : "The game didn't apply the stage (BUG-085): often the quest isn't really started, so its " +
+                "aliases are empty and the stage's script can't run. Start the quest properly, or leave it.",
+            console = r?.DeepClone(),
+        };
+    }
+
+    [McpServerTool]
     [Description("Get information about active quests including objectives and completion status. " +
         "Note: In heavily modded games this may return a large number of quests. " +
         "For a specific quest, use ExecuteConsoleCommand with 'getqueststage <questID>' instead.")]

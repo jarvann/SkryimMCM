@@ -321,8 +321,15 @@ public class PlayerTools : ToolBase
         // Exports from build 117/118 listed every not-completed quest as running: keep only ones actually started there.
         static bool Started(JsonNode? q) => q?["inJournal"]?.GetValue<bool>() == true || (q?["stage"]?.GetValue<int>() ?? 0) > 0 ||
                                             (q?["objectives"] as JsonArray)?.Count > 0;
+        // A player-facing quest has a journal entry or objectives; the rest are world encounters, scenes and mod managers.
+        static bool PlayerFacing(JsonNode? q) => q?["inJournal"]?.GetValue<bool>() == true || (q?["objectives"] as JsonArray)?.Count > 0;
+        var background = (saved["running"] as JsonArray ?? new JsonArray())
+            .Where(q => Started(q) && !PlayerFacing(q) && !doneHere.Contains(Key(q)) && !runningHere.Contains(Key(q)))
+            .Select(q => q?["name"]?.ToString()).ToList();
         var runningThere = (saved["running"] as JsonArray ?? new JsonArray())
             .Where(Started)
+            .Where(PlayerFacing)
+            .Where(q => (q?["stage"]?.GetValue<int>() ?? 0) < 255)  // finished encounters that never set the completed flag
             .Where(q => !doneHere.Contains(Key(q)))
             .Where(q => !runningHere.Contains(Key(q)) ||
                         (q?["stage"]?.GetValue<int>() ?? 0) > ((nowByKey.TryGetValue(Key(q), out var m) ? m?["stage"]?.GetValue<int>() : 0) ?? 0))
@@ -331,6 +338,8 @@ public class PlayerTools : ToolBase
         {
             completedThereNotHere = completedThere,
             runningThereNotHere = runningThere,
+            backgroundThereNotHere = background.Count > 0 ? background : null,
+            backgroundNote = background.Count > 0 ? "Started there with no journal entry or objectives: world encounters, scenes and mod managers, not player progress." : null,
             note = "Compared only; nothing is applied. Forcing a quest stage (SetQuestStage, CompleteQuest) skips its rewards, world " +
                    "changes and the scripts that start follow-on quests, and main or faction quests can break. Decide per quest " +
                    "with the player, simple miscellaneous ones first, after a save.",

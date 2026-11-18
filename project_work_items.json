@@ -1131,6 +1131,10 @@
             {
               "datetime": "2026-11-19T23:59",
               "note": "executedStages read back only 0s (0 or 0,0 for quests at stage 30-255): stagesDone dropped from the 1.3 export. For the 1.4 replay find a reliable source: the stage list from the plugin's QUST records plus Quest.GetStageDone per stage, or the runtime stage flags."
+            },
+            {
+              "datetime": "2026-11-20T00:10",
+              "note": "In game (build 119): new character's export 4 completed and 161 running (was thousands), 0.59 MB; Arya against her: six completed and the journal quests with stages listed; self-comparison empty. Thane of Falkreath SetStage(200) refused on a quest that never started: replay must start the quest so aliases fill."
             }
           ],
           "targetRelease": "1.3"
@@ -3930,7 +3934,7 @@
         {
           "id": "BUG-084",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Quest export lists every quest as running; stagesDone holds only zeros; in-progress gaps missed",
           "description": "In game (build 118): the export worked ('L'etreinte' was the bad string, now converted) and completed quests compared well (six listed with Arya's objectives), but running held 6,651 quests (nearly every quest), so in-progress quests on both sides cancelled out (Thane of Falkreath at 200 there, 0 here, not reported); stagesDone read 0 or 0,0 for quests at stage 30 to 255; completed quests showed inJournal false; a quests-only dry run carried the equipment note. Now: a quest counts as started only when in the journal, past stage 0, or with a shown objective (older exports are filtered the same way when compared); running quests further on there are reported with both stages; stagesDone is dropped until a reliable source is found (FEAT-262, 1.4); inJournal only on running quests; the note only with item sections.",
@@ -3938,6 +3942,25 @@
             {
               "datetime": "2026-11-19T23:59",
               "note": "From the in-game agent's quest comparison."
+            },
+            {
+              "datetime": "2026-11-20T00:10",
+              "note": "In game (build 119): new character's export 4 completed and 161 running (was thousands), 0.59 MB; Arya against her: six completed and the journal quests with stages listed; self-comparison empty. Thane of Falkreath SetStage(200) refused on a quest that never started: replay must start the quest so aliases fill."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-085",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "No verified way to set a quest stage; quest comparison still noisy",
+          "description": "In game: the agent tried Thane of Falkreath stage 200 on the new character (after a save): console setstage reported nothing wrong but the stage stayed 0, and Quest.SetStage(200) returned false (aliases empty, the quest never really started). New SetQuestStage tool: sets the stage, reads it back after half a second and reports applied and stageNow, with a note when the game refused; gated like face edits; its description warns that stage scripts run. Build 119 comparison passed (six completed, nine journal quests with Arya's stages, three earlier-stage cases) but about half of 73 entries were world encounters at 255, scenes and mod managers: running quests without a journal entry or objectives now go to backgroundThereNotHere, and stage 255 is left out. Not done: objective text with unresolved alias tokens.",
+          "history": [
+            {
+              "datetime": "2026-11-20T00:10",
+              "note": "From the in-game agent's Thane test and build 119 checks."
             }
           ],
           "targetRelease": "1.3"
