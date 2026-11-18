@@ -1912,6 +1912,10 @@
             {
               "datetime": "2026-11-19T12:15",
               "note": "Ships untested: needs a crash inside a SkyLink game-thread task to exercise."
+            },
+            {
+              "datetime": "2026-11-19T14:00",
+              "note": "In game: six bad inputs (missing forms, wrong types, unknown console target, unknown cell) were all refused before any unsafe code ran, so the fault layer never fired. Ships untested."
             }
           ],
           "targetRelease": "1.3"
@@ -3116,6 +3120,10 @@
             {
               "datetime": "2026-11-19T12:15",
               "note": "Ships untested in game: no menu hair on this load order is packed in a BSA (the Beyond Skyrim hairs aren't installed)."
+            },
+            {
+              "datetime": "2026-11-19T14:00",
+              "note": "In game: the 29 Beyond Skyrim hairs' meshes are absent from this install (757 BSAs scanned). Ships untested."
             }
           ],
           "targetRelease": "1.3"
@@ -3142,7 +3150,7 @@
         {
           "id": "BUG-054",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "SetFace dry run omits head parts; preset head-part type is a list position; added reads as not applied",
           "description": "From the in-game SetFace test (passed: Feather hair, plum lips, blush 0.25, smile and lash sliders in one call). The dry run now lists the head parts it would set; GetFacePreset shows a preset's head-part entries with listPosition instead of type (it is RaceMenu's save order: the same part read type 11 then 7); SetHeadPart reports replaced and applied instead of added (which meant a new slot).",
@@ -3158,6 +3166,10 @@
             {
               "datetime": "2026-11-19T12:15",
               "note": "Dry-run head parts confirmed; the 'replaced' wording on a live SetHeadPart not seen. Ships as is."
+            },
+            {
+              "datetime": "2026-11-19T14:00",
+              "note": "In game: SetHeadPart replies replaced: true with part and previous, no 'added'."
             }
           ],
           "targetRelease": "1.3"
@@ -3501,6 +3513,21 @@
             {
               "datetime": "2026-11-19T13:45",
               "note": "In game (build 91): byKey object, actor-wide keys, cleared-name note, OBody notes all pass. Then: the unknown-name warning checks whether another key gives the morph a value (a repeated typo was unflagged); leftOutNoValue always a number."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-070",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Teleport to a cell that doesn't exist reports success",
+          "description": "In game: Teleport(NoSuchCellXYZ123) returned success: true and nothing happened (the server ignored the plugin's reply). The plugin now looks the cell up by editor ID and refuses an unknown one, pointing at SearchForms(type: cell); the tool returns the plugin's reply with the cell's name. The description no longer says invalid IDs crash the game.",
+          "history": [
+            {
+              "datetime": "2026-11-19T14:00",
+              "note": "From the in-game agent's crash-protection attempts."
             }
           ],
           "targetRelease": "1.3"

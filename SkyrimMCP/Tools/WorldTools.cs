@@ -106,17 +106,17 @@ public class WorldTools : ToolBase
     [Description("Teleport player to a location (e.g., 'whiterun', 'riverwood', 'solitude'). " +
         "CAUTION: Teleporting during combat, scripted scenes, or dialogue can crash the game. " +
         "Ask the user to confirm they are in a safe state before teleporting. " +
-        "Invalid cell IDs will crash the game — use known locations from ListKnownItems or verify the cell ID first.")]
+        "Takes a known location name or a cell editor ID (SearchForms type 'cell' finds them); an unknown cell is refused.")]
     public async Task<object> Teleport(string location)
     {
-        var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.ToLower();
+        var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
 
-        await _pipe.SendRequestAsync("teleport", new JsonObject
+        var data = await _pipe.SendRequestAsync("teleport", new JsonObject
         {
             ["cellId"] = cellId
         });
-
-        return new { success = true, message = $"Teleporting to {location}" };
+        if (data?["error"] != null) return DeserializeResponse(data);
+        return new { success = true, message = $"Teleporting to {location}", cell = data?["cell"]?.ToString(), cellName = data?["cellName"]?.ToString() };
     }
 
     [McpServerTool]
