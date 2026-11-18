@@ -3905,6 +3905,10 @@
             {
               "datetime": "2026-11-19T22:30",
               "note": "From the in-game agent while setting up a new character; the face restore then matched the export exactly."
+            },
+            {
+              "datetime": "2026-11-19T18:00",
+              "note": "Shipped in 1.3.0; not separately re-checked in game after the fix."
             }
           ],
           "targetRelease": "1.3"
@@ -3920,6 +3924,10 @@
             {
               "datetime": "2026-11-19T22:50",
               "note": "From the in-game agent copying Arya to a new character."
+            },
+            {
+              "datetime": "2026-11-19T18:00",
+              "note": "Shipped in 1.3.0; not separately re-checked in game after the fix."
             }
           ],
           "targetRelease": "1.3"
@@ -3973,9 +3981,28 @@
             {
               "datetime": "2026-11-20T00:10",
               "note": "From the in-game agent's Thane test and build 119 checks."
+            },
+            {
+              "datetime": "2026-11-19T18:00",
+              "note": "Shipped in 1.3.0; not separately re-checked in game after the fix."
             }
           ],
           "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-086",
+          "type": "bug",
+          "status": "planned",
+          "priority": "low",
+          "title": "No lighting warning on a very dark capture; camera refusal names the pause, not the message box",
+          "description": "Release check (1.3.0): a night capture outside Helgen read skin lightness 5.6 (reference 59); the comparison flagged it but the measurement's own lighting.warnings was empty: warn below about 15, since colour numbers mean nothing there. With the grass cache prompt up, the camera refusal said 'a menu is open (the game is paused)' while moveBlockers named the message box: the camera kind should use the named message box line.",
+          "history": [
+            {
+              "datetime": "2026-11-19T18:00",
+              "note": "From the in-game agent's release check; for 1.3.1."
+            }
+          ],
+          "targetRelease": "1.3.1"
         },
         {
           "id": "BUG-050",
