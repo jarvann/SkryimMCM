@@ -344,6 +344,41 @@ namespace SkyrimMCP::Protocol {
                         if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
             return MakeResponse(id, false, {}, "mode must be prepare, enter, aim, snapshot, check or exit").dump() + "\n";
         };
+        // FEAT-257: proves the game-thread fault guard (FEAT-220) by faulting on purpose inside a guarded task. The fault is in
+        // SkyLink's own code with no engine lock or object held, so after it is caught the game is unaffected.
+        registry["crash_test"] = [](const std::string& id, const json& params) {
+            if (params.value("confirm", std::string()) != "crash-test") {
+                return MakeResponse(id, false, {}, "crash_test needs confirm: \"crash-test\"").dump() + "\n";
+            }
+            const auto mode = params.value("mode", std::string("null_read"));
+            if (mode != "null_read" && mode != "divide_by_zero") {
+                return MakeResponse(id, false, {}, "mode must be null_read or divide_by_zero").dump() + "\n";
+            }
+            const auto faultsBefore = TaskQueue::FaultCount();
+            json out = {{"mode", mode}, {"faultsCaughtBefore", faultsBefore}};
+            try {
+                auto r = TaskQueue::RunOnGameThread([mode]() -> json {
+                    if (mode == "divide_by_zero") {
+                        volatile int zero = 0;
+                        volatile int value = 1 / zero;
+                        return {{"value", static_cast<int>(value)}};
+                    }
+                    volatile int* nowhere = nullptr;
+                    volatile int value = *nowhere;
+                    return {{"value", static_cast<int>(value)}};
+                });
+                out["caught"] = false;
+                out["result"] = "No fault was raised (unexpected): " + r.dump();
+            } catch (const std::exception& e) {
+                out["caught"] = TaskQueue::FaultCount() > faultsBefore;
+                out["guardMessage"] = e.what();
+            }
+            out["faultsCaughtNow"] = TaskQueue::FaultCount();
+            out["note"] = "The fault was in SkyLink's own code with no engine lock or object held, so the game is unaffected; "
+                          "the real guard message tells players to save to a new slot because a real fault may leave the engine "
+                          "in a bad state.";
+            return MakeResponse(id, true, out).dump() + "\n";
+        };
         registry["reapply_face_state"] = [](const std::string& id, const json&) {
             return GameThread(id, []() { return FaceState::Reapply(); });
         };

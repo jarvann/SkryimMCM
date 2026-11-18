@@ -3213,6 +3213,21 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "FEAT-257",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "Crash protection test hook (TestCrashProtection)",
+          "description": "FEAT-220's guard never fired in testing because every bad input is refused before unsafe code runs. TestCrashProtection(mode, confirm) runs a guarded game-thread task that faults on purpose in SkyLink's own code (null read or integer divide by zero), holding no engine lock or object, and reports whether the guard caught it (caught, guardMessage, fault counts). Needs confirm=true; the plugin action also requires a confirm string.",
+          "history": [
+            {
+              "datetime": "2026-11-19T14:20",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-055",
           "type": "bug",
           "status": "complete",
