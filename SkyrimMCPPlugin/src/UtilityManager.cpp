@@ -143,8 +143,7 @@ namespace SkyrimMCP::UtilityManager {
             typesToSearch = {{RE::FormType::Global, "global"}};
         } else {
             // BUG-062: an unknown type used to search a few common types silently; say so instead.
-            return {{"error", "Unknown type '" + formTypeFilter + "'"},
-                    {"types", "all, weapon, armor, potion, ingredient, book, misc, ammo, key, soulgem, scroll, spell, perk, quest, npc, "
+            return {{"error", "Unknown type '" + formTypeFilter + "'. Types: all, weapon, armor, potion, ingredient, book, misc, ammo, key, soulgem, scroll, spell, perk, quest, npc, "
                               "race, enchantment, shout, wordofpower, location, idle, faction, worldspace, cell, container, activator, "
                               "furniture, door, flora, music, keyword, magiceffect, headpart, eyes, outfit, voicetype, class, "
                               "combatstyle, scene, relationship, recipe, projectile, light, global"}};
@@ -196,6 +195,8 @@ namespace SkyrimMCP::UtilityManager {
             try {
                 const char* name = form->GetName();
                 const char* editorId = form->GetFormEditorID();
+                // Generated LOD cells (DynDOLOD) crowd a cell search out.
+                if (formType == RE::FormType::Cell && editorId && std::string_view(editorId).find("DynDOLOD") != std::string_view::npos) return false;
 
                 bool matched = false;
                 if (name && name[0]) {
@@ -636,8 +637,10 @@ namespace SkyrimMCP::UtilityManager {
             result["sameNameNote"] = "Other categories have this name; this set only the first. Pass a FormID to set another.";
         }
         if (CategoryKey(result["category"].get<std::string>()).find("music") != std::string::npos) {
-            result["note"] = "The track already playing may keep its volume (heard in game: music went on at 0); the next track "
-                             "uses the new value, or StopMusic to change track now.";
+            // BUG-028: heard in game, a playing track went on for up to a minute after Music was set to 0, then went quiet; a
+            // new track started at the new volume. StopMusic left silence for minutes.
+            result["note"] = "A playing track takes the new volume after a delay (up to about a minute); a new track starts at it. "
+                             "Don't use StopMusic to hurry it: music may not resume until the location or situation changes.";
         } else {
             result["note"] = "Applies at once, like the Audio menu slider. The Audio menu may show the old position until reopened.";
         }

@@ -43,6 +43,19 @@ public partial class RaceMenuTools : ToolBase
         return data?["result"];
     }
 
+    // The whole reply (result, signature, target), for diagnosing a call that returns nothing.
+    private async Task<JsonNode?> PapyrusRaw(string className, string function, params JsonNode?[] args)
+    {
+        var data = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+        {
+            ["className"] = className,
+            ["functionName"] = function,
+            ["args"] = new JsonArray(args.Select(a => a?.DeepClone()).ToArray()),
+        });
+        if (data?["error"] is JsonNode error) throw new McpException($"{className}.{function}: {error}");
+        return data;
+    }
+
     private static string RefArg(string? refId) => string.IsNullOrWhiteSpace(refId) ? "player" : refId.Trim();
 
     private async Task<bool> IsFemale(string? refId, bool? female)
@@ -134,15 +147,26 @@ public partial class RaceMenuTools : ToolBase
         await Papyrus("NiOverride", "UpdateModelWeight", target);
         // BUG-060: in game a set reported success while GetBodyMorphs listed nothing; read it back so a set that didn't
         // take says so.
-        var readBack = (await Papyrus("NiOverride", "GetBodyMorph", target, morph, key) as JsonValue)?.GetValue<float>();
+        var readCall = await PapyrusRaw("NiOverride", "GetBodyMorph", target, morph, key);
+        var readBack = (readCall?["result"] as JsonValue)?.GetValue<float>();
         var listed = (await Papyrus("NiOverride", "GetMorphNames", target) as JsonArray)?.Count ?? 0;
         await NotifyInGame("Body morph changed");
         var took = readBack.HasValue && Math.Abs(readBack.Value - value) < 0.001;
+        if (took)
+            return new { actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed };
+        // BUG-065: in game GetBodyMorph came back with no value at all (not even 0), which a float function only does when the
+        // call failed in the VM; report what was called so the cause can be found (Papyrus log, or a different signature).
+        var setCall = await PapyrusRaw("NiOverride", "SetBodyMorph", target, morph, key, value);
         return new
         {
-            actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed,
-            warning = took ? null : "The morph didn't read back as set: RaceMenu may not store morphs for this actor, or the morph name isn't one the body uses.",
-            note = took && listed == 0 ? "Read back fine, but RaceMenu's morph list is empty: GetBodyMorphs(morph) reads one morph directly." : null,
+            actor = target, morph, key, value,
+            readBack = readBack?.ToString() ?? "none (the read returned no value)",
+            morphsListed = listed,
+            warning = "The morph didn't read back as set. If readBack is none, the NiOverride calls aren't completing: check " +
+                      "GetScriptFunctions('NiOverride') for SetBodyMorph/GetBodyMorph and the Papyrus log for errors.",
+            setSignature = setCall?["signature"]?.ToString(),
+            getSignature = readCall?["signature"]?.ToString(),
+            setResult = setCall?["result"]?.ToJsonString(),
         };
     }
 

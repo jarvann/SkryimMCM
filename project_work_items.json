@@ -2282,7 +2282,7 @@
         {
           "id": "BUG-028",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetVolume: no audible change; Music read back 0.16 after setting 0.23",
           "description": "In game 2026-11-16 (in-game agent): Master stored but not heard; $Music set to 0 did not silence music, and a later set to 0.23 read back as 0.16. Check whether the music system ducks or overrides the category volume each frame, whether the Audio menu applies menu categories through another path (static attenuation, INI prefs such as fAudioMusicVolume?), and whether the master needs BSAudioManager to re-apply. Confirm by ear with the player.",
@@ -2294,6 +2294,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "With the player listening: every zeroed category went silent except Music, which kept playing at 0. The playing track keeps its volume; SetVolume now says so (BUG-059). Recheck: set Music, StopMusic, listen to the next track."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "With the player listening (build 83): a playing track went quiet within about a minute of Music 0; a new track started at the set volume. Documented in the reply (BUG-065)."
             }
           ],
           "targetRelease": "1.3"
@@ -3239,7 +3243,7 @@
         {
           "id": "BUG-059",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetVolume: reads back the effective volume and calls it an error; no restore, no FormID for duplicate names",
           "description": "In game (2026-11-19): every non-zero set returned 'The game kept the volume at...' though it changed: the read-back was the effective volume (own value times parent and static multiplier: Music 0.7, Menus 0.3 under Effects). previous was effective too, so restoring landed low; two categories share names (Weapons, Footsteps) and a FormID was refused; 31 calls to zero everything, 52 to restore. Now: own (volumeMult) and effective reported separately, previous is the own value, no error on the difference, FormID targets, sameName warning, category all, and snapshot/restore (server-side file, parents first). With 30 categories at 0 the player heard only music (BUG-028): the playing track keeps its volume; the reply says so and points at StopMusic.",
@@ -3247,6 +3251,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the in-game agent's older-items round."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "In game (build 83): snapshot of 32 categories, Music own 0.5/effective 0.35, Footsteps by FormID, restore of all 32."
             }
           ],
           "targetRelease": "1.3"
@@ -3269,7 +3277,7 @@
         {
           "id": "BUG-061",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Blueprint dry run on an unchanged character lists equipped items and one item to add",
           "description": "In game: ApplyBlueprint dryRun on a blueprint exported a minute earlier listed all 17 equipped items as to-equip and Hot Clam Chowder to add. Worn items (and hand and power selections) are now skipped and counted as alreadyEquipped; each item to add shows blueprintCount and has, to explain cases like the chowder.",
@@ -3277,6 +3285,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the in-game agent's older-items round."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "In game (build 83): alreadyEquipped 17, nothing to add on an unchanged character."
             }
           ],
           "targetRelease": "1.3"
@@ -3292,6 +3304,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the in-game agent's older-items round."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "In game (build 83): cell search works; unknown type refused but the list was dropped (fixed in BUG-065)."
             }
           ],
           "targetRelease": "1.3"
@@ -3322,6 +3338,21 @@
             {
               "datetime": "2026-11-19T12:00",
               "note": "From the in-game agent. Fixed on bugfix/BUG-064-npc-head-parts."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-065",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Build 83 findings: loose face file missed, refusal too broad, unset NPC morphs, body morph calls return nothing",
+          "description": "In game (build 83): faceGenMeshSource said none for Lucien though Data\\\\Meshes\\\\...\\\\Lucien.esp\\\\00005900.nif exists: the path started with meshes and MeshFiles added meshes again; MeshFiles now accepts both forms. A swap to HairMaleImperial1 without refresh looked right and held through cell changes and an in-session load, while the first swap (refresh, Beyond Skyrim hair) gave the dark face: the refusal now covers only refresh=true on a pre-built face (force for putting original parts back). NPC faceMorphs FLT_MAX and facePresets -1 left out. SearchForms puts the type list in the error text (the list field was dropped) and skips DynDOLOD cells. Music: a playing track took the new volume after up to a minute, a new track started at it, StopMusic left minutes of silence: the note says so (BUG-028). SetBodyMorph: GetBodyMorph returned no value at all; the warning now carries the Papyrus signatures and set result. Snapshot/restore, FormID targets, blueprint alreadyEquipped and cell search passed.",
+          "history": [
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "From the in-game agent's build 83 rechecks."
             }
           ],
           "targetRelease": "1.3"
