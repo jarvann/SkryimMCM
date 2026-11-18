@@ -3707,7 +3707,7 @@
         {
           "id": "FEAT-260",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Safety rules per kind of action, including OStim scenes",
           "description": "In game: GetGameSafety said safe during an OStim scene (OActor.IsInOStim(player) was true) and during a bed animation. One safe flag can't fit reads and teleports alike. Each kind of action now has its own rule, applied by its tools (ToolBase.SafetyBlock): move (Teleport, StudioGo, StudioReturn): the player-free check (FEAT-259) and no OStim scene; camera (CaptureFace, live MeasureFace, MeasureProfile, live MeasureBody) and face (SetFace, SetFaceSliders, SetFaceTint, SetBrowColor, ResetFace, SculptFace, LoadRaceMenuPreset, SetHairColor, SetSkinTone, SetHeadPart, RemoveHeadPart, SetBodyMorph, ProbeSlider(s)): no OStim or scripted scene, no script-held controls, conversation, combat, kill move, load or save, and face also not in beast form; actor (MoveActorTo): that actor not in an OStim scene. Dry runs and reads are not gated. GetGameSafety(action, refId) answers for a kind of action (allowed, reason). OStim is checked with OActor.IsInOStim and skipped when OStim isn't installed. Still to check: the flag clears when a scene ends; no force option yet.",
@@ -3719,6 +3719,10 @@
             {
               "datetime": "2026-11-19T19:10",
               "note": "In game (build 106): during an OStim scene move and face were refused with the OStim reason; after it ended both were allowed. Sitting refused move, allowed face and camera."
+            },
+            {
+              "datetime": "2026-11-19T20:45",
+              "note": "In game (live OStim scene): isInOStimScene true, scene first and no in-the-air line, TakeScreenshot ran, CaptureFace and MoveActorTo on a follower in the scene refused, the scene carried on; the flag cleared after. Build 110: camera look-ahead refuses with the map open."
             }
           ],
           "targetRelease": "1.3"
@@ -3726,7 +3730,7 @@
         {
           "id": "BUG-076",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "GetGameSafety: OStim scene missing from the plain reply; scene posing read as in the air; safe contradicts allowed",
           "description": "In game (build 106) with an OStim scene: move and face refused with the OStim reason, and both cleared after the scene (pass). But the plain GetGameSafety reply listed only 'in the air (try again in a moment)', the scene's posing, and safe stayed true beside allowed false. The plain reply now has isInOStimScene, puts the scene first in moveBlockers, drops 'in the air' while a scene is on (also in the per-action reasons), and safeMeans explains that safe covers reads and simple changes.",
@@ -3738,6 +3742,10 @@
             {
               "datetime": "2026-11-19T19:40",
               "note": "In game (build 107): isInOStimScene and safeMeans present. Scene listing not yet seen during a scene."
+            },
+            {
+              "datetime": "2026-11-19T20:45",
+              "note": "In game (live OStim scene): isInOStimScene true, scene first and no in-the-air line, TakeScreenshot ran, CaptureFace and MoveActorTo on a follower in the scene refused, the scene carried on; the flag cleared after. Build 110: camera look-ahead refuses with the map open."
             }
           ],
           "targetRelease": "1.3"
@@ -3776,6 +3784,21 @@
             {
               "datetime": "2026-11-19T20:20",
               "note": "In game (build 109): mounted move and camera refusals say only dismount first; camera adds the TakeScreenshot pointer. Then: the camera look-ahead said allowed with a pausing menu open while CaptureFace refuses; the camera rule now includes the menu."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-079",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Menus that a mod keeps from pausing aren't seen by the safety checks; no way to delete a body reference",
+          "description": "In game: with the Tab menu (TweenMenu) open, gameIsPaused was false on this load order (a mod keeps menus from pausing), so move, camera and face were all reported allowed; the map still pauses, which is why earlier menu tests passed. The player-free check now also looks for open menus by name when the game isn't paused: inventory, magic, map, journal, stats, book, lockpicking, sleep/wait, training, crafting, RaceMenu, message boxes, favourites, console and level-up refuse moves and captures; container, barter and gift menus refuse moves only (a capture with a container open was fine). Also: SetBodyReference(name, delete=true) removes a stale reference (arya_test, out of date after OBody preset changes). Live OStim checks passed: isInOStimScene true with one blocker, TakeScreenshot ran, CaptureFace and MoveActorTo on a follower in the scene were refused, the scene carried on.",
+          "history": [
+            {
+              "datetime": "2026-11-19T20:45",
+              "note": "From the in-game agent."
             }
           ],
           "targetRelease": "1.3"
