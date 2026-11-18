@@ -594,6 +594,47 @@ namespace SkyrimMCP::PlayerQueries {
         return {{"favorites", spells}, {"count", spells.size()}};
     }
 
+    // FEAT-262: the journal's quests (named ones) that are completed or running, with stage and type.
+    json ExportQuests() {
+        static const char* kTypes[] = {"none", "main", "College of Winterhold", "Thieves Guild", "Dark Brotherhood", "Companions",
+                                       "miscellaneous", "Daedric", "side", "Civil War", "Dawnguard", "Dragonborn"};
+        json completed = json::array(), running = json::array();
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) return {{"error", "Game data not available"}};
+        for (auto* quest : dataHandler->GetFormArray<RE::TESQuest>()) {
+            if (!quest) continue;
+            const char* name = quest->GetName();
+            if (!name || !name[0]) continue;  // unnamed quests are scripts and controllers, not journal entries
+            const bool done = quest->IsCompleted();
+            const bool live = quest->IsRunning();
+            if (!done && !live) continue;
+            const auto t = static_cast<int>(quest->GetType());
+            json q = {{"formId", std::format("{:08X}", quest->GetFormID())}, {"name", name},
+                      {"type", t >= 0 && t < static_cast<int>(std::size(kTypes)) ? kTypes[t] : "other"},
+                      {"stage", quest->GetCurrentStageID()}, {"inJournal", quest->IsActive()}};
+            if (const char* edid = quest->GetFormEditorID(); edid && edid[0]) q["editorId"] = edid;
+            // The stages the game lists as executed, and every objective the player has seen, with its state.
+            json stages = json::array();
+            if (quest->executedStages) {
+                for (auto& stage : *quest->executedStages) stages.push_back(stage.data.index);
+            }
+            q["stagesDone"] = stages;
+            static const char* kStates[] = {"dormant", "shown", "completed", "completed", "failed", "failed"};
+            json objectives = json::array();
+            for (auto& obj : quest->objectives) {
+                if (!obj || !obj->initialized) continue;
+                const auto st = static_cast<int>(obj->state.get());
+                if (st == 0) continue;  // never shown
+                objectives.push_back({{"index", obj->index},
+                                      {"text", obj->displayText.c_str() ? obj->displayText.c_str() : ""},
+                                      {"state", st >= 0 && st < 6 ? kStates[st] : "other"}});
+            }
+            if (!objectives.empty()) q["objectives"] = objectives;
+            (done ? completed : running).push_back(std::move(q));
+        }
+        return {{"completed", completed}, {"running", running}, {"completedCount", completed.size()}, {"runningCount", running.size()}};
+    }
+
     json GetCharacterBlueprint() {
         // Single call that exports everything needed to recreate a character
         json blueprint;
@@ -637,6 +678,12 @@ namespace SkyrimMCP::PlayerQueries {
         blueprint["resistances"] = GetMagicResistances();
         blueprint["diseaseStatus"] = GetDiseaseStatus();
         blueprint["powers"] = GetPowers();
+
+        // FEAT-262: quest progress (journal quests, completed or running), so a new character's progress can be compared or
+        // carried over with care. Read-only here; nothing applies it.
+        blueprint["quests"] = ExportQuests();
+        blueprint["notCaptured"] = "Quest effects (rewards given, world changes, NPCs recruited or killed), map markers, "
+                                   "stats and achievements, crime and bounties, and anything kept only by other mods' scripts.";
 
         // Cross-module data
         blueprint["factions"] = NPCManager::GetFactions();

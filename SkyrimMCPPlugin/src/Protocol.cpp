@@ -255,7 +255,14 @@ namespace SkyrimMCP::Protocol {
         };
 
         // FEAT-207: add missing items, equip and restore gold from a blueprint
-        registry["apply_blueprint_items"] = [](const std::string& id, const json& params) {
+        registry["export_quests"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() {
+                auto q = PlayerQueries::ExportQuests();
+                BlueprintManager::AddPortableIds(q);
+                return q;
+            });
+        };
+                registry["apply_blueprint_items"] = [](const std::string& id, const json& params) {
             return GameThread(id, [params]() { return BlueprintManager::ApplyBlueprintItems(params); });
         };
 

@@ -188,7 +188,10 @@ public class PlayerTools : ToolBase
         "Use this to save a character template that can be re-applied to a new character. " +
         "IMPORTANT: Pass an outputPath to write the blueprint directly to a file on disk — the data is too large " +
         "for the MCP response. Example outputPath: 'C:\\Users\\<you>\\Documents\\blueprint.json'. " +
-        "Every form ID also carries its plugin name and local ID (formIdSource), so ApplyBlueprint still finds modded items after a load-order change.")]
+        "Every form ID also carries its plugin name and local ID (formIdSource), so ApplyBlueprint still finds modded items after a load-order change. " +
+        "Also records quest progress (journal quests completed or running, with current stage, the stages done, objectives seen with " +
+        "their state, and type) and notCaptured: what a blueprint " +
+        "can't hold (quest rewards and world changes, map markers, crime, other mods' script state).")]
     public async Task<object> GetCharacterBlueprint(string? outputPath = null)
     {
         var data = await _pipe.SendRequestAsync("get_character_blueprint");
@@ -235,7 +238,8 @@ public class PlayerTools : ToolBase
     [McpServerTool]
     [Description("Apply the inventory, equipment and gold of a character blueprint file (from GetCharacterBlueprint) to the player. " +
         "dryRun defaults to TRUE: first show the player what would change, then call again with dryRun=false once they agree. " +
-        "sections (comma-separated, default 'inventory,equipment,gold'). Only missing items are added (blueprint count minus what " +
+        "sections (comma-separated, default 'inventory,equipment,gold'; add 'quests' to compare the blueprint's quest progress " +
+        "with this game's: listed only, never applied). Only missing items are added (blueprint count minus what " +
         "the player has); nothing is ever removed, and gold only goes up unless exactGold=true. Then the blueprint's equipped " +
         "armor and weapons are equipped (an item to equip that she lacks is added, even with only the equipment section; spells she " +
         "doesn't know are skipped, since spells aren't restored; worn items not in the blueprint stay on). Items are found by plugin name and local ID, so a different load order works; " +
@@ -254,6 +258,10 @@ public class PlayerTools : ToolBase
         }
         if (blueprint is not JsonObject bp) return new { error = "The file isn't a blueprint (expected a JSON object)" };
 
+        // FEAT-262: quests are compared, never applied: forcing a stage skips rewards, world changes and follow-on triggers.
+        object? questReport = null;
+        if (sections.Contains("quests", StringComparison.OrdinalIgnoreCase))
+            questReport = await CompareQuests(bp);
         var parms = new JsonObject
         {
             ["sections"] = new JsonArray(sections.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -274,6 +282,52 @@ public class PlayerTools : ToolBase
             exportedBy = bp["exportSource"]?.GetValue<string>(),
             portableIds = bp["formatVersion"]?.GetValue<int>() >= 2,
             result,
+            quests = questReport,
+        };
+    }
+
+    // Blueprint quests against this game's: what the blueprint's character had completed or running that this one hasn't.
+    private async Task<object> CompareQuests(JsonObject bp)
+    {
+        if (bp["quests"] is not JsonObject saved) return new { note = "This blueprint has no quests section (exported before 1.3)." };
+        var now = await _pipe.SendRequestAsync("export_quests");
+        static string Key(JsonNode? q) =>
+            q?["formIdSource"] is JsonObject src && src["plugin"] != null
+                ? $"{src["plugin"]}:{src["localId"]}".ToLowerInvariant()
+                : (q?["editorId"]?.ToString() ?? q?["name"]?.ToString() ?? "").ToLowerInvariant();
+        var doneHere = new HashSet<string>((now?["completed"] as JsonArray ?? new JsonArray()).Select(Key));
+        var runningHere = new HashSet<string>((now?["running"] as JsonArray ?? new JsonArray()).Select(Key));
+        var nowByKey = new Dictionary<string, JsonNode?>();
+        foreach (var q in (now?["completed"] as JsonArray ?? new JsonArray()).Concat(now?["running"] as JsonArray ?? new JsonArray()))
+            nowByKey[Key(q)] = q;
+        object Row(JsonNode? q, string here)
+        {
+            nowByKey.TryGetValue(Key(q), out var mine);
+            var objectivesThere = (q?["objectives"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                .Where(o => o["state"]?.ToString() == "completed").Select(o => o["text"]?.ToString()).ToList();
+            var objectivesHere = new HashSet<string?>((mine?["objectives"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                .Where(o => o["state"]?.ToString() == "completed").Select(o => o["text"]?.ToString()));
+            return new
+            {
+                name = q?["name"]?.ToString(), type = q?["type"]?.ToString(), stage = q?["stage"]?.GetValue<int>(),
+                stageHere = mine?["stage"]?.GetValue<int>(), formId = q?["formId"]?.ToString(), here,
+                stagesDone = q?["stagesDone"]?.DeepClone(),
+                objectivesDoneThereNotHere = objectivesThere.Where(t => !objectivesHere.Contains(t)).ToList(),
+            };
+        }
+        var completedThere = (saved["completed"] as JsonArray ?? new JsonArray())
+            .Where(q => !doneHere.Contains(Key(q)))
+            .Select(q => Row(q, runningHere.Contains(Key(q)) ? "running" : "not started")).ToList();
+        var runningThere = (saved["running"] as JsonArray ?? new JsonArray())
+            .Where(q => !doneHere.Contains(Key(q)) && !runningHere.Contains(Key(q)))
+            .Select(q => Row(q, "not started")).ToList();
+        return new
+        {
+            completedThereNotHere = completedThere,
+            runningThereNotHere = runningThere,
+            note = "Compared only; nothing is applied. Forcing a quest stage (SetQuestStage, CompleteQuest) skips its rewards, world " +
+                   "changes and the scripts that start follow-on quests, and main or faction quests can break. Decide per quest " +
+                   "with the player, simple miscellaneous ones first, after a save.",
         };
     }
 

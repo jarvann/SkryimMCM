@@ -20,6 +20,7 @@ namespace SkyrimMCP {
         json GetAppearance(const std::string& refId = "");
         json GetFavorites();
         json GetCharacterBlueprint();
+        json ExportQuests();
         json IsInCombat();
         json GetMagicResistances();
         json GetDiseaseStatus();
