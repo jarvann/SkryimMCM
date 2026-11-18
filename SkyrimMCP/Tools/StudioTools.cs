@@ -47,6 +47,7 @@ public class StudioTools : ToolBase
         "Followers may come along. Save the game first. Refused in combat or while already in the studio. StudioReturn brings her back.")]
     public async Task<object> StudioGo(string cell = "QASmoke", string preset = "neutral", double intensity = 1.0)
     {
+        if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         try
         {
             if (LoadState()["markerId"] is JsonNode existing)
@@ -100,6 +101,7 @@ public class StudioTools : ToolBase
         "reply); without it, the reply lists the candidate markers.")]
     public async Task<object> StudioReturn(string? markerId = null)
     {
+        if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         try
         {
             var state = LoadState();

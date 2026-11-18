@@ -35,6 +35,7 @@ public class ProbeTools : ToolBase
         "inert slider look active).")]
     public async Task<CallToolResult> ProbeSlider(string slider, double value, int samples = 3, double noise = 3.0)
     {
+        if (await SafetyBlock("face", null) is string gateReason) return Blocked(gateReason);  // FEAT-260
         try
         {
             samples = Math.Clamp(samples, 1, 3);
@@ -131,6 +132,7 @@ public class ProbeTools : ToolBase
         "map a region: all the lip sliders, all the nose sliders. Studio light, as for ProbeSlider.")]
     public async Task<CallToolResult> ProbeSliders(Dictionary<string, double> sliders, int samples = 3, double noise = 3.0, int budgetSeconds = 100)
     {
+        if (await SafetyBlock("face", null) is string gateReason) return Blocked(gateReason);  // FEAT-260
         var started = DateTime.UtcNow;
         var done = new JsonArray();
         var remaining = new JsonObject();

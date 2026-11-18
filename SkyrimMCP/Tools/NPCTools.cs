@@ -94,6 +94,7 @@ public class NPCTools : ToolBase
         "(default) or a reference ID. Brings followers left behind by a teleport.")]
     public async Task<object> MoveActorTo(string refId, string target = "player")
     {
+        if (await SafetyBlock("actor", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         var data = await _pipe.SendRequestAsync("move_actor_to", new JsonObject { ["actorFormId"] = refId, ["target"] = target });
         return DeserializeResponse(data);
     }

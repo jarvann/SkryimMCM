@@ -16,6 +16,54 @@ public abstract class ToolBase
     }
 
     /// <summary>
+    /// FEAT-260: what each kind of action needs before it runs. "move" (Teleport, studio trips): the player free to move, no
+    /// animation scene. "camera" (captures, measurements, probes) and "face" (face and body edits): no animation or scripted
+    /// scene, no script-held controls, no conversation, combat, kill move, load or save; "face" also not in beast form.
+    /// "actor" (moving someone else): that actor not in an animation scene. Returns the reason it can't run, or null.
+    /// Reads (inventory, quests, morphs...) have no gate.
+    /// </summary>
+    protected async Task<string?> SafetyBlock(string kind, string? actorRef = null)
+    {
+        var reasons = new List<string>();
+        var actor = string.IsNullOrWhiteSpace(actorRef) ? "player" : actorRef.Trim();
+        if (await InAnimationScene(actor) is string scene) reasons.Add(scene);
+        if (kind != "actor")
+        {
+            JsonNode? safety = null;
+            try { safety = await _pipe.SendRequestAsync("get_game_safety"); } catch (Exception) { }
+            var blockers = (safety?["moveBlockers"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").ToList();
+            var notes = (safety?["notes"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").ToList();
+            string[] stillWords = ["scripted scene", "controls are taken", "conversation", "combat", "kill move", "loading", "saving"];
+            if (kind == "move") reasons.AddRange(blockers);
+            else reasons.AddRange(blockers.Where(b => stillWords.Any(w => b.Contains(w, StringComparison.OrdinalIgnoreCase))));
+            if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
+        }
+        return reasons.Count == 0 ? null : "Not now: " + string.Join("; ", reasons.Distinct()) + ".";
+    }
+
+    // OStim (and frameworks exposing the same call): OActor.IsInOStim(actor). Without OStim the call fails and this is null.
+    private async Task<string?> InAnimationScene(string actor)
+    {
+        try
+        {
+            var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "OActor", ["functionName"] = "IsInOStim", ["args"] = new JsonArray(actor),
+            });
+            if (r?["result"] is JsonValue v && v.TryGetValue<bool>(out var inScene) && inScene)
+                return (actor == "player" ? "she is" : actor + " is") + " in an OStim scene: wait until it ends";
+        }
+        catch (Exception) { }
+        return null;
+    }
+
+    protected static ModelContextProtocol.Protocol.CallToolResult Blocked(string reason) => new()
+    {
+        Content = [new ModelContextProtocol.Protocol.TextContentBlock { Text = JsonSerializer.Serialize(new { error = reason }) }],
+        IsError = true,
+    };
+
+    /// <summary>
     /// Send an in-game notification to the player's HUD.
     /// Fire-and-forget — errors are silently ignored.
     /// </summary>

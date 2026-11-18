@@ -71,6 +71,7 @@ public class FaceCaptureTools : ToolBase
         int previewWidth = 1200, int waitSeconds = 10, bool showImage = true, string expression = "neutral", double strength = 0.7,
         bool hideEffects = true, double mouthOpen = 0)
     {
+        if (await SafetyBlock("camera") is string gateReason) return Blocked(gateReason);  // FEAT-260
         if (!Expressions.TryGetValue(expression.Trim(), out var expressionIndex))
             return Error($"expression must be one of {string.Join(", ", Expressions.Keys)}");
         float angleDeg;

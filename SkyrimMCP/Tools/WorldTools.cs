@@ -113,6 +113,7 @@ public class WorldTools : ToolBase
         "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names.")]
     public async Task<object> Teleport(string location)
     {
+        if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
         var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
         var fromCell = before?["cellFormId"]?.ToString();
