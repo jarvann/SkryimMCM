@@ -3297,6 +3297,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-064",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "SetHeadPart on an NPC with a pre-built face gives a dark face; NPC head parts unreadable",
+          "description": "In game (2026-11-19): swapping a follower's hair (Lucien, LucienHair to HairMaleImperial05) turned his face black with the hair as a detached wisp: the classic dark-face fault, since the FaceGen mesh no longer matches the record. The agent reverted it. Also no tool read an NPC's head parts (GetAppearance was player only). Now GetAppearance(refId) reads NPCs and reports faceGenMesh (path from the face NPC's plugin and local ID) and whether it exists (loose or BSA); SetHeadPart and RemoveHeadPart refuse on such an NPC unless force=true, suggesting a wig or a Creation Kit face regeneration. A runtime face-regeneration tool is a separate, larger item. Build 82's server failed to compile (key shadowed in GetBodyMorphs): fixed here.",
+          "history": [
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "From the in-game agent. Fixed on bugfix/BUG-064-npc-head-parts."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",

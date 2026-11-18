@@ -98,7 +98,10 @@ namespace SkyrimMCP::Protocol {
         noParam("get_known_enchantments", []() { return GameInterface::GetKnownEnchantments(); });
         noParam("get_skill_levels", []() { return GameInterface::GetSkillLevels(); });
         noParam("get_perks", []() { return GameInterface::GetPerks(); });
-        noParam("get_appearance", []() { return GameInterface::GetAppearance(); });
+        registry["get_appearance"] = [](const std::string& id, const json& params) {
+            const auto refId = params.value("refId", std::string());
+            return GameThread(id, [refId]() { return GameInterface::GetAppearance(refId); });
+        };
         noParam("get_favorites", []() { return GameInterface::GetFavorites(); });
         noParam("get_character_blueprint", []() { return GameInterface::GetCharacterBlueprint(); });
         noParam("is_in_combat", []() { return GameInterface::IsInCombat(); });

@@ -107,8 +107,8 @@ public partial class RaceMenuTools : ToolBase
         {
             var keys = await Papyrus("NiOverride", "GetMorphKeys", target, name) as JsonArray ?? new JsonArray();
             var values = new JsonObject();
-            foreach (var key in keys.Select(k => k?.GetValue<string>()).OfType<string>())
-                values[key] = (await Papyrus("NiOverride", "GetBodyMorph", target, name, key))?.DeepClone();
+            foreach (var morphKey in keys.Select(k => k?.GetValue<string>()).OfType<string>())
+                values[morphKey] = (await Papyrus("NiOverride", "GetBodyMorph", target, name, morphKey))?.DeepClone();
             morphs.Add(new JsonObject { ["morph"] = name, ["byKey"] = values });
         }
         return DeserializeResponse(new JsonObject
