@@ -3814,7 +3814,7 @@
         {
           "id": "BUG-080",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Pausing menus aren't named; a mod's own menu isn't seen",
           "description": "In game (build 112): the Tab menu was named, but the map and skills menu (which pause here) got the generic 'a pausing menu' text, and Extended Destruction Perks' skill picker (CustomMenu: modal, takes the cursor, doesn't pause) was only caught because the Tab menu was open behind it; its skill tree itself shows as StatsMenu. The menu check now names the open menu whether or not the game is paused, treats any open menu that takes the cursor and isn't a permanent overlay as blocking ('a mod's menu is open (CustomMenu)'; the cursor, HUD, loading, dialogue and fader menus are left out), and keeps a generic paused line only when nothing else names a capture-blocking menu. Also confirmed: the SetBodyReference delete and the friendly Tab menu name.",
@@ -3822,6 +3822,10 @@
             {
               "datetime": "2026-11-19T21:40",
               "note": "From the in-game agent's menu mapping with Cory."
+            },
+            {
+              "datetime": "2026-11-19T22:00",
+              "note": "In game (build 113): nothing open stays clear (no false trigger from HUD, widgets or cursor); map alone and skills menu alone named; Tab then Map leaves only the map open. Skills over the Tab menu named the Tab menu underneath: the Tab menu is now checked last so the menu on top is named. The mod-menu rule (a picker without the Tab menu behind it) not seen."
             }
           ],
           "targetRelease": "1.3"
