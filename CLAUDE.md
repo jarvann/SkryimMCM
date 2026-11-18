@@ -103,9 +103,10 @@ Response: `{"id":"uuid","success":bool,"data":{},"error":"..."}`
 ## Key Technical Decisions
 
 - **Console commands:** Use ConsoleUtilSSE-style `CompileAndRunImpl` with `RELOCATION_ID(21416, AE_CHECK(SKSE::RUNTIME_SSE_1_6_1130, 21890, 441582))` (never test `patch()` alone: 1.7.104 has patch 104). Credit: VersuchDrei/ConsoleUtilSSE (MIT License). CommonLibSSE-NG's built-in CompileAndRun crashes on Skyrim >= 1.6.1130.
-- **NPC targeting:** Use dot-notation `refId.command` (e.g., `FE124B0E.kill`). The `prid` command does NOT persist between separate ExecuteConsoleCommand calls.
+- **NPC targeting:** Use dot-notation `refId.command` (e.g., `FE124B0E.kill`). A refId starting with a digit must be quoted (`"61033226".moveto player`), or the console reads it as a command name. The `prid` command does NOT persist between separate ExecuteConsoleCommand calls.
 - **Thread safety:** All game API calls go through TaskQueue to run on the game thread. Only `ping`, `poll_events`, and Papyrus catalog operations are handled directly on the pipe thread.
 - **Papyrus VM calls:** DispatchStaticCall must NOT go through TaskQueue (deadlock). Called from pipe thread, callback fires on game thread.
+- **Papyrus form arguments:** a dispatched call is type-checked exactly (no implicit cast as a script call gets): give each object Variable the declared parameter type (`SetObject(obj, paramType.GetRawType())`), or a Form parameter rejects an Actor and the call returns None (BUG-066).
 - **SEH crash protection:** `__try/__except` around CompileAndRun catches access violations safely.
 - **Static linking:** `x64-windows-static` vcpkg triplet required — dynamic linking causes SKSE load failure (0x0000007E).
 - **CommonLibSSE-NG includes:** Must come BEFORE any Windows API headers. Use `void*` for HANDLE in headers, include `<windows.h>` only in .cpp files after CommonLibSSE.

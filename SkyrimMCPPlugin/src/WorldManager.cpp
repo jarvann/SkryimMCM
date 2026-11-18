@@ -60,8 +60,20 @@ namespace SkyrimMCP::WorldManager {
         }
         // BUG-071: coc runs the loading screen inside the call, so a slow load timed the request out though the move worked.
         // Start it on the next frame and return at once; the server waits for the cell to change.
+        // BUG-072: mark the starting spot (as StudioGo does) so Teleport("back") can return without raw console moves.
+        json markerId = nullptr;
+        if (auto* player = RE::PlayerCharacter::GetSingleton()) {
+            if (auto* xmarker = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000003B)) {
+                if (auto marker = player->PlaceObjectAtMe(xmarker, true)) {
+                    marker->SetPosition(player->GetPosition());
+                    marker->data.angle = player->data.angle;
+                    markerId = std::format("{:08X}", marker->GetFormID());
+                }
+            }
+        }
         TaskQueue::Post([cellId]() { Helpers::ExecuteConsoleCommand("coc " + cellId); });
-        json result = {{"moving", true}, {"cell", cellId}, {"targetFormId", std::format("{:08X}", target->GetFormID())}};
+        json result = {{"moving", true}, {"cell", cellId}, {"targetFormId", std::format("{:08X}", target->GetFormID())},
+                       {"markerId", markerId}};
         if (const char* name = target->GetName(); name && name[0]) result["targetName"] = name;
         return result;
     }

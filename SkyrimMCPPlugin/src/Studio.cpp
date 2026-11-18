@@ -140,6 +140,18 @@ namespace SkyrimMCP {
             return {{"preset", preset}, {"intensity", intensity}, {"removed", removed}, {"lights", placed}};
         }
 
+        // A readable name for where the player is: the cell's name, else (outdoors, where cells are unnamed) the location and
+        // worldspace, e.g. "Riverwood (Skyrim)".
+        json CellName(RE::PlayerCharacter* player, RE::TESObjectCELL* cell) {
+            if (cell && cell->GetName() && cell->GetName()[0]) return cell->GetName();
+            std::string name;
+            if (auto* location = player ? player->GetCurrentLocation() : nullptr; location && location->GetName()) name = location->GetName();
+            if (auto* world = player ? player->GetWorldspace() : nullptr; world && world->GetName() && world->GetName()[0]) {
+                name = name.empty() ? world->GetName() : name + " (" + world->GetName() + ")";
+            }
+            return name.empty() ? json(nullptr) : json(name);
+        }
+
         json Go(const std::string& cellEditorId) {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
@@ -246,7 +258,7 @@ namespace SkyrimMCP {
                     {"preset", lights > 0 && !preset.empty() ? json(preset) : json(nullptr)},
                     {"cell", cellId ? cellId : ""},
                     {"cellFormId", cell ? json(std::format("{:08X}", cell->GetFormID())) : json(nullptr)},
-                    {"cellName", cell && cell->GetName() ? json(cell->GetName()) : json(nullptr)},
+                    {"cellName", CellName(player, cell)},
                     {"interior", cell && cell->IsInteriorCell()},
                     {"markerId", s_marker ? json(std::format("{:08X}", s_marker)) : json(nullptr)}};
         }

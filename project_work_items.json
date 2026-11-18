@@ -3562,7 +3562,7 @@
         {
           "id": "BUG-071",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Teleport reports a timeout when the loading screen is slow; crash log reply doesn't say whether Crash Logger is installed",
           "description": "In game (build 95): Teleport(riverwood) moved her but returned Game thread task timed out, because coc ran the loading screen inside the request (the agent's console return trip did the same; Windows showed not responding). The plugin now validates, starts coc on the next frame and returns at once; the server waits up to 20 s for her cell (by form ID) to change and reports where she landed, or arrived false. The description says to warn the player about the loading screen. GetCrashLog with no reports now says whether a crash reporter is installed instead of only asking.",
@@ -3570,6 +3570,25 @@
             {
               "datetime": "2026-11-19T15:00",
               "note": "From the in-game agent's build 95 checks."
+            },
+            {
+              "datetime": "2026-11-19T15:30",
+              "note": "In game (build 96): Teleport(riverwood) returned arrived true with no timeout; GetCrashLog reported crashReporterInstalled true."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-072",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "low",
+          "title": "Teleport: no way back without console coordinates, blank outdoor cell name, followers left behind",
+          "description": "In game (build 96): the agent returned the player with cow Tamriel -5 -16 (which still timed out); cellName was empty for an exterior; two of three followers followed to Riverwood and stayed there; the warning said loading screen though the player saw a frozen frame. Teleport now marks the starting spot with an XMarker (as StudioGo does) and Teleport(back) returns there, then deletes the marker; the reply names outdoor cells by location and worldspace, lists followers more than 3000 units away with the MoveActorTo hint, and the description says the screen freezes for several seconds. Console description and CLAUDE.md: a refId starting with a digit must be quoted (\"61033226\".moveto player).",
+          "history": [
+            {
+              "datetime": "2026-11-19T15:30",
+              "note": "From the in-game agent's build 96 checks."
             }
           ],
           "targetRelease": "1.3"
