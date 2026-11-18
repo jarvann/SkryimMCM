@@ -89,10 +89,18 @@ public partial class RaceMenuTools : ToolBase
 
     [McpServerTool]
     [Description("List an actor's RaceMenu body morphs (BodySlide sliders set at runtime): each morph with the keys that set it " +
-        "(each mod uses its own key) and their values. Defaults to the player; refId for an NPC reference.")]
-    public async Task<object> GetBodyMorphs(string? refId = null)
+        "(each mod uses its own key) and their values. morph (with key, default 'SkyLinkAI') reads that one morph directly. " +
+        "Defaults to the player; refId for an NPC reference.")]
+    public async Task<object> GetBodyMorphs(string? refId = null, string? morph = null, string key = DefaultMorphKey)
     {
         var target = RefArg(refId);
+        if (!string.IsNullOrWhiteSpace(morph))
+        {
+            // BUG-060: read one morph directly, in case RaceMenu's list of morph names comes back empty.
+            var value = (await Papyrus("NiOverride", "GetBodyMorph", target, morph.Trim(), key) as JsonValue)?.GetValue<float>();
+            var keys = await Papyrus("NiOverride", "GetMorphKeys", target, morph.Trim()) as JsonArray;
+            return new { actor = target, morph = morph.Trim(), key, value, keys = keys?.Select(k => k?.ToString()).ToList() };
+        }
         var names = await Papyrus("NiOverride", "GetMorphNames", target) as JsonArray ?? new JsonArray();
         var morphs = new JsonArray();
         foreach (var name in names.Take(150).Select(n => n?.GetValue<string>()).OfType<string>())
@@ -124,8 +132,18 @@ public partial class RaceMenuTools : ToolBase
         var before = await Papyrus("NiOverride", "GetBodyMorph", target, morph, key);
         await Papyrus("NiOverride", "SetBodyMorph", target, morph, key, value);
         await Papyrus("NiOverride", "UpdateModelWeight", target);
+        // BUG-060: in game a set reported success while GetBodyMorphs listed nothing; read it back so a set that didn't
+        // take says so.
+        var readBack = (await Papyrus("NiOverride", "GetBodyMorph", target, morph, key) as JsonValue)?.GetValue<float>();
+        var listed = (await Papyrus("NiOverride", "GetMorphNames", target) as JsonArray)?.Count ?? 0;
         await NotifyInGame("Body morph changed");
-        return new { actor = target, morph, key, previous = before?.GetValue<float>(), value };
+        var took = readBack.HasValue && Math.Abs(readBack.Value - value) < 0.001;
+        return new
+        {
+            actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed,
+            warning = took ? null : "The morph didn't read back as set: RaceMenu may not store morphs for this actor, or the morph name isn't one the body uses.",
+            note = took && listed == 0 ? "Read back fine, but RaceMenu's morph list is empty: GetBodyMorphs(morph) reads one morph directly." : null,
+        };
     }
 
     [McpServerTool]

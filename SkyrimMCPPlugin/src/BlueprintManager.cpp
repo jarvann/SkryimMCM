@@ -114,11 +114,19 @@ namespace SkyrimMCP::BlueprintManager {
         }
         const bool dryRun = params.value("dryRun", false);
 
-        // What the player has now, by form.
+        // What the player has now, by form, and what she is wearing (BUG-061: a dry run on her own unchanged blueprint
+        // listed all 17 equipped items as to-equip).
         std::unordered_map<RE::FormID, int> have;
+        std::set<RE::FormID> worn;
         for (auto& [object, data] : player->GetInventory()) {
-            if (object) have[object->GetFormID()] += data.first;
+            if (!object) continue;
+            have[object->GetFormID()] += data.first;
+            if (data.second && (data.second->IsWorn() || data.second->IsWorn(true))) worn.insert(object->GetFormID());
         }
+        for (bool left : {false, true}) {
+            if (auto* f = player->GetEquippedObject(left)) worn.insert(f->GetFormID());
+        }
+        if (auto* power = player->GetActorRuntimeData().selectedPower) worn.insert(power->GetFormID());
 
         json report;
         report["dryRun"] = dryRun;
@@ -145,6 +153,8 @@ namespace SkyrimMCP::BlueprintManager {
                 }
                 json a = Label(entry);
                 a["count"] = missing;
+                a["blueprintCount"] = wanted;
+                a["has"] = have[object->GetFormID()];
                 a["resolvedBy"] = how;
                 RE::FormID oldId = 0;
                 if (ParseHexId(entry.value("formId", json()), oldId) && form->GetFormID() != oldId) a["formIdNow"] = std::format("{:08X}", form->GetFormID());
@@ -181,12 +191,13 @@ namespace SkyrimMCP::BlueprintManager {
         }
 
         if (sections.contains("equipment")) {
-            json toEquip = json::array(), unresolved = json::array(), planned = json::array();
+            json toEquip = json::array(), unresolved = json::array(), planned = json::array(), alreadyEquipped = json::array();
             for (const auto& entry : params.value("equipped", json::array())) {
                 if (!entry.is_object() || entry.value("empty", false)) continue;
                 std::string how;
                 auto* form = Resolve(entry, how);
                 if (!form) { auto l = Label(entry); l["reason"] = how; unresolved.push_back(l); continue; }
+                if (worn.contains(form->GetFormID())) { alreadyEquipped.push_back(entry.value("name", "")); continue; }
                 json item = {{"formId", std::format("{:08X}", form->GetFormID())}};
                 const auto slot = entry.value("slot", "");
                 if (slot == "rightHand") item["hand"] = "right";
@@ -196,7 +207,7 @@ namespace SkyrimMCP::BlueprintManager {
                 planned.push_back(p);
                 toEquip.push_back(item);
             }
-            json equipReport = {{"items", planned}, {"unresolved", unresolved}};
+            json equipReport = {{"items", planned}, {"alreadyEquipped", alreadyEquipped.size()}, {"unresolved", unresolved}};
             if (!dryRun && !toEquip.empty()) {
                 auto r = InventoryManager::EquipItems(toEquip, "", false);
                 equipReport["succeeded"] = r.value("succeeded", 0);
