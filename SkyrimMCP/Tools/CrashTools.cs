@@ -222,7 +222,8 @@ public class CrashTools : ToolBase
             1 => "exited cleanly",
             2 => "had started quitting to the desktop but did not reach a normal exit (a crash on exit, or the game ended itself abruptly)",
             _ when running => "still running",
-            _ => "did not exit cleanly: it crashed, or was closed by force (Task Manager, power loss)",
+            _ => "did not exit cleanly: it crashed, or was closed by force (Task Manager, power loss). Builds before 1.3 could " +
+                 "also show a normal quit this way; check the last entries.",
         };
 
         return new

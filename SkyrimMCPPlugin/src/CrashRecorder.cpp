@@ -235,6 +235,23 @@ namespace SkyrimMCP::CrashRecorder {
         }
     }
 
+    namespace {
+        BOOL CALLBACK FindWindowOfProcess(HWND hwnd, LPARAM out) {
+            DWORD pid = 0;
+            GetWindowThreadProcessId(hwnd, &pid);
+            if (pid != GetCurrentProcessId() || !IsWindowVisible(hwnd) || GetWindow(hwnd, GW_OWNER) != nullptr) return TRUE;
+            *reinterpret_cast<HWND*>(out) = hwnd;
+            return FALSE;
+        }
+
+        // The game's main window: the visible top-level window of this process.
+        HWND FindGameWindow() {
+            HWND found = nullptr;
+            EnumWindows(&FindWindowOfProcess, reinterpret_cast<LPARAM>(&found));
+            return found;
+        }
+    }
+
     void StartQuitWatcher() {
         if (!Enabled()) return;
         try {
@@ -242,12 +259,22 @@ namespace SkyrimMCP::CrashRecorder {
             // atexit alone could label every session a crash. The game sets Main::quitGame
             // when the player quits to the desktop; once it is set, the session is marked
             // "quitting" (exit state 2). A normal exit then upgrades that to clean.
+            // BUG-063: a normal quit on 1.7.104 was recorded as "did not exit cleanly": neither quitGame nor the atexit
+            // handler fired. The game's window going away is a second sign of quitting that doesn't depend on a field
+            // offset; a crash leaves the window in place until the process dies.
             std::thread([]() {
+                HWND window = nullptr;
                 for (;;) {
                     Sleep(250);
+                    if (!window) window = FindGameWindow();
                     auto* main = RE::Main::GetSingleton();
                     if (main && main->GetRuntimeData().quitGame) {
                         Record(Kind::Note, "The game is quitting (Main::quitGame set)");
+                        SetExitState(kExitQuitting);
+                        return;
+                    }
+                    if (window && !IsWindow(window)) {
+                        Record(Kind::Note, "The game is quitting (its window closed)");
                         SetExitState(kExitQuitting);
                         return;
                     }
