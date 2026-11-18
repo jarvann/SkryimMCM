@@ -1103,6 +1103,21 @@
           "targetRelease": "2.0"
         },
         {
+          "id": "FEAT-262",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Quest state in the character blueprint (export, then a careful apply)",
+          "description": "The blueprint has no quests section, so a new character can't be brought to the old one's quest progress from the file (in game, 2026-11-19: the agent had to propose loading the old save to read quests). Export: completed and running quests with their stage and objectives (read-only, cheap). Apply: dry run first, with a warning per quest that forcing a stage skips rewards, world changes and follow-on triggers; main quest and faction lines flagged; never the default.",
+          "history": [
+            {
+              "datetime": "2026-11-19T22:45",
+              "note": "From Cory's request to copy Arya's quests to a new character."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "FEAT-123",
           "type": "feature",
           "status": "complete",
