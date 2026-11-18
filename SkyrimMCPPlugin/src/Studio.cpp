@@ -229,7 +229,7 @@ namespace SkyrimMCP {
             }
             std::sort(found.begin(), found.end(), [](auto* a, auto* b) { return a->GetFormID() > b->GetFormID(); });
             json list = json::array();
-            for (std::size_t i = 0; i < found.size() && i < 5; i++) {
+            for (std::size_t i = 0; i < found.size() && i < 20; i++) {  // BUG-074: 5 hid the Teleport('back') marker
                 auto* ref = found[i];
                 auto* cell = ref->GetParentCell();
                 const char* cellId = cell ? cell->GetFormEditorID() : nullptr;
@@ -242,7 +242,7 @@ namespace SkyrimMCP {
                                 {"position", {pos.x, pos.y, pos.z}},
                                 {"facingDeg", ref->GetAngleZ() * 180.0f / std::numbers::pi_v<float>}});
             }
-            return {{"markers", list}};
+            return {{"markers", list}, {"total", found.size()}};
         }
 
         json Status() {
