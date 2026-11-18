@@ -1545,7 +1545,7 @@
         {
           "id": "INFRA-018",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "complete",
           "title": "Reconnect test with a state-changing first call",
           "description": "The stale-pipe retry (1.1.0) was verified only with a read-only first call after a Skyrim restart. Test with a write (e.g. add_item) as the first call and confirm it runs exactly once.",
           "history": [
@@ -1556,6 +1556,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Procedure written in docs/1.3-test-plan.md step 10 (AddItem one gold as the first call after a Skyrim restart; gold must rise by exactly 1). Code review: the client only resends when the write itself fails, so a request can't run twice."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game (2026-11-19): first call after a restart was AddItem of one gold; the recorder shows one add_item request, ok in 24 ms, no repeat."
             }
           ],
           "targetRelease": "1.3"
@@ -3323,6 +3327,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the in-game agent's older-items round."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: Quit to Desktop at 11:06 still left no quit, window or exit mark. The reader now uses the absence of a crash report instead (BUG-067)."
             }
           ],
           "targetRelease": "1.3"
@@ -3353,6 +3361,40 @@
             {
               "datetime": "2026-11-19T13:30",
               "note": "From the in-game agent's build 83 rechecks."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game (build 84): face file found (loose), refusal with refresh worked, type list in the error, unset morphs gone. The no-refresh swap later proved unsafe after a restart (BUG-067)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-066",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Every Papyrus call given a form argument returns nothing",
+          "description": "In game: StorageUtil.GetIntValue(player, key, 7) returned no value (7 with None); NiOverride.GetBodyMorph and GetMorphNames the same, so SetBodyMorph never took (BUG-060) and the overlay tools probably read nothing either. Diagnostics showed the form packed correctly (class Actor, bound, valid, resolves). The Papyrus log had the cause: Function StorageUtil.GetIntValue(Form param1,string param2,int param3) received incompatible arguments! Received types (Actor,string,int) instead! A dispatched call is type-checked exactly; a script gets the cast from its compiler. Form arguments now carry the declared parameter type (castTo in the diagnostics).",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "Found from the in-game agent's probe plus Papyrus.0.log."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-067",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "An NPC head part change is saved and breaks the face after a restart",
+          "description": "In game: Lucien with HairMaleImperial1 (no rebuild) looked right through cell changes and loads, but the change was saved, and after a full restart his head was built from the changed record and the face broke; his extra part LucienHairHL was lost. The agent repaired him with his original hair, refresh and force. SetHeadPart and RemoveHeadPart again refuse on any NPC with a pre-built face unless force=true, and say the change breaks the face after a restart; force with refresh is documented as the repair. Also from this round: GetCrashLog now judges a session with no exit mark by whether a crash report was written when it ended (a Quit to Desktop on 1.7.104 still sets none of the recorder's signals: BUG-063 not fixed by the window check); the first screenshot after a load came back black.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the restart test."
             }
           ],
           "targetRelease": "1.3"

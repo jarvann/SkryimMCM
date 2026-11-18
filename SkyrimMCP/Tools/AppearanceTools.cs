@@ -116,14 +116,14 @@ public class AppearanceTools : ToolBase
         "Hair, eyes, eyebrows, facial hair and scars replace the current part; misc parts are added, since several can be worn " +
         "(remove one with RemoveHeadPart). The face part can't be changed. Reports the previous part so it can be put back. " +
         "If the change doesn't show, refresh=true rebuilds the 3D (a brief flicker), and saving then loading always applies it. " +
-        "On an NPC this changes the base record (every copy of that NPC) for this game session. On an NPC with a pre-built face " +
-        "(most named NPCs and followers) leave refresh off: the part updates on its own and the face stays intact (seen in game), " +
-        "while refresh=true rebuilt the head from the record and gave a dark face, so it is refused there unless force=true. " +
-        "Whether the change survives quitting the game isn't known yet. GetAppearance(refId) reads an NPC's current parts.")]
+        "On an NPC this changes the base record (every copy of that NPC) and is saved with the game. On an NPC with a pre-built " +
+        "face (most named NPCs and followers) it is refused unless force=true: it can look right in the session, but after the " +
+        "game is restarted the head is built from the changed record and the face breaks (seen in game). force=true with " +
+        "refresh=true is the repair: putting the NPC's original parts back. GetAppearance(refId) reads an NPC's current parts.")]
     public async Task<object> SetHeadPart(string? part = null, string? type = null, int index = -1, string? refId = null, bool refresh = false,
         bool force = false)
     {
-        if (refresh && !force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
+        if (!force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
         var parms = new JsonObject { ["index"] = index, ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(part)) parms["part"] = part;
         if (!string.IsNullOrEmpty(type)) parms["type"] = type;
@@ -138,11 +138,11 @@ public class AppearanceTools : ToolBase
         "part: the FormID or editor ID of the part (GetAppearance lists the current ones), or type for the current part of that type " +
         "(misc needs part, since several can be worn). The face and eyes can't be removed, only replaced. " +
         "The part stays visible until the 3D is rebuilt: refresh=true does it now, or save and load. " +
-        "Reports the removed part so SetHeadPart can put it back. On an NPC with a pre-built face refresh is refused unless force=true (see SetHeadPart).")]
+        "Reports the removed part so SetHeadPart can put it back. Refused on an NPC with a pre-built face unless force=true (see SetHeadPart).")]
     public async Task<object> RemoveHeadPart(string? part = null, string? type = null, string? refId = null, bool refresh = false,
         bool force = false)
     {
-        if (refresh && !force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
+        if (!force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
         var parms = new JsonObject { ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(part)) parms["part"] = part;
         if (!string.IsNullOrEmpty(type)) parms["type"] = type;
@@ -152,9 +152,9 @@ public class AppearanceTools : ToolBase
         return DeserializeResponse(data);
     }
 
-    // BUG-064/065: on an NPC with a FaceGen mesh, rebuilding the head after a head part change gave the dark-face fault (a
-    // follower: black face, the new hair as a detached wisp); without the rebuild the same kind of swap looked right. Returns
-    // the refusal for a rebuild, or null when there is no pre-built face.
+    // BUG-064/065/067: on an NPC with a FaceGen mesh a head part change gives a broken face: at once with a rebuild, and after
+    // the next game restart without one (the change is saved; seen on a follower). Returns the refusal, or null when there is
+    // no pre-built face.
     private async Task<string?> PrebuiltFace(string? refId)
     {
         if (string.IsNullOrWhiteSpace(refId) || refId.Trim().Equals("player", StringComparison.OrdinalIgnoreCase)) return null;
@@ -162,9 +162,8 @@ public class AppearanceTools : ToolBase
         if (appearance?["faceGenMesh"]?.GetValue<string>() is not string mesh) return null;
         var source = SkyrimMCP.Face.MeshFiles.Source(mesh);
         if (source == null) return null;
-        return $"{appearance["name"]} has a pre-built face ({mesh}, {source}): refresh=true rebuilds the head from the record, which no " +
-               "longer matches the face file, and the face goes dark. Call again without refresh: the part updates on its own and " +
-               "the face stays intact. force=true rebuilds anyway: safe when putting back the NPC's original parts (they match the face " +
-               "file), otherwise reload a save if the face goes dark.";
+        return $"{appearance["name"]} has a pre-built face ({mesh}, {source}). A head part change is saved with the game, and after a " +
+               "restart the head is built from the changed record, which no longer matches the face file: the face breaks. Use a wig " +
+               "(an equippable hair item) instead. force=true (with refresh=true) is for putting the NPC's original parts back.";
     }
 }
