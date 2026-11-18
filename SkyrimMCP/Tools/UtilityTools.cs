@@ -303,6 +303,18 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Developer test of SkyLink's crash protection (FEAT-220): runs a game-thread task that faults on purpose " +
+        "(mode null_read or divide_by_zero) and reports whether the guard caught it and the game kept running. The fault is in " +
+        "SkyLink's own code, holding nothing in the engine, so the game is unaffected; still, only run it when the player has " +
+        "asked for it and has saved. confirm must be true.")]
+    public async Task<object> TestCrashProtection(string mode = "null_read", bool confirm = false)
+    {
+        if (!confirm) return new { error = "This faults on purpose inside the game. Ask the player, have them save, then pass confirm=true." };
+        var data = await _pipe.SendRequestAsync("crash_test", new JsonObject { ["mode"] = mode, ["confirm"] = "crash-test" });
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("Stop the currently playing music via native API. Returns what was playing.")]
     public async Task<object> StopMusic()
     {
