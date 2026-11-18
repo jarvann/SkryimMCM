@@ -3466,7 +3466,7 @@
         {
           "id": "BUG-068",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Body morph names are case-sensitive; keys stack; long morph list",
           "description": "In game (build 87) with an OBody preset: 128 morphs under key OBody. The Belly test set a new morph beside OBody's belly (names are case-sensitive), which the body probably ignores. SetBodyMorph now refuses when only a different-case name exists, warns on a name the actor didn't have, reports the total across keys and byKey, and its description no longer lists capitalised examples as universal; GetBodyMorphs reports each morph's total, the keys in use, and takes nameContains and nonZero (default true). Guidance: with OBody, change the body there and read it here.",
@@ -3474,6 +3474,10 @@
             {
               "datetime": "2026-11-19T12:40",
               "note": "From the in-game agent's OBody read."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "In game (build 89): case refusal, filters, stacked totals, unknown-name warning all pass."
             }
           ],
           "targetRelease": "1.3"
@@ -3489,6 +3493,10 @@
             {
               "datetime": "2026-11-19T13:00",
               "note": "From the in-game agent's OBody reads."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "In game (build 89): managedBy OBody and the write guidance pass. Polish: byKey object, actor-wide keys, cleared-name note."
             }
           ],
           "targetRelease": "1.3"
