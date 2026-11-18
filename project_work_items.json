@@ -3654,6 +3654,10 @@
             {
               "datetime": "2026-11-19T17:20",
               "note": "From the in-game agent."
+            },
+            {
+              "datetime": "2026-11-19T17:40",
+              "note": "In game (build 102): the stuck trip was cleared and five stray markers listed; one of them moved between calls (another mod's), and the Teleport back marker (FF003849) wasn't listed because the list stopped at 5. Now: up to 20 with a total; SkyLink records the markers it places (markers_created.json) and the list says placedBy SkyLink or unknown, with the Teleport back one marked inUse."
             }
           ],
           "targetRelease": "1.3"
