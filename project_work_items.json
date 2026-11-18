@@ -4000,6 +4000,10 @@
             {
               "datetime": "2026-11-19T18:00",
               "note": "From the in-game agent's release check; for 1.3.1."
+            },
+            {
+              "datetime": "2026-11-19T18:10",
+              "note": "Also for 1.3.1: in the studio (1.3.0) brow_lightness read 0.625 and the brow colour a pale grey #857E80 while the brow shader was #4A2416: her fringe covers the brow line, so the brow sample picks up hair. Sample brow pixels away from hair, or flag 'brows obscured by hair' (hideHair: true is the workaround). Studio capture itself was fine: skin lightness 62.2, shape numbers unchanged from the night capture."
             }
           ],
           "targetRelease": "1.3.1"
