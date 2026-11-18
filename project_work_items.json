@@ -1092,7 +1092,13 @@
           "status": "designed",
           "title": "Apply character blueprint",
           "description": "Import blueprint JSON selectively \u2014 AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API \u2014 bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first \u2014 only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower).",
-          "targetRelease": "1.3-stretch"
+          "targetRelease": "1.4",
+          "history": [
+            {
+              "datetime": "2026-11-19T22:45",
+              "note": "Moved from 1.3-stretch to 1.4: ApplyBlueprint (FEAT-207) covers inventory, equipment and gold; skills, perks, spells, shouts and level are this item."
+            }
+          ]
         },
         {
           "id": "FEAT-122",
