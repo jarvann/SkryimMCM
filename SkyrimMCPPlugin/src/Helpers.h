@@ -24,6 +24,20 @@ namespace SkyrimMCP::Helpers {
     // Strict: the whole string must be 1-8 hex digits (optional 0x, surrounding spaces allowed).
     // std::stoul alone stops at the first non-hex character, so a name like "Forsworn" parsed as
     // 0xF (gold) and "Beef" as 0xBEEF: TransferItems then matched the player's gold (2026-11-16).
+    // Why the player can't be moved now (an open pausing menu, a mount, a bed or chair), or empty when she can (BUG-073/075).
+    inline std::string MoveBlocker() {
+        if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
+            return "A menu is open (the map, inventory, a container, crafting or another pausing menu): close it and try again";
+        }
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return "Player not available";
+        if (player->IsOnMount()) return "She is on a mount: dismount first";
+        if (auto* state = player->AsActorState(); state && state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal) {
+            return "She is sitting, lying down or using furniture: get up first";
+        }
+        return {};
+    }
+
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");

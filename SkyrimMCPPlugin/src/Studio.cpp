@@ -156,9 +156,7 @@ namespace SkyrimMCP {
         json Go(const std::string& cellEditorId) {
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return {{"error", "Player not available"}};
-            if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
-                return {{"error", "A menu is open (the map, inventory, a container, crafting or another pausing menu): close it and try again"}};
-            }
+            if (const auto blocked = Helpers::MoveBlocker(); !blocked.empty()) return {{"error", blocked}};
             if (player->IsInCombat()) return {{"error", "In combat: the studio has to wait"}};
             auto* xmarker = RE::TESForm::LookupByID<RE::TESBoundObject>(0x0000003B);
             if (!xmarker) return {{"error", "XMarker (Skyrim.esm 00003B) not found"}};
@@ -189,9 +187,7 @@ namespace SkyrimMCP {
 
         json Return(RE::FormID markerId) {
             auto* player = RE::PlayerCharacter::GetSingleton();
-            if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
-                return {{"error", "A menu is open (the map, inventory, a container, crafting or another pausing menu): close it and try again"}};
-            }
+            if (const auto blocked = Helpers::MoveBlocker(); !blocked.empty()) return {{"error", blocked}};
             auto* marker = RE::TESForm::LookupByID<RE::TESObjectREFR>(markerId);
             if (!player || !marker) return {{"error", std::format("Marker {:08X} not found", markerId)}};
             const int removed = RemoveLights(Root(player));

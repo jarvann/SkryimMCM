@@ -145,13 +145,19 @@ public class StudioTools : ToolBase
     [McpServerTool]
     [Description("Where the studio trip stands: the player's cell, the studio lights and preset, the marker of the starting spot. If a " +
         "StudioGo or StudioReturn reply said 'moving', this finishes it once she has arrived (face rebuild, lights, marker clean-up); " +
-        "a trip that never left is cleared. With no trip on, lists stray run-time markers; deleteMarker removes one (ask the player first).")]
-    public async Task<object> StudioStatus(string? deleteMarker = null)
+        "a trip that never left is cleared. With no trip on, lists the run-time markers SkyLink placed (showAllMarkers for every " +
+        "XMarker placed at run time, including other mods'); deleteMarker removes one of SkyLink's after asking the player " +
+        "(another mod's needs force=true; one marker that follows the player belongs to another mod).")]
+    public async Task<object> StudioStatus(string? deleteMarker = null, bool showAllMarkers = false, bool force = false)
     {
         try
         {
             if (!string.IsNullOrWhiteSpace(deleteMarker))
             {
+                // BUG-075: a marker SkyLink didn't record may be another mod's (one followed the player around).
+                if (MarkerRegistry.Get(deleteMarker) == null && !force)
+                    return new { error = $"{deleteMarker} wasn't placed by SkyLink (or was placed before 1.3): it may belong to another mod. " +
+                                         "Delete it only if the player is sure, with force=true." };
                 // BUG-074: markers left by trips whose replies were lost; delete one the player agreed to.
                 var r = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = deleteMarker.Trim() });
                 MarkerRegistry.Remove(deleteMarker);
@@ -187,13 +193,22 @@ public class StudioTools : ToolBase
                         if (File.Exists(backFile)) backMarker = JsonNode.Parse(File.ReadAllText(backFile))?["markerId"]?.ToString();
                     }
                     catch (Exception) { }
-                    foreach (var m in (strayMarkers?["markers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                    var listed = strayMarkers?["markers"] as JsonArray ?? new JsonArray();
+                    foreach (var m in listed.OfType<JsonObject>())
                     {
                         var id = m["markerId"]?.ToString();
                         var mine = MarkerRegistry.Get(id);
                         m["placedBy"] = mine != null ? "SkyLink" : "unknown (another mod, or SkyLink before 1.3)";
                         if (mine != null) m["purpose"] = mine["purpose"]?.DeepClone();
                         if (id != null && id.Equals(backMarker, StringComparison.OrdinalIgnoreCase)) m["inUse"] = "Teleport('back') returns here: keep";
+                    }
+                    // Only SkyLink's by default; the rest are counted.
+                    if (!showAllMarkers && strayMarkers is JsonObject sm)
+                    {
+                        var mineOnly = new JsonArray(listed.OfType<JsonObject>().Where(m => m["placedBy"]?.ToString() == "SkyLink" || m["inUse"] != null)
+                            .Select(m => (JsonNode?)m.DeepClone()).ToArray());
+                        sm["otherMarkers"] = listed.Count - mineOnly.Count;
+                        sm["markers"] = mineOnly;
                     }
                 }
                 catch (Exception) { }
