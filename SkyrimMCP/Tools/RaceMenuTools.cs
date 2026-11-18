@@ -158,7 +158,7 @@ public partial class RaceMenuTools : ToolBase
             ["actor"] = target,
             ["count"] = names.Count,
             ["listed"] = morphs.Count,
-            ["leftOutNoValue"] = skipped > 0 ? skipped : null,
+            ["leftOutNoValue"] = skipped,
             ["keys"] = new JsonArray(keysSeen.Select(k => (JsonNode?)JsonValue.Create(k)).ToArray()),
             // BUG-069: OBody marks actors it handles (obody_processed) and stores under its own key; its values change whenever
             // a preset is assigned, so a read is a snapshot.
@@ -191,6 +191,11 @@ public partial class RaceMenuTools : ToolBase
             if (sameLetters != null)
                 return new { error = $"No morph '{morph}' on this actor, but '{sameLetters}' exists: morph names are case-sensitive. Use '{sameLetters}'." };
         }
+        // A typo used twice is already in RaceMenu's list, so "in the list" isn't proof the body uses it: check whether any other
+        // key gives it a value.
+        var (othersBefore, _) = await MorphValues(target, morph);
+        var usedElsewhere = othersBefore.Any(kv => !kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase) &&
+                                                    Math.Abs(kv.Value?.GetValue<double>() ?? 0) > 1e-6);
         var before = await Papyrus("NiOverride", "GetBodyMorph", target, morph, key);
         await Papyrus("NiOverride", "SetBodyMorph", target, morph, key, value);
         await Papyrus("NiOverride", "UpdateModelWeight", target);
@@ -211,9 +216,9 @@ public partial class RaceMenuTools : ToolBase
                 note = byKey.Count > 1 ? "Other keys also set this morph; the body shows the total. A body mod such as OBody may re-apply its own values." : null,
                 obody = existing.Contains("obody_processed")
                     ? "OBody manages this body: this value stacks on OBody's, and the result shifts when OBody assigns another preset. Change the body through OBody's preset instead; ClearBodyMorphs undoes this." : null,
-                warning = existing.Count > 0 && !existing.Contains(morph)
-                    ? $"'{morph}' wasn't set on this actor before: check that the body uses a morph with this exact name (names are case-sensitive). " +
-                      "RaceMenu keeps the name in the actor's list even after ClearBodyMorphs." : null,
+                warning = existing.Count > 0 && !usedElsewhere
+                    ? $"No other mod gives '{morph}' a value on this actor: check that the body uses a morph with this exact name " +
+                      "(names are case-sensitive). RaceMenu keeps the name in the actor's list even after ClearBodyMorphs." : null,
             };
         }
         // BUG-065: in game GetBodyMorph came back with no value at all (not even 0), which a float function only does when the
