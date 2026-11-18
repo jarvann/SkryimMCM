@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <cctype>
 #include <algorithm>
+#include <iterator>
+#include <string_view>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -153,12 +155,11 @@ namespace SkyrimMCP::Helpers {
     inline PlayerFreeState CheckPlayerFree() {
         PlayerFreeState out;
         auto* ui = RE::UI::GetSingleton();
-        if (ui && ui->GameIsPaused()) out.blockers.push_back("a menu is open (the map, inventory, a container, crafting or another pausing menu): close it");
-        // BUG-079: with a mod that keeps menus from pausing (Skyrim Souls and similar) the pause flag stays off, so check the
-        // menus by name too. Container, barter and gift menus show the world as it is: they block moves but not captures
-        // (a capture with a container open came out fine).
-        if (ui && !ui->GameIsPaused()) {
-            // Internal name, and what a player calls it.
+        // BUG-079/080: name the open menu, paused or not (a mod can keep menus from pausing, and a pausing one was reported
+        // only as "a pausing menu"). Container, barter and gift menus show the world as it is: they block moves but not
+        // captures. Any other menu that takes the cursor and isn't a permanent overlay (a mod's own menu, e.g. a custom skill
+        // picker) blocks like the named ones.
+        if (ui) {
             static constexpr std::pair<const char*, const char*> kMenus[] = {
                 {"TweenMenu", "the Tab menu"}, {"InventoryMenu", "the inventory"}, {"MagicMenu", "the magic menu"},
                 {"MapMenu", "the map"}, {"Journal Menu", "the journal"}, {"StatsMenu", "the skills menu"},
@@ -166,19 +167,40 @@ namespace SkyrimMCP::Helpers {
                 {"Training Menu", "training"}, {"Crafting Menu", "a crafting station"}, {"RaceSex Menu", "the character menu"},
                 {"MessageBoxMenu", "a message box"}, {"FavoritesMenu", "favourites"}, {"Console", "the console"},
                 {"LevelUp Menu", "the level-up menu"}, {"Tutorial Menu", "a tutorial"}, {"Credits Menu", "the credits"}};
+            static constexpr std::pair<const char*, const char*> kWorldMenus[] = {
+                {"ContainerMenu", "a container"}, {"BarterMenu", "a trade"}, {"GiftMenu", "the gift menu"}};
+            static constexpr const char* kIgnore[] = {"Cursor Menu", "HUD Menu", "Loading Menu", "Dialogue Menu", "Fader Menu",
+                "Main Menu", "Mist Menu", "LoadWaitSpinner", "TitleSequence Menu"};
+            bool named = false;  // a menu that blocks captures too
             for (const auto& [name, friendly] : kMenus) {
                 if (ui->IsMenuOpen(name)) {
                     out.blockers.push_back(std::string(friendly) + " is open (" + name + "): close it");
+                    named = true;
                     break;
                 }
             }
-            static constexpr std::pair<const char*, const char*> kWorldMenus[] = {
-                {"ContainerMenu", "a container"}, {"BarterMenu", "a trade"}, {"GiftMenu", "the gift menu"}};
             for (const auto& [name, friendly] : kWorldMenus) {
                 if (ui->IsMenuOpen(name)) {
                     out.blockers.push_back(std::string(friendly) + " is open (" + name + "): close it before she is moved");
                     break;
                 }
+            }
+            for (auto& [name, entry] : ui->menuMap) {
+                const auto& menu = entry.menu;
+                if (!menu || !menu->OnStack() || menu->AlwaysOpen() || !menu->UsesCursor()) continue;
+                const std::string_view n(name.c_str());
+                bool known = std::any_of(std::begin(kIgnore), std::end(kIgnore), [&](const char* x) { return n == x; }) ||
+                             std::any_of(std::begin(kMenus), std::end(kMenus), [&](const auto& m) { return n == m.first; }) ||
+                             std::any_of(std::begin(kWorldMenus), std::end(kWorldMenus), [&](const auto& m) { return n == m.first; });
+                if (known) continue;
+                out.blockers.push_back(std::string("a mod's menu is open (") + std::string(n) + "): close it");
+                named = true;
+                break;
+            }
+            // Paused with nothing named that blocks captures (another menu, or a container that pauses on this setup): captures
+            // refuse while paused, so say so.
+            if (!named && ui->GameIsPaused()) {
+                out.blockers.push_back("a menu is open (the game is paused): close it");
             }
         }
         if (ui && ui->IsMenuOpen("Loading Menu")) out.blockers.push_back("the game is loading");
