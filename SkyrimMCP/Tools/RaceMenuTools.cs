@@ -140,7 +140,13 @@ public partial class RaceMenuTools : ToolBase
         var skipped = 0;
         foreach (var name in names.Select(n => n?.GetValue<string>()).OfType<string>())
         {
-            if (!string.IsNullOrWhiteSpace(nameContains) && !name.Contains(nameContains.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.IsNullOrWhiteSpace(nameContains) && !name.Contains(nameContains.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                // keys describes the actor, not the filtered rows.
+                foreach (var k in (await Papyrus("NiOverride", "GetMorphKeys", target, name) as JsonArray ?? new JsonArray())
+                             .Select(k => k?.GetValue<string>()).OfType<string>()) keysSeen.Add(k);
+                continue;
+            }
             var (values, total) = await MorphValues(target, name);
             // BUG-068: 128 morphs on an OBody body, many with no value; leave those out by default.
             if (nonZero && Math.Abs(total) < 1e-6) { skipped++; continue; }
@@ -201,12 +207,13 @@ public partial class RaceMenuTools : ToolBase
             return new
             {
                 actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed,
-                total = Math.Round(total, 4), byKey = byKey.ToJsonString(),
+                total = Math.Round(total, 4), byKey,
                 note = byKey.Count > 1 ? "Other keys also set this morph; the body shows the total. A body mod such as OBody may re-apply its own values." : null,
                 obody = existing.Contains("obody_processed")
                     ? "OBody manages this body: this value stacks on OBody's, and the result shifts when OBody assigns another preset. Change the body through OBody's preset instead; ClearBodyMorphs undoes this." : null,
                 warning = existing.Count > 0 && !existing.Contains(morph)
-                    ? $"'{morph}' wasn't set on this actor before: check that the body uses a morph with this exact name (names are case-sensitive)." : null,
+                    ? $"'{morph}' wasn't set on this actor before: check that the body uses a morph with this exact name (names are case-sensitive). " +
+                      "RaceMenu keeps the name in the actor's list even after ClearBodyMorphs." : null,
             };
         }
         // BUG-065: in game GetBodyMorph came back with no value at all (not even 0), which a float function only does when the
