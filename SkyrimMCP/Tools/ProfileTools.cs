@@ -29,6 +29,7 @@ public class ProfileTools : ToolBase
         "forward or back: a front picture can't show that.")]
     public async Task<CallToolResult> MeasureProfile()
     {
+        if (await SafetyBlock("camera", null) is string gateReason) return Blocked(gateReason);  // FEAT-260
         try
         {
             var capture = new FaceCaptureTools(_pipe);

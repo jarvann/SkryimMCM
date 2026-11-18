@@ -3697,6 +3697,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-260",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Safety rules per kind of action, including OStim scenes",
+          "description": "In game: GetGameSafety said safe during an OStim scene (OActor.IsInOStim(player) was true) and during a bed animation. One safe flag can't fit reads and teleports alike. Each kind of action now has its own rule, applied by its tools (ToolBase.SafetyBlock): move (Teleport, StudioGo, StudioReturn): the player-free check (FEAT-259) and no OStim scene; camera (CaptureFace, live MeasureFace, MeasureProfile, live MeasureBody) and face (SetFace, SetFaceSliders, SetFaceTint, SetBrowColor, ResetFace, SculptFace, LoadRaceMenuPreset, SetHairColor, SetSkinTone, SetHeadPart, RemoveHeadPart, SetBodyMorph, ProbeSlider(s)): no OStim or scripted scene, no script-held controls, conversation, combat, kill move, load or save, and face also not in beast form; actor (MoveActorTo): that actor not in an OStim scene. Dry runs and reads are not gated. GetGameSafety(action, refId) answers for a kind of action (allowed, reason). OStim is checked with OActor.IsInOStim and skipped when OStim isn't installed. Still to check: the flag clears when a scene ends; no force option yet.",
+          "history": [
+            {
+              "datetime": "2026-11-19T18:45",
+              "note": "From the in-game agent's OStim finding and its per-action proposal."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",

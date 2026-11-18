@@ -498,6 +498,7 @@ public partial class RaceMenuTools
         "Reports each slider's previous value. dryRun=true shows the changes without applying them. Take a screenshot to judge the result.")]
     public async Task<object> SetFaceSliders(Dictionary<string, double> sliders, bool dryRun = false)
     {
+        if (!dryRun && await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (sliders == null || sliders.Count == 0) return new { error = "sliders is empty: pass a map of slider name to value" };
         var changes = new List<object>();
         var unknown = new List<string>();
@@ -530,6 +531,7 @@ public partial class RaceMenuTools
     public async Task<object> SetFace(Dictionary<string, double>? sliders = null, Dictionary<string, string>? tints = null,
         Dictionary<string, string>? headParts = null, bool dryRun = false)
     {
+        if (!dryRun && await SafetyBlock("face") is string gateReason) return new { error = gateReason };  // FEAT-260
         if ((sliders == null || sliders.Count == 0) && (tints == null || tints.Count == 0) && (headParts == null || headParts.Count == 0))
             return new { error = "Nothing to change: pass sliders, tints and/or headParts." };
         var changes = new List<object>();
@@ -696,6 +698,7 @@ public partial class RaceMenuTools
         "load round trip as SetFaceSliders, which also rebuilds the face-tint texture. Refused while RaceMenu is open. Reports the previous value.")]
     public async Task<object> SetFaceTint(int? index = null, string? color = null, double? alpha = null, bool dryRun = false)
     {
+        if (!dryRun && await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (index == null)
         {
             if (await RaceMenuOpenError() is string open) return new { error = open };
@@ -792,6 +795,7 @@ public partial class RaceMenuTools
         "dark colour. Check with CaptureFace(hideHair: true).")]
     public async Task<object> SetBrowColor(string color)
     {
+        if (await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         var reset = color.Trim().Equals("hair", StringComparison.OrdinalIgnoreCase);
         var hex = color.Trim().TrimStart('#').ToUpperInvariant();
         var rgb = 0;
@@ -855,6 +859,7 @@ public partial class RaceMenuTools
         "every face edit; save a named preset before if you want to come back to this face. dryRun shows what would change.")]
     public async Task<object> ResetFace(bool keepSculpt = false, bool keepSliders = false, bool dryRun = false, string keep = "scar")
     {
+        if (!dryRun && await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (keepSculpt && keepSliders) return new { error = "Nothing to reset: keepSculpt and keepSliders are both true." };
         object? reset = null;
         string? keptNames = null;

@@ -22,11 +22,28 @@ public class UtilityTools : ToolBase
         "Call this before risky operations like spawning NPCs, teleporting, or quest manipulation. " +
         "canMovePlayer and moveBlockers say whether Teleport and studio trips would be refused and why (menus, combat, dialogue, " +
         "scenes, script-held controls such as cutscenes or OStim, furniture, mount, ragdoll, falling, bleeding out, a held object); " +
-        "notes flag swimming and beast form. Check it before moving the player.")]
-    public async Task<object> GetGameSafety()
+        "notes flag swimming and beast form. Check it before moving the player. action (move, camera, face or actor, with refId " +
+        "for actor) answers for that kind of action, as its tools decide (allowed, reason), including an OStim scene; reads need " +
+        "no check. The tools apply these rules themselves and refuse with the reason.")]
+    public async Task<object> GetGameSafety(string? action = null, string? refId = null)
     {
         var data = await _pipe.SendRequestAsync("get_game_safety");
-        return DeserializeResponse(data);
+        if (string.IsNullOrWhiteSpace(action) || data is not JsonObject o) return DeserializeResponse(data);
+        // FEAT-260: answer for one kind of action, the way that action's tools decide.
+        var kind = action.Trim().ToLowerInvariant() switch
+        {
+            "teleport" or "move" or "studio" => "move",
+            "capture" or "camera" or "measure" => "camera",
+            "face" or "body" or "edit" => "face",
+            "actor" or "moveactor" or "follower" => "actor",
+            _ => null,
+        };
+        if (kind == null) return new { error = "action must be move, camera, face or actor (or leave it out for the raw states)" };
+        var blocked = await SafetyBlock(kind, refId);
+        o["action"] = kind;
+        o["allowed"] = blocked == null;
+        o["reason"] = blocked;
+        return DeserializeResponse(o);
     }
 
     [McpServerTool]

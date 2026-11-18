@@ -44,6 +44,7 @@ public class AppearanceTools : ToolBase
         "colour asked for, kept in RaceMenu's own hair colour form the way RaceMenu's colour picker does, instead of the nearest existing one.")]
     public async Task<object> SetHairColor(string color, string? refId = null, bool exact = false)
     {
+        if (await SafetyBlock("face", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         var parms = new JsonObject { ["color"] = color, ["exact"] = exact };
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         var data = await _pipe.SendRequestAsync("set_hair_color", parms);
@@ -75,6 +76,7 @@ public class AppearanceTools : ToolBase
         "Tell the player to set skin tone in RaceMenu for a lasting change; this tool is for a quick look or for games without RaceMenu.")]
     public async Task<object> SetSkinTone(string color, string? refId = null, bool refresh = false)
     {
+        if (await SafetyBlock("face", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         var parms = new JsonObject { ["color"] = color, ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(refId)) parms["refId"] = refId;
         var data = await _pipe.SendRequestAsync("set_skin_tone", parms);
@@ -123,6 +125,7 @@ public class AppearanceTools : ToolBase
     public async Task<object> SetHeadPart(string? part = null, string? type = null, int index = -1, string? refId = null, bool refresh = false,
         bool force = false)
     {
+        if (await SafetyBlock("face", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (!force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
         var parms = new JsonObject { ["index"] = index, ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(part)) parms["part"] = part;
@@ -142,6 +145,7 @@ public class AppearanceTools : ToolBase
     public async Task<object> RemoveHeadPart(string? part = null, string? type = null, string? refId = null, bool refresh = false,
         bool force = false)
     {
+        if (await SafetyBlock("face", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (!force && await PrebuiltFace(refId) is string blocked) return new { error = blocked };
         var parms = new JsonObject { ["refresh"] = refresh };
         if (!string.IsNullOrEmpty(part)) parms["part"] = part;

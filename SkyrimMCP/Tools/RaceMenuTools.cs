@@ -180,6 +180,7 @@ public partial class RaceMenuTools : ToolBase
         "Needs RaceMenu and a body built with morph support. Defaults to the player; refId for an NPC reference.")]
     public async Task<object> SetBodyMorph(string morph, float value, string key = DefaultMorphKey, string? refId = null)
     {
+        if (await SafetyBlock("face", refId) is string gateReason) return new { error = gateReason };  // FEAT-260
         if (string.IsNullOrWhiteSpace(morph)) return new { error = "morph is empty" };
         var target = RefArg(refId);
         // BUG-068: morph names are case-sensitive ("Belly" set a new morph beside OBody's "belly", which the body may not use).
@@ -361,6 +362,7 @@ public partial class RaceMenuTools : ToolBase
         "that is normal. Head parts RaceMenu's loader drops are put back (see headParts). Take a screenshot afterwards to check the face.")]
     public async Task<object> LoadRaceMenuPreset(string name, string? folder = null)
     {
+        if (await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         // Loading by script while RaceMenu is open broke the face tint in game.
         if (await RaceMenuOpenError() is string open) return new { error = open };
 

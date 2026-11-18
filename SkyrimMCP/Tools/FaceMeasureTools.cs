@@ -54,6 +54,7 @@ public class FaceMeasureTools : ToolBase
         double tolerance = 3, string view = "front", bool hideHair = false, string expression = "neutral", double strength = 0.7, double mouthOpen = 0)
     {
         if (!OperatingSystem.IsWindows()) return Error("Face measurement needs Windows.");
+        if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase) && await SafetyBlock("camera") is string gateReason) return Blocked(gateReason);  // FEAT-260
         samples = Math.Clamp(samples, 1, 5);
 
         var measured = new List<JsonObject>();

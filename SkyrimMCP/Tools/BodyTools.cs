@@ -28,6 +28,7 @@ public class BodyTools : ToolBase
         "change these; compare captures in the same pose.")]
     public async Task<CallToolResult> MeasureBody(string image = "live", string? reference = null, double distance = 200, double heightOffset = -60)
     {
+        if (image.Trim().Equals("live", StringComparison.OrdinalIgnoreCase) && await SafetyBlock("camera", null) is string gateReason) return Blocked(gateReason);  // FEAT-260
         try
         {
             string path;
