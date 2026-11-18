@@ -52,7 +52,7 @@ namespace {
         response["id"] = "";
         response["success"] = false;
         response["error"] = message;
-        return response.dump() + "\n";
+        return response.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
     }
 }
 
@@ -106,7 +106,7 @@ extern "C" __declspec(dllexport) void SkyLink_GetInfo(SkyLinkWriteFn write, void
         nlohmann::json info;
         info["version"] = SKYLINK_VERSION_STRING;
         info["built"] = SkyrimMCP::BuildInfo::GetBuildTime();
-        Write(write, ctx, info.dump());
+        Write(write, ctx, info.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     } catch (...) {
         Write(write, ctx, "{}");
     }

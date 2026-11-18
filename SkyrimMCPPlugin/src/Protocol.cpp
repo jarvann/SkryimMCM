@@ -36,16 +36,16 @@ namespace SkyrimMCP::Protocol {
     static std::string GameThread(const std::string& id, std::function<json()> fn) {
         auto result = TaskQueue::RunOnGameThread(std::move(fn));
         if (result.contains("error")) {
-            return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump() + "\n";
+            return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         }
-        return MakeResponse(id, true, result).dump() + "\n";
+        return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
     }
 
     // Helper: require a string param, then run on game thread
     static std::string RequireStr(const std::string& id, const json& params,
         const char* paramName, std::function<json(const std::string&)> fn) {
         std::string val = params.value(paramName, "");
-        if (val.empty()) return MakeResponse(id, false, {}, std::string("Missing '") + paramName + "' parameter").dump() + "\n";
+        if (val.empty()) return MakeResponse(id, false, {}, std::string("Missing '") + paramName + "' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         return GameThread(id, [fn, val]() { return fn(val); });
     }
 
@@ -65,7 +65,7 @@ namespace SkyrimMCP::Protocol {
             TaskQueue::RunOnGameThread([]() { return json::object(); }, timeoutMs);
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - started).count();
-            return MakeResponse(id, true, {{"gameThreadMs", ms}}).dump() + "\n";
+            return MakeResponse(id, true, {{"gameThreadMs", ms}}).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
 
         registry["save_game"] = [](const std::string& id, const json& params) {
@@ -73,7 +73,7 @@ namespace SkyrimMCP::Protocol {
             TaskQueue::Post([saveName]() {
                 GameInterface::SaveGame(saveName);
             });
-            return MakeResponse(id, true, {{"saving", true}, {"saveName", saveName}}).dump() + "\n";
+            return MakeResponse(id, true, {{"saving", true}, {"saveName", saveName}}).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
 
         // === No-param game thread handlers ===
@@ -141,14 +141,14 @@ namespace SkyrimMCP::Protocol {
             // Catalog scan is file I/O, safe on any thread
             auto result = GameInterface::GetPapyrusCatalog();
             if (result.contains("error"))
-                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump() + "\n";
-            return MakeResponse(id, true, result).dump() + "\n";
+                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         registry["scan_papyrus_sources"] = [](const std::string& id, const json&) {
             auto result = GameInterface::ScanPapyrusSources();
             if (result.contains("error"))
-                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump() + "\n";
-            return MakeResponse(id, true, result).dump() + "\n";
+                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         // get_script_functions is registered below with other formIdParam entries
         registry["call_papyrus_function"] = [](const std::string& id, const json& params) {
@@ -156,15 +156,15 @@ namespace SkyrimMCP::Protocol {
             std::string functionName = params.value("functionName", "");
             auto args = params.value("args", json::array());
             if (className.empty() || functionName.empty())
-                return MakeResponse(id, false, {}, "Missing className or functionName").dump() + "\n";
+                return MakeResponse(id, false, {}, "Missing className or functionName").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             // DO NOT use GameThread — DispatchStaticCall queues onto the VM which
             // executes on the game thread. If we block the game thread waiting for
             // the result, we deadlock. Call directly from the pipe thread instead.
             std::string target = params.value("target", "");
             auto result = GameInterface::CallPapyrusFunction(className, functionName, args, target);
             if (result.contains("error"))
-                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump() + "\n";
-            return MakeResponse(id, true, result).dump() + "\n";
+                return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         noParam("get_damage_stats", []() { return GameInterface::GetDamageStats(); });
 
@@ -211,7 +211,7 @@ namespace SkyrimMCP::Protocol {
             std::string idleFormId = params.value("idleFormId", "");
             std::string refId = params.value("refId", "");
             if (idleFormId.empty())
-                return MakeResponse(id, false, {}, "Missing idleFormId").dump() + "\n";
+                return MakeResponse(id, false, {}, "Missing idleFormId").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [idleFormId, refId]() { return GameInterface::PlayIdle(idleFormId, refId); });
         };
         registry["get_current_idle"] = [](const std::string& id, const json& params) {
@@ -242,7 +242,7 @@ namespace SkyrimMCP::Protocol {
 
         registry["execute_command"] = [](const std::string& id, const json& params) {
             std::string command = params.value("command", "");
-            if (command.empty()) return MakeResponse(id, false, {}, "Missing 'command' parameter").dump() + "\n";
+            if (command.empty()) return MakeResponse(id, false, {}, "Missing 'command' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [command]() { return GameInterface::ExecuteConsoleCommand(command); });
         };
 
@@ -329,7 +329,7 @@ namespace SkyrimMCP::Protocol {
             if (mode == "cleanup") return GameThread(id, [=]() { return Studio::Cleanup(marker); });
             if (mode == "status") return GameThread(id, []() { return Studio::Status(); });
             if (mode == "find") return GameThread(id, []() { return Studio::FindMarkers(); });
-            return MakeResponse(id, false, {}, "mode must be lights, go, return, cleanup, find or status").dump() + "\n";
+            return MakeResponse(id, false, {}, "mode must be lights, go, return, cleanup, find or status").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         registry["face_camera"] = [](const std::string& id, const json& params) {
             std::string mode = params.value("mode", "");
@@ -349,17 +349,17 @@ namespace SkyrimMCP::Protocol {
             if (mode == "snapshot") return GameThread(id, []() { return FaceCamera::SculptSnapshot(); });
             if (mode == "check") return GameThread(id, []() { return FaceCamera::Check(); });
                         if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
-            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim, snapshot, check or exit").dump() + "\n";
+            return MakeResponse(id, false, {}, "mode must be prepare, enter, aim, snapshot, check or exit").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         // FEAT-257: proves the game-thread fault guard (FEAT-220) by faulting on purpose inside a guarded task. The fault is in
         // SkyLink's own code with no engine lock or object held, so after it is caught the game is unaffected.
         registry["crash_test"] = [](const std::string& id, const json& params) {
             if (params.value("confirm", std::string()) != "crash-test") {
-                return MakeResponse(id, false, {}, "crash_test needs confirm: \"crash-test\"").dump() + "\n";
+                return MakeResponse(id, false, {}, "crash_test needs confirm: \"crash-test\"").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             }
             const auto mode = params.value("mode", std::string("null_read"));
             if (mode != "null_read" && mode != "divide_by_zero") {
-                return MakeResponse(id, false, {}, "mode must be null_read or divide_by_zero").dump() + "\n";
+                return MakeResponse(id, false, {}, "mode must be null_read or divide_by_zero").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             }
             const auto faultsBefore = TaskQueue::FaultCount();
             json out = {{"mode", mode}, {"faultsCaughtBefore", faultsBefore}};
@@ -375,7 +375,7 @@ namespace SkyrimMCP::Protocol {
                     return {{"value", static_cast<int>(value)}};
                 });
                 out["caught"] = false;
-                out["result"] = "No fault was raised (unexpected): " + r.dump();
+                out["result"] = "No fault was raised (unexpected): " + r.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
             } catch (const std::exception& e) {
                 out["caught"] = TaskQueue::FaultCount() > faultsBefore;
                 out["guardMessage"] = e.what();
@@ -384,7 +384,7 @@ namespace SkyrimMCP::Protocol {
             out["note"] = "The fault was in SkyLink's own code with no engine lock or object held, so the game is unaffected; "
                           "the real guard message tells players to save to a new slot because a real fault may leave the engine "
                           "in a bad state.";
-            return MakeResponse(id, true, out).dump() + "\n";
+            return MakeResponse(id, true, out).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         registry["reapply_face_state"] = [](const std::string& id, const json&) {
             return GameThread(id, []() { return FaceState::Reapply(); });
@@ -418,7 +418,7 @@ namespace SkyrimMCP::Protocol {
         registry["set_hair_color"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
             std::string color = params.value("color", "");
-            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump() + "\n";
+            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             bool exact = params.value("exact", false);
             return GameThread(id, [refId, color, exact]() { return GameInterface::SetHairColor(refId, color, exact); });
         };
@@ -426,7 +426,7 @@ namespace SkyrimMCP::Protocol {
             std::string refId = params.value("refId", "");
             std::string color = params.value("color", "");
             bool refresh = params.value("refresh", false);
-            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump() + "\n";
+            if (color.empty()) return MakeResponse(id, false, {}, "Missing 'color' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [refId, color, refresh]() { return GameInterface::SetSkinTone(refId, color, refresh); });
         };
 
@@ -441,14 +441,14 @@ namespace SkyrimMCP::Protocol {
         registry["add_item"] = [](const std::string& id, const json& params) {
             std::string formId = params.value("formId", "");
             int count = params.value("count", 1);
-            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump() + "\n";
+            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [formId, count]() { return GameInterface::AddItem(formId, count); });
         };
 
         registry["remove_item"] = [](const std::string& id, const json& params) {
             std::string formId = params.value("formId", "");
             int count = params.value("count", 1);
-            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump() + "\n";
+            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [formId, count]() { return GameInterface::RemoveItem(formId, count); });
         };
 
@@ -456,20 +456,20 @@ namespace SkyrimMCP::Protocol {
             std::string attribute = params.value("attribute", "");
             float value = params.value("value", 0.0f);
             std::string refId = params.value("refId", "");
-            if (attribute.empty()) return MakeResponse(id, false, {}, "Missing 'attribute' parameter").dump() + "\n";
+            if (attribute.empty()) return MakeResponse(id, false, {}, "Missing 'attribute' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [attribute, value, refId]() { return GameInterface::SetActorValue(attribute, value, refId); });
         };
 
         registry["teleport"] = [](const std::string& id, const json& params) {
             std::string cellId = params.value("cellId", "");
-            if (cellId.empty()) return MakeResponse(id, false, {}, "Missing 'cellId' parameter").dump() + "\n";
+            if (cellId.empty()) return MakeResponse(id, false, {}, "Missing 'cellId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [cellId]() { return GameInterface::Teleport(cellId); });
         };
 
         registry["set_quest_stage"] = [](const std::string& id, const json& params) {
             std::string formId = params.value("formId", "");
             int stage = params.value("stage", 0);
-            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump() + "\n";
+            if (formId.empty()) return MakeResponse(id, false, {}, "Missing 'formId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [formId, stage]() { return GameInterface::SetQuestStage(formId, stage); });
         };
 
@@ -477,28 +477,28 @@ namespace SkyrimMCP::Protocol {
             std::string actorId = params.value("actorFormId", "");
             std::string attribute = params.value("attribute", "");
             float value = params.value("value", 0.0f);
-            if (actorId.empty() || attribute.empty()) return MakeResponse(id, false, {}, "Missing parameters").dump() + "\n";
+            if (actorId.empty() || attribute.empty()) return MakeResponse(id, false, {}, "Missing parameters").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [actorId, attribute, value]() { return GameInterface::SetActorValue(attribute, value, actorId); });
         };
 
         registry["move_actor_to"] = [](const std::string& id, const json& params) {
             std::string actorId = params.value("actorFormId", "");
             std::string target = params.value("target", "");
-            if (actorId.empty()) return MakeResponse(id, false, {}, "Missing 'actorFormId' parameter").dump() + "\n";
+            if (actorId.empty()) return MakeResponse(id, false, {}, "Missing 'actorFormId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [actorId, target]() { return GameInterface::MoveActorTo(actorId, target); });
         };
 
         registry["set_relationship_rank"] = [](const std::string& id, const json& params) {
             std::string actorId = params.value("actorFormId", "");
             int rank = params.value("rank", 0);
-            if (actorId.empty()) return MakeResponse(id, false, {}, "Missing 'actorFormId' parameter").dump() + "\n";
+            if (actorId.empty()) return MakeResponse(id, false, {}, "Missing 'actorFormId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [actorId, rank]() { return GameInterface::SetRelationshipRank(actorId, rank); });
         };
 
         registry["lock_door"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
             int lockLevel = params.value("lockLevel", 1);
-            if (refId.empty()) return MakeResponse(id, false, {}, "Missing 'refId' parameter").dump() + "\n";
+            if (refId.empty()) return MakeResponse(id, false, {}, "Missing 'refId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [refId, lockLevel]() { return GameInterface::LockDoor(refId, lockLevel); });
         };
 
@@ -520,7 +520,7 @@ namespace SkyrimMCP::Protocol {
 
         registry["show_notification"] = [](const std::string& id, const json& params) {
             std::string message = params.value("message", "");
-            if (message.empty()) return MakeResponse(id, false, {}, "Missing 'message' parameter").dump() + "\n";
+            if (message.empty()) return MakeResponse(id, false, {}, "Missing 'message' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [message]() { return GameInterface::ShowNotification(message); });
         };
 
@@ -528,7 +528,7 @@ namespace SkyrimMCP::Protocol {
             std::string query = params.value("query", "");
             std::string typeFilter = params.value("type", "all");
             int maxResults = params.value("maxResults", 25);
-            if (query.empty()) return MakeResponse(id, false, {}, "Missing 'query' parameter").dump() + "\n";
+            if (query.empty()) return MakeResponse(id, false, {}, "Missing 'query' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return GameThread(id, [query, typeFilter, maxResults]() { return GameInterface::SearchForms(query, typeFilter, maxResults); });
         };
 
@@ -548,7 +548,7 @@ namespace SkyrimMCP::Protocol {
         try {
             request = json::parse(requestLine);
         } catch (const json::parse_error& e) {
-            return MakeResponse("", false, {}, std::string("JSON parse error: ") + e.what()).dump() + "\n";
+            return MakeResponse("", false, {}, std::string("JSON parse error: ") + e.what()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         }
 
         std::string id = request.value("id", "");
@@ -559,12 +559,12 @@ namespace SkyrimMCP::Protocol {
             auto& registry = GetRegistry();
             auto it = registry.find(action);
             if (it == registry.end()) {
-                return MakeResponse(id, false, {}, "Unknown action: " + action).dump() + "\n";
+                return MakeResponse(id, false, {}, "Unknown action: " + action).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             }
             return it->second(id, params);
         } catch (const std::exception& e) {
             SKSE::log::error("Error handling action '{}': {}", action, e.what());
-            return MakeResponse(id, false, {}, e.what()).dump() + "\n";
+            return MakeResponse(id, false, {}, e.what()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         }
     }
 
