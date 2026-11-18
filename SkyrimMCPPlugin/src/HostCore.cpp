@@ -134,7 +134,7 @@ namespace SkyrimMCP::HostCore {
                 CrashRecorder::Record(CrashRecorder::Kind::Papyrus, "Papyrus call returned");
                 {
                     std::scoped_lock lock(_mutex);
-                    _result = out.dump();
+                    _result = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
                     _done = true;
                 }
                 _cv.notify_all();
@@ -218,7 +218,7 @@ namespace SkyrimMCP::HostCore {
             } else {
                 response["error"] = error;
             }
-            return response.dump() + "\n";
+            return response.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         }
 
         json LogicStatusJson() {

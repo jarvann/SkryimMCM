@@ -28,6 +28,36 @@ namespace SkyrimMCP::Helpers {
     // Strict: the whole string must be 1-8 hex digits (optional 0x, surrounding spaces allowed).
     // std::stoul alone stops at the first non-hex character, so a name like "Forsworn" parsed as
     // 0xF (gold) and "Beef" as 0xBEEF: TransferItems then matched the player's gold (2026-11-16).
+    // BUG-083: game and mod strings are in the game's code page (Windows-1252 for most languages), not UTF-8; one accented
+    // quest name made the blueprint fail to serialise. Valid UTF-8 is kept as is; anything else is read as Windows-1252.
+    inline std::string Utf8(const char* text) {
+        if (!text) return {};
+        const auto* p = reinterpret_cast<const unsigned char*>(text);
+        bool valid = true;
+        for (size_t i = 0; p[i];) {
+            const unsigned char c = p[i];
+            int extra = c < 0x80 ? 0 : (c >> 5) == 0x6 ? 1 : (c >> 4) == 0xE ? 2 : (c >> 3) == 0x1E ? 3 : -1;
+            if (extra < 0) { valid = false; break; }
+            for (int k = 1; k <= extra; ++k) {
+                if ((p[i + k] & 0xC0) != 0x80) { valid = false; break; }
+            }
+            if (!valid) break;
+            i += extra + 1;
+        }
+        if (valid) return text;
+        static const char16_t k80[32] = {0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160,
+                                         0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD, 0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022,
+                                         0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178};
+        std::string out;
+        for (size_t i = 0; p[i]; ++i) {
+            unsigned cp = p[i] < 0x80 ? p[i] : p[i] < 0xA0 ? k80[p[i] - 0x80] : p[i];
+            if (cp < 0x80) out += static_cast<char>(cp);
+            else if (cp < 0x800) { out += static_cast<char>(0xC0 | (cp >> 6)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+            else { out += static_cast<char>(0xE0 | (cp >> 12)); out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+        }
+        return out;
+    }
+
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");

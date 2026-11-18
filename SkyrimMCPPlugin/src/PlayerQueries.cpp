@@ -609,10 +609,10 @@ namespace SkyrimMCP::PlayerQueries {
             const bool live = quest->IsRunning();
             if (!done && !live) continue;
             const auto t = static_cast<int>(quest->GetType());
-            json q = {{"formId", std::format("{:08X}", quest->GetFormID())}, {"name", name},
+            json q = {{"formId", std::format("{:08X}", quest->GetFormID())}, {"name", Helpers::Utf8(name)},
                       {"type", t >= 0 && t < static_cast<int>(std::size(kTypes)) ? kTypes[t] : "other"},
                       {"stage", quest->GetCurrentStageID()}, {"inJournal", quest->IsActive()}};
-            if (const char* edid = quest->GetFormEditorID(); edid && edid[0]) q["editorId"] = edid;
+            if (const char* edid = quest->GetFormEditorID(); edid && edid[0]) q["editorId"] = Helpers::Utf8(edid);
             // The stages the game lists as executed, and every objective the player has seen, with its state.
             json stages = json::array();
             if (quest->executedStages) {
@@ -626,7 +626,7 @@ namespace SkyrimMCP::PlayerQueries {
                 const auto st = static_cast<int>(obj->state.get());
                 if (st == 0) continue;  // never shown
                 objectives.push_back({{"index", obj->index},
-                                      {"text", obj->displayText.c_str() ? obj->displayText.c_str() : ""},
+                                      {"text", Helpers::Utf8(obj->displayText.c_str())},
                                       {"state", st >= 0 && st < 6 ? kStates[st] : "other"}});
             }
             if (!objectives.empty()) q["objectives"] = objectives;
