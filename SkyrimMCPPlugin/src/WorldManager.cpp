@@ -51,14 +51,16 @@ namespace SkyrimMCP::WorldManager {
         // all cell loading/transition logic (loading screens, cell attach, navmesh)
         // that direct MoveTo doesn't. coc is a valid script command, not batch.
         // BUG-070: coc to a cell that doesn't exist did nothing and the tool still reported success.
-        auto* cell = RE::TESForm::LookupByEditorID<RE::TESObjectCELL>(cellId);
-        if (!cell) {
+        // coc takes a cell's editor ID (and a few worldspace names), which the game keeps; any form with that editor ID
+        // counts, so nothing coc accepts is refused.
+        auto* target = RE::TESForm::LookupByEditorID(cellId);
+        if (!target) {
             return {{"error", "No cell with the editor ID '" + cellId + "'. Find one with SearchForms(type: 'cell') or use a known location name."}};
         }
         auto result = Helpers::ExecuteConsoleCommand("coc " + cellId);
         result["cell"] = cellId;
-        result["cellFormId"] = std::format("{:08X}", cell->GetFormID());
-        if (const char* name = cell->GetName(); name && name[0]) result["cellName"] = name;
+        result["cellFormId"] = std::format("{:08X}", target->GetFormID());
+        if (const char* name = target->GetName(); name && name[0]) result["cellName"] = name;
         return result;
     }
 
