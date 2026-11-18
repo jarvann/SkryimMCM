@@ -73,6 +73,8 @@ with Skyrim SE/AE's runtime engine via an SKSE plugin.
 - Address Library for SKSE, current All-in-One for your game version (https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - .NET 10 Runtime (https://dotnet.microsoft.com/download/dotnet/10.0)
 - Claude Desktop (https://claude.ai/desktop)
+- RaceMenu (optional): needed for the face builder, presets, sculpting, body
+  morphs and overlays. Hair colour, skin tone and head parts work without it.
 
 ## Installation
 1. Install with Mod Organizer 2 or Vortex, or extract the zip into your
@@ -109,20 +111,25 @@ and earlier.
 3. Ask Claude to interact with your game!
 
 ## Features
-- 89 MCP tools for reading and modifying game state
+- About 150 MCP tools for reading and changing game state
 - Player stats, inventory, spells, perks, shouts, appearance
-- Quest management, NPC interaction, follower management
-- Weather control, world objects, containers, locks
-- Combat analysis, threat assessment, damage stats
-- Event system (combat, death, quest updates, location changes)
-- Character blueprint export/import
-- Papyrus VM bridge (call any mod's Papyrus functions)
-- Form search engine (replaces console 'help' command)
+- Quests, NPCs, followers, weather, world objects, containers, teleport
+- Combat analysis, event system, crash log
+- Face builder (experimental, needs RaceMenu): captures, measurement against a
+  photo, sliders, makeup, hair and brow colour, sculpt, a lit studio room
+- Hair picker and body measurement (experimental)
+- Character blueprint export (with quest progress) and apply (items, gear, gold)
+- Safety rules: moves, captures and face edits refuse in menus, scenes,
+  combat, furniture and similar states, with the reason
+- Papyrus VM bridge and form search
 
 ## Credits
 - ConsoleUtilSSE approach by VersuchDrei (MIT License)
 - CommonLibSSE-NG (alandtse fork; originally by CharmedBaryon and Ryan McKenzie)
 - SKSE by Ian Patterson, Stephen Abel, and Paul Shortman
+- Face and pose models: Google MediaPipe (Apache-2.0), see SkyLinkAI_Server\Models\NOTICE.txt
+- ONNX Runtime by Microsoft (MIT)
+- Guidebook answers from UESP (CC BY-SA 2.5), fetched on demand
 
 ## License
 - SkyrimMCPPlugin.dll and SkyLinkAI\SkyLinkLogic.dll: GPL-3.0-or-later (statically link CommonLibSSE-NG)
