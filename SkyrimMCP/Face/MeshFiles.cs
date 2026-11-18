@@ -13,7 +13,7 @@ public static class MeshFiles
     public static byte[]? Read(string meshPath)
     {
         if (Find(meshPath) is string loose) return File.ReadAllBytes(loose);
-        var inArchive = Path.Combine("meshes", meshPath.Replace('/', '\\').TrimStart('\\'));
+        var inArchive = Path.Combine("meshes", Relative(meshPath));
         foreach (var bsa in Archives())
             if (bsa.Contains(inArchive)) return bsa.Read(inArchive);
         return null;
@@ -23,8 +23,16 @@ public static class MeshFiles
     public static string? Source(string meshPath)
     {
         if (Find(meshPath) != null) return "loose";
-        var inArchive = Path.Combine("meshes", meshPath.Replace('/', '\\').TrimStart('\\'));
+        var inArchive = Path.Combine("meshes", Relative(meshPath));
         return Archives().Any(b => b.Contains(inArchive)) ? "bsa" : null;
+    }
+
+    // BUG-065: a path given relative to Data (meshes\actors\...) was looked up under meshes\meshes, so a follower's loose face
+    // file read as missing.
+    private static string Relative(string meshPath)
+    {
+        var p = meshPath.Replace('/', '\\').TrimStart('\\');
+        return p.StartsWith("meshes\\", StringComparison.OrdinalIgnoreCase) ? p[7..] : p;
     }
 
     private static List<BsaArchive> Archives()
@@ -62,7 +70,7 @@ public static class MeshFiles
 
     public static string? Find(string meshPath)
     {
-        var relative = Path.Combine("meshes", meshPath.Replace('/', '\\').TrimStart('\\'));
+        var relative = Path.Combine("meshes", Relative(meshPath));
         var settings = SkyLinkSettings.Load();
         var candidates = new List<string>();
         if (settings["mo2Path"]?.GetValue<string>() is { Length: > 0 } mo2)

@@ -514,16 +514,17 @@ namespace SkyrimMCP::PlayerQueries {
                 "chinNarrowWide", "chinUpDown", "chinUnderbiteOverbite", "eyesForwardBack", "unk"
             };
             for (int i = 0; i < RE::TESNPC::FaceData::Morphs::kTotal; i++) {
-                morphs[morphNames[i]] = base->faceData->morphs[i];
+                // BUG-065: NPCs keep FLT_MAX for morphs that were never set; leave those out.
+                if (std::abs(base->faceData->morphs[i]) < 1e30f) morphs[morphNames[i]] = base->faceData->morphs[i];
             }
-            result["faceMorphs"] = morphs;
+            if (!morphs.empty()) result["faceMorphs"] = morphs;
 
             json parts;
             static const char* partNames[] = { "nose", "unknown", "eyes", "mouth" };
             for (int i = 0; i < RE::TESNPC::FaceData::Parts::kTotal; i++) {
-                parts[partNames[i]] = base->faceData->parts[i];
+                if (base->faceData->parts[i] >= 0) parts[partNames[i]] = base->faceData->parts[i];  // -1: not set
             }
-            result["facePresets"] = parts;
+            if (!parts.empty()) result["facePresets"] = parts;
         }
 
         // Head parts. FEAT-209: menuIndex is the part's 0-based position among the choices for

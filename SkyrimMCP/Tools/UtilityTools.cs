@@ -317,7 +317,7 @@ public class UtilityTools : ToolBase
         "volume and parent), 'snapshot' (save every category's own value and Master; volume ignored) or 'restore' (put the last " +
         "snapshot back, parents first; volume ignored). Take a snapshot before changing several volumes. " +
         "'own' is the category's value; 'effective' is what plays after its parent and static multiplier, so it can read lower. " +
-        "Applies at once; music already playing may keep its volume until the next track. Ask the player whether they hear the change.")]
+        "Applies at once, except that music already playing takes up to a minute. Ask the player whether they hear the change.")]
     public async Task<object> SetVolume(float volume = 1.0f, string category = "master")
     {
         var key = category.Trim().ToLowerInvariant();
