@@ -19,7 +19,10 @@ public class UtilityTools : ToolBase
     [Description("Check if the game is in a safe state for executing commands. " +
         "Returns safety flags: isLoading, isPaused, isInCombat, isInKillMove, isInDialogue, isSaving. " +
         "If safe=false, the warning field explains why commands should be avoided. " +
-        "Call this before risky operations like spawning NPCs, teleporting, or quest manipulation.")]
+        "Call this before risky operations like spawning NPCs, teleporting, or quest manipulation. " +
+        "canMovePlayer and moveBlockers say whether Teleport and studio trips would be refused and why (menus, combat, dialogue, " +
+        "scenes, script-held controls such as cutscenes or OStim, furniture, mount, ragdoll, falling, bleeding out, a held object); " +
+        "notes flag swimming and beast form. Check it before moving the player.")]
     public async Task<object> GetGameSafety()
     {
         var data = await _pipe.SendRequestAsync("get_game_safety");
