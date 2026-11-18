@@ -11,6 +11,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 #include <nlohmann/json.hpp>
@@ -24,20 +25,6 @@ namespace SkyrimMCP::Helpers {
     // Strict: the whole string must be 1-8 hex digits (optional 0x, surrounding spaces allowed).
     // std::stoul alone stops at the first non-hex character, so a name like "Forsworn" parsed as
     // 0xF (gold) and "Beef" as 0xBEEF: TransferItems then matched the player's gold (2026-11-16).
-    // Why the player can't be moved now (an open pausing menu, a mount, a bed or chair), or empty when she can (BUG-073/075).
-    inline std::string MoveBlocker() {
-        if (auto* ui = RE::UI::GetSingleton(); ui && ui->GameIsPaused()) {
-            return "A menu is open (the map, inventory, a container, crafting or another pausing menu): close it and try again";
-        }
-        auto* player = RE::PlayerCharacter::GetSingleton();
-        if (!player) return "Player not available";
-        if (player->IsOnMount()) return "She is on a mount: dismount first";
-        if (auto* state = player->AsActorState(); state && state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal) {
-            return "She is sitting, lying down or using furniture: get up first";
-        }
-        return {};
-    }
-
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");
@@ -153,6 +140,59 @@ namespace SkyrimMCP::Helpers {
         return std::string(console->lastMessage);
     }
 
+    // FEAT-259: is the player free to be moved (Teleport, studio trips)? Each reason that blocks it, plus warnings that don't.
+    // The engine states that leave something broken if she is moved out of them: menus, combat, dialogue, kill moves, scenes,
+    // controls taken by a script (cutscenes, OStim and other animation frameworks), furniture, mounts, ragdoll, falling,
+    // bleeding out, a held object.
+    struct PlayerFreeState {
+        std::vector<std::string> blockers;
+        std::vector<std::string> warnings;
+    };
+
+    inline PlayerFreeState CheckPlayerFree() {
+        PlayerFreeState out;
+        auto* ui = RE::UI::GetSingleton();
+        if (ui && ui->GameIsPaused()) out.blockers.push_back("a menu is open (the map, inventory, a container, crafting or another pausing menu): close it");
+        if (ui && ui->IsMenuOpen("Loading Menu")) out.blockers.push_back("the game is loading");
+        if (ui && ui->IsMenuOpen("Dialogue Menu")) out.blockers.push_back("she is in a conversation: finish it");
+        if (ui && !ui->IsSavingAllowed()) out.blockers.push_back("the game is saving or can't save right now");
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) { out.blockers.push_back("player not available"); return out; }
+        if (player->IsInCombat()) out.blockers.push_back("she is in combat");
+        if (player->IsInKillMove()) out.blockers.push_back("she is in a kill move");
+        if (player->GetCurrentScene()) out.blockers.push_back("she is in a scripted scene");
+        if (auto* controls = RE::ControlMap::GetSingleton(); controls && !controls->IsMovementControlsEnabled()) {
+            out.blockers.push_back("her controls are taken by a script (a cutscene, an animation scene such as OStim, or a quest)");
+        }
+        if (player->IsOnMount()) out.blockers.push_back("she is on a mount: dismount first");
+        if (auto* state = player->AsActorState()) {
+            if (state->GetSitSleepState() != RE::SIT_SLEEP_STATE::kNormal) out.blockers.push_back("she is sitting, lying down or using furniture: get up first");
+            if (state->GetKnockState() != RE::KNOCK_STATE_ENUM::kNormal) out.blockers.push_back("she is knocked down or ragdolled");
+            if (state->IsBleedingOut()) out.blockers.push_back("she is bleeding out");
+            if (state->IsSwimming()) out.warnings.push_back("she is swimming");
+        }
+        if (player->IsInRagdollState()) out.blockers.push_back("she is ragdolled");
+        if (player->IsInMidair()) out.blockers.push_back("she is in the air (jumping or falling): try again in a moment");
+        if (player->GetGrabbedRef()) out.blockers.push_back("she is holding an object: drop it first");
+        if (auto* race = player->GetRace()) {
+            const char* edid = race->GetFormEditorID();
+            const std::string id = edid ? edid : "";
+            if (id.find("WerewolfBeastRace") != std::string::npos || id.find("VampireBeastRace") != std::string::npos) {
+                out.warnings.push_back("she is in beast form (face tools would act on the beast's head)");
+            }
+        }
+        return out;
+    }
+
+    // Why the player can't be moved now, or empty when she can (BUG-073/075, FEAT-259).
+    inline std::string MoveBlocker() {
+        auto state = CheckPlayerFree();
+        if (state.blockers.empty()) return {};
+        std::string text = "Not now: ";
+        for (size_t i = 0; i < state.blockers.size(); ++i) text += (i ? "; " : "") + state.blockers[i];
+        return text + ".";
+    }
+
     // ==================== Game State Safety Check ====================
     //
     // Check if the game is in a safe state for executing commands.
@@ -219,6 +259,11 @@ namespace SkyrimMCP::Helpers {
         result["isInDialogue"] = state.isInDialogue;
         result["isSaving"] = state.isSaving;
         if (!state.warning.empty()) result["warning"] = state.warning;
+        // FEAT-259: whether the player can be moved (Teleport, studio trips), and why not.
+        auto freeState = CheckPlayerFree();
+        result["canMovePlayer"] = freeState.blockers.empty();
+        if (!freeState.blockers.empty()) result["moveBlockers"] = freeState.blockers;
+        if (!freeState.warnings.empty()) result["notes"] = freeState.warnings;
         return result;
     }
 

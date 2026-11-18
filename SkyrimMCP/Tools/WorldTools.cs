@@ -107,8 +107,9 @@ public class WorldTools : ToolBase
         "'cell' finds them); an unknown cell is refused. location 'back' returns her to where the last Teleport started, facing the " +
         "same way. Tell the player first: the screen freezes for several seconds (the game may show as not responding), and " +
         "teleporting during combat, scenes or dialogue can crash the game. The reply waits up to 20 seconds for her to arrive, says " +
-        "where she is, and lists followers left far away (MoveActorTo brings them). Refused while a menu pauses the game (the map, " +
-        "inventory, a container): ask the player to close it. Player homes (breezehome, honeyside, proudspire manor, vlindrel hall, " +
+        "where she is, and lists followers left far away (MoveActorTo brings them). Refused, with the reason, while she isn't free " +
+        "to move: a pausing menu, combat, dialogue, a scene or script-held controls (cutscenes, OStim), furniture, a mount, " +
+        "ragdoll, falling, bleeding out or holding an object; GetGameSafety shows canMovePlayer beforehand. Player homes (breezehome, honeyside, proudspire manor, vlindrel hall, " +
         "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names.")]
     public async Task<object> Teleport(string location)
     {

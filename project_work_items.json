@@ -3682,6 +3682,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-259",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "One player-free check before moving her; reported by GetGameSafety",
+          "description": "From the in-game agent's list of states a teleport could break. Teleport, Teleport back, StudioGo and StudioReturn refuse, with every reason, while: a pausing menu is open, loading, dialogue, saving not allowed, combat, a kill move, a scripted scene, movement controls taken by a script (cutscenes, OStim and other animation frameworks), mounted, sitting or lying or using furniture, knocked down or ragdolled, bleeding out, in the air, or holding an object. Swimming and beast form are notes. GetGameSafety reports canMovePlayer, moveBlockers and notes. Not done: jail and crime state, a direct OStim query (the controls check should cover it), helmets for captures.",
+          "history": [
+            {
+              "datetime": "2026-11-19T18:20",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",
