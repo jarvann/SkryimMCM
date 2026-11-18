@@ -190,13 +190,24 @@ public class WorldTools : ToolBase
         var leftBehind = new List<object>();
         try
         {
-            var near = new Dictionary<string, double>();
-            var followers = await _pipe.SendRequestAsync("get_followers");
-            foreach (var f in (followers?["followers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
-                if (f["refId"]?.ToString() is string id) near[id] = f["distance"]?.GetValue<double>() ?? 0;
+            async Task<Dictionary<string, double>> Near()
+            {
+                var near = new Dictionary<string, double>();
+                var followers = await _pipe.SendRequestAsync("get_followers");
+                foreach (var f in (followers?["followers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                    if (f["refId"]?.ToString() is string id) near[id] = f["distance"]?.GetValue<double>() ?? 0;
+                return near;
+            }
+            var now = await Near();
+            // Followers aren't found at the moment she arrives; a second look a few seconds later usually finds them.
+            if (followersBefore.Keys.Any(id => !now.ContainsKey(id)))
+            {
+                await Task.Delay(3000);
+                now = await Near();
+            }
             foreach (var (id, name) in followersBefore)
-                if (!near.TryGetValue(id, out var d) || d > 3000)
-                    leftBehind.Add(new { name, refId = id, distance = near.ContainsKey(id) ? Math.Round(d).ToString() : "not nearby" });
+                if (!now.TryGetValue(id, out var d) || d > 3000)
+                    leftBehind.Add(new { name, refId = id, distance = now.ContainsKey(id) ? Math.Round(d).ToString() : "not found nearby" });
         }
         catch (Exception) { }
         return new
@@ -204,8 +215,10 @@ public class WorldTools : ToolBase
             success = true, arrived = true, location, cellId,
             cellName = arrived["cellName"]?.ToString(), cellFormId = arrived["cellFormId"]?.ToString(),
             followersLeftBehind = leftBehind.Count > 0 ? leftBehind : null,
-            followersNote = leftBehind.Count > 0
-                ? "MoveActorTo(refId) brings a follower to her. Whether followers travel depends on how long she stays; they may still catch up." : null,
+            followersNote = leftBehind.Count == 0 ? null
+                : location == "back"
+                    ? "Followers who set off after her may be stranded on the road: MoveActorTo(refId) brings each one to her."
+                    : "MoveActorTo(refId) brings a follower to her. Whether followers travel depends on how long she stays; they may still catch up.",
             back = location == "back" ? null : "Teleport('back') returns her to where she started.",
         };
     }

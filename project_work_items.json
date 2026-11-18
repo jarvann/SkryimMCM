@@ -3596,7 +3596,7 @@
         {
           "id": "BUG-072",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Teleport: no way back without console coordinates, blank outdoor cell name, followers left behind",
           "description": "In game (build 96): the agent returned the player with cow Tamriel -5 -16 (which still timed out); cellName was empty for an exterior; two of three followers followed to Riverwood and stayed there; the warning said loading screen though the player saw a frozen frame. Teleport now marks the starting spot with an XMarker (as StudioGo does) and Teleport(back) returns there, then deletes the marker; the reply names outdoor cells by location and worldspace, lists followers more than 3000 units away with the MoveActorTo hint, and the description says the screen freezes for several seconds. Console description and CLAUDE.md: a refId starting with a digit must be quoted (\"61033226\".moveto player).",
@@ -3608,6 +3608,10 @@
             {
               "datetime": "2026-11-19T16:00",
               "note": "In game (build 97): Riverwood and back exact (position and facing), cellName Riverwood (Skyrim). Fixed after: followers aren't found once she is far away, so the reply compares with the followers before the move; no MoveActorTo MCP tool existed (added); bare worldspace reads Wilderness (Skyrim)."
+            },
+            {
+              "datetime": "2026-11-19T16:30",
+              "note": "In game (build 98): followers left behind listed both ways, Wilderness (Skyrim), MoveActorTo moved all three, return exact. Then: one re-check after 3 s when followers aren't found, and a back-specific note about followers stranded on the road."
             }
           ],
           "targetRelease": "1.3"
