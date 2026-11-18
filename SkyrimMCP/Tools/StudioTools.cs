@@ -62,7 +62,8 @@ public class StudioTools : ToolBase
                 go = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "go", ["cell"] = cell.Trim() });
                 if (go?["error"] is JsonNode error) return new { error = error.ToString() };
             }
-            catch (Exception ex) { goNote = "The move reply was lost across the loading screen (" + ex.Message + ")."; }
+            catch (Exception ex) when (LostAcrossLoad(ex)) { goNote = "The move reply was lost across the loading screen (" + ex.Message + ")."; }
+            catch (Exception ex) { return new { error = ex.Message }; }  // BUG-074: a refusal (a menu open) is an answer, not a lost reply
 
             var state = new JsonObject
             {
@@ -123,7 +124,8 @@ public class StudioTools : ToolBase
                 var back = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "return", ["markerId"] = markerId });
                 if (back?["error"] is JsonNode error) return new { error = error.ToString(), markerId };
             }
-            catch (Exception ex) { backNote = "The move reply was lost across the loading screen (" + ex.Message + ")."; }
+            catch (Exception ex) when (LostAcrossLoad(ex)) { backNote = "The move reply was lost across the loading screen (" + ex.Message + ")."; }
+            catch (Exception ex) { return new { error = ex.Message }; }
 
             state["markerId"] = markerId;
             state["studioCell"] = studioCell;
@@ -141,16 +143,41 @@ public class StudioTools : ToolBase
 
     [McpServerTool]
     [Description("Where the studio trip stands: the player's cell, the studio lights and preset, the marker of the starting spot. If a " +
-        "StudioGo or StudioReturn reply said 'moving', this finishes it once she has arrived (face rebuild, lights, marker clean-up).")]
-    public async Task<object> StudioStatus()
+        "StudioGo or StudioReturn reply said 'moving', this finishes it once she has arrived (face rebuild, lights, marker clean-up); " +
+        "a trip that never left is cleared. With no trip on, lists stray run-time markers; deleteMarker removes one (ask the player first).")]
+    public async Task<object> StudioStatus(string? deleteMarker = null)
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(deleteMarker))
+            {
+                // BUG-074: markers left by trips whose replies were lost; delete one the player agreed to.
+                var r = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = deleteMarker.Trim() });
+                return DeserializeResponse(r);
+            }
             var state = LoadState();
             var status = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
             var cell = status?["cell"]?.GetValue<string>() ?? "";
             var studioCell = state["studioCell"]?.GetValue<string>() ?? "";
             var pending = state["pending"]?.GetValue<string>();
+            // BUG-074: a trip whose move never started (refused, or written by an older build) said "still moving" forever:
+            // no marker, she is still in the cell she started in, and it is over a minute old.
+            string? cleared = null;
+            if (pending == "arrive" && state["markerId"] == null && status?["markerId"] == null &&
+                cell.Equals(state["markedCell"]?.GetValue<string>() ?? "", StringComparison.OrdinalIgnoreCase) &&
+                DateTime.TryParse(state["at"]?.GetValue<string>(), out var at) && DateTime.Now - at > TimeSpan.FromMinutes(1))
+            {
+                SaveState(new JsonObject());
+                state = new JsonObject();
+                pending = null;
+                cleared = "A studio trip on record never left this cell (no marker, still where it started); it was cleared.";
+            }
+            JsonNode? strayMarkers = null;
+            if (pending == null)
+            {
+                try { strayMarkers = (await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "find" }))?.DeepClone(); }
+                catch (Exception) { }
+            }
             var done = pending switch
             {
                 "arrive" => cell.Equals(studioCell, StringComparison.OrdinalIgnoreCase),
@@ -166,10 +193,21 @@ public class StudioTools : ToolBase
                 ["trip"] = LoadState().DeepClone(),
                 ["pending"] = pending == null ? null : (done ? pending + " finished" : pending + ": still moving, call again shortly"),
                 ["finished"] = finished,
+                ["cleared"] = cleared,
+                ["strayMarkers"] = strayMarkers,
+                ["strayNote"] = strayMarkers == null ? null
+                    : "Run-time markers in the world (SkyLink's from lost trip replies or Teleport('back'), or another mod's). " +
+                      "With the player's agreement, StudioStatus(deleteMarker: <id>) deletes one. Don't delete the one Teleport('back') uses.",
             });
         }
         catch (Exception ex) { return new { error = "StudioStatus: " + ex.Message }; }
     }
+
+    // A timeout or dropped connection during the load: the move may have started. Anything else is the plugin's answer.
+    private static bool LostAcrossLoad(Exception ex) =>
+        ex.Message.Contains("Timed out", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+        ex.Message.Contains("Lost connection", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("Empty response", StringComparison.OrdinalIgnoreCase) ||
+        ex is IOException || ex is TimeoutException;
 
     // Finishes an arrival (face rebuild, lights) or a return (face rebuild, marker deleted, trip cleared).
     private async Task<JsonObject> Finish(JsonObject state)
