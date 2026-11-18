@@ -3589,6 +3589,10 @@
             {
               "datetime": "2026-11-19T15:30",
               "note": "From the in-game agent's build 96 checks."
+            },
+            {
+              "datetime": "2026-11-19T16:00",
+              "note": "In game (build 97): Riverwood and back exact (position and facing), cellName Riverwood (Skyrim). Fixed after: followers aren't found once she is far away, so the reply compares with the followers before the move; no MoveActorTo MCP tool existed (added); bare worldspace reads Wilderness (Skyrim)."
             }
           ],
           "targetRelease": "1.3"

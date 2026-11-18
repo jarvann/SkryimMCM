@@ -89,6 +89,16 @@ public class NPCTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Move an actor (a follower left behind, an NPC) to the player or to another reference, natively (no console). " +
+        "refId: the actor's reference ID (GetFollowers, GetNearbyNPCs, or a Teleport reply's followersLeftBehind). target: 'player' " +
+        "(default) or a reference ID. Brings followers left behind by a teleport.")]
+    public async Task<object> MoveActorTo(string refId, string target = "player")
+    {
+        var data = await _pipe.SendRequestAsync("move_actor_to", new JsonObject { ["actorFormId"] = refId, ["target"] = target });
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("Play an idle animation on the player or an NPC via native API (no console commands). " +
         "Pass the idle animation's FormID. Optional refId targets a specific NPC — leave empty for the player. " +
         "Use SearchForms with type='idle' to find animation FormIDs. " +
