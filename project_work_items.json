@@ -1123,6 +1123,10 @@
             {
               "datetime": "2026-11-19T23:10",
               "note": "Export part built for 1.3 at Cory's request: GetCharacterBlueprint adds quests (journal quests completed or running: current stage, stagesDone, objectives seen with completed/failed/shown, type, portable IDs) and notCaptured. ApplyBlueprint(sections incl. 'quests') compares with this game and lists what was completed or running there and not here, with objectives done there; it applies nothing. Applying quest state stays 1.4 and careful."
+            },
+            {
+              "datetime": "2026-11-19T23:20",
+              "note": "Design note for the 1.4 apply (Cory): multi-path quests branch by stage, so the stages done and the failed/completed objectives are what identify the path taken; marking a quest complete would lose it. Replaying the recorded stages in order with SetStage runs each stage's script fragment, which reproduces the branch and most of its outcomes (unlike CompleteQuest), but also runs its side effects: dry run per quest, a save first, main and faction lines flagged. Check whether executedStages keeps execution order or only stage-number order."
             }
           ],
           "targetRelease": "1.3"
