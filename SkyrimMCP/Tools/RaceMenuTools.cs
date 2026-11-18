@@ -43,6 +43,9 @@ public partial class RaceMenuTools : ToolBase
         return data?["result"];
     }
 
+    private static bool ManagedByOBody(JsonArray names, IEnumerable<string> keys) =>
+        names.Any(n => n?.GetValue<string>() == "obody_processed") || keys.Any(k => k.Equals("OBody", StringComparison.OrdinalIgnoreCase));
+
     // One morph's value under each key that sets it, and their sum (what the body shows).
     private async Task<(JsonObject Values, double Total)> MorphValues(string target, string name)
     {
@@ -151,6 +154,12 @@ public partial class RaceMenuTools : ToolBase
             ["listed"] = morphs.Count,
             ["leftOutNoValue"] = skipped > 0 ? skipped : null,
             ["keys"] = new JsonArray(keysSeen.Select(k => (JsonNode?)JsonValue.Create(k)).ToArray()),
+            // BUG-069: OBody marks actors it handles (obody_processed) and stores under its own key; its values change whenever
+            // a preset is assigned, so a read is a snapshot.
+            ["managedBy"] = ManagedByOBody(names, keysSeen) ? "OBody" : null,
+            ["managedNote"] = ManagedByOBody(names, keysSeen)
+                ? "OBody manages this body: these values are its current preset and change when another preset is assigned. Read, don't cache; change the body through OBody."
+                : null,
             ["morphs"] = morphs,
             ["note"] = morphs.Count >= 200 ? "Only the first 200 morphs are listed: narrow with nameContains." : null,
         });
@@ -194,6 +203,8 @@ public partial class RaceMenuTools : ToolBase
                 actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed,
                 total = Math.Round(total, 4), byKey = byKey.ToJsonString(),
                 note = byKey.Count > 1 ? "Other keys also set this morph; the body shows the total. A body mod such as OBody may re-apply its own values." : null,
+                obody = existing.Contains("obody_processed")
+                    ? "OBody manages this body: this value stacks on OBody's, and the result shifts when OBody assigns another preset. Change the body through OBody's preset instead; ClearBodyMorphs undoes this." : null,
                 warning = existing.Count > 0 && !existing.Contains(morph)
                     ? $"'{morph}' wasn't set on this actor before: check that the body uses a morph with this exact name (names are case-sensitive)." : null,
             };

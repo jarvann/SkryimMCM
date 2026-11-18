@@ -20,7 +20,8 @@ public class BodyTools : ToolBase
     [Description("Measure body proportions (experimental): image 'live' takes a full-body capture of the player (the face camera " +
         "pulled back: distance default 200, heightOffset -60 aims at the hips; neutral pose, no image returned), or a full path " +
         "to a picture of a whole standing person (crop it to the person if the picture is wide or busy). Use it in the studio: outdoors, " +
-        "low light or a follower in frame gave nonsense, and below a confidence floor it now refuses. Returns shoulder width, " +
+        "low light or a follower in frame gave nonsense, and below a confidence floor it now refuses. With OBody (or another mod that " +
+        "assigns body presets) a live reference only holds while the same preset is on her: re-register it after a preset change. Returns shoulder width, " +
         "hip to shoulder width, torso, legs, arms and head-and-neck against height, and silhouette widths at chest, waist and hips " +
         "against the shoulders (unproven: hair, clothes and arms count; not compared; arm length isn't compared either), with confidence (lowest visibility of shoulders, hips and ankles: under 0.5, the feet or hips " +
         "weren't seen and the numbers are guesses). With reference (SetBodyReference), the gaps. Body morph tools (SetBodyMorph) " +
