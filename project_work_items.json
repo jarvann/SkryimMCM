@@ -1312,7 +1312,7 @@
         {
           "id": "FEAT-227",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "RaceMenu integration (skee64.dll)",
           "description": "General RaceMenu support, beyond hair and skin colour: detect skee64.dll (PLUG-004, INFRA-010) and use its Papyrus API through the existing bridge. Scope: read and set RaceMenu sliders and morphs (NiOverride), body morphs (SetBodyMorph + UpdateModelWeight), overlays such as tattoos and warpaint, hair and skin tint through RaceMenu when it is installed, and loading or saving presets (.jslot via CharGen). This is the base for 'create my character from a description' (FEAT-121 applies a blueprint with it) and for FEAT-208/209. Without RaceMenu, fall back to the native tools (FEAT-226, FEAT-208).",
@@ -1328,6 +1328,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "In game: GetOverlays lists 9 empty body slots; body morph read-back failed (BUG-060)."
+            },
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "In game (build 87): body morphs set, read and cleared; overlays read with overlaysEnabled true (body 9, face 8 slots, all empty on this character)."
             }
           ],
           "targetRelease": "1.3"
@@ -3266,7 +3270,7 @@
         {
           "id": "BUG-060",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetBodyMorph reports success but GetBodyMorphs lists nothing",
           "description": "In game: SetBodyMorph(Belly, 0.05) said ok; GetBodyMorphs straight after showed 0 morphs. Cause not known offline. SetBodyMorph now reads the morph back (readBack, morphsListed, warning when it didn't take); GetBodyMorphs(morph) reads one morph directly, so the next test shows whether the set or the list is at fault.",
@@ -3274,6 +3278,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the in-game agent's older-items round."
+            },
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "In game (build 87): SetBodyMorph Belly 0.05 read back 0.05; 66 morphs listed (other mods' morphs now visible). Closed by BUG-066."
             }
           ],
           "targetRelease": "1.3"
@@ -3319,7 +3327,7 @@
         {
           "id": "BUG-063",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Crash recorder: a normal quit recorded as did not exit cleanly",
           "description": "GetCrashLog flagged the 2026-11-18 15:34-16:49 session as not clean, though the player quit normally: neither Main::quitGame (offset unverified on 1.7.104) nor atexit fired. The quit watcher now also marks quitting when the game window closes. Host DLL: needs a game restart; check after the next normal quit.",
@@ -3331,6 +3339,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "In game: Quit to Desktop at 11:06 still left no quit, window or exit mark. The reader now uses the absence of a crash report instead (BUG-067)."
+            },
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "Handled by the reader (BUG-067): an unmarked session with no crash report reads as most likely a normal quit."
             }
           ],
           "targetRelease": "1.3"
@@ -3372,7 +3384,7 @@
         {
           "id": "BUG-066",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Every Papyrus call given a form argument returns nothing",
           "description": "In game: StorageUtil.GetIntValue(player, key, 7) returned no value (7 with None); NiOverride.GetBodyMorph and GetMorphNames the same, so SetBodyMorph never took (BUG-060) and the overlay tools probably read nothing either. Diagnostics showed the form packed correctly (class Actor, bound, valid, resolves). The Papyrus log had the cause: Function StorageUtil.GetIntValue(Form param1,string param2,int param3) received incompatible arguments! Received types (Actor,string,int) instead! A dispatched call is type-checked exactly; a script gets the cast from its compiler. Form arguments now carry the declared parameter type (castTo in the diagnostics).",
@@ -3380,6 +3392,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "Found from the in-game agent's probe plus Papyrus.0.log."
+            },
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "In game (build 87): StorageUtil.GetIntValue(player) returned 7 with castTo Form."
             }
           ],
           "targetRelease": "1.3"
@@ -3387,7 +3403,7 @@
         {
           "id": "BUG-067",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "An NPC head part change is saved and breaks the face after a restart",
           "description": "In game: Lucien with HairMaleImperial1 (no rebuild) looked right through cell changes and loads, but the change was saved, and after a full restart his head was built from the changed record and the face broke; his extra part LucienHairHL was lost. The agent repaired him with his original hair, refresh and force. SetHeadPart and RemoveHeadPart again refuse on any NPC with a pre-built face unless force=true, and say the change breaks the face after a restart; force with refresh is documented as the repair. Also from this round: GetCrashLog now judges a session with no exit mark by whether a crash report was written when it ended (a Quit to Desktop on 1.7.104 still sets none of the recorder's signals: BUG-063 not fixed by the window check); the first screenshot after a load came back black.",
@@ -3395,6 +3411,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "From the restart test."
+            },
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "In game (build 87): Lucien refused without force with the restart warning; GetCrashLog reads the 11:06 quit as most likely normal. Added: says when no crash reporter is installed."
             }
           ],
           "targetRelease": "1.3"
