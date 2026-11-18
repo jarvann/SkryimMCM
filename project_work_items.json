@@ -3882,6 +3882,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-082",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "ApplyBlueprint equipment: items not added before equipping; unlearned spells equipped",
+          "description": "In game (new character from Arya's blueprint): ApplyBlueprint(sections: equipment) failed 15 of 17 with 'Not in the inventory', and the dry run listed all 17 as fine; the two that worked were Lightning Storm in both hands, a spell she doesn't know (spells aren't restored), which no tool can unequip. The agent worked around it with BulkAddItems and EquipItems. Now the equipment section adds one of any item it will equip that she lacks (the dry run marks it added), and skips spells she doesn't know (spellsNotKnown). Not done: an option to unequip slots the blueprint leaves empty (her starting robes stayed on), and a tool to unequip a spell.",
+          "history": [
+            {
+              "datetime": "2026-11-19T22:50",
+              "note": "From the in-game agent copying Arya to a new character."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",

@@ -192,22 +192,42 @@ namespace SkyrimMCP::BlueprintManager {
 
         if (sections.contains("equipment")) {
             json toEquip = json::array(), unresolved = json::array(), planned = json::array(), alreadyEquipped = json::array();
+            json spellsSkipped = json::array();
             for (const auto& entry : params.value("equipped", json::array())) {
                 if (!entry.is_object() || entry.value("empty", false)) continue;
                 std::string how;
                 auto* form = Resolve(entry, how);
                 if (!form) { auto l = Label(entry); l["reason"] = how; unresolved.push_back(l); continue; }
                 if (worn.contains(form->GetFormID())) { alreadyEquipped.push_back(entry.value("name", "")); continue; }
+                // BUG-082: spells aren't restored, so an unlearned spell ended up in her hands (and nothing can unequip it).
+                if (auto* spell = form->As<RE::SpellItem>()) {
+                    if (!player->HasSpell(spell)) { spellsSkipped.push_back(entry.value("name", "")); continue; }
+                }
+                // BUG-082: with only the equipment section, 15 of 17 items failed "not in the inventory". Equipping needs the
+                // item, so add one when she has none.
+                bool adding = false;
+                if (auto* object = form->As<RE::TESBoundObject>(); object && !form->As<RE::SpellItem>() && have[form->GetFormID()] <= 0) {
+                    adding = true;
+                    if (!dryRun) {
+                        player->AddObjectToContainer(object, nullptr, 1, nullptr);
+                        have[form->GetFormID()] += 1;
+                    }
+                }
                 json item = {{"formId", std::format("{:08X}", form->GetFormID())}};
                 const auto slot = entry.value("slot", "");
                 if (slot == "rightHand") item["hand"] = "right";
                 else if (slot == "leftHand") item["hand"] = "left";
                 auto p = Label(entry);
                 if (item.contains("hand")) p["hand"] = item["hand"];
+                if (adding) p["added"] = true;
                 planned.push_back(p);
                 toEquip.push_back(item);
             }
             json equipReport = {{"items", planned}, {"alreadyEquipped", alreadyEquipped.size()}, {"unresolved", unresolved}};
+            if (!spellsSkipped.empty()) {
+                equipReport["spellsNotKnown"] = spellsSkipped;
+                equipReport["spellNote"] = "Spells aren't restored by the blueprint; these weren't equipped because she doesn't know them.";
+            }
             if (!dryRun && !toEquip.empty()) {
                 auto r = InventoryManager::EquipItems(toEquip, "", false);
                 equipReport["succeeded"] = r.value("succeeded", 0);
@@ -219,8 +239,8 @@ namespace SkyrimMCP::BlueprintManager {
             report["equipment"] = equipReport;
         }
 
-        report["note"] = dryRun ? "Nothing was changed. Call again with dryRun=false to apply."
-                                : "Only missing items were added; nothing was removed.";
+        report["note"] = dryRun ? "Nothing was changed. Call again with dryRun=false to apply. Items marked added would be added to equip them."
+                                : "Only missing items were added (and one of each item to be equipped); nothing was removed or unequipped.";
         return report;
     }
 
