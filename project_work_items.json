@@ -1201,6 +1201,10 @@
             {
               "datetime": "2026-11-16T19:00",
               "note": "Build 16 replaced the console setgs (did nothing) with sound categories, but master fell back to the Magic category. Build 17: master sets fAudioMasterVolume:AudioMenu and BSAudioManager::masterVolume. Retest by ear."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: categories apply at once except the playing music track; restore fixed in BUG-059."
             }
           ],
           "targetRelease": "1.3"
@@ -1320,6 +1324,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: RaceMenu tools through NiOverride/CharGen (body morphs, overlays, presets); the Papyrus bridge now passes forms/references and returns arrays (host change). Not tested in game yet."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: GetOverlays lists 9 empty body slots; body morph read-back failed (BUG-060)."
             }
           ],
           "targetRelease": "1.3"
@@ -1361,7 +1369,7 @@
         {
           "id": "FEAT-206",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Portable form IDs in the blueprint",
           "description": "Store plugin name plus local form ID for every modded form so a blueprint survives a load-order change. Resolve back to a runtime ID on import. Prerequisite for FEAT-121.",
           "history": [
@@ -1372,6 +1380,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: GetCharacterBlueprint adds <key>Source {plugin, localId} next to every form ID, formatVersion 2. Not tested in game yet."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: blueprint exported with portable IDs; dry-run apply resolved everything by plugin, gold change 0."
             }
           ],
           "targetRelease": "1.3"
@@ -1390,6 +1402,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: ApplyBlueprint (dry run by default) adds missing items, raises gold, equips. Not tested in game yet."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: dry run works; it listed worn items and one food item on an unchanged character (BUG-061)."
             }
           ],
           "targetRelease": "1.3"
@@ -1841,6 +1857,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: host CrashRecorder, a memory-mapped ring of 512 entries (requests, events, cell, Papyrus, notes) in My Games\\...\\SkyLinkAI\\crash-recorder.bin; previous unclean session kept as crash-recorder-previous.bin; GetCrashLog shows it. Host DLL: needs a deploy with the game closed."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "GetCrashLog read the recorder; a normal quit was flagged as not clean (BUG-063)."
             }
           ],
           "targetRelease": "1.3"
@@ -1919,7 +1939,7 @@
         {
           "id": "FEAT-221",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Skyrim guidebook the AI checks first",
           "description": "Give the AI a game reference (quests, locations, skills, crafting, alchemy) and tell it to look there before answering a help question, so answers come from the book rather than memory. Options: an MCP resource or a search tool over a bundled reference. Licence check before bundling anything: UESP text is CC BY-SA 2.5 (attribution and share-alike).",
           "history": [
@@ -1930,6 +1950,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: SearchGuidebook and GetGuidebookPage over the live UESP API (CC BY-SA 2.5 attribution in every reply, 7-day cache), plus MCP server instructions telling the AI to check it first. Not tested in game yet."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: SearchGuidebook('Blackreach') 106 hits, page opened with sections; a Dark Brotherhood question answered from the book."
             }
           ],
           "targetRelease": "1.3"
@@ -2239,7 +2263,7 @@
         {
           "id": "BUG-027",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SetVolume rejects \"Music\": category names are localisation keys ($Music)",
           "description": "The Audio menu categories are named $Music, $Effects..., so the tool description's 'Music' was refused and only '$Music' worked. Names are now listed without the $ and matching ignores it and case, and also accepts the editor ID.",
@@ -2247,6 +2271,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Reported by the in-game agent 2026-11-16. Fixed in logic build b13_27."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "In game: 'music' and 'Music' both accepted."
             }
           ],
           "targetRelease": "1.3"
@@ -2254,7 +2282,7 @@
         {
           "id": "BUG-028",
           "type": "bug",
-          "status": "needs-research",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "SetVolume: no audible change; Music read back 0.16 after setting 0.23",
           "description": "In game 2026-11-16 (in-game agent): Master stored but not heard; $Music set to 0 did not silence music, and a later set to 0.23 read back as 0.16. Check whether the music system ducks or overrides the category volume each frame, whether the Audio menu applies menu categories through another path (static attenuation, INI prefs such as fAudioMusicVolume?), and whether the master needs BSAudioManager to re-apply. Confirm by ear with the player.",
@@ -2262,6 +2290,10 @@
             {
               "datetime": "2026-11-16T23:00",
               "note": "Reported by the in-game agent."
+            },
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "With the player listening: every zeroed category went silent except Music, which kept playing at 0. The playing track keeps its volume; SetVolume now says so (BUG-059). Recheck: set Music, StopMusic, listen to the next track."
             }
           ],
           "targetRelease": "1.3"
@@ -3190,6 +3222,81 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "BUG-059",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetVolume: reads back the effective volume and calls it an error; no restore, no FormID for duplicate names",
+          "description": "In game (2026-11-19): every non-zero set returned 'The game kept the volume at...' though it changed: the read-back was the effective volume (own value times parent and static multiplier: Music 0.7, Menus 0.3 under Effects). previous was effective too, so restoring landed low; two categories share names (Weapons, Footsteps) and a FormID was refused; 31 calls to zero everything, 52 to restore. Now: own (volumeMult) and effective reported separately, previous is the own value, no error on the difference, FormID targets, sameName warning, category all, and snapshot/restore (server-side file, parents first). With 30 categories at 0 the player heard only music (BUG-028): the playing track keeps its volume; the reply says so and points at StopMusic.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the in-game agent's older-items round."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-060",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SetBodyMorph reports success but GetBodyMorphs lists nothing",
+          "description": "In game: SetBodyMorph(Belly, 0.05) said ok; GetBodyMorphs straight after showed 0 morphs. Cause not known offline. SetBodyMorph now reads the morph back (readBack, morphsListed, warning when it didn't take); GetBodyMorphs(morph) reads one morph directly, so the next test shows whether the set or the list is at fault.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the in-game agent's older-items round."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-061",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Blueprint dry run on an unchanged character lists equipped items and one item to add",
+          "description": "In game: ApplyBlueprint dryRun on a blueprint exported a minute earlier listed all 17 equipped items as to-equip and Hot Clam Chowder to add. Worn items (and hand and power selections) are now skipped and counted as alreadyEquipped; each item to add shows blueprintCount and has, to explain cases like the chowder.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the in-game agent's older-items round."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-062",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "SearchForms: cell finds nothing, unknown types fall back silently, empty editor IDs unexplained",
+          "description": "In game: type cell returned 0 for Whiterun (interior cells aren't in the form array); now searched through the global form map. Unknown types used to search a few common types silently: refused with the list. Empty editor IDs (perks, spells, shouts, locations) are the game dropping them: a note says so. 'Fire Ball' under shout left as is (likely a mod's shout record).",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the in-game agent's older-items round."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-063",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Crash recorder: a normal quit recorded as did not exit cleanly",
+          "description": "GetCrashLog flagged the 2026-11-18 15:34-16:49 session as not clean, though the player quit normally: neither Main::quitGame (offset unverified on 1.7.104) nor atexit fired. The quit watcher now also marks quitting when the game window closes. Host DLL: needs a game restart; check after the next normal quit.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:30",
+              "note": "From the in-game agent's older-items round."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",
@@ -3664,6 +3771,10 @@
         {
           "datetime": "2026-03-23T20:01",
           "note": "Implemented. Needs game restart to test."
+        },
+        {
+          "datetime": "2026-11-19T11:30",
+          "note": "In game: perk, spell, shout, race, location and quest search fine; cell fixed in BUG-062."
         }
       ],
       "targetRelease": "1.3"
