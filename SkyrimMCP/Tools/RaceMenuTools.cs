@@ -43,6 +43,21 @@ public partial class RaceMenuTools : ToolBase
         return data?["result"];
     }
 
+    // One morph's value under each key that sets it, and their sum (what the body shows).
+    private async Task<(JsonObject Values, double Total)> MorphValues(string target, string name)
+    {
+        var keys = await Papyrus("NiOverride", "GetMorphKeys", target, name) as JsonArray ?? new JsonArray();
+        var values = new JsonObject();
+        double total = 0;
+        foreach (var morphKey in keys.Select(k => k?.GetValue<string>()).OfType<string>())
+        {
+            var v = (await Papyrus("NiOverride", "GetBodyMorph", target, name, morphKey) as JsonValue)?.GetValue<float>() ?? 0f;
+            values[morphKey] = Math.Round(v, 4);
+            total += v;
+        }
+        return (values, total);
+    }
+
     // The whole reply (result, signature, target), for diagnosing a call that returns nothing.
     private async Task<JsonNode?> PapyrusRaw(string className, string function, params JsonNode?[] args)
     {
@@ -102,9 +117,11 @@ public partial class RaceMenuTools : ToolBase
 
     [McpServerTool]
     [Description("List an actor's RaceMenu body morphs (BodySlide sliders set at runtime): each morph with the keys that set it " +
-        "(each mod uses its own key) and their values. morph (with key, default 'SkyLinkAI') reads that one morph directly. " +
-        "Defaults to the player; refId for an NPC reference.")]
-    public async Task<object> GetBodyMorphs(string? refId = null, string? morph = null, string key = DefaultMorphKey)
+        "(each mod uses its own key), their values and the total (keys add up). nameContains filters by name; nonZero (default " +
+        "true) leaves out morphs with no value. morph (with key, default 'SkyLinkAI') reads that one morph directly. " +
+        "Bodies managed by OBody or a similar mod: change the body there and read it here. Defaults to the player; refId for an NPC.")]
+    public async Task<object> GetBodyMorphs(string? refId = null, string? morph = null, string key = DefaultMorphKey,
+        string? nameContains = null, bool nonZero = true)
     {
         var target = RefArg(refId);
         if (!string.IsNullOrWhiteSpace(morph))
@@ -116,32 +133,49 @@ public partial class RaceMenuTools : ToolBase
         }
         var names = await Papyrus("NiOverride", "GetMorphNames", target) as JsonArray ?? new JsonArray();
         var morphs = new JsonArray();
-        foreach (var name in names.Take(150).Select(n => n?.GetValue<string>()).OfType<string>())
+        var keysSeen = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skipped = 0;
+        foreach (var name in names.Select(n => n?.GetValue<string>()).OfType<string>())
         {
-            var keys = await Papyrus("NiOverride", "GetMorphKeys", target, name) as JsonArray ?? new JsonArray();
-            var values = new JsonObject();
-            foreach (var morphKey in keys.Select(k => k?.GetValue<string>()).OfType<string>())
-                values[morphKey] = (await Papyrus("NiOverride", "GetBodyMorph", target, name, morphKey))?.DeepClone();
-            morphs.Add(new JsonObject { ["morph"] = name, ["byKey"] = values });
+            if (!string.IsNullOrWhiteSpace(nameContains) && !name.Contains(nameContains.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+            var (values, total) = await MorphValues(target, name);
+            // BUG-068: 128 morphs on an OBody body, many with no value; leave those out by default.
+            if (nonZero && Math.Abs(total) < 1e-6) { skipped++; continue; }
+            foreach (var (k, _) in values) keysSeen.Add(k);
+            if (morphs.Count < 200) morphs.Add(new JsonObject { ["morph"] = name, ["total"] = Math.Round(total, 4), ["byKey"] = values });
         }
         return DeserializeResponse(new JsonObject
         {
             ["actor"] = target,
             ["count"] = names.Count,
+            ["listed"] = morphs.Count,
+            ["leftOutNoValue"] = skipped > 0 ? skipped : null,
+            ["keys"] = new JsonArray(keysSeen.Select(k => (JsonNode?)JsonValue.Create(k)).ToArray()),
             ["morphs"] = morphs,
-            ["note"] = names.Count > 150 ? "Only the first 150 morphs are listed." : null,
+            ["note"] = morphs.Count >= 200 ? "Only the first 200 morphs are listed: narrow with nameContains." : null,
         });
     }
 
     [McpServerTool]
-    [Description("Set a RaceMenu body morph (a BodySlide slider such as Breasts, Butt, Belly, Thighs, Arms, Waist, Muscle) on an actor. " +
+    [Description("Set a RaceMenu body morph (a BodySlide slider) on an actor. Names are case-sensitive and depend on the body: " +
+        "read them first with GetBodyMorphs (e.g. 'belly', 'hips', 'Breasts' on one 3BA/OBody setup). " +
         "value: usually -1 to 1 (1 = the slider at 100). Stored under key (default 'SkyLinkAI'), so ClearBodyMorphs can undo it " +
         "without touching other mods' morphs, and saved with the game. The body updates at once. " +
+        "Values from different keys add up. If OBody or a similar mod manages the body, change it there instead. " +
         "Needs RaceMenu and a body built with morph support. Defaults to the player; refId for an NPC reference.")]
     public async Task<object> SetBodyMorph(string morph, float value, string key = DefaultMorphKey, string? refId = null)
     {
         if (string.IsNullOrWhiteSpace(morph)) return new { error = "morph is empty" };
         var target = RefArg(refId);
+        // BUG-068: morph names are case-sensitive ("Belly" set a new morph beside OBody's "belly", which the body may not use).
+        var existing = (await Papyrus("NiOverride", "GetMorphNames", target) as JsonArray ?? new JsonArray())
+            .Select(n => n?.GetValue<string>()).OfType<string>().ToList();
+        if (!existing.Contains(morph))
+        {
+            var sameLetters = existing.FirstOrDefault(n => n.Equals(morph, StringComparison.OrdinalIgnoreCase));
+            if (sameLetters != null)
+                return new { error = $"No morph '{morph}' on this actor, but '{sameLetters}' exists: morph names are case-sensitive. Use '{sameLetters}'." };
+        }
         var before = await Papyrus("NiOverride", "GetBodyMorph", target, morph, key);
         await Papyrus("NiOverride", "SetBodyMorph", target, morph, key, value);
         await Papyrus("NiOverride", "UpdateModelWeight", target);
@@ -153,7 +187,17 @@ public partial class RaceMenuTools : ToolBase
         await NotifyInGame("Body morph changed");
         var took = readBack.HasValue && Math.Abs(readBack.Value - value) < 0.001;
         if (took)
-            return new { actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed };
+        {
+            var (byKey, total) = await MorphValues(target, morph);
+            return new
+            {
+                actor = target, morph, key, previous = (before as JsonValue)?.GetValue<float>(), value, readBack, morphsListed = listed,
+                total = Math.Round(total, 4), byKey = byKey.ToJsonString(),
+                note = byKey.Count > 1 ? "Other keys also set this morph; the body shows the total. A body mod such as OBody may re-apply its own values." : null,
+                warning = existing.Count > 0 && !existing.Contains(morph)
+                    ? $"'{morph}' wasn't set on this actor before: check that the body uses a morph with this exact name (names are case-sensitive)." : null,
+            };
+        }
         // BUG-065: in game GetBodyMorph came back with no value at all (not even 0), which a float function only does when the
         // call failed in the VM; report what was called so the cause can be found (Papyrus log, or a different signature).
         var setCall = await PapyrusRaw("NiOverride", "SetBodyMorph", target, morph, key, value);
