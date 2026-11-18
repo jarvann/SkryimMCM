@@ -160,12 +160,18 @@ This saves tokens and context window space. Ask *"How many spells do I have?"* i
 ### Character Blueprint
 
 The blueprint is a complete character snapshot exported to a JSON file:
-- Player info, skills, perks (700+), spells (1400+), shouts
-- Equipment (32 slots), full inventory with enchantments
-- Appearance (19 face morphs, head parts, race, height)
+- Player info, skills, perks, spells, shouts
+- Equipment, full inventory with enchantments, gold
+- Appearance (face morphs, head parts, race, height)
+- Quest progress (1.3): quests completed or started, with stage and the objectives seen
 - Factions, resistances, powers, diseases, damage stats
+- `notCaptured` lists what it can't hold (quest rewards and world changes, map markers, crime, other mods' script state)
 
-Always use `outputPath` — the data is too large for the MCP response.
+Always use `outputPath`: the data is too large for the MCP response.
+
+`ApplyBlueprint` (dry run by default) adds missing items and gold and equips the blueprint's gear on another character. With
+`sections: "quests"` it compares quest progress and lists what the other character finished or started that this one hasn't;
+it never changes quests. Skills, perks, spells and level aren't applied yet (planned for 1.4).
 
 ### Event Filtering
 
@@ -182,16 +188,37 @@ Framework quest noise (NFF cycling, etc.) is auto-filtered.
 - Instead of `sqv questId` → use `GetQuestStages` + `GetQuestAliases`
 - Instead of `help "iron" 0` → use `SearchForms`
 
-When using console commands, target NPCs with dot-notation: `FE124B0E.kill` (not `prid`).
+When using console commands, target NPCs with dot-notation: `FE124B0E.kill` (not `prid`). Quote a reference that starts
+with a digit: `"61033226".moveto player`. To set a quest stage, use `SetQuestStage`: it reports whether the game applied it,
+which `setstage` in the console doesn't.
 
 ### Game Safety
 
-Check `GetGameSafety` before risky operations (spawning, teleporting during combat). The tool reports:
-- `isLoading` — game is loading, commands will crash
-- `isInKillMove` — animation in progress, commands may crash
-- `isSaving` — save in progress, commands may corrupt
+Tools check what they need themselves and refuse with the reason. `GetGameSafety(action: "move" | "camera" | "face" | "actor")`
+answers the same way in advance; with no action it lists the raw states (menus, scenes, OStim, furniture, mount...). Reads
+are never blocked. For a picture during a scene or in a chair, use `TakeScreenshot`.
 
-Some tools (like ToggleImmortalMode) automatically check safety and use fallback strategies.
+## Face Builder (experimental)
+
+Needs RaceMenu. The AI can measure the character's face, compare it with a photo or drawing, and edit it until they match.
+A typical session:
+
+1. **Studio:** `StudioGo` takes her to a quiet room with fixed lights (`StudioReturn` brings her back to the exact spot).
+   Measurements outdoors vary with light and weather.
+2. **Reference:** `SetFaceReference(image: "<path to photo>")` registers the face to aim for (several pictures of one person
+   work better than one).
+3. **Measure:** `MeasureFace(reference: "default")` lists every proportion and colour with the gap to the reference;
+   `FaceSideBySide` shows both.
+4. **Edit:** `SetFace` (sliders, makeup tints, head parts in one load), `SetBrowColor`, `SetHairColor`, `SculptFace` for
+   shapes no slider reaches. `ProbeSlider` measures what a slider actually does on this head.
+5. **Repeat** 3 and 4, then save a preset.
+
+Hair: `FindHairstyles(length: "shoulder", fringe: true)` shows contact sheets of every hair the character menu offers,
+measured from the mesh files, so styles can be compared without loading each one in game.
+
+Limits: proportions can match closely, but a likeness also depends on soft tissue and hairstyle; body silhouette widths
+and arm length are reported, not compared. Changing head parts on followers with pre-built faces is refused (their face
+breaks after a restart).
 
 ## Troubleshooting
 

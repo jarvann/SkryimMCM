@@ -7,7 +7,7 @@
 # SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
-    [string]$Version = "1.2.1",
+    [string]$Version = "1.3.0",
     [string]$OutputDir = "release",
     [string]$VcpkgRoot = "C:\vcpkg"
 )

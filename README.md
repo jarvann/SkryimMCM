@@ -1,45 +1,47 @@
 # SkyLink AI
 
-A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. 89 tools for reading and modifying game state in real time — player stats, inventory, quests, NPCs, world interaction, combat, and more.
+A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. About 150 tools for reading and changing game state in real time: player stats, inventory, quests, NPCs, world, combat, and (new in 1.3, experimental) building and matching a character's face.
 
 ## Architecture
 
 ```
-Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (inside Skyrim)
+Claude Desktop <--stdio--> SkyLinkLauncher <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE plugin (inside Skyrim)
 ```
 
-**SKSE Plugin** (C++ DLL) — runs inside Skyrim's process via SKSE. Uses CommonLibSSE-NG for native engine access. Exposes 74 game actions over a named pipe (`\\.\pipe\SkyrimMCP`).
+**SKSE plugin** (C++, CommonLibSSE-NG): a small host DLL loaded by SKSE and a logic DLL it loads and can swap while the game runs. Exposes the game actions over a named pipe (`\\.\pipe\SkyrimMCP`).
 
-**C# MCP Server** (.NET 10) — bridges Claude Desktop (stdio MCP) and the SKSE plugin (named pipe). 89 MCP tools auto-discovered via `[McpServerTool]` attributes.
+**C# MCP server** (.NET 10): bridges Claude Desktop (stdio MCP) and the plugin. The launcher restarts it when a new version is installed. Face and body measurement run here, locally, with ONNX Runtime and Google's MediaPipe models (no internet, no account).
 
 ## Features
 
-### 74 Game Actions
-
 | Category | Tools |
 |----------|-------|
-| **Player** | Info, skills, perks, spells, shouts, appearance, factions, resistances, powers, diseases, level, blueprint export |
-| **Inventory** | Full inventory (paged), equipped items (32 slots), add/remove, bulk add, equip/unequip, enchantment details |
-| **Quests** | Active quests, stages, aliases (resolved to NPCs), quest items, set stage, start/stop/complete |
-| **NPCs** | Nearby NPCs, detailed info, NPC inventory, followers, detection level, crosshair targeting, kill, move |
-| **World** | Weather (get/set/list 339 types), cell info, nearby objects, containers, lock/unlock doors, map markers, teleport |
-| **Combat** | Combat state (targets + allies), damage stats (armor + weapon damage), threat assessment |
-| **Economy** | Nearby merchants, merchant inventory, bounties, clear bounties |
-| **Magic** | Spell details (cost/school/effects), enchantment info, magic resistances, disease/vampire/werewolf status |
-| **Actions** | God mode, immortal mode, collision toggle, save/load game, set time, notifications |
-| **Events** | 17 event types: combat, death, quests, location, inventory, equip, hits, spells, activate |
-| **Utility** | Console commands (with output capture), form search, load order, SKSE plugin scanner, game safety check |
-| **Papyrus** | Function catalog (3,389 functions from 166 scripts), script function lookup, VM call bridge |
+| **Player** | Info, skills, perks, spells, shouts, appearance, factions, resistances, powers, diseases, level, blueprint export (now with quest progress) and apply (inventory, equipment, gold) |
+| **Inventory** | Full inventory (paged), equipped items, add/remove, bulk add, equip/unequip, enchantment details, loot by category |
+| **Quests** | Active quests, stages, aliases (resolved to NPCs), quest items, verified set stage, start/stop/complete |
+| **NPCs** | Nearby NPCs, detailed info, NPC inventory and appearance, followers, detection, crosshair targeting, move to the player |
+| **World** | Weather, cell info, nearby objects, containers, doors, map markers, teleport (with a way back) |
+| **Combat** | Combat state, damage stats, threat assessment |
+| **Face builder** *(experimental, needs RaceMenu)* | Repeatable face captures, measurement against a photo, sliders, makeup tints, brow and hair colour, head parts, sculpt brush, slider probing, a lit studio room, side-by-side sheets |
+| **Hair and body** *(experimental)* | Hair picker by shape (contact sheets, no in-game cycling), body proportions, RaceMenu body morphs and overlays (OBody-aware) |
+| **Utility** | Console commands with output, form search, load order, volume (with snapshot and restore), screenshots, crash log and SkyLink's crash recorder, Skyrim guidebook (UESP), notes and goals |
+| **Papyrus** | Function catalog, function lookup, VM call bridge |
 
-### Smart Features
+### Safety
 
-- **Paged output** — large responses (inventory, spells, perks) support page/pageSize params. `page=0` returns count-only summary
-- **Character blueprint** — single-call export of entire character state (skills, perks, spells, shouts, equipment, inventory, appearance, factions, resistances)
-- **Event system** — 17 event types with framework noise filtering and type/exclude filters
-- **Game safety checker** — detects unsafe states (loading, kill moves, saves) before executing commands
-- **HUD notifications** — in-game notifications for all actions
-- **Loot scanner** — finds and ranks nearby container contents by value
-- **Snapshot** — exports blueprint + saves game with matching timestamped names
+Each kind of action has its own rule, applied by the tool itself, and `GetGameSafety(action)` answers the same way in advance:
+
+- **Moving the player** (teleport, studio trips) is refused during menus (including ones a mod keeps from pausing), combat, dialogue, scenes, OStim scenes, script-held controls, furniture, mounts, ragdoll, falling, bleeding out or carrying an object.
+- **Captures and measurements** are refused in scenes, menus, combat or furniture (a capture's pose reset would stand her up); `TakeScreenshot` always works.
+- **Face edits** wait for scenes, a mod's menu or a message box, and beast form.
+- Reads (inventory, quests, morphs...) are never blocked. Every game-thread task runs inside a fault guard.
+
+### Other
+
+- **Paged output** for large lists; `page=0` returns a count-only summary
+- **Character blueprint**: one call exports the whole character, with portable form IDs that survive a load-order change
+- **Event system**: 17 event types with noise filtering
+- **Hot reload**: both the plugin's logic and the server update while the game and Claude Desktop keep running
 
 ## Requirements
 
@@ -49,6 +51,7 @@ Claude Desktop <--stdio/MCP--> C# MCP Server <--named pipe--> SKSE Plugin (insid
 - **Address Library for SKSE** ([Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/32444))
 - **.NET 10 Runtime** ([download](https://dotnet.microsoft.com/download/dotnet/10.0))
 - **Claude Desktop** ([claude.ai/desktop](https://claude.ai/desktop))
+- **RaceMenu** (optional): needed for the face builder, presets, sculpting, body morphs and overlays. The native appearance tools (hair colour, skin tone, head parts) work without it.
 
 ## Installation
 
@@ -120,7 +123,7 @@ dotnet build SkyrimMCP
 dotnet build SkyLinkLauncher
 
 # Or build release package
-.\build_release.ps1 -Version "1.2.1"
+.\build_release.ps1 -Version "1.3.0"
 ```
 
 ## Project Structure
@@ -173,10 +176,14 @@ dotnet build SkyLinkLauncher
 - Console command execution approach adapted from [ConsoleUtilSSE](https://github.com/VersuchDrei/ConsoleUtilSSE) by VersuchDrei (MIT License)
 - [CommonLibSSE-NG](https://github.com/alandtse/CommonLibVR/tree/ng) — alandtse fork (Skyrim 1.7 support), originally by CharmedBaryon and Ryan McKenzie
 - SKSE by Ian Patterson, Stephen Abel, and Paul Shortman
+- Face and pose landmark models: Google [MediaPipe](https://ai.google.dev/edge/mediapipe) Face Landmarker and Pose Landmarker (Apache-2.0), converted to ONNX unchanged; see `Models\NOTICE.txt`
+- [ONNX Runtime](https://onnxruntime.ai/) by Microsoft (MIT)
+- Guidebook content from [UESP](https://en.uesp.net/) (CC BY-SA 2.5), fetched on demand
 
 ## License
 
 - **SKSE plugin** (`SkyrimMCPPlugin/`, distributed as `SkyrimMCPPlugin.dll`): GPL-3.0-or-later. It statically links CommonLibSSE-NG, which is GPL-3.0-or-later with a modding exception, so the compiled plugin carries that licence.
 - **MCP server** (`SkyrimMCP/`): MIT. It is a separate program that talks to the plugin over a named pipe.
+- **Models** (`SkyrimMCP/Models/`): Apache-2.0 (Google MediaPipe), with `NOTICE.txt` and the licence text alongside.
 
 Full texts: [`SkyrimMCPPlugin/LICENSE`](SkyrimMCPPlugin/LICENSE) and [`SkyrimMCP/LICENSE`](SkyrimMCP/LICENSE). Source for both is in this repository.
