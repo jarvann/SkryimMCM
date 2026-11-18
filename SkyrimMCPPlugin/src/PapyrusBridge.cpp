@@ -346,7 +346,7 @@ namespace SkyrimMCP::PapyrusBridge {
     // Converts one JSON argument to a Variable of the parameter's declared type.
     // Returns an error message, or an empty string on success.
     static std::string PackArgument(const json& a_arg, const RE::BSScript::TypeInfo& a_type,
-                                    const std::string& a_paramName, RE::BSScript::Variable& a_out) {
+                                    const std::string& a_paramName, RE::BSScript::Variable& a_out, json& a_diag) {
         auto mismatch = [&](const char* a_expected) {
             return "Argument '" + a_paramName + "' must be " + a_expected + ", got " + a_arg.dump();
         };
@@ -379,15 +379,44 @@ namespace SkyrimMCP::PapyrusBridge {
                 return "Argument '" + a_paramName + "' must be an Actor, but " + text + " isn't one";
             }
             // The task owns its Variable: if the wait times out, the game thread may still run it later.
+            // BUG-066: in game every call given a form came back with no value (StorageUtil.GetIntValue(player, key, 7)
+            // returned nothing; with None it returned 7). Report how each form was bound, so the step that fails shows.
             auto holder = std::make_shared<RE::BSScript::Variable>();
+            json diag;
             try {
-                TaskQueue::RunOnGameThread([holder, form]() -> json {
-                    RE::BSScript::PackHandle(holder.get(), form, static_cast<RE::VMTypeID>(form->GetFormType()));
-                    return json::object();
+                diag = TaskQueue::RunOnGameThread([holder, form, a_paramName]() -> json {
+                    const auto typeId = static_cast<RE::VMTypeID>(form->GetFormType());
+                    json d = {{"param", a_paramName}, {"form", std::format("{:08X}", form->GetFormID())}, {"typeId", typeId}};
+                    auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+                    if (!vm) { d["problem"] = "no VM"; return d; }
+                    RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> classPtr;
+                    const bool typed = vm->GetScriptObjectType(typeId, classPtr) && classPtr;
+                    d["class"] = typed && classPtr->GetName() ? classPtr->GetName() : "(none)";
+                    auto* policy = vm->GetObjectHandlePolicy1();
+                    const auto handle = policy ? policy->GetHandleForObject(typeId, form) : 0;
+                    d["handle"] = std::format("{:016X}", handle);
+                    if (policy) {
+                        d["handleAvailable"] = policy->IsHandleObjectAvailable(handle);
+                        d["handleIsType"] = policy->HandleIsType(typeId, handle);
+                    }
+                    RE::BSTSmartPointer<RE::BSScript::Object> bound;
+                    d["alreadyBound"] = typed && vm->FindBoundObject(handle, classPtr->GetName(), bound) && bound;
+                    RE::BSScript::PackHandle(holder.get(), form, typeId);
+                    d["packedIsObject"] = holder->IsObject();
+                    if (auto obj = holder->GetObject()) {
+                        d["objectClass"] = obj->GetTypeInfo() && obj->GetTypeInfo()->GetName() ? obj->GetTypeInfo()->GetName() : "(none)";
+                        d["objectHandle"] = std::format("{:016X}", obj->GetHandle());
+                        d["objectValid"] = obj->IsValid();
+                        d["objectConstructed"] = obj->IsConstructed();
+                        d["objectInitialized"] = obj->IsInitialized();
+                        d["resolves"] = obj->Resolve(typeId) == form;
+                    }
+                    return d;
                 });
             } catch (const std::exception& e) {
                 return "Argument '" + a_paramName + "': " + e.what();
             }
+            a_diag = diag;
             a_out = *holder;
             return {};
         }
@@ -488,13 +517,16 @@ namespace SkyrimMCP::PapyrusBridge {
         };
 
         auto dynArgs = std::make_unique<DynamicArgs>();
+        json packed = json::array();
         for (std::uint32_t i = 0; i < paramCount; i++) {
             RE::BSFixedString paramName;
             RE::BSScript::TypeInfo paramType;
             func->GetParam(i, paramName, paramType);
 
             RE::BSScript::Variable v;
-            auto err = PackArgument(args[i], paramType, paramName.c_str() ? paramName.c_str() : "?", v);
+            json diag;
+            auto err = PackArgument(args[i], paramType, paramName.c_str() ? paramName.c_str() : "?", v, diag);
+            if (!diag.is_null()) packed.push_back(diag);
             if (!err.empty()) {
                 return {{"error", err + ". Signature: " + signature}};
             }
@@ -552,6 +584,7 @@ namespace SkyrimMCP::PapyrusBridge {
         result["functionName"] = functionName;
         result["signature"] = signature;
         if (targetForm) result["target"] = std::format("{:08X}", targetForm->GetFormID());
+        if (!packed.empty()) result["packed"] = packed;
         return result;
     }
 
