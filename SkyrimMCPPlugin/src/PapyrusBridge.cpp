@@ -13,6 +13,11 @@
 #include <regex>
 #include <cstring>
 
+// windows.h (via SKSE) defines GetObject as GetObjectA, which hides Variable::GetObject.
+#ifdef GetObject
+#undef GetObject
+#endif
+
 namespace SkyrimMCP::PapyrusBridge {
 
     using json = nlohmann::json;
@@ -403,7 +408,7 @@ namespace SkyrimMCP::PapyrusBridge {
                     d["alreadyBound"] = typed && vm->FindBoundObject(handle, classPtr->GetName(), bound) && bound;
                     RE::BSScript::PackHandle(holder.get(), form, typeId);
                     d["packedIsObject"] = holder->IsObject();
-                    if (auto obj = (holder->GetObject)()) {  // parenthesised: windows.h defines GetObject
+                    if (auto obj = holder->GetObject()) {
                         d["objectClass"] = obj->GetTypeInfo() && obj->GetTypeInfo()->GetName() ? obj->GetTypeInfo()->GetName() : "(none)";
                         d["objectHandle"] = std::format("{:016X}", obj->GetHandle());
                         d["objectValid"] = obj->IsValid();
