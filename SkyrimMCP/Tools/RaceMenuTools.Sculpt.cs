@@ -51,7 +51,8 @@ public partial class RaceMenuTools
         "direction or LoadRaceMenuPreset. dryRun shows what would move without changing the face.")]
     public async Task<object> SculptFace(string region, string direction, double amount, double? radius = null, bool dryRun = false)
     {
-        if (!dryRun && await SafetyBlock("face", null) is string gateReason) return new { error = gateReason };  // FEAT-260
+        // It captures to aim the stroke (even a dry run), so the camera rule applies too (BUG-077).
+        if ((await SafetyBlock("camera", null) ?? (dryRun ? null : await SafetyBlock("face", null))) is string gateReason) return new { error = gateReason };  // FEAT-260
         try
         {
             if (!OperatingSystem.IsWindows()) return new { error = "Sculpting needs Windows (face landmarks)." };

@@ -3692,6 +3692,10 @@
             {
               "datetime": "2026-11-19T18:20",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T19:40",
+              "note": "In game (build 107): a real Teleport while seated was refused with the furniture reason and she stayed put."
             }
           ],
           "targetRelease": "1.3"
@@ -3726,6 +3730,25 @@
             {
               "datetime": "2026-11-19T19:10",
               "note": "From the in-game agent's live OStim test."
+            },
+            {
+              "datetime": "2026-11-19T19:40",
+              "note": "In game (build 107): isInOStimScene and safeMeans present. Scene listing not yet seen during a scene."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-077",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "A capture pulls a seated player out of the chair",
+          "description": "In game (build 107): with her seated, a real Teleport was refused (pass), but CaptureFace stood her up: the neutral-pose idle reset ended the furniture state (Cory saw it). A preset load while seated left her seated, so face edits need no rule. The camera kind now refuses while she is sitting, lying or using furniture: CaptureFace (unless neutralPose=false, which keeps her pose), live MeasureFace, MeasureProfile, live MeasureBody, FaceSideBySide live, ProbeSlider(s) and SculptFace (it captures to aim, even a dry run).",
+          "history": [
+            {
+              "datetime": "2026-11-19T19:40",
+              "note": "From the in-game agent's seated tests."
             }
           ],
           "targetRelease": "1.3"

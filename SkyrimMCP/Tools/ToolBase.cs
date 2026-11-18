@@ -19,6 +19,7 @@ public abstract class ToolBase
     /// FEAT-260: what each kind of action needs before it runs. "move" (Teleport, studio trips): the player free to move, no
     /// animation scene. "camera" (captures, measurements, probes) and "face" (face and body edits): no animation or scripted
     /// scene, no script-held controls, no conversation, combat, kill move, load or save; "face" also not in beast form.
+    /// "camera" also refuses while she is using furniture (the pose reset stands her up); "camera-seated" doesn't.
     /// "actor" (moving someone else): that actor not in an animation scene. Returns the reason it can't run, or null.
     /// Reads (inventory, quests, morphs...) have no gate.
     /// </summary>
@@ -38,6 +39,9 @@ public abstract class ToolBase
             if (reasons.Count > 0) blockers = blockers.Where(b => !b.Contains("in the air")).ToList();
             if (kind == "move") reasons.AddRange(blockers);
             else reasons.AddRange(blockers.Where(b => stillWords.Any(w => b.Contains(w, StringComparison.OrdinalIgnoreCase))));
+            // BUG-077: a capture's neutral-pose reset pulled her out of a chair (seen in game); measurements also need her
+            // standing. "camera-seated" is a capture that keeps her pose (CaptureFace neutralPose=false).
+            if (kind == "camera") reasons.AddRange(blockers.Where(b => b.Contains("sitting, lying")).Select(b => b + " (a capture would pull her out of it)"));
             if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
         }
         return reasons.Count == 0 ? null : "Not now: " + string.Join("; ", reasons.Distinct()) + ".";
