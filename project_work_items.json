@@ -3142,6 +3142,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-256",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Regenerate an NPC's face after a head part change",
+          "description": "Changing a head part on an NPC with a pre-built FaceGen mesh gives the dark-face fault (BUG-064: Lucien's hair). A real fix rebuilds the face: write a new FaceGeom NIF (head parts with morphs applied) and FaceTint DDS for the NPC, as the Creation Kit's Export FaceGen does, into an override folder, then rebuild his 3D. Needs: reading every head part NIF and its TRI morphs (FEAT-254 readers), writing SSE NIF, tint layer compositing to DDS. Interim: wigs (equippable hair).",
+          "history": [
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "From the Lucien hair test; after 1.3."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "BUG-055",
           "type": "bug",
           "status": "complete",
