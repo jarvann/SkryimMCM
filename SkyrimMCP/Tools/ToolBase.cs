@@ -44,7 +44,8 @@ public abstract class ToolBase
             if (kind == "camera") reasons.AddRange(blockers.Where(b => b.Contains("sitting, lying")).Select(b => b + " (a capture would pull her out of it)"));
             if (kind is "camera" or "camera-seated") reasons.AddRange(blockers.Where(b => b.Contains("on a mount")));
             // The capture refuses with a pausing menu open (BUG-057); say so in the look-ahead too (BUG-078).
-            if (kind is "camera" or "camera-seated") reasons.AddRange(blockers.Where(b => b.Contains("a menu is open")));
+            if (kind is "camera" or "camera-seated")
+                reasons.AddRange(blockers.Where(b => b.Contains("a menu is open") || (b.Contains(" is open (") && !b.Contains("before she is moved"))));
             if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
         }
         if (reasons.Count == 0) return null;

@@ -3799,6 +3799,10 @@
             {
               "datetime": "2026-11-19T20:45",
               "note": "From the in-game agent."
+            },
+            {
+              "datetime": "2026-11-19T21:10",
+              "note": "In game (build 111): Tab menu refused move and camera with isPaused false; a container refused move and allowed camera. SetBodyReference delete failed with a blank error, game running or not: image was still required, so the call failed before the tool ran. image is now optional (needed only to register). Menus are named the way a player says them (the Tab menu, the inventory...) with the internal name in brackets."
             }
           ],
           "targetRelease": "1.3"
