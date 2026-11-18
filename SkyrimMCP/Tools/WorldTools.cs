@@ -103,24 +103,53 @@ public class WorldTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Teleport player to a location (e.g., 'whiterun', 'riverwood', 'solitude'). " +
-        "CAUTION: Teleporting during combat, scripted scenes, or dialogue can crash the game. " +
-        "Ask the user to confirm they are in a safe state before teleporting. " +
-        "Takes a known location name or a cell editor ID (SearchForms type 'cell' finds them); an unknown cell is refused. " +
-        "There is a loading screen (the game may show as not responding): tell the player first. The reply waits up to 20 seconds " +
-        "for her to arrive and says where she is.")]
+    [Description("Teleport the player to a location (e.g. 'whiterun', 'riverwood', 'solitude') or a cell editor ID (SearchForms type " +
+        "'cell' finds them); an unknown cell is refused. location 'back' returns her to where the last Teleport started, facing the " +
+        "same way. Tell the player first: the screen freezes for several seconds (the game may show as not responding), and " +
+        "teleporting during combat, scenes or dialogue can crash the game. The reply waits up to 20 seconds for her to arrive, says " +
+        "where she is, and lists followers left far away (MoveActorTo brings them).")]
     public async Task<object> Teleport(string location)
     {
-        var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
-
+        var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
         var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
         var fromCell = before?["cellFormId"]?.ToString();
-        var data = await _pipe.SendRequestAsync("teleport", new JsonObject
+        string? markerId = null;
+        string? oldMarker = null;
+        try { if (File.Exists(backFile)) oldMarker = JsonNode.Parse(await File.ReadAllTextAsync(backFile))?["markerId"]?.ToString(); } catch (Exception) { }
+
+        if (location.Trim().Equals("back", StringComparison.OrdinalIgnoreCase))
         {
-            ["cellId"] = cellId
-        });
+            // BUG-072: back to the marked starting spot, no console coordinates.
+            if (oldMarker == null) return new { error = "No earlier Teleport on record to go back to." };
+            var r = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "return", ["markerId"] = oldMarker });
+            if (r?["error"] != null) return DeserializeResponse(r);
+            var back = await WaitForArrival(fromCell);
+            if (back is JsonObject)
+            {
+                await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker });
+                File.Delete(backFile);
+            }
+            return await ArrivalReply("back", null, back);
+        }
+
+        var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
+        var data = await _pipe.SendRequestAsync("teleport", new JsonObject { ["cellId"] = cellId });
         if (data?["error"] != null) return DeserializeResponse(data);
-        // BUG-071: wait out the loading screen (the game thread doesn't answer during it) and report where she landed.
+        markerId = data?["markerId"]?.ToString();
+        if (markerId != null)
+        {
+            // Keep only the newest starting spot: "back" means the last trip.
+            if (oldMarker != null && oldMarker != markerId)
+                try { await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "cleanup", ["markerId"] = oldMarker }); } catch (Exception) { }
+            Directory.CreateDirectory(SkyLinkSettings.Folder);
+            await File.WriteAllTextAsync(backFile, new JsonObject { ["markerId"] = markerId, ["from"] = before?["cellName"]?.DeepClone() }.ToJsonString());
+        }
+        return await ArrivalReply(location, cellId, await WaitForArrival(fromCell));
+    }
+
+    // BUG-071: waits out the frozen screen (the game thread doesn't answer during it); the new cell, or null after 20 s.
+    private async Task<JsonNode?> WaitForArrival(string? fromCell)
+    {
         for (var waited = 0; waited < 20000; waited += 750)
         {
             await Task.Delay(750);
@@ -128,13 +157,36 @@ public class WorldTools : ToolBase
             {
                 var now = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
                 var cell = now?["cellFormId"]?.ToString();
-                if (cell != null && cell != fromCell)
-                    return new { success = true, arrived = true, location, cellId, cellName = now?["cellName"]?.ToString(), cellFormId = cell };
+                if (cell != null && cell != fromCell) return now;
             }
-            catch (Exception) { /* loading screen */ }
+            catch (Exception) { /* still loading */ }
         }
-        return new { success = true, arrived = false, location, cellId,
-                     note = "The move started but she hadn't arrived after 20 seconds (a long loading screen). Check with GetCellInfo shortly." };
+        return null;
+    }
+
+    private async Task<object> ArrivalReply(string location, string? cellId, JsonNode? arrived)
+    {
+        if (arrived == null)
+            return new { success = true, arrived = false, location, cellId,
+                         note = "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
+        // BUG-072: followers don't always come along; list the ones left far away.
+        var leftBehind = new List<object>();
+        try
+        {
+            var followers = await _pipe.SendRequestAsync("get_followers");
+            foreach (var f in (followers?["followers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                if ((f["distance"]?.GetValue<double>() ?? 0) > 3000)
+                    leftBehind.Add(new { name = f["name"]?.ToString(), refId = f["refId"]?.ToString(), distance = Math.Round(f["distance"]!.GetValue<double>()) });
+        }
+        catch (Exception) { }
+        return new
+        {
+            success = true, arrived = true, location, cellId,
+            cellName = arrived["cellName"]?.ToString(), cellFormId = arrived["cellFormId"]?.ToString(),
+            followersLeftBehind = leftBehind.Count > 0 ? leftBehind : null,
+            followersNote = leftBehind.Count > 0 ? "MoveActorTo(actorFormId: <refId>, target: 'player') brings a follower to her." : null,
+            back = location == "back" ? null : "Teleport('back') returns her to where she started.",
+        };
     }
 
     [McpServerTool]

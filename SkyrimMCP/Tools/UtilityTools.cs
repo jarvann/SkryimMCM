@@ -62,6 +62,7 @@ public class UtilityTools : ToolBase
         "Actions: ToggleGodMode, ToggleCollision, SetHealth, SetMagicka, SetStamina, SaveGame, SearchForms, ShowNotification. " +
         "Only use this tool if none of the above cover your need. " +
         "TARGETING: Use dot-notation with refId (e.g., 'FE124B0E.kill'), NOT prid — prid does not persist between calls. " +
+        "A refId that starts with a digit must be quoted ('\"61033226\".moveto player'), or the console reads it as a command. " +
         "Player commands: use 'player.' prefix (e.g., 'player.additem 0000000F 100'). " +
         "Commands run with the player selected, as if the player were clicked in the console, so 'tcl' here only " +
         "sets the player's reference flag and is NOT no-clip: use ToggleCollision for that. " +
