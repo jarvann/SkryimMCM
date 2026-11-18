@@ -161,12 +161,14 @@ namespace SkyrimMCP::Helpers {
         // picker) blocks like the named ones.
         if (ui) {
             static constexpr std::pair<const char*, const char*> kMenus[] = {
-                {"TweenMenu", "the Tab menu"}, {"InventoryMenu", "the inventory"}, {"MagicMenu", "the magic menu"},
+                {"InventoryMenu", "the inventory"}, {"MagicMenu", "the magic menu"},
                 {"MapMenu", "the map"}, {"Journal Menu", "the journal"}, {"StatsMenu", "the skills menu"},
                 {"Book Menu", "a book"}, {"Lockpicking Menu", "lockpicking"}, {"Sleep/Wait Menu", "the sleep or wait menu"},
                 {"Training Menu", "training"}, {"Crafting Menu", "a crafting station"}, {"RaceSex Menu", "the character menu"},
                 {"MessageBoxMenu", "a message box"}, {"FavoritesMenu", "favourites"}, {"Console", "the console"},
-                {"LevelUp Menu", "the level-up menu"}, {"Tutorial Menu", "a tutorial"}, {"Credits Menu", "the credits"}};
+                {"LevelUp Menu", "the level-up menu"}, {"Tutorial Menu", "a tutorial"}, {"Credits Menu", "the credits"},
+                // Last: the skills menu opens over it and is what the player is looking at (BUG-080).
+                {"TweenMenu", "the Tab menu"}};
             static constexpr std::pair<const char*, const char*> kWorldMenus[] = {
                 {"ContainerMenu", "a container"}, {"BarterMenu", "a trade"}, {"GiftMenu", "the gift menu"}};
             static constexpr const char* kIgnore[] = {"Cursor Menu", "HUD Menu", "Loading Menu", "Dialogue Menu", "Fader Menu",
