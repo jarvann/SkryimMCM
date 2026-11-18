@@ -4996,6 +4996,13 @@
         "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.2.1",
         "nexus": "https://www.nexusmods.com/skyrimspecialedition/mods/175682"
       }
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-11-19",
+      "nexus": "mod 175682 file updated, version 1.3.0, sticky post edited",
+      "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.3.0",
+      "notes": "docs/release-notes-1.3.md"
     }
   ],
   "releasePlan": {
