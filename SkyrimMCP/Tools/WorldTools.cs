@@ -106,17 +106,35 @@ public class WorldTools : ToolBase
     [Description("Teleport player to a location (e.g., 'whiterun', 'riverwood', 'solitude'). " +
         "CAUTION: Teleporting during combat, scripted scenes, or dialogue can crash the game. " +
         "Ask the user to confirm they are in a safe state before teleporting. " +
-        "Takes a known location name or a cell editor ID (SearchForms type 'cell' finds them); an unknown cell is refused.")]
+        "Takes a known location name or a cell editor ID (SearchForms type 'cell' finds them); an unknown cell is refused. " +
+        "There is a loading screen (the game may show as not responding): tell the player first. The reply waits up to 20 seconds " +
+        "for her to arrive and says where she is.")]
     public async Task<object> Teleport(string location)
     {
         var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
 
+        var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
+        var fromCell = before?["cellFormId"]?.ToString();
         var data = await _pipe.SendRequestAsync("teleport", new JsonObject
         {
             ["cellId"] = cellId
         });
         if (data?["error"] != null) return DeserializeResponse(data);
-        return new { success = true, message = $"Teleporting to {location}", cell = data?["cell"]?.ToString(), cellName = data?["cellName"]?.ToString() };
+        // BUG-071: wait out the loading screen (the game thread doesn't answer during it) and report where she landed.
+        for (var waited = 0; waited < 20000; waited += 750)
+        {
+            await Task.Delay(750);
+            try
+            {
+                var now = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
+                var cell = now?["cellFormId"]?.ToString();
+                if (cell != null && cell != fromCell)
+                    return new { success = true, arrived = true, location, cellId, cellName = now?["cellName"]?.ToString(), cellFormId = cell };
+            }
+            catch (Exception) { /* loading screen */ }
+        }
+        return new { success = true, arrived = false, location, cellId,
+                     note = "The move started but she hadn't arrived after 20 seconds (a long loading screen). Check with GetCellInfo shortly." };
     }
 
     [McpServerTool]

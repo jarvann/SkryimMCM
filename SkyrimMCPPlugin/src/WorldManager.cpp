@@ -1,5 +1,6 @@
 #include "WorldManager.h"
 #include "Helpers.h"
+#include "TaskQueue.h"
 
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
@@ -57,10 +58,11 @@ namespace SkyrimMCP::WorldManager {
         if (!target) {
             return {{"error", "No cell with the editor ID '" + cellId + "'. Find one with SearchForms(type: 'cell') or use a known location name."}};
         }
-        auto result = Helpers::ExecuteConsoleCommand("coc " + cellId);
-        result["cell"] = cellId;
-        result["cellFormId"] = std::format("{:08X}", target->GetFormID());
-        if (const char* name = target->GetName(); name && name[0]) result["cellName"] = name;
+        // BUG-071: coc runs the loading screen inside the call, so a slow load timed the request out though the move worked.
+        // Start it on the next frame and return at once; the server waits for the cell to change.
+        TaskQueue::Post([cellId]() { Helpers::ExecuteConsoleCommand("coc " + cellId); });
+        json result = {{"moving", true}, {"cell", cellId}, {"targetFormId", std::format("{:08X}", target->GetFormID())}};
+        if (const char* name = target->GetName(); name && name[0]) result["targetName"] = name;
         return result;
     }
 

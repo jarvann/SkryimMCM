@@ -245,6 +245,8 @@ namespace SkyrimMCP {
             return {{"lights", lights},
                     {"preset", lights > 0 && !preset.empty() ? json(preset) : json(nullptr)},
                     {"cell", cellId ? cellId : ""},
+                    {"cellFormId", cell ? json(std::format("{:08X}", cell->GetFormID())) : json(nullptr)},
+                    {"cellName", cell && cell->GetName() ? json(cell->GetName()) : json(nullptr)},
                     {"interior", cell && cell->IsInteriorCell()},
                     {"markerId", s_marker ? json(std::format("{:08X}", s_marker)) : json(nullptr)}};
         }
