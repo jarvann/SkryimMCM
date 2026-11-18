@@ -1190,7 +1190,7 @@
         {
           "id": "FEAT-131",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Volume control",
           "description": "Master/category volume adjustment.",
           "history": [
@@ -1205,6 +1205,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "In game: categories apply at once except the playing music track; restore fixed in BUG-059."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: Volume tested in game through builds 82-87: categories, snapshot/restore, FormID targets; music delay documented."
             }
           ],
           "targetRelease": "1.3"
@@ -1395,7 +1399,7 @@
         {
           "id": "FEAT-207",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "One-call apply blueprint with dry run",
           "description": "Single call that adds items, equips them and restores gold from a blueprint, with a dry-run option that reports what would change. First deliverable slice of FEAT-121 (inventory/equipment/gold sections only).",
           "history": [
@@ -1410,6 +1414,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "In game: dry run works; it listed worn items and one food item on an unchanged character (BUG-061)."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: Dry run tested in game (build 83): empty on an unchanged character. A real apply (dryRun false) not run."
             }
           ],
           "targetRelease": "1.3"
@@ -1417,7 +1425,7 @@
         {
           "id": "FEAT-208",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Appearance write tools",
           "description": "Head parts can be read but not changed. Add tools to set or remove head parts (the case that prompted it: fixing horns directly). Relates to FEAT-121 appearance section.",
           "history": [
@@ -1428,6 +1436,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built: SetHeadPart (FormID/editor ID or type+menu index) and RemoveHeadPart (not face/eyes). Not tested in game yet."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: Appearance write tools used throughout the face work (SetHairColor, SetSkinTone, SetHeadPart, RemoveHeadPart)."
             }
           ],
           "targetRelease": "1.3"
@@ -1582,9 +1594,13 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "No GOG copy and no reply yet. Build 13 adds CheckConnection diagnostics (store, Address Library file, game-thread tasks queued vs run, diagnostics.problem) so the next GOG report shows whether SKSE runs SkyLink's tasks at all. Host DLL change."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "Moved to 1.4: can't be tested without a GOG copy; waiting on a GOG user's report."
             }
           ],
-          "targetRelease": "1.3"
+          "targetRelease": "1.4"
         },
         {
           "id": "BUG-013",
@@ -1853,7 +1869,7 @@
         {
           "id": "FEAT-219",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Crash recorder: what SkyLink and the game did just before a crash",
           "description": "The host DLL (never unloaded) keeps a ring buffer of the last few hundred events: AI tool calls, Papyrus calls, game events, current cell, quest stage changes. A vectored exception handler writes it to a file on a fatal exception, then lets Crash Logger SSE write its normal report (chained, never swallowing the crash). On the next launch the AI reads both together (with FEAT-217) to explain the crash. Does not try to recover or to make an emergency save: the game state is already damaged by then.",
@@ -1869,6 +1885,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "GetCrashLog read the recorder; a normal quit was flagged as not clean (BUG-063)."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: In game: GetCrashLog reads both sessions; quits judged by crash reports (BUG-067)."
             }
           ],
           "targetRelease": "1.3"
@@ -1888,6 +1908,10 @@
             {
               "datetime": "2026-11-16T16:00",
               "note": "Built 2026-11-15: TaskQueue SEH guard (CallGuarded/FaultFilter) on every game-thread task. No fault has occurred to exercise it."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "Ships untested: needs a crash inside a SkyLink game-thread task to exercise."
             }
           ],
           "targetRelease": "1.3"
@@ -3088,6 +3112,10 @@
             {
               "datetime": "2026-11-18T14:00",
               "note": "Archive layout and a wig's skin-partition vertices checked offline in Python (character-space z about 107). Built on feature/FEAT-254-bsa-meshes."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "Ships untested in game: no menu hair on this load order is packed in a BSA (the Beyond Skyrim hairs aren't installed)."
             }
           ],
           "targetRelease": "1.3"
@@ -3126,6 +3154,10 @@
             {
               "datetime": "2026-11-18T18:30",
               "note": "In game (build 78): SetFace dry run lists head parts. The replaced wording not exercised yet."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "Dry-run head parts confirmed; the 'replaced' wording on a live SetHeadPart not seen. Ships as is."
             }
           ],
           "targetRelease": "1.3"
@@ -3308,7 +3340,7 @@
         {
           "id": "BUG-062",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "SearchForms: cell finds nothing, unknown types fall back silently, empty editor IDs unexplained",
           "description": "In game: type cell returned 0 for Whiterun (interior cells aren't in the form array); now searched through the global form map. Unknown types used to search a few common types silently: refused with the list. Empty editor IDs (perks, spells, shouts, locations) are the game dropping them: a note says so. 'Fire Ball' under shout left as is (likely a mod's shout record).",
@@ -3320,6 +3352,10 @@
             {
               "datetime": "2026-11-19T13:30",
               "note": "In game (build 83): cell search works; unknown type refused but the list was dropped (fixed in BUG-065)."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: In game (build 83/84): cell search works, unknown type refused with the list."
             }
           ],
           "targetRelease": "1.3"
@@ -3350,7 +3386,7 @@
         {
           "id": "BUG-064",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "SetHeadPart on an NPC with a pre-built face gives a dark face; NPC head parts unreadable",
           "description": "In game (2026-11-19): swapping a follower's hair (Lucien, LucienHair to HairMaleImperial05) turned his face black with the hair as a detached wisp: the classic dark-face fault, since the FaceGen mesh no longer matches the record. The agent reverted it. Also no tool read an NPC's head parts (GetAppearance was player only). Now GetAppearance(refId) reads NPCs and reports faceGenMesh (path from the face NPC's plugin and local ID) and whether it exists (loose or BSA); SetHeadPart and RemoveHeadPart refuse on such an NPC unless force=true, suggesting a wig or a Creation Kit face regeneration. A runtime face-regeneration tool is a separate, larger item. Build 82's server failed to compile (key shadowed in GetBodyMorphs): fixed here.",
@@ -3358,6 +3394,10 @@
             {
               "datetime": "2026-11-19T12:00",
               "note": "From the in-game agent. Fixed on bugfix/BUG-064-npc-head-parts."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: In game (build 84/87): GetAppearance(refId) reads NPC parts and face file; refusal works."
             }
           ],
           "targetRelease": "1.3"
@@ -3365,7 +3405,7 @@
         {
           "id": "BUG-065",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Build 83 findings: loose face file missed, refusal too broad, unset NPC morphs, body morph calls return nothing",
           "description": "In game (build 83): faceGenMeshSource said none for Lucien though Data\\\\Meshes\\\\...\\\\Lucien.esp\\\\00005900.nif exists: the path started with meshes and MeshFiles added meshes again; MeshFiles now accepts both forms. A swap to HairMaleImperial1 without refresh looked right and held through cell changes and an in-session load, while the first swap (refresh, Beyond Skyrim hair) gave the dark face: the refusal now covers only refresh=true on a pre-built face (force for putting original parts back). NPC faceMorphs FLT_MAX and facePresets -1 left out. SearchForms puts the type list in the error text (the list field was dropped) and skips DynDOLOD cells. Music: a playing track took the new volume after up to a minute, a new track started at it, StopMusic left minutes of silence: the note says so (BUG-028). SetBodyMorph: GetBodyMorph returned no value at all; the warning now carries the Papyrus signatures and set result. Snapshot/restore, FormID targets, blueprint alreadyEquipped and cell search passed.",
@@ -3377,6 +3417,10 @@
             {
               "datetime": "2026-11-19T11:30",
               "note": "In game (build 84): face file found (loose), refusal with refresh worked, type list in the error, unset morphs gone. The no-refresh swap later proved unsafe after a restart (BUG-067)."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: In game (build 84): face file found, unset morphs gone, type list in errors. Policy later tightened (BUG-067)."
             }
           ],
           "targetRelease": "1.3"
@@ -3445,7 +3489,7 @@
         {
           "id": "BUG-051",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "SculptFace fails on a face without a sculpt; lid edges from small photo eyes",
           "description": "In game (build 66, photo pass 4): SculptFace(cheeks, out, 0.08) failed twice with a blank error on the control build (ResetFace had cleared its sculpt): every vertex row was new, written as ints, and read back with GetValue<double>, which throws for a non-JsonElement value. Rows are now written as longs and read with a numeric helper, and SculptFace returns any error as text. The new lid edges read nonsense on the photo reference (1.57/1.74 lower, 1.02/0.66 upper, against 0.60 on the build): they are now only measured when the iris radius is at least 10 px, so a small-eyed reference has none and they aren't compared.",
@@ -3457,6 +3501,10 @@
             {
               "datetime": "2026-11-18T11:30",
               "note": "In game (build 67): SculptFace on the control build (no sculpt) applied cleanly three times. Lid-edge exclusion not yet confirmed: the stored photo reference was registered before the build and needs re-registering."
+            },
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "1.3 close-out: In game: cheeks sculpted on a face without a sculpt (build 66+); lid edges dropped from photos (BUG-058)."
             }
           ],
           "targetRelease": "1.3"
@@ -3887,7 +3935,7 @@
     {
       "id": "INFRA-014",
       "type": "infrastructure",
-      "status": "implemented-untested",
+      "status": "complete",
       "title": "SearchForms expanded to 30+ form types",
       "description": "Added: idle, race, faction, worldspace, cell, container, activator, furniture, door, flora, music, keyword, magiceffect, headpart, eyes, outfit, voicetype, class, combatstyle, wordofpower, scene, relationship, recipe, projectile, light, global.",
       "history": [
@@ -3898,6 +3946,10 @@
         {
           "datetime": "2026-11-19T11:30",
           "note": "In game: perk, spell, shout, race, location and quest search fine; cell fixed in BUG-062."
+        },
+        {
+          "datetime": "2026-11-19T12:15",
+          "note": "1.3 close-out: In game: perk, spell, shout, race, location, quest and cell search work."
         }
       ],
       "targetRelease": "1.3"
