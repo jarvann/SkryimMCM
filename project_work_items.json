@@ -3236,6 +3236,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-258",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Named teleports show the game's loading screen",
+          "description": "Teleport to a named place runs the console coc on the next frame and shows a frozen or black frame for several seconds; Teleport(back) uses the native MoveTo to a marker and briefly showed the loading screen's level bar (in game, build 97). Studio trips (CenterOnCell, small interior) are near instant. Try a native move for named places: MoveTo the cell's COC heading marker or a door inside it, or CenterOnCell for interiors, and see whether the loading screen draws. Until then the description warns that the screen freezes.",
+          "history": [
+            {
+              "datetime": "2026-11-19T16:10",
+              "note": "From Cory and the in-game agent; after 1.3."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "BUG-055",
           "type": "bug",
           "status": "complete",
