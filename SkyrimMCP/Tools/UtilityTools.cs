@@ -93,7 +93,10 @@ public class UtilityTools : ToolBase
     [Description("Search for forms (items, NPCs, quests, spells, etc.) by name or editor ID. " +
         "This is the equivalent of the 'help' console command but safe and returns structured data. " +
         "Use this to find FormIDs for items, NPCs, quests, or any game record from any mod in the load order. " +
-        "Optionally filter by type: weapon, armor, potion, book, misc, spell, perk, quest, npc, enchantment, shout, key, ammo, ingredient, soulgem, scroll, location. " +
+        "Optionally filter by type: weapon, armor, potion, book, misc, spell, perk, quest, npc, race, enchantment, shout, key, ammo, " +
+        "ingredient, soulgem, scroll, location, cell (interiors by name), worldspace, faction, idle, container, activator, furniture, " +
+        "door, flora, music, keyword, magiceffect, headpart, outfit, class, recipe, light, global and more; an unknown type is refused " +
+        "with the list. Editor IDs are often empty (the game drops them). " +
         "Returns up to maxResults matches (default 25).")]
     public async Task<object> SearchForms(string query, string type = "all", int maxResults = 25)
     {

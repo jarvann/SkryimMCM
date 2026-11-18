@@ -142,13 +142,12 @@ namespace SkyrimMCP::UtilityManager {
         } else if (lowerFilter == "global" || lowerFilter == "glob") {
             typesToSearch = {{RE::FormType::Global, "global"}};
         } else {
-            // Default to searching common types
-            typesToSearch = {
-                {RE::FormType::Weapon, "weapon"}, {RE::FormType::Armor, "armor"},
-                {RE::FormType::AlchemyItem, "potion"}, {RE::FormType::Book, "book"},
-                {RE::FormType::Misc, "misc"}, {RE::FormType::Quest, "quest"},
-                {RE::FormType::NPC, "npc"}, {RE::FormType::Spell, "spell"},
-            };
+            // BUG-062: an unknown type used to search a few common types silently; say so instead.
+            return {{"error", "Unknown type '" + formTypeFilter + "'"},
+                    {"types", "all, weapon, armor, potion, ingredient, book, misc, ammo, key, soulgem, scroll, spell, perk, quest, npc, "
+                              "race, enchantment, shout, wordofpower, location, idle, faction, worldspace, cell, container, activator, "
+                              "furniture, door, flora, music, keyword, magiceffect, headpart, eyes, outfit, voicetype, class, "
+                              "combatstyle, scene, relationship, recipe, projectile, light, global"}};
         }
 
         json results = json::array();
@@ -258,7 +257,8 @@ namespace SkyrimMCP::UtilityManager {
 
                 // Some form types (notably Idle) have empty form arrays in TESDataHandler.
                 // Fall back to the global form map filtered by FormType.
-                if (forms.empty() && formType == RE::FormType::Idle) {
+                // BUG-062: cells too (interior cells live in their own list, so "cell" found nothing).
+                if (forms.empty() && (formType == RE::FormType::Idle || formType == RE::FormType::Cell)) {
                     SKSE::log::info("SearchForms: formArray empty for '{}', falling back to global form map", label);
                     const auto& [allForms, lock] = RE::TESForm::GetAllForms();
                     RE::BSReadLockGuard readLock(lock);
@@ -282,7 +282,14 @@ namespace SkyrimMCP::UtilityManager {
             }
         }
 
-        return {{"results", results}, {"count", count}, {"query", query}};
+        json out = {{"results", results}, {"count", count}, {"query", query}};
+        bool missingEditorIds = false;
+        for (const auto& r : results) if (r.value("editorId", "").empty()) { missingEditorIds = true; break; }
+        if (missingEditorIds) {
+            out["editorIdNote"] = "The game drops most editor IDs after loading (a tweaks plugin such as powerofthree's Tweaks keeps "
+                                  "them); empty editorId isn't an error.";
+        }
+        return out;
     }
 
     json GetLoadedSKSEPlugins() {
