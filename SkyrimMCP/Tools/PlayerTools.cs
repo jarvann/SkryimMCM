@@ -189,8 +189,8 @@ public class PlayerTools : ToolBase
         "IMPORTANT: Pass an outputPath to write the blueprint directly to a file on disk — the data is too large " +
         "for the MCP response. Example outputPath: 'C:\\Users\\<you>\\Documents\\blueprint.json'. " +
         "Every form ID also carries its plugin name and local ID (formIdSource), so ApplyBlueprint still finds modded items after a load-order change. " +
-        "Also records quest progress (journal quests completed or running, with current stage, the stages done, objectives seen with " +
-        "their state, and type) and notCaptured: what a blueprint " +
+        "Also records quest progress (quests completed or started, with current stage, objectives seen with their state, and " +
+        "type) and notCaptured: what a blueprint " +
         "can't hold (quest rewards and world changes, map markers, crime, other mods' script state).")]
     public async Task<object> GetCharacterBlueprint(string? outputPath = null)
     {
@@ -311,16 +311,22 @@ public class PlayerTools : ToolBase
             {
                 name = q?["name"]?.ToString(), type = q?["type"]?.ToString(), stage = q?["stage"]?.GetValue<int>(),
                 stageHere = mine?["stage"]?.GetValue<int>(), formId = q?["formId"]?.ToString(), here,
-                stagesDone = q?["stagesDone"]?.DeepClone(),
                 objectivesDoneThereNotHere = objectivesThere.Where(t => !objectivesHere.Contains(t)).ToList(),
             };
         }
         var completedThere = (saved["completed"] as JsonArray ?? new JsonArray())
             .Where(q => !doneHere.Contains(Key(q)))
             .Select(q => Row(q, runningHere.Contains(Key(q)) ? "running" : "not started")).ToList();
+        // BUG-084: a quest running in both games but further on there (Thane of Falkreath at 200 there, 0 here) is a gap too.
+        // Exports from build 117/118 listed every not-completed quest as running: keep only ones actually started there.
+        static bool Started(JsonNode? q) => q?["inJournal"]?.GetValue<bool>() == true || (q?["stage"]?.GetValue<int>() ?? 0) > 0 ||
+                                            (q?["objectives"] as JsonArray)?.Count > 0;
         var runningThere = (saved["running"] as JsonArray ?? new JsonArray())
-            .Where(q => !doneHere.Contains(Key(q)) && !runningHere.Contains(Key(q)))
-            .Select(q => Row(q, "not started")).ToList();
+            .Where(Started)
+            .Where(q => !doneHere.Contains(Key(q)))
+            .Where(q => !runningHere.Contains(Key(q)) ||
+                        (q?["stage"]?.GetValue<int>() ?? 0) > ((nowByKey.TryGetValue(Key(q), out var m) ? m?["stage"]?.GetValue<int>() : 0) ?? 0))
+            .Select(q => Row(q, runningHere.Contains(Key(q)) ? "running, earlier stage" : "not started")).ToList();
         return new
         {
             completedThereNotHere = completedThere,
