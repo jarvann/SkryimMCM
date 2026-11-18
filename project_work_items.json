@@ -3623,7 +3623,7 @@
         {
           "id": "BUG-073",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Teleport runs with a pausing menu open",
           "description": "In game: Teleport ran with the map open (to BYOHHouse1Exterior) and succeeded with no refusal; with a container, barter or crafting menu the menu could be left attached to something far away. Teleport, Teleport(back) and the studio moves now refuse while a menu pauses the game (UI::GameIsPaused), as captures do since BUG-057.",
@@ -3635,6 +3635,10 @@
             {
               "datetime": "2026-11-19T16:55",
               "note": "Also: player homes as known names (Lakeview, Windstad, Heljarchen; Hjerim mapped to its own cell instead of Windhelm); the description mentions the menu refusal. Build 99 follower re-check confirmed (real distances 12,700 to 13,100)."
+            },
+            {
+              "datetime": "2026-11-19T17:05",
+              "note": "In game (builds 100-101): Teleport refused with the map open; lakeview manor resolves. Home exteriors confirmed: BYOHHouse1Exterior 00009BF7, BYOHHouse2Exterior 000092B2, BYOHHouse3Exterior 000090C4. Studio refusal shares the check, not seen."
             }
           ],
           "targetRelease": "1.3"
