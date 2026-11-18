@@ -521,6 +521,29 @@ namespace SkyrimMCP::UtilityManager {
     // FEAT-131: the Audio menu's sliders are sound categories (Master, Effects, Music, Voice...);
     // setting a category's volume is what the menu does. The old tool ran "setgs
     // fAudioMasterVolume", an INI preference the console can't change, so nothing happened.
+    namespace {
+        std::string FormHex(const RE::TESForm* f) { return std::format("{:08X}", f->GetFormID()); }
+
+        // BUG-059: the game's own value is volumeMult (what the Audio menu slider sets); GetCategoryVolume() is the
+        // effective volume, which also carries the static multiplier and the parent categories (Music read 0.7 of what was
+        // set, Menus 0.3: Effects' value). Restores need the own value; listing only the effective one made "previous" wrong.
+        json DescribeCategory(RE::BGSSoundCategory* c) {
+            json j = {{"name", CategoryName(c)}, {"formId", FormHex(c)}, {"own", c->volumeMult},
+                      {"effective", c->GetCategoryVolume()}, {"staticMultiplier", c->staticMult / 65535.0f}};
+            if (c->parentCategory) j["parent"] = CategoryName(c->parentCategory) + " (" + FormHex(c->parentCategory) + ")";
+            return j;
+        }
+
+        int Depth(const RE::BGSSoundCategory* c) {
+            int d = 0;
+            for (auto* p = c->parentCategory; p && d < 16; p = p->parentCategory) ++d;
+            return d;
+        }
+    }
+
+    // FEAT-131: the Audio menu's sliders are sound categories (Master, Effects, Music, Voice...);
+    // setting a category's volume is what the menu does. The old tool ran "setgs
+    // fAudioMasterVolume", an INI preference the console can't change, so nothing happened.
     json SetVolume(const std::string& category, float volume) {
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
         if (!dataHandler) return {{"error", "Game data not ready"}};
@@ -529,12 +552,19 @@ namespace SkyrimMCP::UtilityManager {
         for (auto* c : dataHandler->GetFormArray<RE::BGSSoundCategory>()) {
             if (c && c->IsMenuCategory()) menu.push_back(c);
         }
+        // Parents first, so a restore in list order sets a parent before its children.
+        std::stable_sort(menu.begin(), menu.end(), [](auto* a, auto* b) { return Depth(a) < Depth(b); });
         json listed = json::array();
-        for (auto* c : menu) {
-            listed.push_back({{"name", CategoryName(c)}, {"formId", std::format("{:08X}", c->GetFormID())},
-                              {"volume", c->GetCategoryVolume()}, {"master", c->parentCategory == nullptr}});
+        for (auto* c : menu) listed.push_back(DescribeCategory(c));
+        auto* prefs = RE::INIPrefSettingCollection::GetSingleton();
+        auto* masterSetting = prefs ? prefs->GetSetting("fAudioMasterVolume:AudioMenu") : nullptr;
+        if (category == "list") {
+            return {{"categories", listed},
+                    {"master", masterSetting ? json(masterSetting->data.f) : json(nullptr)},
+                    {"note", "own: the category's own value (what SetVolume sets and what to restore); effective: what plays, "
+                             "after the static multiplier and the parent categories. Parents are listed first. Master is "
+                             "fAudioMasterVolume, not a category."}};
         }
-        if (category == "list") return {{"categories", listed}, {"master", "separate: the Audio menu's Master slider is fAudioMasterVolume, not a category"}};
 
         const auto wanted = CategoryKey(category.empty() ? "master" : category);
         volume = std::clamp(volume, 0.0f, 1.0f);
@@ -543,14 +573,12 @@ namespace SkyrimMCP::UtilityManager {
         // "Magic"). It is the fAudioMasterVolume preference, which the audio manager keeps as
         // its own masterVolume.
         if (wanted == "master") {
-            auto* prefs = RE::INIPrefSettingCollection::GetSingleton();
-            auto* setting = prefs ? prefs->GetSetting("fAudioMasterVolume:AudioMenu") : nullptr;
             auto* audio = RE::BSAudioManager::GetSingleton();
-            if (!setting && !audio) return {{"error", "Neither the master volume setting nor the audio manager is available"}};
+            if (!masterSetting && !audio) return {{"error", "Neither the master volume setting nor the audio manager is available"}};
             json result = {{"category", "Master"}};
-            if (setting) {
-                result["previous"] = setting->data.f;
-                setting->data.f = volume;
+            if (masterSetting) {
+                result["previous"] = masterSetting->data.f;
+                masterSetting->data.f = volume;
             }
             if (audio) {
                 if (!result.contains("previous")) result["previous"] = audio->masterVolume;
@@ -562,20 +590,47 @@ namespace SkyrimMCP::UtilityManager {
             return result;
         }
 
-        RE::BGSSoundCategory* target = nullptr;
-        const auto wantedKey = CategoryKey(wanted);
+        auto apply = [&](RE::BGSSoundCategory* c) {
+            const float before = c->volumeMult;
+            c->SetCategoryVolume(volume);
+            json r = DescribeCategory(c);
+            r["previous"] = before;
+            r["volume"] = c->volumeMult;
+            if (std::abs(c->volumeMult - volume) > 0.01f) {
+                r["warning"] = std::format("The category's own value reads {:.2f} after setting {:.2f}", c->volumeMult, volume);
+            }
+            return r;
+        };
+
+        // BUG-059: "all" sets every Audio menu category (not Master) in one call.
+        if (wanted == "all") {
+            json changed = json::array();
+            for (auto* c : menu) changed.push_back(apply(c));
+            return {{"category", "all"}, {"changed", changed}, {"note", "previous is each category's own value: restore with those, parents first."}};
+        }
+
+        // BUG-059: a FormID picks one category when two share a name (Weapons and Footsteps exist twice with some mods).
+        std::vector<RE::BGSSoundCategory*> found;
         for (auto* c : menu) {
             const char* edid = c->GetFormEditorID();
-            if (CategoryKey(CategoryName(c)) == wantedKey || (edid && CategoryKey(edid) == wantedKey)) { target = c; break; }
+            if (CategoryKey(CategoryName(c)) == wanted || (edid && CategoryKey(edid) == wanted) || LowerCopy(FormHex(c)) == wanted ||
+                LowerCopy("0x" + FormHex(c)) == wanted) {
+                found.push_back(c);
+            }
         }
-        if (!target) return {{"error", "No Audio menu category named '" + category + "'"}, {"categories", listed}};
+        if (found.empty()) return {{"error", "No Audio menu category named '" + category + "'"}, {"categories", listed}};
 
-        const float before = target->GetCategoryVolume();
-        target->SetCategoryVolume(volume);
-        const float after = target->GetCategoryVolume();
-        json result = {{"category", CategoryName(target)}, {"previous", before}, {"volume", after}};
-        if (std::abs(after - volume) > 0.01f) {
-            result["error"] = std::format("The game kept the volume at {:.2f} after setting {:.2f}", after, volume);
+        json result = apply(found.front());
+        result["category"] = CategoryName(found.front());
+        if (found.size() > 1) {
+            json others = json::array();
+            for (size_t i = 1; i < found.size(); ++i) others.push_back(FormHex(found[i]));
+            result["sameName"] = others;
+            result["sameNameNote"] = "Other categories have this name; this set only the first. Pass a FormID to set another.";
+        }
+        if (CategoryKey(result["category"].get<std::string>()).find("music") != std::string::npos) {
+            result["note"] = "The track already playing may keep its volume (heard in game: music went on at 0); the next track "
+                             "uses the new value, or StopMusic to change track now.";
         } else {
             result["note"] = "Applies at once, like the Audio menu slider. The Audio menu may show the old position until reopened.";
         }

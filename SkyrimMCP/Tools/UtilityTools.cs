@@ -309,13 +309,50 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set a game volume, like the Audio menu sliders: volume 0.0 (mute) to 1.0 (full). " +
-        "category: 'master' (default, the Master slider) or an Audio menu category such as Music, Effects, Voice, Footsteps or Magic; " +
-        "'list' shows the categories and their current volumes. Reports the previous volume so it can be put back. " +
-        "Applies at once; ask the player whether they hear the change.")]
-    public async Task<object> SetVolume(float volume, string category = "master")
+        "category: 'master' (default, the Master slider), an Audio menu category such as Music, Effects, Voice, Footsteps or Magic " +
+        "(or its FormID, when two share a name), 'all' (every category, not Master), 'list' (each category's own and effective " +
+        "volume and parent), 'snapshot' (save every category's own value and Master; volume ignored) or 'restore' (put the last " +
+        "snapshot back, parents first; volume ignored). Take a snapshot before changing several volumes. " +
+        "'own' is the category's value; 'effective' is what plays after its parent and static multiplier, so it can read lower. " +
+        "Applies at once; music already playing may keep its volume until the next track. Ask the player whether they hear the change.")]
+    public async Task<object> SetVolume(float volume = 1.0f, string category = "master")
     {
+        var key = category.Trim().ToLowerInvariant();
+        var snapshotFile = Path.Combine(SkyLinkSettings.Folder, "volume_snapshot.json");
+        if (key == "snapshot")
+        {
+            var list = await _pipe.SendRequestAsync("set_volume", new JsonObject { ["volume"] = 0, ["category"] = "list" });
+            if (list?["error"] is not null) return DeserializeResponse(list);
+            var snap = new JsonObject
+            {
+                ["saved"] = DateTime.Now.ToString("s"),
+                ["master"] = list?["master"]?.DeepClone(),
+                ["categories"] = new JsonArray((list?["categories"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                    .Select(c => (JsonNode?)new JsonObject { ["formId"] = c["formId"]?.DeepClone(), ["name"] = c["name"]?.DeepClone(), ["own"] = c["own"]?.DeepClone() }).ToArray()),
+            };
+            Directory.CreateDirectory(SkyLinkSettings.Folder);
+            await File.WriteAllTextAsync(snapshotFile, snap.ToJsonString());
+            return new { saved = snapshotFile, categories = (snap["categories"] as JsonArray)!.Count, master = snap["master"]?.ToString() };
+        }
+        if (key == "restore")
+        {
+            if (!File.Exists(snapshotFile)) return new { error = "No volume snapshot saved: SetVolume(category: 'snapshot') first." };
+            var snap = JsonNode.Parse(await File.ReadAllTextAsync(snapshotFile)) as JsonObject;
+            var restored = new List<string>();
+            var failed = new List<string>();
+            foreach (var c in (snap?["categories"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())  // saved parents first
+            {
+                var r = await _pipe.SendRequestAsync("set_volume", new JsonObject { ["volume"] = c["own"]?.GetValue<float>() ?? 1f, ["category"] = c["formId"]?.GetValue<string>() });
+                if (r?["error"] != null || r?["warning"] != null) failed.Add($"{c["name"]} ({c["formId"]}): {r?["error"] ?? r?["warning"]}");
+                else restored.Add($"{c["name"]} {c["own"]}");
+            }
+            if (snap?["master"] is JsonValue m)
+                await _pipe.SendRequestAsync("set_volume", new JsonObject { ["volume"] = m.GetValue<float>(), ["category"] = "master" });
+            await NotifyInGame("Volumes restored");
+            return new { restoredFrom = snap?["saved"]?.ToString(), restored = restored.Count, master = snap?["master"]?.ToString(), failed };
+        }
         var data = await _pipe.SendRequestAsync("set_volume", new JsonObject { ["volume"] = volume, ["category"] = category });
-        if (category != "list") await NotifyInGame($"{data?["category"]?.GetValue<string>() ?? "Volume"}: {volume:P0}");
+        if (key != "list") await NotifyInGame($"{data?["category"]?.GetValue<string>() ?? "Volume"}: {volume:P0}");
         return DeserializeResponse(data);
     }
 
