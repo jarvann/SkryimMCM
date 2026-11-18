@@ -109,7 +109,7 @@ public static class SkyrimOffsets
         // Dungeons and locations
         { "bleak_falls_barrow", "bleakfallsbarrow01" },
         { "helgen", "helgen" },
-        { "high_hrothgar", "highhrotgar" },
+        { "high_hrothgar", "highhrothgar" },
         { "skyhaven_temple", "skyhaventemple01" },
         { "throat_of_the_world", "throatoftheworldpartb" },
 
