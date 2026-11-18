@@ -46,7 +46,7 @@ namespace SkyrimMCP {
         inline json GetKnownShouts() { return PlayerQueries::GetKnownShouts(); }
         inline json GetSkillLevels() { return PlayerQueries::GetSkillLevels(); }
         inline json GetPerks() { return PlayerQueries::GetPerks(); }
-        inline json GetAppearance() { return PlayerQueries::GetAppearance(); }
+        inline json GetAppearance(const std::string& refId = "") { return PlayerQueries::GetAppearance(refId); }
         inline json GetFavorites() { return PlayerQueries::GetFavorites(); }
         inline json GetCharacterBlueprint() { return PlayerQueries::GetCharacterBlueprint(); }
         inline json IsInCombat() { return PlayerQueries::IsInCombat(); }

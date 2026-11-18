@@ -162,10 +162,15 @@ public class PlayerTools : ToolBase
         "Each head part has typeName, menuIndex (the number RaceMenu's slider shows for it, 0-based, editor IDs in case-sensitive order) " +
         "and menuChoices (how many playable choices of that type for this race and sex; RaceMenu may show one or two more). " +
         "ListHeadPartChoices lists the parts around a slider number. " +
-        "Hair colour and skin tone: GetHairAndSkinColor.")]
-    public async Task<object> GetAppearance()
+        "Hair colour and skin tone: GetHairAndSkinColor. refId reads an NPC instead (head parts, morphs, and faceGenMesh: whether " +
+        "the NPC has a pre-built face, which a runtime head part change would no longer match).")]
+    public async Task<object> GetAppearance(string? refId = null)
     {
-        var data = await _pipe.SendRequestAsync("get_appearance");
+        var parms = new JsonObject();
+        if (!string.IsNullOrWhiteSpace(refId)) parms["refId"] = refId.Trim();
+        var data = await _pipe.SendRequestAsync("get_appearance", parms);
+        if (data is JsonObject o && o["faceGenMesh"]?.GetValue<string>() is string mesh)
+            o["faceGenMeshSource"] = SkyrimMCP.Face.MeshFiles.Source(mesh) ?? "none (the face is built at runtime)";
         return DeserializeResponse(data);
     }
 

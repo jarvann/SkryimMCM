@@ -17,7 +17,7 @@ namespace SkyrimMCP {
         json GetKnownShouts();
         json GetSkillLevels();
         json GetPerks();
-        json GetAppearance();
+        json GetAppearance(const std::string& refId = "");
         json GetFavorites();
         json GetCharacterBlueprint();
         json IsInCombat();

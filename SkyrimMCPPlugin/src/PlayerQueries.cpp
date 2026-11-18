@@ -469,15 +469,28 @@ namespace SkyrimMCP::PlayerQueries {
         return {{"perks", perks}, {"count", perks.size()}};
     }
 
-    json GetAppearance() {
-        auto* player = RE::PlayerCharacter::GetSingleton();
-        if (!player) return {{"error", "Player not available"}};
+    json GetAppearance(const std::string& refId) {
+        // BUG-064: NPCs too (the in-game agent had to read a follower's head parts from his face file on disk).
+        auto* player = Helpers::ResolveActor(refId);
+        if (!player) return {{"error", "Actor not found: " + refId}};
 
         auto* base = player->GetActorBase();
         if (!base) return {{"error", "Actor base not available"}};
 
         json result;
         result["name"] = player->GetName() ? player->GetName() : "";
+        if (!player->IsPlayerRef()) {
+            // An NPC's face comes from a pre-built FaceGen mesh named after the record that defines it. If it exists, a
+            // head part changed at runtime no longer matches it and the face goes dark.
+            const auto* faceNpc = base->GetRootFaceNPC();
+            if (!faceNpc) faceNpc = base;
+            result["baseFormId"] = std::format("{:08X}", base->GetFormID());
+            if (auto* file = faceNpc->GetFile(0)) {
+                const auto local = file->IsLight() ? (faceNpc->GetFormID() & 0xFFF) : (faceNpc->GetFormID() & 0xFFFFFF);
+                result["faceGenMesh"] = std::format("meshes\\actors\\character\\facegendata\\facegeom\\{}\\{:08X}.nif",
+                                                    file->GetFilename(), local);
+            }
+        }
         result["race"] = base->GetRace() ? base->GetRace()->GetName() : "unknown";
         result["raceFormId"] = base->GetRace() ? std::format("{:08X}", base->GetRace()->GetFormID()) : "";
         result["sex"] = base->GetSex() == RE::SEX::kMale ? "male" : "female";
