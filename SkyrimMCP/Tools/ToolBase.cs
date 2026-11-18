@@ -42,9 +42,14 @@ public abstract class ToolBase
             // BUG-077: a capture's neutral-pose reset pulled her out of a chair (seen in game); measurements also need her
             // standing. "camera-seated" is a capture that keeps her pose (CaptureFace neutralPose=false).
             if (kind == "camera") reasons.AddRange(blockers.Where(b => b.Contains("sitting, lying")).Select(b => b + " (a capture would pull her out of it)"));
+            if (kind is "camera" or "camera-seated") reasons.AddRange(blockers.Where(b => b.Contains("on a mount")));
             if (kind == "face" && actor == "player") reasons.AddRange(notes.Where(n => n.Contains("beast form")));
         }
-        return reasons.Count == 0 ? null : "Not now: " + string.Join("; ", reasons.Distinct()) + ".";
+        if (reasons.Count == 0) return null;
+        var text = "Not now: " + string.Join("; ", reasons.Distinct()) + ".";
+        // BUG-078: point at what does work. A plain screenshot doesn't touch the camera or her pose.
+        if (kind.StartsWith("camera")) text += " For a picture of the screen as it is, use TakeScreenshot.";
+        return text;
     }
 
     // OStim (and frameworks exposing the same call): OActor.IsInOStim(actor). Without OStim the call fails and this is null.
