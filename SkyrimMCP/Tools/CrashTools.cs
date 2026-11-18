@@ -230,6 +230,9 @@ public class CrashTools : ToolBase
         {
             1 => "exited cleanly",
             0 when !running && crashReport != null => $"crashed: a crash report was written when it ended ({crashReport})",
+            0 when !running && list.Count > 0 && !CrashReporterInstalled() => "ended without an exit mark, and no crash reporter " +
+                "(Crash Logger SSE) is installed, so a crash can't be told from a normal quit (this game version ends the process " +
+                "without a normal exit, so a quit isn't marked)",
             0 when !running && list.Count > 0 => "ended without a crash report: most likely a normal quit (this game version ends " +
                 "the process without a normal exit, so a quit isn't marked) or a forced close. A crash with Crash Logger installed " +
                 "leaves a report.",
@@ -285,6 +288,23 @@ public class CrashTools : ToolBase
             yield return Path.Combine(docs, "My Games", game, "SKSE");
         if (!string.IsNullOrEmpty(skyrimPath))
             yield return Path.Combine(skyrimPath, "Data", "NetScriptFramework", "Crash");
+    }
+
+    // Crash Logger SSE (CrashLogger.dll) or NetScriptFramework in the SKSE plugins folder, loose or in MO2's mods.
+    private static bool CrashReporterInstalled()
+    {
+        if (FindCrashLogs(null).Count > 0) return true;
+        try
+        {
+            var folders = new List<string>();
+            if (SkyLinkSettings.DataPath() is string data) folders.Add(Path.Combine(data, "SKSE", "Plugins"));
+            var settings = SkyLinkSettings.Load();
+            if (settings["mo2Path"]?.GetValue<string>() is { Length: > 0 } mo2 && Directory.Exists(Path.Combine(mo2, "mods")))
+                folders.AddRange(Directory.EnumerateDirectories(Path.Combine(mo2, "mods")).Select(m => Path.Combine(m, "SKSE", "Plugins")));
+            return folders.Where(Directory.Exists).Any(f =>
+                Directory.EnumerateFiles(f, "CrashLogger*.dll").Any() || Directory.EnumerateFiles(f, "NetScriptFramework*.dll").Any());
+        }
+        catch (Exception) { return false; }
     }
 
     internal static List<FileInfo> FindCrashLogs(string? skyrimPath)
