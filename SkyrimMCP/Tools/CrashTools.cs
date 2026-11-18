@@ -45,10 +45,16 @@ public class CrashTools : ToolBase
         var recent = logs.Take(10).Select(f => new { file = f.FullName, written = f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss") }).ToArray();
         if (logs.Count == 0)
         {
+            // BUG-071: say whether a crash reporter is installed, since "no reports" only means something when one is.
+            var installed = CrashReporterInstalled();
             return Task.FromResult<object>(new
             {
-                error = "No crash reports found. Crash Logger SSE (recommended) writes crash-*.log to Documents\\My Games\\Skyrim Special Edition\\SKSE. " +
-                        "Is it installed? Searched: " + string.Join("; ", SearchFolders(skyrimPath)),
+                crashReports = "none",
+                crashReporterInstalled = installed,
+                note = installed
+                    ? "No crash reports: Crash Logger is installed and hasn't written one, so the game hasn't crashed since its reports were last cleared."
+                    : "No crash reports, and no crash reporter is installed: install Crash Logger SSE so crashes leave a report. Searched: " +
+                      string.Join("; ", SearchFolders(skyrimPath)),
                 skylinkRecorder = recorder,
             });
         }

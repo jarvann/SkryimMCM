@@ -1896,7 +1896,7 @@
         {
           "id": "FEAT-220",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Crash protection for every game-thread task SkyLink runs",
           "description": "Extend the SEH guard that already wraps console commands to every TaskQueue job, so an AI request that hits a bad form or pointer comes back as an error instead of a CTD. Only covers SkyLink's own calls, not other plugins.",
@@ -1916,6 +1916,10 @@
             {
               "datetime": "2026-11-19T14:00",
               "note": "In game: six bad inputs (missing forms, wrong types, unknown console target, unknown cell) were all refused before any unsafe code ran, so the fault layer never fired. Ships untested."
+            },
+            {
+              "datetime": "2026-11-19T15:00",
+              "note": "In game (build 95): a null read and a divide by zero inside guarded game-thread tasks were caught (access violation C0000005, divide by zero C0000094, with module offsets); the game kept running and later calls worked."
             }
           ],
           "targetRelease": "1.3"
@@ -3215,7 +3219,7 @@
         {
           "id": "FEAT-257",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Crash protection test hook (TestCrashProtection)",
           "description": "FEAT-220's guard never fired in testing because every bad input is refused before unsafe code runs. TestCrashProtection(mode, confirm) runs a guarded game-thread task that faults on purpose in SkyLink's own code (null read or integer divide by zero), holding no engine lock or object, and reports whether the guard caught it (caught, guardMessage, fault counts). Needs confirm=true; the plugin action also requires a confirm string.",
@@ -3223,6 +3227,10 @@
             {
               "datetime": "2026-11-19T14:20",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T15:00",
+              "note": "In game (build 95): both modes caught, fault count 0 to 1 to 2."
             }
           ],
           "targetRelease": "1.3"
@@ -3535,7 +3543,7 @@
         {
           "id": "BUG-070",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Teleport to a cell that doesn't exist reports success",
           "description": "In game: Teleport(NoSuchCellXYZ123) returned success: true and nothing happened (the server ignored the plugin's reply). The plugin now looks the cell up by editor ID and refuses an unknown one, pointing at SearchForms(type: cell); the tool returns the plugin's reply with the cell's name. The description no longer says invalid IDs crash the game.",
@@ -3543,6 +3551,25 @@
             {
               "datetime": "2026-11-19T14:00",
               "note": "From the in-game agent's crash-protection attempts."
+            },
+            {
+              "datetime": "2026-11-19T15:00",
+              "note": "In game (build 95): unknown cell refused with the SearchForms hint; riverwood still works (its timeout is BUG-071)."
+            }
+          ],
+          "targetRelease": "1.3"
+        },
+        {
+          "id": "BUG-071",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Teleport reports a timeout when the loading screen is slow; crash log reply doesn't say whether Crash Logger is installed",
+          "description": "In game (build 95): Teleport(riverwood) moved her but returned Game thread task timed out, because coc ran the loading screen inside the request (the agent's console return trip did the same; Windows showed not responding). The plugin now validates, starts coc on the next frame and returns at once; the server waits up to 20 s for her cell (by form ID) to change and reports where she landed, or arrived false. The description says to warn the player about the loading screen. GetCrashLog with no reports now says whether a crash reporter is installed instead of only asking.",
+          "history": [
+            {
+              "datetime": "2026-11-19T15:00",
+              "note": "From the in-game agent's build 95 checks."
             }
           ],
           "targetRelease": "1.3"
