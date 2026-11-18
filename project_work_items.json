@@ -3631,6 +3631,10 @@
             {
               "datetime": "2026-11-19T16:45",
               "note": "From the in-game agent."
+            },
+            {
+              "datetime": "2026-11-19T16:55",
+              "note": "Also: player homes as known names (Lakeview, Windstad, Heljarchen; Hjerim mapped to its own cell instead of Windhelm); the description mentions the menu refusal. Build 99 follower re-check confirmed (real distances 12,700 to 13,100)."
             }
           ],
           "targetRelease": "1.3"
