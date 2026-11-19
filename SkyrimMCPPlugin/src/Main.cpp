@@ -11,6 +11,7 @@
 #include "EventSystem.h"
 #include "HostCore.h"
 #include <chrono>
+#include <format>
 #include <atomic>
 #include <thread>
 #include "HostFaceRefresh.h"
@@ -83,7 +84,8 @@ namespace {
         void RestoreAfterLoad() {
             const std::uint32_t id = g_fromCosave;
             auto* saves = RE::BGSSaveLoadManager::GetSingleton();
-            SKSE::log::info("Character ID after load: game {:08X}, SkyLink co-save record {:08X}", saves ? saves->currentCharacterID : 0, id);
+            SKSE::log::info("Character ID after load: game {:08X}, SkyLink co-save record {}", saves ? saves->currentCharacterID : 0,
+                            id != 0 ? std::format("{:08X}", id) : std::string("none (a save from before SkyLink kept the ID)"));
             if (id == 0) return;
             ApplyIfLost(id, "at load");
             const unsigned generation = ++g_generation;

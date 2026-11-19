@@ -4545,7 +4545,7 @@
         {
           "id": "BUG-091",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Loading a console-made save drops the character ID to 00000000",
           "description": "Autosaves made after loading custom-named saves (Arya_clean_after_StackTest_..., SkyLink_Check_...) carried character ID 00000000. Likely the game takes the ID from the file name when it loads a save. Breaks BUG-090's per-character data and the load menu's character grouping.",
@@ -4561,6 +4561,10 @@
             {
               "datetime": "2026-11-20T01:00",
               "note": "Retest: the CHID record is written (IdProbe3.skse: SKLK/CHID = 0369832C) and RepairCharacterId works (face data back), but the restore never fired: at kPostLoadGame the game still held the previous ID and zeroed it later. Now: logs both values at post-load, re-checks on the game thread at +0.5..+20 s and sets the ID when the game has 0; a save made while lost also fixes it first. Also: SaveGame/CheckSave/CleanAndReload re-request a save the game dropped (no file after 10 s), seen twice."
+            },
+            {
+              "datetime": "2026-11-20T01:30",
+              "note": "Retest passes: IdProbe3 loaded, the game cleared the ID 6 s after post-load and the re-check restored 0369832C; IdProbe4 written straight after a load with the CHID record. Mods can refuse saves (a drawn weapon blocks it in this load order): saves now sheathe first and report a refused save in ~12 s naming likely causes; CleanAndReload stops if its way-back save isn't written. Log says 'none' for saves without the record (host, next restart)."
             }
           ],
           "targetRelease": "1.4"
