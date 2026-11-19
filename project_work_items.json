@@ -1144,6 +1144,21 @@
           "targetRelease": "1.3"
         },
         {
+          "id": "FEAT-263",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Quest replay from a blueprint (dry run first)",
+          "description": "Apply part of FEAT-262. Needs a reliable record of stages done first (executedStages read only zeros): the stage list from the plugin's QUST records plus Quest.GetStageDone, or the runtime stage flags. Then: start the quest so its aliases fill, replay the recorded stages in order with SetQuestStage (which verifies each), dry run per quest with warnings, main and faction lines flagged, a save first. Thane of Falkreath SetStage(200) on an unstarted quest was refused by the game.",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:00",
+              "note": "Split from FEAT-262 for the 1.4 plan."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "FEAT-123",
           "type": "feature",
           "status": "complete",
@@ -4074,6 +4089,21 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "BUG-090",
+          "type": "bug",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Per-character data keyed by name and race only",
+          "description": "Face state, brow colour, slider notes and references are keyed 'name|race', so two characters with the same name and race in one game share them (seen across games before BUG-088). Key by something specific to the character, e.g. the save's character ID (the hex ID in the .ess name).",
+          "history": [
+            {
+              "datetime": "2026-11-19T11:00",
+              "note": "Split from BUG-088 for the 1.4 plan."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",
@@ -4297,7 +4327,7 @@
         {
           "id": "FEAT-236",
           "type": "feature",
-          "status": "planned",
+          "status": "complete",
           "priority": "medium",
           "title": "Face builder: hair picker without cycling",
           "description": "Some hairs are heavy to load, so the AI must not slide through them in game. List hair head parts grouped by source plugin and mod, with the Nexus mod ID from Vortex's vortex.deployment.json (source folder names end in -<modId>-<version>-<time>) or MO2's meta.ini, so the AI can look up pictures online and propose a shortlist. Apply one with SetHeadPart; toggle only between shortlisted parts, on request, one at a time.",
@@ -4309,6 +4339,10 @@
             {
               "datetime": "2026-11-18T14:55",
               "note": "In game (build 72): FindHairstyles(long, fringe) read 1,400 hair meshes, 428 matches, quick; silhouettes correct. BSA path not exercised (the KS wigs are armour, not menu hair)."
+            },
+            {
+              "datetime": "2026-11-19T11:00",
+              "note": "Shipped in 1.3.0 as FindHairstyles (contact sheets, BSA reader); tracker entry was stale."
             }
           ],
           "targetRelease": "1.4"
