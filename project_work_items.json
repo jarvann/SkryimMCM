@@ -1269,6 +1269,10 @@
             {
               "datetime": "2026-11-19T19:00",
               "note": "Flood retest: totals add up (0 unattributed) and creeping beats spiking, but queued stacks stayed '(queued, function unknown)' (1,062 -> 10,960) and queuedStacks wasn't passed on; the history mixed states across a save load; a paused game (console) looked calm. Built (not deployed): queued stacks named from the VM's pending function messages (funcMsgQueue and overflowFuncMsgs map each stack to its call), queuedStacks passed on, a paused warning from get_menu_state, and a history break when game time goes back or jumps (gameDays stored per run). TEST_StackFlood_Aniya_DO_NOT_PLAY saved for later tools."
+            },
+            {
+              "datetime": "2026-11-19T20:00",
+              "note": "Retest: queuedStacks, totals and the paused warning work; queued naming still failed (none of ~11,000 matched a function message); no history break when the load moved time forward a little; paused calls went into the history. Now: the suspend queues (two ring buffers and their overflow arrays) are walked too, with queuedDiagnostics (entries per source, calls found, queued stacks named); the host counts save loads and new games (gameLoads in ping, needs a restart) and a change starts the history over; paused calls are left out of the history."
             }
           ],
           "targetRelease": "1.4"

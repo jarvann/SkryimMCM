@@ -66,6 +66,7 @@ namespace {
                 break;
 
             case SKSE::MessagingInterface::kPostLoadGame:
+                SkyrimMCP::HostCore::NoteGameLoaded();
                 SKSE::log::info("Game loaded");
                 // data is the load result (a bool passed as the pointer value).
                 SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note,
@@ -79,6 +80,7 @@ namespace {
                 break;
 
             case SKSE::MessagingInterface::kNewGame:
+                SkyrimMCP::HostCore::NoteGameLoaded();
                 SkyrimMCP::CrashRecorder::Record(SkyrimMCP::CrashRecorder::Kind::Note, "New game started");
                 break;
         }

@@ -45,6 +45,7 @@ namespace SkyrimMCP::HostCore {
         std::atomic<std::uint64_t> g_tasksQueued{ 0 };
         std::atomic<std::uint64_t> g_tasksRun{ 0 };
         std::atomic<std::int64_t> g_lastTaskRunMs{ 0 };  // steady clock, 0 = never
+        std::atomic<std::uint32_t> g_gameLoads{ 0 };
 
         std::int64_t SteadyMs() {
             return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -355,6 +356,7 @@ namespace SkyrimMCP::HostCore {
             info["pluginBuilt"] = BuildInfo::GetBuildTime();
             info["gameVersion"] = REL::Module::get().version().string(".");
             info["loadingScreen"] = LoadingScreenWatcher::Get().Active();
+            info["gameLoads"] = g_gameLoads.load();  // FEAT-268: saves loaded or games started this session
             info["logic"] = LogicStatusJson();
             info["diagnostics"] = Diagnostics();
             return Respond(id, true, info);
@@ -521,6 +523,8 @@ namespace SkyrimMCP::HostCore {
             }
         }
     }
+
+    void NoteGameLoaded() { ++g_gameLoads; }
 
     std::string HandleRequest(const std::string& requestLine) {
         json request;

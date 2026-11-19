@@ -131,6 +131,7 @@ public class PapyrusTools : ToolBase
         var skipped = 0;
         var taken = 0;
         var queuedLast = 0;
+        JsonNode? queuedDiagnostics = null;
         // FEAT-268: a paused game (console, map, a menu) runs no scripts, so frozen counts look like a calm game.
         string? paused = null;
         try
@@ -144,6 +145,9 @@ public class PapyrusTools : ToolBase
         // A save load (or a new game) starts the history over: game time going backwards or jumping marks it.
         double? gameDays = null;
         try { gameDays = (await _pipe.SendRequestAsync("get_game_time"))?["daysPassed"]?.GetValue<double>(); } catch (Exception) { }
+        // The host counts save loads and new games (from this build): a change means a different game state.
+        int? gameLoads = null;
+        try { gameLoads = (await _pipe.SendRequestAsync("ping"))?["gameLoads"]?.GetValue<int>(); } catch (Exception) { }
         for (var i = 0; i < samples; i++)
         {
             if (i > 0) await Task.Delay(intervalMs);
@@ -155,6 +159,7 @@ public class PapyrusTools : ToolBase
             if (data?["error"] != null) { skipped++; continue; }
             taken++;
             queuedLast = data?["queuedStacks"]?.GetValue<int>() ?? queuedLast;
+            queuedDiagnostics = data?["queuedDiagnostics"]?.DeepClone() ?? queuedDiagnostics;
             running.Add(data?["runningStacks"]?.GetValue<int>() ?? 0);
             waitingMessages.Add(data?["waitingFunctionMessages"]?.GetValue<int>() ?? 0);
             if (data?["overstressed"]?.GetValue<bool>() == true) overstressed++;
@@ -223,6 +228,11 @@ public class PapyrusTools : ToolBase
         var cutoff = DateTime.Now.AddMinutes(-30);
         var recent = history.OfType<JsonObject>().Where(h => DateTime.TryParse(h["at"]?.ToString(), out var t) && t >= cutoff).ToList();
         string? historyBreak = null;
+        if (recent.Count > 0 && gameLoads.HasValue && recent.Last()["gameLoads"] is JsonValue lastLoads && lastLoads.GetValue<int>() != gameLoads.Value)
+        {
+            historyBreak = "A save was loaded since the last call: the history starts over from here.";
+            recent.Clear();
+        }
         if (recent.Count > 0 && gameDays.HasValue && recent.Last()["gameDays"] is JsonValue lastDays)
         {
             var prevDays = lastDays.GetValue<double>();
@@ -233,7 +243,7 @@ public class PapyrusTools : ToolBase
                 recent.Clear();
             }
         }
-        var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["gameDays"] = gameDays, ["entries"] = new JsonObject() };
+        var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["gameDays"] = gameDays, ["gameLoads"] = gameLoads, ["entries"] = new JsonObject() };
         foreach (var r in perEntry)
             if (r.Value.Max() >= 5)
                 ((JsonObject)thisRun["entries"]!)[r.Key] = new JsonObject
@@ -268,7 +278,8 @@ public class PapyrusTools : ToolBase
             crossSummary.Add($"{name}{(plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})")} is {pattern}: " +
                              (creeping ? string.Join(" -> ", lasts) : "peaks " + string.Join(", ", series.Select(x => x.peak))) + ".");
         }
-        recent.Add(thisRun);
+        // A paused game's counts are frozen: don't let them into the history.
+        if (paused == null) recent.Add(thisRun);
         try
         {
             Directory.CreateDirectory(SkyLinkSettings.Folder);
@@ -298,6 +309,7 @@ public class PapyrusTools : ToolBase
             paused,
             historyBreak,
             queuedStacks = queuedLast,
+            queuedDiagnostics,
             historyCalls = recent.Count,
             runningStacks = new { first = running.First(), last = running.Last(), max = running.Max(), listedInEntryPoints = listedTotal, unattributed },
             waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },
