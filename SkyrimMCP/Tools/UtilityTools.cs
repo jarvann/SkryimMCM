@@ -104,6 +104,34 @@ public class UtilityTools : ToolBase
         "Console output may be captured if the command produces text output.")]
     public async Task<object> ExecuteConsoleCommand(string command)
     {
+        // BUG-024: a console move (coc, cow, centeroncell, player.moveto) loads a cell inside the call and timed out though it
+        // worked. Start it, then wait for the cell to change, as Teleport does.
+        var c = command.Trim().ToLowerInvariant();
+        var isMove = c.StartsWith("coc ") || c.StartsWith("cow ") || c.StartsWith("centeroncell ") || c.StartsWith("centeronworld ") ||
+                     c.StartsWith("player.moveto ") || c.StartsWith("player.moveto(");
+        if (isMove)
+        {
+            if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };
+            JsonNode? before = null;
+            try { before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" }); } catch (Exception) { }
+            var fromCell = before?["cellFormId"]?.ToString();
+            var started = await _pipe.SendRequestAsync("execute_command_async", new JsonObject { ["command"] = command });
+            if (started?["error"] != null) return DeserializeResponse(started);
+            for (var waited = 0; waited < 20000; waited += 750)
+            {
+                await Task.Delay(750);
+                try
+                {
+                    var now = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
+                    var cell = now?["cellFormId"]?.ToString();
+                    if (cell != null && cell != fromCell)
+                        return new { command, moved = true, cellName = now?["cellName"]?.ToString(), cellFormId = cell,
+                                     note = "Teleport has a way back (Teleport('back')); console moves don't." };
+                }
+                catch (Exception) { /* loading */ }
+            }
+            return new { command, moved = (bool?)null, note = "Started, but the cell hadn't changed after 20 seconds (still loading, or the same cell). Check with GetCellInfo." };
+        }
         var data = await _pipe.SendRequestAsync("execute_command", new JsonObject
         {
             ["command"] = command

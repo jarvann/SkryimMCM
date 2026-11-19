@@ -610,6 +610,22 @@ public sealed class FaceMeasurer : IDisposable
         if (Math.Abs(sides[0] - sides[1]) > 12) warnings.Add("lit from one side: shading differs from an evenly lit capture");
         if (clipped.Values.Max() > 0.05) warnings.Add("overexposed: some skin or lip pixels are clipped to white");
         if (contrast < 0.5) warnings.Add("washed out (haze or fog): colour differences read smaller than they are");
+        // BUG-086: brows under a fringe. The brow sample then reads hair (brow_lightness 0.625 and #857E80 on a #4A2416 brow).
+        // If the forehead just above the brows doesn't look like skin, hair covers that band and the brows likely too.
+        {
+            var forehead = new List<double[]>();
+            img.SampleDisc(L[151, 0], L[151, 1], radius * 2, forehead);
+            if (forehead.Count > 0)
+            {
+                var fh = MedianLab(forehead);
+                var sk = lab["skin"];
+                var dE = Math.Sqrt(Math.Pow(fh[0] - sk[0], 2) + Math.Pow(fh[1] - sk[1], 2) + Math.Pow(fh[2] - sk[2], 2));
+                if (dE > 20) warnings.Add($"forehead covered (hair or a hood, colour difference {dE:0} from the skin): brow colour and brow measures may read the hair; capture with hideHair: true");
+            }
+        }
+        // BUG-086: a night capture read skin L* 5.6 (15 on GOG) with no warning while the comparison said "much darker".
+        if (lab["skin"][0] < 15) warnings.Add($"very dark (skin lightness {lab["skin"][0]:0}): colour numbers are meaningless at this level; capture in the studio or in daylight");
+        else if (lab["skin"][0] < 30) warnings.Add($"dark (skin lightness {lab["skin"][0]:0}): colours are unreliable; the studio gives comparable light");
         var lighting = new Dictionary<string, object>
         {
             ["skin_L"] = R(lab["skin"][0]),

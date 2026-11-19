@@ -153,6 +153,14 @@ public class CrashTools : ToolBase
         }
 
         object? previousCrash = previous != null ? DecodeRecorder(previous, entries, out _) : null;
+        // FEAT-264: older unclean sessions kept by the plugin (previous-2 ... previous-5), summarised.
+        var older = new List<object>();
+        for (var n = 2; n <= 5; n++)
+            if (FindRecorderFile($"crash-recorder-previous-{n}.bin") is FileInfo f)
+            {
+                var d = JsonSerializer.SerializeToNode(DecodeRecorder(f, 3, out _));
+                older.Add(new { file = f.Name, sessionStart = d?["sessionStart"]?.ToString(), lastEntry = d?["lastEntry"]?.ToString(), exit = d?["exit"]?.ToString() });
+            }
         object? lastSession = null;
         string? lastSessionNote = null;
         if (current != null)
@@ -164,7 +172,7 @@ public class CrashTools : ToolBase
                 lastSessionNote = "The game is running, so lastSession is this session; pass recorderCurrent=true to see it.";
         }
 
-        return new { previousCrash, lastSession, lastSessionNote };
+        return new { previousCrash, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
     }
 
     private static object DecodeRecorder(FileInfo file, int maxEntries, out bool running)
