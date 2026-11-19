@@ -99,6 +99,15 @@ namespace SkyrimMCP::Protocol {
         noParam("get_known_enchantments", []() { return GameInterface::GetKnownEnchantments(); });
         noParam("get_skill_levels", []() { return GameInterface::GetSkillLevels(); });
         noParam("get_perks", []() { return GameInterface::GetPerks(); });
+        // BUG-091 follow-up: a drawn weapon or spell blocks saving in some load orders; SaveGame sheathes first.
+        noParam("sheathe", []() -> json {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            auto* state = player ? player->AsActorState() : nullptr;
+            if (!state) return {{"error", "No player"}};
+            const bool drawn = state->IsWeaponDrawn();
+            if (drawn && state->GetWeaponState() == RE::WEAPON_STATE::kDrawn) player->DrawWeaponMagicHands(false);
+            return {{"wasDrawn", drawn}, {"weaponState", static_cast<int>(state->GetWeaponState())}};
+        });
         // BUG-091: put a lost character ID back (RepairCharacterId); only when the game has none, never over a real one.
         registry["set_character_id"] = [](const std::string& id, const json& params) {
             const auto hex = params.value("characterId", std::string());

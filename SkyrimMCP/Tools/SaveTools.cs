@@ -51,6 +51,19 @@ public class SaveTools : ToolBase
     internal static async Task<string?> RequestSave(IPipeClient pipe, string name)
     {
         var file = Path.Combine(SaveFolder(), name + ".ess");
+        // A drawn weapon or spell is enough for some load orders to refuse the save (seen in game): sheathe first and wait for it.
+        var sheathed = false;
+        try
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                var s = await pipe.SendRequestAsync("sheathe");
+                if (s?["wasDrawn"]?.GetValue<bool>() != true) break;
+                sheathed = true;
+                await Task.Delay(500);
+            }
+        }
+        catch (Exception) { }
         for (var attempt = 1; attempt <= 2; attempt++)
         {
             var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = name });
@@ -61,7 +74,7 @@ public class SaveTools : ToolBase
                 if (File.Exists(file)) return null;
             }
         }
-        return $"the game didn't save '{name}' (no file after two requests, 12 seconds). Most likely a mod blocked it: survival or " +
+        return $"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}). Most likely a mod blocked it: survival or " +
                "save-limiting mods (Survival Mode, SaveReminder and the like) refuse saves under their own rules, console saves included; " +
                "the game also won't save in combat, during a load or while another save is being written. Nothing else was done.";
     }
