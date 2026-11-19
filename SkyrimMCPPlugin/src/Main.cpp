@@ -10,6 +10,9 @@
 #include "CrashRecorder.h"
 #include "EventSystem.h"
 #include "HostCore.h"
+#include <chrono>
+#include <atomic>
+#include <thread>
 #include "HostFaceRefresh.h"
 #include "PipeServer.h"
 #include "SkseInterfaceProxy.h"
@@ -46,6 +49,7 @@ namespace {
             auto* saves = RE::BGSSaveLoadManager::GetSingleton();
             const std::uint32_t id = saves ? saves->currentCharacterID : 0;
             const std::uint32_t keep = id != 0 ? id : g_fromCosave;   // never overwrite a known ID with 0
+            if (id == 0 && keep != 0 && saves) saves->currentCharacterID = keep;
             if (keep != 0 && a_intfc->OpenRecord(kRecord, 1)) a_intfc->WriteRecordData(keep);
         }
 
@@ -59,18 +63,38 @@ namespace {
             }
         }
 
-        void OnRevert(SKSE::SerializationInterface*) { g_fromCosave = 0; }
+        void OnRevert(SKSE::SerializationInterface*);
 
-        void RestoreAfterLoad() {
+        std::atomic<unsigned> g_generation{ 0 };
+
+        void OnRevert(SKSE::SerializationInterface*) { g_fromCosave = 0; ++g_generation; }
+
+        // Sets the ID if the game has none. Game thread only.
+        void ApplyIfLost(std::uint32_t a_id, const char* a_when) {
             auto* saves = RE::BGSSaveLoadManager::GetSingleton();
-            if (!saves) return;
-            if (saves->currentCharacterID == 0 && g_fromCosave != 0) {
-                saves->currentCharacterID = g_fromCosave;
-                SKSE::log::info("Character ID was 00000000 after the load; restored {:08X} from SkyLink's co-save record", g_fromCosave);
-                SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Note, "Character ID restored: {:08X}", g_fromCosave);
-            } else if (saves->currentCharacterID != 0) {
-                g_fromCosave = saves->currentCharacterID;
-            }
+            if (!saves || saves->currentCharacterID != 0 || a_id == 0) return;
+            saves->currentCharacterID = a_id;
+            SKSE::log::info("Character ID was 00000000 {}; restored {:08X} from SkyLink's co-save record", a_when, a_id);
+            SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Note, "Character ID restored: {:08X}", a_id);
+        }
+
+        // Retest 2026-11-19: at kPostLoadGame the game still held the previous ID and cleared it afterwards, so a check there
+        // never fired. Check again on the game thread over the next 20 seconds (host thread: the host never unloads).
+        void RestoreAfterLoad() {
+            const std::uint32_t id = g_fromCosave;
+            auto* saves = RE::BGSSaveLoadManager::GetSingleton();
+            SKSE::log::info("Character ID after load: game {:08X}, SkyLink co-save record {:08X}", saves ? saves->currentCharacterID : 0, id);
+            if (id == 0) return;
+            ApplyIfLost(id, "at load");
+            const unsigned generation = ++g_generation;
+            std::thread([id, generation]() {
+                for (const int delayMs : { 500, 1000, 1500, 3000, 6000, 8000 }) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+                    if (g_generation.load() != generation) return;   // another load since
+                    if (auto* tasks = SKSE::GetTaskInterface())
+                        tasks->AddTask([id, generation]() { if (g_generation.load() == generation) ApplyIfLost(id, "after the load"); });
+                }
+            }).detach();
         }
     }
 
