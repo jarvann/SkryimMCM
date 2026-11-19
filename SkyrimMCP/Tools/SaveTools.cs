@@ -37,6 +37,103 @@ public class SaveTools : ToolBase
         return Path.Combine(docs, local.TrimEnd('\\', '/'));
     }
 
+    static bool IsSkyLinkSave(string file) =>
+        file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
+
+    static readonly Regex EngineName = new(@"^([^_]+)_([0-9A-F]{8})_(.+)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// A save name the game can read the character ID from. The game takes it from the file name when it loads a save: a custom
+    /// name (SkyLink_Check_..., Arya_clean_...) has none, so after loading one the character ID was 00000000 and every later save
+    /// carried it (seen 2026-11-19). The name is the label (no underscores) followed by the rest of the newest real save of this
+    /// character: its ID, flags, name and the other fields the game expects.
+    /// </summary>
+    internal async Task<string> GameStyleName(string label)
+    {
+        label = Regex.Replace(label, "[^A-Za-z0-9-]", "");
+        string? currentId = null;
+        string? player = null;
+        try { currentId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+        try { player = (await _pipe.SendRequestAsync("get_player_info"))?["name"]?.ToString(); } catch (Exception) { }
+        var folder = SaveFolder();
+        if (Directory.Exists(folder))
+        {
+            foreach (var f in new DirectoryInfo(folder).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc).Take(400))
+            {
+                var m = EngineName.Match(Path.GetFileNameWithoutExtension(f.Name));
+                if (!m.Success || m.Groups[2].Value == "00000000") continue;
+                if (currentId is { Length: 8 } ? !m.Groups[2].Value.Equals(currentId, StringComparison.OrdinalIgnoreCase)
+                    : player == null || !string.Equals(SafeHeader(f.FullName)?.PlayerName, player, StringComparison.Ordinal)) continue;
+                var name = $"{label}_{m.Groups[2].Value}_{m.Groups[3].Value}";
+                for (var i = 2; File.Exists(Path.Combine(folder, name + ".ess")); i++) name = $"{label}{i}_{m.Groups[2].Value}_{m.Groups[3].Value}";
+                return name;
+            }
+        }
+        return label;   // no real save of this character yet: the plain label
+    }
+
+    static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
+
+    // Queued calls and the mod with the most, for marking way-back saves that still hold a flood (about 0.5 s a save).
+    static object? QuickStacks(string path)
+    {
+        try
+        {
+            var s = EssScanner.Scan(path);
+            var top = s.QueuedByPlugin.FirstOrDefault();
+            return new { queued = s.SuspendedStacks1 + s.SuspendedStacks2, threads = s.ActiveScripts, topMod = top == null ? null : $"{top.Plugin} {top.Count}",
+                         flood = s.SuspendedStacks1 + s.SuspendedStacks2 >= 1000 ? true : (bool?)null };
+        }
+        catch (Exception ex) { return new { error = ex.Message }; }
+    }
+
+    [McpServerTool]
+    [Description("Move saves out of the save folder into Saves\\SkyLink_Archive (with their .skse co-saves), so they stop cluttering " +
+        "the load menu without being deleted: move them back by hand to restore. names: comma-separated save names, or 'skylink' " +
+        "for every save SkyLink made (SkyLinkCheck*, SkyLinkBeforeClean*, *Cleaned*, and older SkyLink_* names) older than olderThanMinutes. dryRun " +
+        "(default true) lists what would move. Never moves the newest save. Use ListSaves(scan: true) first to see which way-back " +
+        "saves still hold a stack flood.")]
+    public Task<object> ArchiveSaves(string names, int olderThanMinutes = 30, bool dryRun = true)
+    {
+        var folder = SaveFolder();
+        if (!Directory.Exists(folder)) return Task.FromResult<object>(new { error = $"Save folder not found: {folder}" });
+        var all = new DirectoryInfo(folder).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc).ToList();
+        var newest = all.FirstOrDefault()?.FullName;
+        List<FileInfo> pick;
+        if (names.Trim().Equals("skylink", StringComparison.OrdinalIgnoreCase))
+            pick = all.Where(f => IsSkyLinkSave(f.Name) && f.LastWriteTime < DateTime.Now.AddMinutes(-olderThanMinutes)).ToList();
+        else
+        {
+            pick = [];
+            foreach (var n in names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var bare = n.EndsWith(".ess", StringComparison.OrdinalIgnoreCase) ? n[..^4] : n;
+                var f = all.FirstOrDefault(x => Path.GetFileNameWithoutExtension(x.Name).Equals(bare, StringComparison.OrdinalIgnoreCase));
+                if (f == null) return Task.FromResult<object>(new { error = $"No save named '{n}' (exact name, as ListSaves shows it)." });
+                pick.Add(f);
+            }
+        }
+        pick = pick.Where(f => f.FullName != newest).ToList();
+        var archive = Path.Combine(folder, "SkyLink_Archive");
+        if (dryRun || pick.Count == 0)
+            return Task.FromResult<object>(new { dryRun = true, wouldMove = pick.Select(f => Path.GetFileNameWithoutExtension(f.Name)), to = archive,
+                                                  note = "Nothing moved. The newest save is never moved (Continue loads it)." });
+        Directory.CreateDirectory(archive);
+        var moved = new List<string>();
+        foreach (var f in pick)
+        {
+            try
+            {
+                f.MoveTo(Path.Combine(archive, f.Name), overwrite: false);
+                var cosave = Path.ChangeExtension(Path.Combine(folder, f.Name), ".skse");
+                if (File.Exists(cosave)) File.Move(cosave, Path.Combine(archive, Path.GetFileName(cosave)), overwrite: false);
+                moved.Add(Path.GetFileNameWithoutExtension(f.Name));
+            }
+            catch (IOException ex) { moved.Add($"{f.Name}: not moved ({ex.Message})"); }
+        }
+        return Task.FromResult<object>(new { moved, to = archive, note = "Move a save back into the save folder to restore it." });
+    }
+
     static string? ResolveSave(string name)
     {
         var folder = SaveFolder();
@@ -52,8 +149,9 @@ public class SaveTools : ToolBase
     [McpServerTool]
     [Description("List the running game's saves (Steam or GOG, whichever is connected), newest first: file name, character, " +
         "level, location, in-game date, when saved, size, and the character ID from the file name (saves of one character " +
-        "share it). filter matches the file name, character or location. Read-only.")]
-    public async Task<object> ListSaves(string? filter = null, int limit = 20)
+        "share it). filter matches the file name, character or location. scan: true also reads each save's stacks (queued calls, " +
+        "the mod with most, flood when 1,000+), about half a second a save. madeBySkyLink marks check, way-back and cleaned saves. Read-only.")]
+    public async Task<object> ListSaves(string? filter = null, int limit = 20, bool scan = false)
     {
         var folder = SaveFolder();
         if (!Directory.Exists(folder)) return new { error = $"Save folder not found: {folder}" };
@@ -82,6 +180,8 @@ public class SaveTools : ToolBase
                 characterId = id,
                 currentCharacter = currentId != null && id != null ? string.Equals(id, currentId, StringComparison.OrdinalIgnoreCase) : (bool?)null,
                 unreadable = h == null ? true : (bool?)null,
+                madeBySkyLink = IsSkyLinkSave(f.Name) ? true : (bool?)null,
+                stacks = scan ? QuickStacks(f.FullName) : null,
             });
         }
         return new { folder, currentCharacterId = currentId, count = rows.Count, saves = rows };
@@ -89,7 +189,7 @@ public class SaveTools : ToolBase
 
     [McpServerTool]
     [Description("Check a save for problems with SkyLink's own save scanner (based on ReSaver's). With no saveName it first " +
-        "saves the current game as SkyLink_Check_<time> and scans that, so the result is the game as it is now; with a name " +
+        "saves the current game as SkyLinkCheck<time>_<character ID>_... and scans that, so the result is the game as it is now; with a name " +
         "it scans that save (ListSaves shows them). Reports: script stacks stored in the save (running threads and queued calls " +
         "by function and mod: a big queue is the usual FPS killer), script leftovers from removed or changed mods (undefined " +
         "scripts and instances), unattached instances, plugins the save uses that aren't loaded now, and sizes. Read-only: " +
@@ -101,7 +201,7 @@ public class SaveTools : ToolBase
         if (string.IsNullOrWhiteSpace(saveName))
         {
             if (await SafetyBlock("save") is string blocked) return new { error = blocked };
-            made = $"SkyLink_Check_{DateTime.Now:yyyyMMdd-HHmmss}";
+            made = await GameStyleName($"SkyLinkCheck{DateTime.Now:yyyyMMdd-HHmmss}");
             var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
             if (started?["error"] != null) return DeserializeResponse(started);
             path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
@@ -140,8 +240,13 @@ public class SaveTools : ToolBase
             {
                 var live = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 });
                 if (live?["entryPointOwners"] is JsonObject o)
-                    liveOwners = o.Where(kv => kv.Value is JsonArray { Count: > 0 })
-                        .ToDictionary(kv => kv.Key.Replace(" (queued)", ""), kv => ((JsonArray)kv.Value!)[0]?["plugin"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase);
+                {
+                    // "X" and "X (queued)" both appear when a handler is running and queued: first one wins (ToDictionary threw).
+                    liveOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var (key, value) in o)
+                        if (value is JsonArray { Count: > 0 } list && list[0]?["plugin"]?.ToString() is { Length: > 0 } owner)
+                            liveOwners.TryAdd(key.Replace(" (queued)", ""), owner);
+                }
             }
             catch (Exception) { }
         }
@@ -217,9 +322,12 @@ public class SaveTools : ToolBase
     {
         var dir = Path.GetDirectoryName(original)!;
         var bare = Path.GetFileNameWithoutExtension(original);
+        // Keep the game-style tail (character ID and the rest) so the cleaned save still carries the character ID.
+        var m = EngineName.Match(bare);
         for (var i = 1; ; i++)
         {
-            var name = i == 1 ? $"{bare}_cleaned" : $"{bare}_cleaned{i}";
+            var tag = i == 1 ? "Cleaned" : $"Cleaned{i}";
+            var name = m.Success ? $"{m.Groups[1].Value}{tag}_{m.Groups[2].Value}_{m.Groups[3].Value}" : $"{bare}_{tag.ToLowerInvariant()}";
             if (!File.Exists(Path.Combine(dir, name + ".ess"))) return Path.Combine(dir, name + ".ess");
         }
     }
@@ -364,7 +472,8 @@ public class SaveTools : ToolBase
                                         "Stop the cause too: update or reconfigure the mod, stop the quest that drives it (StopQuest), or disable the mod before playing on.");
         }
         if (dryRun)
-            return new { dryRun = true, save = Path.GetFileNameWithoutExtension(path), wouldClean = plan.Items, warnings = plan.Warnings,
+            return new { stillActive = info.StillActive.Count > 0 ? $"{string.Join(", ", info.StillActive)} is still loaded: cleaning alone buys a minute or two. Stop the cause as well (see warnings)." : null,
+                         dryRun = true, save = Path.GetFileNameWithoutExtension(path), wouldClean = plan.Items, warnings = plan.Warnings,
                          note = "Nothing changed. Run again with dryRun=false after the player agrees; the cleaned copy is a new save and the original stays." };
 
         var resaver = ResaverFolder();
@@ -406,18 +515,29 @@ public class SaveTools : ToolBase
         "it only saves, checks and shows what would be cleaned and what could break. Editing a save is risky: explain the risks " +
         "and get the player's agreement before confirm=true. The fresh save is kept as the way back. Refused in menus, combat, " +
         "scenes and other states where a load isn't safe. Run StackReport after it to see whether the pile-up is gone or returns.")]
-    public async Task<object> CleanAndReload(string? stacks = null, string levels = "safe", bool confirm = false)
+    public async Task<object> CleanAndReload(string? stacks = null, string levels = "safe", bool confirm = false, string? previewSave = null)
     {
         if (await SafetyBlock("move") is string blocked) return new { error = blocked };
-        var made = $"SkyLink_BeforeClean_{DateTime.Now:yyyyMMdd-HHmmss}";
-        var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
-        if (started?["error"] != null) return DeserializeResponse(started);
-        var path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
-        if (path == null) return new { error = $"Saved as {made}, but the file didn't appear complete within 2 minutes; nothing was cleaned." };
+        string made;
+        string? path = null;
+        // The preview's save, if it's recent: one way-back save per cleanup instead of two.
+        if (confirm && previewSave is { Length: > 0 } && ResolveSave(previewSave) is string prev && File.GetLastWriteTime(prev) > DateTime.Now.AddMinutes(-10))
+        {
+            made = Path.GetFileNameWithoutExtension(prev);
+            path = prev;
+        }
+        else
+        {
+            made = await GameStyleName($"SkyLinkBeforeClean{DateTime.Now:yyyyMMdd-HHmmss}");
+            var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
+            if (started?["error"] != null) return DeserializeResponse(started);
+            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
+            if (path == null) return new { error = $"Saved as {made}, but the file didn't appear complete within 2 minutes; nothing was cleaned." };
+        }
 
         var info = new CleanInfo();
         var result = await CleanFile(path, levels, stacks, dryRun: !confirm, info);
-        if (!confirm) return new { step = "preview", savedAs = made, plan = result, next = "If the player agrees, call CleanAndReload again with confirm=true (it saves again, so it cleans the game as it is then)." };
+        if (!confirm) return new { step = "preview", savedAs = made, plan = result, next = $"If the player agrees, call CleanAndReload again with confirm=true and previewSave=\"{made}\" (within 10 minutes it cleans that save instead of saving again; later it saves afresh)." };
         var cleanedName = System.Text.Json.JsonSerializer.SerializeToNode(result)?["cleaned"]?.ToString();
         if (cleanedName == null) return new { step = "clean failed", savedAs = made, result };
 
