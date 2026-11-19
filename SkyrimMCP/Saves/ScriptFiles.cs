@@ -21,17 +21,24 @@ public static class ScriptFiles
     }
 
     /// <summary>Indexes Data's scripts. archiveOrder: BSA base names in load order (later wins); others count as earliest.</summary>
-    public static Index Build(string dataFolder, IReadOnlyList<string>? archiveOrder = null)
+    public static Index Build(string dataFolder, IReadOnlyList<string>? archiveOrder = null) => Build([dataFolder], archiveOrder);
+
+    /// <summary>Several folders, lowest priority first (Data, then MO2 mods by priority, then overwrite): a later folder's
+    /// loose script wins; archives still rank by plugin order.</summary>
+    public static Index Build(IReadOnlyList<string> folders, IReadOnlyList<string>? archiveOrder = null)
     {
         var index = new Index();
-        var scripts = Path.Combine(dataFolder, "Scripts");
-        if (Directory.Exists(scripts))
-            foreach (var f in Directory.EnumerateFiles(scripts, "*.pex"))
-                index.Loose[Path.GetFileNameWithoutExtension(f)] = f;
+        foreach (var folder in folders)
+        {
+            var scripts = Path.Combine(folder, "Scripts");
+            if (Directory.Exists(scripts))
+                foreach (var f in Directory.EnumerateFiles(scripts, "*.pex"))
+                    index.Loose[Path.GetFileNameWithoutExtension(f)] = f;
+        }
 
         var rank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         if (archiveOrder != null) for (var i = 0; i < archiveOrder.Count; i++) rank.TryAdd(archiveOrder[i], i + 1);
-        var bsas = Directory.Exists(dataFolder) ? Directory.EnumerateFiles(dataFolder, "*.bsa").ToList() : [];
+        var bsas = folders.Where(Directory.Exists).SelectMany(f => Directory.EnumerateFiles(f, "*.bsa")).ToList();
         foreach (var bsa in bsas.OrderBy(b => rank.GetValueOrDefault(BsaOwner(b))))
         {
             try { IndexBsa(bsa, index); index.Archives++; }

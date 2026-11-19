@@ -19,7 +19,10 @@ class Program
             var current = Saves.MigrationReport.FromPluginsTxt(args[1], args[2]);
             var baseline = args[3] == "-" ? null : Saves.EssScanner.Scan(args[3], scriptMembers: true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var index = Saves.ScriptFiles.Build(Path.Combine(args[2], "Data"), Saves.MigrationReport.ArchiveOrder(current));
+            // With SKYRIM_PATH set to the game folder, MO2 mod folders are searched too (found from MO2's settings).
+            var index = Environment.GetEnvironmentVariable("SKYRIM_PATH") is { Length: > 0 }
+                ? Saves.ScriptFiles.Build(SkyLinkSettings.GameFileFolders(), Saves.MigrationReport.ArchiveOrder(current))
+                : Saves.ScriptFiles.Build(Path.Combine(args[2], "Data"), Saves.MigrationReport.ArchiveOrder(current));
             Console.Error.WriteLine($"script index: {index.Loose.Count} loose, {index.Archived.Count} in {index.Archives} archives, {index.Errors.Count} errors, {sw.ElapsedMilliseconds} ms");
             foreach (var path in args.Skip(4))
             {
