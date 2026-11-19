@@ -30,7 +30,19 @@ public class GuidebookTools : ToolBase
         "SearchGuidebook to find the page, then GetGuidebookPage (ask for one section when the page is long). " +
         "Base the answer on the page, and name the UESP page it came from. " +
         "If the guidebook has no page on it or cannot be reached, say you are answering from memory, which may be wrong. " +
-        "The live game tools show this player's own state (inventory, quest stages, position); use them alongside the guidebook.";
+        "The live game tools show this player's own state (inventory, quest stages, position); use them alongside the guidebook. " +
+        // FEAT-266/267: slow games and falling FPS lead to the stack and save checks.
+        "When the player says the game is slow, stuttering or laggy, or the FPS are dropping, offer to check it: StackReport " +
+        "first (live script pile-ups, a few seconds, changes nothing), then CheckSave (saves a copy and scans it for script " +
+        "leftovers and queued stacks). Explain what they found in plain words, naming the mods responsible, and start a " +
+        "conversation about those mods: what they do, whether the player still needs them, settings or updates that stop " +
+        "the pile-up, and known conflicts (look them up). Ask whether the player develops mods; if they do, ask which ones " +
+        "they're working on and tie the findings back to that work (their scripts in a pile-up, an event handler that " +
+        "registers again without finishing, leftovers from an earlier build of their mod in this save). Cleaning a save " +
+        "(CleanAndReload, when it is in your tool list) edits saved game data: say so before offering it, say what could " +
+        "break (a quest stuck at a stage, a mod losing its setup), that the original save is kept as the way back, and that " +
+        "the pile-up returns if the mod keeps causing it. Only clean after the player agrees; the cleanup saves, cleans a " +
+        "copy and loads it in one go.";
 
     // Namespace ids from meta=siteinfo (checked 2026-11-16): 134 = Skyrim (Dawnguard and Hearthfire pages live
     // here too), 146 = Dragonborn.
