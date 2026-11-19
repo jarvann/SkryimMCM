@@ -153,9 +153,15 @@ public class PapyrusTools : ToolBase
             var max = c.Max();
             var rising = c.Zip(c.Skip(1), (a, b) => b - a).Count(d => d > 0);
             var falling = c.Zip(c.Skip(1), (a, b) => b - a).Count(d => d < 0);
-            var growing = last > first && rising > falling;
+            // Growing: up by at least 2 and rising in most intervals (3 -> 4 over six samples is jitter).
+            var steps = Math.Max(1, c.Count - 1);
+            var growing = last - first >= 2 && rising >= Math.Ceiling(steps * 0.6) && rising > falling;
             var runaway = max >= 20 || (growing && last - first >= 5);
-            var plugin = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null)?.FirstOrDefault()?["plugin"]?.ToString();
+            // Headline: every real plugin among the owners; "(created in game)" only when there is nothing else.
+            var ownerList = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null) ?? new JsonArray();
+            var named = ownerList.Select(x => x?["plugin"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
+            var real = named.Where(n => !n.StartsWith("(")).ToList();
+            var plugin = real.Count > 0 ? string.Join(", ", real) : named.FirstOrDefault();
             return new { entry = kv.Key, last, max, first, growing, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
         }).OrderByDescending(r => r.runaway).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
 

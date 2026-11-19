@@ -54,6 +54,13 @@ namespace SkyrimMCP::ScriptStats {
             if (!frame) return {};
             auto obj = frame->self.GetObject();
             if (!obj) return {};
+            // A magic effect script runs on an active effect, not a form: trace it to its spell (or the effect's base form).
+            if (auto* active = static_cast<RE::ActiveEffect*>(obj->Resolve(RE::ActiveEffect::VMTYPEID))) {
+                const RE::TESForm* source = active->spell ? static_cast<const RE::TESForm*>(active->spell) : active->GetBaseObject();
+                if (source) {
+                    if (auto* file = source->GetFile(0)) return std::string(file->GetFilename());
+                }
+            }
             const auto handle = obj->GetHandle();
             const auto formId = static_cast<RE::FormID>(handle & 0xFFFFFFFF);
             auto* form = formId ? RE::TESForm::LookupByID(formId) : nullptr;
