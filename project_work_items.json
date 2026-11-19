@@ -2502,13 +2502,17 @@
         {
           "id": "BUG-025",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "get_enchantment_info reports magnitude 100 for console-made enchantments",
           "description": "On an item enchanted with the playerenchantobject console command, get_enchantment_info showed magnitude 100 on both effects while the game shows Turn Undead at level 0 (2026-11-16). Check which magnitude the tool reads (base effect vs the created enchantment's effect items) and the cost/level the game displays.",
           "history": [
             {
               "datetime": "2026-11-16T20:00",
               "note": "Reported by the in-game agent."
+            },
+            {
+              "datetime": "2026-11-20T06:00",
+              "note": "Diagnostic build: GetEnchantmentInfo now reports per effect noMagnitude/noDuration, archetype, cost and the description template (<mag>), with a note that the stored magnitude and the item card can differ for player and console enchantments. Needs the Turn Undead item in game to see which value the card uses."
             }
           ],
           "targetRelease": "1.4"
@@ -4004,7 +4008,7 @@
         {
           "id": "FEAT-261",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
           "title": "Treat a running MCM Recorder playback as not safe",
           "description": "MCM Recorder drives mods' settings menus step by step; between steps no menu may be open, so the checks would allow a face load or a move that could knock a step out. Look for a running state its script exposes (McmRecorder) and add it to the move, camera and face rules.",
@@ -4012,6 +4016,10 @@
             {
               "datetime": "2026-11-19T22:30",
               "note": "From the in-game agent."
+            },
+            {
+              "datetime": "2026-11-20T06:00",
+              "note": "Built: the move, camera and face rules (and GetGameSafety) call McmRecorder_Player.IsPlayingRecording() (a global in MCM Recorder's scripts, backed by JDB) and refuse with the recording's name while it plays; a game without MCM Recorder is remembered as such after the first 'not found'."
             }
           ],
           "targetRelease": "1.4"
