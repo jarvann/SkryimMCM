@@ -48,7 +48,7 @@ DRIVE=${SKYLINK_WSL_DRIVE:-W:}
 LOCAL_SRC=${SKYLINK_LOCAL_SRC:-'C:\src\skylink-hr'}
 BUILD_DIR=${SKYLINK_BUILD_DIR:-'C:\build\skylink-hr'}
 PLUGINS_ARG=""
-[ -n "$SKYLINK_PLUGINS_DIR" ] && PLUGINS_ARG="-SkyrimPlugins '$SKYLINK_PLUGINS_DIR'"
+[ -n "${SKYLINK_PLUGINS_DIR:-}" ] && PLUGINS_ARG="-SkyrimPlugins '$SKYLINK_PLUGINS_DIR'"
 
 if [ ! -d "$WORKTREE" ]; then
     echo "Creating build worktree $WORKTREE"
