@@ -1227,6 +1227,21 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "FEAT-268",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "StackReport: live runaway script stacks (FPS)",
+          "description": "Cory's main save-cleaning target is script stacks, because they pile up and destroy FPS. StackReport samples the live Papyrus VM (building on GetScriptStats) and reports stack counts per script and function, growth between samples, the plugin each comes from, and flags runaway stacks (many copies of one function, growing, long latent waits), next to overstress. Cleaning them is a save edit plus reload (FEAT-267) with stack-specific risk levels: uninstalled = safe, runaway duplicates of installed scripts = caution (the usual FPS killer), a few non-growing stacks or quest-script stacks = risky, base game = never. Plan: docs/save-health-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "FEAT-123",
           "type": "feature",
           "status": "complete",
