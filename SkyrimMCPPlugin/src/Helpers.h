@@ -66,6 +66,14 @@ namespace SkyrimMCP::Helpers {
         return {};
     }
 
+    // BUG-090: the save system's character ID (the 8-digit hex in save file names, e.g. Save102_0369832C_...), which tells
+    // two characters with the same name and race apart. Empty when there is none yet (the main menu).
+    inline std::string CharacterId() {
+        auto* saves = RE::BGSSaveLoadManager::GetSingleton();
+        if (!saves || saves->currentCharacterID == 0) return {};
+        return std::format("{:08X}", saves->currentCharacterID);
+    }
+
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");

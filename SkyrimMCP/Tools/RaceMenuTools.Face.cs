@@ -828,6 +828,7 @@ public partial class RaceMenuTools
 
         JsonNode? applied;
         var key = SkyrimMCP.Face.FaceState.Key(appearance);
+        if (key == null) return new { error = SkyrimMCP.Face.FaceState.NoCharacterId };
         var browColor = reset ? null : "#" + hex;
         SkyrimMCP.Face.FaceState.SetBrowColor(key, browColor);
         if (reset)
@@ -933,12 +934,12 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Record what a face slider does on this character's head, so later sessions don't probe it again: note 'inert' " +
         "(no measurable effect; 'inert (detail)' also counts), or the effect found (e.g. 'nose length -8% at 0.7'). Several at once: notes is a map of slider " +
-        "name to note; an empty note removes the entry. Without notes, lists what is recorded. Stored per character (name and " +
-        "race) in SkyLinkAI\\face_state.json.")]
+        "name to note; an empty note removes the entry. Without notes, lists what is recorded. Stored per character (by the " +
+        "save's character ID) in SkyLinkAI\\face_state.json.")]
     public async Task<object> SliderNotes(Dictionary<string, string>? notes = null)
     {
         var key = SkyrimMCP.Face.FaceState.Key(await _pipe.SendRequestAsync("get_appearance"));
-        if (key == null) return new { error = "Couldn't read the player's name for the character key." };
+        if (key == null) return new { error = SkyrimMCP.Face.FaceState.NoCharacterId };
         JsonObject result = SkyrimMCP.Face.FaceState.GetSliderNotes(key);
         foreach (var (slider, note) in notes ?? new Dictionary<string, string>())
             result = SkyrimMCP.Face.FaceState.SetSliderNote(key, slider.Trim(), note);
