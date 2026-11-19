@@ -62,9 +62,14 @@ namespace SkyrimMCP::ScriptStats {
             return text;
         }
 
+        std::string OwnerOf(const RE::BSScript::Variable& self);
+
         std::string OwnerPlugin(const RE::BSScript::StackFrame* frame) {
-            if (!frame) return {};
-            auto obj = frame->self.GetObject();
+            return frame ? OwnerOf(frame->self) : std::string{};
+        }
+
+        std::string OwnerOf(const RE::BSScript::Variable& self) {
+            auto obj = self.GetObject();
             if (!obj) return {};
             // A magic effect script runs on an active effect, not a form: trace it to its spell (or the effect's base form).
             if (auto* active = static_cast<RE::ActiveEffect*>(obj->Resolve(RE::ActiveEffect::VMTYPEID))) {
@@ -124,7 +129,7 @@ namespace SkyrimMCP::ScriptStats {
 
         std::map<std::string, int> byState, byCurrentFunction, byScript, byEntryPoint;
         std::map<std::string, std::map<std::string, int>> entryOwners;
-        std::size_t running = 0, latent = 0;
+        std::size_t running = 0, latent = 0, queued = 0;
         {
             RE::BSSpinLockGuard guard(impl->runningStacksLock);
             running = impl->allRunningStacks.size();
@@ -138,7 +143,28 @@ namespace SkyrimMCP::ScriptStats {
                 if (!stack) continue;
                 ++byState[StateName(stack->state.get())];
                 const auto* topFrame = stack->top;
-                if (!topFrame) continue;
+                if (!topFrame) {
+                    // FEAT-268: a queued stack has no frames yet (14,000 of them during the Aniya flood went unnamed). Its tasklet
+                    // knows the call it will make. (The whole task runs inside the game-thread fault guard.)
+                    ++queued;
+                    std::string name = "(queued, function unknown)";
+                    std::string owner;
+                    if (auto* tasklet = stack->owningTasklet.get()) {
+                        RE::BSScript::Internal::IFuncCallQuery::CallType callType{};
+                        RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> type;
+                        RE::BSFixedString fn;
+                        RE::BSScript::Variable self;
+                        RE::BSScrapArray<RE::BSScript::Variable> args;
+                        if (tasklet->GetFunctionCallInfo(callType, type, fn, self, args)) {
+                            const char* t = type ? type->GetName() : nullptr;
+                            name = std::string(t && t[0] ? t : "?") + "." + (fn.c_str() && fn.c_str()[0] ? fn.c_str() : "?") + " (queued)";
+                            owner = OwnerOf(self);
+                        }
+                    }
+                    ++byEntryPoint[name];
+                    if (!owner.empty()) ++entryOwners[name][owner];
+                    continue;
+                }
                 ++byCurrentFunction[FrameName(topFrame)];
                 // The bottom frame is where the call started: usually an event in the mod's own script.
                 const auto* bottom = topFrame;
@@ -156,6 +182,7 @@ namespace SkyrimMCP::ScriptStats {
         }
 
         result["runningStacks"] = running;
+        result["queuedStacks"] = queued;
         result["waitingLatentReturns"] = latent;
         result["stacksByState"] = byState;
         result["topScripts"] = TopN(byScript, top);

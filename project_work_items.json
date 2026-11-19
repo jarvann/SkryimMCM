@@ -1261,6 +1261,10 @@
             {
               "datetime": "2026-11-19T16:40",
               "note": "Loading-screen skip works (1 skipped inside the Winking Skeever), classes, owner totals and peak summary pass. Found: mihailwendigo.esp's OnUpdate creeping 2 -> 31 across calls, Exalted Enemies spiking on every cell change. Added: a history of the last 20 calls within 30 minutes (stack_history.json per game folder) flagging handlers creeping up across calls (leak) or spiking in 3+ calls."
+            },
+            {
+              "datetime": "2026-11-19T18:00",
+              "note": "Aniya stress test: running stacks 79 -> 1,167 -> 9,720 -> 15,956 peak, plateau ~14,500, overstressed in every sample; Aniya's OnMagicEffectApply named and flagged (25 -> 39 -> 337 -> ~390). Gaps: ~14,000 stacks unnamed (queued stacks have no frames), labels at the extremes (Aniya 'spiking' though flat-high, wendigo flipped from creeping), acrossCalls lost plugin names. Built (not deployed): queued stacks named from their tasklet's GetFunctionCallInfo ('X.Fn (queued)' with owner), queuedStacks count, listed vs unattributed totals, 'stuck high' and creeping-beats-spiking labels, plugins kept in the history."
             }
           ],
           "targetRelease": "1.4"
