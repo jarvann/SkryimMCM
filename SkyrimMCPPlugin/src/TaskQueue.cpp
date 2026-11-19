@@ -139,7 +139,10 @@ namespace SkyrimMCP {
 
         auto status = future.wait_for(std::chrono::milliseconds(timeoutMs));
         if (status == std::future_status::timeout) {
-            throw std::runtime_error("Game thread task timed out - game may be loading or paused");
+            // BUG-087: on a fresh install the game stops when its window loses focus, and every call times out.
+            throw std::runtime_error("Game thread task timed out: the game may be loading, paused, or its window in the "
+                                     "background (a game without bAlwaysActive=1 in Skyrim.ini stops when unfocused). "
+                                     "CheckConnection shows whether the game is running tasks.");
         }
 
         return future.get();
