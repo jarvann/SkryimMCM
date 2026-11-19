@@ -219,8 +219,10 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
         for (var f = 0; f < frames; f++)
         {
             var (name, native, zeroed, owner, script) = ReadFrame();
-            if (f == 0) { t.Top = name; firstNonNativeZeroed = !native && zeroed; }
-            t.Entry = name;
+            // Frame 0 is where the thread started (the event handler); the last frame is where it is now (often a native
+            // call it waits in). Checked on the Aniya flood save: frame 0 = OnMagicEffectApply, last = MagicEffect.HasKeyword.
+            if (f == 0) { t.Entry = name; firstNonNativeZeroed = !native && zeroed; }
+            t.Top = name;
             if (t.OwnerHandle == 0 && owner != 0) t.OwnerHandle = owner;
             if (!native && IsUndefinedScript(script)) t.Undefined = true;
             if (!zeroed && !native) allZeroedOrNative = false;

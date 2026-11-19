@@ -20,6 +20,11 @@ public class SaveScan {
         Papyrus papyrus = ess.getPapyrus();
         if (papyrus == null) { System.out.println("no Papyrus section parsed"); return; }
         int[] undefined = papyrus.countUndefinedElements();
+        System.out.println("counts: strings " + papyrus.getStringTable().size() + "  scripts " + papyrus.getScripts().size()
+                + "  instances " + papyrus.getScriptInstances().size() + "  references " + papyrus.getReferences().size()
+                + "  arrays " + papyrus.getArrays().size() + "  activeScripts " + papyrus.getActiveScripts().size()
+                + "  functionMessages " + papyrus.getFunctionMessages().size() + "  suspended1 " + papyrus.getSuspendedStacks1().size()
+                + "  suspended2 " + papyrus.getSuspendedStacks2().size() + "  changeForms " + ess.getChangeForms().size());
         System.out.println("unattached instances: " + papyrus.countUnattachedInstances() + "  undefined elements: " + Arrays.toString(undefined));
 
         List<String> undefScripts = new ArrayList<>();

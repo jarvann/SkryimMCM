@@ -37,6 +37,7 @@ public static class SkyLinkSettings
         ["dataPath"] = "Data folder, when it isn't <skyrimPath>\\Data (for example a Wabbajack list's Stock Game folder).",
         ["mo2Path"] = "MO2 instance folder, the one containing 'mods', 'overwrite' and 'profiles'. Config files are then searched in overwrite and every enabled mod, in MO2's priority order.",
         ["mo2Profile"] = "MO2 profile to take the mod order from. Defaults to the only profile, or 'Default'.",
+        ["resaverPath"] = "ReSaver (FallrimTools) folder, the one with ReSaver.exe and target\\ReSaver.jar; CleanSave and CleanAndReload use its library.",
         ["extraConfigFolders"] = "More folders to search for SKSE plugin config files, as a list, searched first.",
     };
 
