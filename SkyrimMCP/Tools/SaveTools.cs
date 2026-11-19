@@ -76,7 +76,8 @@ public class SaveTools : ToolBase
         }
         return $"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}). Most likely a mod blocked it: survival or " +
                "save-limiting mods (Survival Mode, SaveReminder and the like) refuse saves under their own rules, console saves included; " +
-               "the game also won't save in combat, during a load or while another save is being written. Nothing else was done.";
+               "the game also won't save in combat, during a load or while another save is being written. In some load orders a drawn " +
+               "weapon or readied spell blocks it too: SkyLink sheathes before saving, so check it stayed sheathed. Nothing else was done.";
     }
 
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
