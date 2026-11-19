@@ -82,6 +82,17 @@ namespace SkyrimMCP::Helpers {
         return std::format("{:08X}", saves->currentCharacterID);
     }
 
+    // BUG-091: in a loaded game with the character ID at 0 (a console-made save was loaded before SkyLink kept the ID in its
+    // co-save): not "no game yet" but "lost", which RepairCharacterId fixes.
+    inline bool CharacterIdLost() {
+        if (auto* ui = RE::UI::GetSingleton();
+            ui && (ui->IsMenuOpen("Main Menu") || ui->IsMenuOpen("Loading Menu") || ui->IsMenuOpen("RaceSex Menu"))) return false;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player || !player->Get3D(false) || !player->GetParentCell()) return false;
+        auto* saves = RE::BGSSaveLoadManager::GetSingleton();
+        return saves && saves->currentCharacterID == 0;
+    }
+
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");

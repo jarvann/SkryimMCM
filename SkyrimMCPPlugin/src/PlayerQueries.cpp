@@ -482,6 +482,7 @@ namespace SkyrimMCP::PlayerQueries {
         if (player->IsPlayerRef()) {
             const auto id = Helpers::CharacterId();
             result["characterId"] = id.empty() ? json(nullptr) : json(id);
+            if (id.empty() && Helpers::CharacterIdLost()) result["characterIdLost"] = true;
         }
         if (!player->IsPlayerRef()) {
             // An NPC's face comes from a pre-built FaceGen mesh named after the record that defines it. If it exists, a

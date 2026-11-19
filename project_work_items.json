@@ -1223,6 +1223,10 @@
             {
               "datetime": "2026-11-19T22:00",
               "note": "Built: ListSaves (header-only, character ID from the file name, current character marked) and CheckSave (fresh SkyLink_Check_<time> save by default, waits for a complete file, scan, plugins not loaded now, plain summary)."
+            },
+            {
+              "datetime": "2026-11-20T00:30",
+              "note": "CheckSave() timed out at the bridge's 80 s while waiting for its save: waits now stop at 55 s with a retry hint; liveOwner added for named saves too; ListSaves topMod counts threads and queued calls per mod (the wendigo's 280 threads in Game.FindRandomActorFromRef); SaveGame waits for the file and reports a save that never appeared."
             }
           ],
           "targetRelease": "1.4"
@@ -4543,12 +4547,16 @@
           "type": "bug",
           "status": "implemented-untested",
           "priority": "medium",
-          "title": "Loading a custom-named save drops the character ID to 00000000",
+          "title": "Loading a console-made save drops the character ID to 00000000",
           "description": "Autosaves made after loading custom-named saves (Arya_clean_after_StackTest_..., SkyLink_Check_...) carried character ID 00000000. Likely the game takes the ID from the file name when it loads a save. Breaks BUG-090's per-character data and the load menu's character grouping.",
           "history": [
             {
               "datetime": "2026-11-19T23:59",
               "note": "Reported by the in-game agent (Autosave101/102_00000000 at 13:41 and 13:56). Built (not yet confirmed in game): SaveGame, CheckSave and CleanAndReload name saves <label>_<characterID>_<rest of the newest real save's name>; cleaned copies insert 'Cleaned' into the first field. Test: load such a save, check GetAppearance characterId and the next autosave's name."
+            },
+            {
+              "datetime": "2026-11-20T00:30",
+              "note": "In-game test disproved the file-name theory: any save written by the console save command (SaveGame, CheckSave, CleanAndReload) loads back with ID 0, whatever its name; only game-made saves keep it. Built: the host keeps the ID in SkyLink's co-save record ('SKLK'/'CHID') and restores it at kPostLoadGame when the game has 0 (host change: game restart); GetAppearance reports characterIdLost; set_character_id + RepairCharacterId (from the newest game-made save of the same player name); save names back to plain labels (the game-format names copied stale fields and misled ListSaves); ListSaves only reads IDs from game-made names; clearer NoCharacterId message."
             }
           ],
           "targetRelease": "1.4"

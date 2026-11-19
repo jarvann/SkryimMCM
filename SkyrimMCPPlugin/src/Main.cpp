@@ -33,6 +33,47 @@ namespace {
             name && *name ? name : "(unnamed)", cell->GetFormID());
     }
 
+    // BUG-091: a save written by the console save command (and so by SkyLink's SaveGame, CheckSave and CleanAndReload) loads
+    // back with the character ID at 00000000, and every save after it carries 00000000 (tested 2026-11-19: the file name
+    // doesn't matter, only how the save was written). SkyLink keeps the ID in its own co-save record and puts it back after a
+    // load that lost it. Lives in the host: SKSE keeps these callbacks for the whole session.
+    namespace CharacterIdKeeper {
+        constexpr std::uint32_t kUid = 'SKLK';
+        constexpr std::uint32_t kRecord = 'CHID';
+        std::uint32_t g_fromCosave = 0;
+
+        void OnSave(SKSE::SerializationInterface* a_intfc) {
+            auto* saves = RE::BGSSaveLoadManager::GetSingleton();
+            const std::uint32_t id = saves ? saves->currentCharacterID : 0;
+            const std::uint32_t keep = id != 0 ? id : g_fromCosave;   // never overwrite a known ID with 0
+            if (keep != 0 && a_intfc->OpenRecord(kRecord, 1)) a_intfc->WriteRecordData(keep);
+        }
+
+        void OnLoad(SKSE::SerializationInterface* a_intfc) {
+            std::uint32_t type = 0, version = 0, length = 0;
+            while (a_intfc->GetNextRecordInfo(type, version, length)) {
+                if (type == kRecord && length == sizeof(std::uint32_t)) {
+                    std::uint32_t id = 0;
+                    if (a_intfc->ReadRecordData(id)) g_fromCosave = id;
+                }
+            }
+        }
+
+        void OnRevert(SKSE::SerializationInterface*) { g_fromCosave = 0; }
+
+        void RestoreAfterLoad() {
+            auto* saves = RE::BGSSaveLoadManager::GetSingleton();
+            if (!saves) return;
+            if (saves->currentCharacterID == 0 && g_fromCosave != 0) {
+                saves->currentCharacterID = g_fromCosave;
+                SKSE::log::info("Character ID was 00000000 after the load; restored {:08X} from SkyLink's co-save record", g_fromCosave);
+                SkyrimMCP::CrashRecorder::Recordf(SkyrimMCP::CrashRecorder::Kind::Note, "Character ID restored: {:08X}", g_fromCosave);
+            } else if (saves->currentCharacterID != 0) {
+                g_fromCosave = saves->currentCharacterID;
+            }
+        }
+    }
+
     void MessageCallback(SKSE::MessagingInterface::Message* a_msg) {
         switch (a_msg->type) {
             case SKSE::MessagingInterface::kDataLoaded:
@@ -66,6 +107,7 @@ namespace {
                 break;
 
             case SKSE::MessagingInterface::kPostLoadGame:
+                CharacterIdKeeper::RestoreAfterLoad();
                 SkyrimMCP::HostCore::NoteGameLoaded();
                 SKSE::log::info("Game loaded");
                 // data is the load result (a bool passed as the pointer value).
@@ -123,6 +165,13 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse) {
     SkyrimMCP::CrashRecorder::Init();
 
     // Console output capture: opens console menu briefly during command execution
+
+    if (auto* serialization = SKSE::GetSerializationInterface()) {
+        serialization->SetUniqueID(CharacterIdKeeper::kUid);
+        serialization->SetSaveCallback(CharacterIdKeeper::OnSave);
+        serialization->SetLoadCallback(CharacterIdKeeper::OnLoad);
+        serialization->SetRevertCallback(CharacterIdKeeper::OnRevert);
+    }
 
     auto messaging = SKSE::GetMessagingInterface();
     if (!messaging->RegisterListener(MessageCallback)) {
