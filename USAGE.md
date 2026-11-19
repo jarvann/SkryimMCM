@@ -109,11 +109,29 @@ The MCP server automatically connects when both Skyrim and Claude Desktop are ru
 
 ### Save & Load
 ```
-"Save my game" (auto-named with character/location/timestamp)
+"Save my game" (sheathes a drawn weapon or spell first; says so if a mod refused the save)
 "Take a snapshot" (blueprint + save with matching names)
 "Load my most recent save"
 "Load save named MyTestSave"
+"List my saves" / "Which of my saves still have a stack flood?" (ListSaves, scan: true)
+"Tidy up the test saves" (ArchiveSaves: moves them to Saves\SkyLink_Archive, never deletes)
 ```
+
+### Performance and Save Health (1.4)
+```
+"The game is getting slow" / "My FPS are dropping"
+  -> StackReport: live script pile-ups for a few seconds, named by handler and mod, with a history across calls
+  -> CheckSave: saves now and scans the save (queued stacks, script leftovers of removed mods, plugins no longer loaded)
+"Clean the Aniya stacks out of my save"
+  -> CleanAndReload (preview first): saves, cleans a copy with ReSaver's library, loads it, and checks whether the
+     pile-up comes back. The original save is kept as the way back. If the mod causing it is still running, it says so:
+     clean AND stop the cause (update, settings, stop its quest), or it returns within a minute.
+"Will this save survive the collection update?"
+  -> CompareSaveToLoadOrder: removed, renamed, retyped and added plugins, and how much of the save each removed one owns
+"My character ID is 00000000" -> RepairCharacterId
+```
+Cleaning needs ReSaver (FallrimTools) installed; SkyLink finds it in the usual places or via SetSkyLinkSetting('resaverPath').
+Editing a save is risky: SkyLink never writes over a save, and the AI should explain what could break before it cleans.
 
 ### Events
 ```
@@ -163,15 +181,21 @@ The blueprint is a complete character snapshot exported to a JSON file:
 - Player info, skills, perks, spells, shouts
 - Equipment, full inventory with enchantments, gold
 - Appearance (face morphs, head parts, race, height)
-- Quest progress (1.3): quests completed or started, with stage and the objectives seen
+- Quest progress (1.3): quests completed or started, with stage and the objectives seen; from 1.4 also the stages done,
+  read from a save made at export, and which shout words were unlocked
 - Factions, resistances, powers, diseases, damage stats
 - `notCaptured` lists what it can't hold (quest rewards and world changes, map markers, crime, other mods' script state)
 
 Always use `outputPath`: the data is too large for the MCP response.
 
-`ApplyBlueprint` (dry run by default) adds missing items and gold and equips the blueprint's gear on another character. With
-`sections: "quests"` it compares quest progress and lists what the other character finished or started that this one hasn't;
-it never changes quests. Skills, perks, spells and level aren't applied yet (planned for 1.4).
+`ApplyBlueprint` (dry run by default) adds missing items and gold and equips the blueprint's gear on another character. From
+1.4 the sections `skills`, `level`, `perks`, `spells` and `shouts` raise and add what this character lacks (nothing is ever
+lowered or removed; perk points and level-up choices aren't given). With `sections: "quests"` it compares quest progress.
+
+`ReplayQuests` (1.4) brings quest progress across, quest by quest: `quests: "list"` shows candidates; a preview makes a
+way-back save and shows the stages to set; confirming starts the quest if needed and sets each missing stage in order,
+running its script as if played, and stops at a stage the game refuses. Main, faction, Civil War and DLC lines need
+`allowMajor: true`. Simple quests first, after a save.
 
 ### Event Filtering
 
