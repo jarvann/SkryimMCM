@@ -689,7 +689,7 @@ public class SaveTools : ToolBase
         "each, mods that changed between full and light (an ESP compacted to ESL renumbers its forms), added mods, and moved " +
         "ones (the game re-maps by name, so moving alone is safe). scripts: true also compares each script's variables in the " +
         "save with the installed script files (loose and in BSAs; slower): removed or retyped variables are what breaks a " +
-        "save after a mod update; differences a recent save (the newest one, assumed made with the current mods) shares are " +
+        "save after a mod update (MO2 mod folders are searched too, found from MO2's own settings); differences a recent save (the newest one, assumed made with the current mods) shares are " +
         "treated as noise. Read-only. saveName: as ListSaves shows it.")]
     public async Task<object> CompareSaveToLoadOrder(string saveName, bool scripts = false)
     {
@@ -706,7 +706,11 @@ public class SaveTools : ToolBase
         catch (Exception) { }
         if (current == null)
         {
-            var txt = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skyrim Special Edition", "Plugins.txt");
+            // MO2 keeps the load order in its profile; Vortex and the game in LocalAppData.
+            var (mo2, profile) = SkyLinkSettings.Mo2Instance();
+            var mo2Txt = mo2 == null ? null : Path.Combine(mo2, "profiles", profile ?? "Default", "plugins.txt");
+            var txt = mo2Txt != null && File.Exists(mo2Txt) ? mo2Txt
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skyrim Special Edition", "Plugins.txt");
             if (!File.Exists(txt)) return new { error = "The game isn't running and Plugins.txt wasn't found: start the game, or run this from the main menu." };
             current = MigrationReport.FromPluginsTxt(txt, SkyLinkSettings.SkyrimPath().Path);
             source = txt + " (game closed: full or light not known, so type changes aren't checked)";
@@ -717,14 +721,14 @@ public class SaveTools : ToolBase
             {
                 var scan = EssScanner.Scan(path, scriptMembers: scripts);
                 object? scriptReport = null;
-                if (scripts && SkyLinkSettings.DataPath() is string data)
+                if (scripts && SkyLinkSettings.GameFileFolders() is { Count: > 0 } folders)
                 {
                     // Baseline: the newest save other than this one, assumed made with the current mods (say so in the reply).
                     var newest = new DirectoryInfo(SaveFolder()).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc)
                         .FirstOrDefault(f => !f.FullName.Equals(path, StringComparison.OrdinalIgnoreCase));
                     SaveScan? baseline = null;
                     try { if (newest != null) baseline = EssScanner.Scan(newest.FullName, scriptMembers: true); } catch (Exception) { }
-                    scriptReport = MigrationReport.CompareScripts(scan, ScriptFiles.Build(data, MigrationReport.ArchiveOrder(current)), baseline);
+                    scriptReport = MigrationReport.CompareScripts(scan, ScriptFiles.Build(folders, MigrationReport.ArchiveOrder(current)), baseline);
                 }
                 return MigrationReport.Build(scan, current, source, scriptReport);
             });

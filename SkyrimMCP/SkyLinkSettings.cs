@@ -83,6 +83,54 @@ public static class SkyLinkSettings
         return (null, "not found");
     }
 
+    /// <summary>
+    /// The MO2 instance for the running game: settings mo2Path, else a global instance (LocalAppData\ModOrganizer\*) whose
+    /// ModOrganizer.ini gamePath is this game's folder. Returns the instance folder and its selected profile.
+    /// </summary>
+    public static (string? Folder, string? Profile) Mo2Instance()
+    {
+        var s = Load();
+        if (Str(s, "mo2Path") is string configured) return (configured, Str(s, "mo2Profile"));
+        var game = SkyrimPath().Path;
+        var root = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ModOrganizer");
+        if (game == null || !Directory.Exists(root)) return (null, null);
+        foreach (var dir in Directory.EnumerateDirectories(root))
+        {
+            var ini = System.IO.Path.Combine(dir, "ModOrganizer.ini");
+            if (!File.Exists(ini)) continue;
+            string? gamePath = null, profile = null;
+            foreach (var line in File.ReadLines(ini))
+            {
+                if (line.StartsWith("gamePath=", StringComparison.OrdinalIgnoreCase)) gamePath = Unwrap(line[9..]).Replace(@"\\", @"\");
+                else if (line.StartsWith("selected_profile=", StringComparison.OrdinalIgnoreCase)) profile = Unwrap(line[17..]);
+            }
+            if (gamePath != null && string.Equals(System.IO.Path.GetFullPath(gamePath).TrimEnd('\\'), System.IO.Path.GetFullPath(game).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                return (dir, profile);
+        }
+        return (null, null);
+
+        static string Unwrap(string v) => v.StartsWith("@ByteArray(") && v.EndsWith(")") ? v[11..^1] : v;
+    }
+
+    /// <summary>Folders that hold game files, lowest priority first: Data, then MO2's enabled mods by priority, then overwrite.</summary>
+    public static List<string> GameFileFolders()
+    {
+        var folders = new List<string>();
+        if (DataPath() is string data) folders.Add(data);
+        var (mo2, profile) = Mo2Instance();
+        if (mo2 != null)
+        {
+            try
+            {
+                folders.AddRange(Mo2ModsByPriority(mo2, profile).Reverse().Select(m => System.IO.Path.Combine(mo2, "mods", m)).Where(Directory.Exists));
+            }
+            catch (IOException) { }
+            var overwrite = System.IO.Path.Combine(mo2, "overwrite");
+            if (Directory.Exists(overwrite)) folders.Add(overwrite);
+        }
+        return folders;
+    }
+
     public static string? DataPath()
     {
         var s = Load();
