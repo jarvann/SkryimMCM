@@ -67,6 +67,18 @@ public static class MigrationReport
 
         var added = current.Where(p => !savedNames.Contains(p.Name)).Select(p => p.Name).ToList();
 
+        // A renamed plugin is a removal to the game (it matches by file name): pair removed and added names that differ only by
+        // case, punctuation, version numbers or SE/AE/ESL tags, so the report can say "renamed", not "gone and something new".
+        static string Norm(string n)
+        {
+            var b = System.Text.RegularExpressions.Regex.Replace(Path.GetFileNameWithoutExtension(n).ToLowerInvariant(), @"[^a-z0-9]+", " ");
+            b = System.Text.RegularExpressions.Regex.Replace(b, @"\b(v?\d+(\s\d+)*|sse|se|ae|esl|esp|esm|flagged|version)\b", " ");
+            return System.Text.RegularExpressions.Regex.Replace(b, @"\s+", "");
+        }
+        var addedByNorm = added.GroupBy(Norm).Where(g => g.Key.Length >= 4).ToDictionary(g => g.Key, g => g.First());
+        var renamed = removed.Select(r => (r, to: addedByNorm.GetValueOrDefault(Norm(r.plugin)))).Where(t => t.to != null)
+            .Select(t => new { from = t.r.plugin, to = t.to, t.r.risk, t.r.footprint }).ToList();
+
         // Order: relative order within each type (full, light) among plugins both lists share. Counting every shift would flag a
         // whole list after one insertion, so count plugins out of order (not on the longest run kept in the same order).
         var nowIndex = current.Select((p, k) => (p.Name, k)).ToDictionary(t => t.Name, t => t.k, StringComparer.OrdinalIgnoreCase);
@@ -98,7 +110,9 @@ public static class MigrationReport
             character = scan.Header.PlayerName,
             currentLoadOrder = currentSource,
             verdict,
-            counts = new { inSave = saved.Count, now = current.Count, removed = removed.Count, added = added.Count, typeChanged = typeChanged.Count, reordered = moved },
+            counts = new { inSave = saved.Count, now = current.Count, removed = removed.Count, probablyRenamed = renamed.Count, added = added.Count, typeChanged = typeChanged.Count, reordered = moved },
+            probablyRenamed = renamed.Take(100),
+            renamedNote = renamed.Count > 0 ? "To the game a renamed plugin is removed plus a new one: its forms and script data in the save don't carry over to the new name. Where the risk is high, the rename matters as much as a removal." : null,
             removed = removed.Where(r => r.risk != "low"),
             removedNoFootprint = removed.Where(r => r.risk == "low").Select(r => r.plugin),
             typeChanged,
