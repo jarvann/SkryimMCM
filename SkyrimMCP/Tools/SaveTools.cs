@@ -689,7 +689,8 @@ public class SaveTools : ToolBase
         "each, mods that changed between full and light (an ESP compacted to ESL renumbers its forms), added mods, and moved " +
         "ones (the game re-maps by name, so moving alone is safe). scripts: true also compares each script's variables in the " +
         "save with the installed script files (loose and in BSAs; slower): removed or retyped variables are what breaks a " +
-        "save after a mod update. Read-only. saveName: as ListSaves shows it.")]
+        "save after a mod update; differences a recent save (the newest one, assumed made with the current mods) shares are " +
+        "treated as noise. Read-only. saveName: as ListSaves shows it.")]
     public async Task<object> CompareSaveToLoadOrder(string saveName, bool scripts = false)
     {
         var path = ResolveSave(saveName);
@@ -717,7 +718,14 @@ public class SaveTools : ToolBase
                 var scan = EssScanner.Scan(path, scriptMembers: scripts);
                 object? scriptReport = null;
                 if (scripts && SkyLinkSettings.DataPath() is string data)
-                    scriptReport = MigrationReport.CompareScripts(scan, ScriptFiles.Build(data, MigrationReport.ArchiveOrder(current)));
+                {
+                    // Baseline: the newest save other than this one, assumed made with the current mods (say so in the reply).
+                    var newest = new DirectoryInfo(SaveFolder()).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc)
+                        .FirstOrDefault(f => !f.FullName.Equals(path, StringComparison.OrdinalIgnoreCase));
+                    SaveScan? baseline = null;
+                    try { if (newest != null) baseline = EssScanner.Scan(newest.FullName, scriptMembers: true); } catch (Exception) { }
+                    scriptReport = MigrationReport.CompareScripts(scan, ScriptFiles.Build(data, MigrationReport.ArchiveOrder(current)), baseline);
+                }
                 return MigrationReport.Build(scan, current, source, scriptReport);
             });
         }

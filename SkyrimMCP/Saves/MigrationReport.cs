@@ -32,8 +32,22 @@ public static class MigrationReport
     /// Scripts whose installed version has different variables than the save recorded: removed (their saved values are dropped),
     /// retyped (the riskiest) or added (start at their defaults: usually harmless). Only scripts with instances in the save.
     /// </summary>
-    public static object CompareScripts(SaveScan scan, ScriptFiles.Index index)
+    public static object CompareScripts(SaveScan scan, ScriptFiles.Index index, SaveScan? baseline = null)
     {
+        // A save made with the current mods should match its scripts; whatever still differs there is noise (file resolution,
+        // scripts patched without the save refreshing its record): drop those scripts from the old save's list.
+        var noise = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (baseline?.ScriptMembers != null)
+            foreach (var (script, members) in baseline.ScriptMembers)
+            {
+                if (baseline.InstancesByScript.GetValueOrDefault(script) == 0) continue;
+                List<ScriptFiles.Variable>? v;
+                try { v = ScriptFiles.ReadVariables(index, script); } catch (Exception ex) when (ex is IOException or InvalidDataException) { v = null; }
+                if (v == null) continue;
+                var a = new HashSet<string>(members.Select(m => m[0] + ":" + m[1]), StringComparer.OrdinalIgnoreCase);
+                var b = new HashSet<string>(v.Select(x => x.Name + ":" + x.Type), StringComparer.OrdinalIgnoreCase);
+                if (!a.SetEquals(b)) noise.Add(script);
+            }
         var changed = new List<(string script, int instances, List<string> removed, List<string> retyped, List<string> added)>();
         var missing = new List<(string script, int instances)>();
         var compared = 0;
@@ -41,7 +55,7 @@ public static class MigrationReport
         foreach (var (script, members) in scan.ScriptMembers ?? [])
         {
             var instances = scan.InstancesByScript.GetValueOrDefault(script);
-            if (instances == 0) continue;
+            if (instances == 0 || noise.Contains(script)) continue;
             List<ScriptFiles.Variable>? vars;
             try { vars = ScriptFiles.ReadVariables(index, script); } catch (Exception ex) when (ex is IOException or InvalidDataException) { vars = null; }
             if (vars == null) { missing.Add((script, instances)); continue; }
@@ -71,6 +85,8 @@ public static class MigrationReport
         return new
         {
             compared,
+            baseline = baseline?.File,
+            ignoredAsNoise = noise.Count,
             changedRisky = risky.Count,
             changedOnlyAdded = onlyAdded.Count,
             objectTypeChanges,
