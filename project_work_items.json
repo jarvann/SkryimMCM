@@ -1273,6 +1273,10 @@
             {
               "datetime": "2026-11-19T20:00",
               "note": "Retest: queuedStacks, totals and the paused warning work; queued naming still failed (none of ~11,000 matched a function message); no history break when the load moved time forward a little; paused calls went into the history. Now: the suspend queues (two ring buffers and their overflow arrays) are walked too, with queuedDiagnostics (entries per source, calls found, queued stacks named); the host counts save loads and new games (gameLoads in ping, needs a restart) and a change starts the history over; paused calls are left out of the history."
+            },
+            {
+              "datetime": "2026-11-19T20:30",
+              "note": "Retest #3: queued naming works. All 11,012 queued stacks named as Aniya's OnMagicEffectApply (Aniya Follower.esp); they live in the suspend queues (11,364 entries) not the function message queue (19). Totals add up; history break on the clean-save load; paused warning works. Built: the headline combines a handler's queued and running copies ('about 11,364 copies (11,012 waiting to start, 352 running)'). Load counter waits for a game restart."
             }
           ],
           "targetRelease": "1.4"
