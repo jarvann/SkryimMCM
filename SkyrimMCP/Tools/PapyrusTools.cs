@@ -209,7 +209,12 @@ public class PapyrusTools : ToolBase
         var recent = history.OfType<JsonObject>().Where(h => DateTime.TryParse(h["at"]?.ToString(), out var t) && t >= cutoff).ToList();
         var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["entries"] = new JsonObject() };
         foreach (var r in perEntry)
-            if (r.Value.Max() >= 5) ((JsonObject)thisRun["entries"]!)[r.Key] = new JsonObject { ["peak"] = r.Value.Max(), ["last"] = r.Value.Last() };
+            if (r.Value.Max() >= 5)
+                ((JsonObject)thisRun["entries"]!)[r.Key] = new JsonObject
+                {
+                    ["peak"] = r.Value.Max(), ["last"] = r.Value.Last(),
+                    ["plugin"] = rows.FirstOrDefault(x => x.entry == r.Key)?.plugin,
+                };
         var crossCall = new List<object>();
         var crossSummary = new List<string>();
         foreach (var name in perEntry.Keys)
@@ -220,13 +225,19 @@ public class PapyrusTools : ToolBase
             series.Add(cur);
             if (series.Count < 3) continue;
             var lasts = series.Select(x => x.last).ToList();
-            var risesInARow = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).All(x => x) && lasts.Last() - lasts.First() >= 5;
+            // Creeping wins over spiking when the counts rise most of the time (68 -> 71 -> 75 with the odd dip); stuck high
+            // when every call stays at 20+ and never drains (Aniya flat at ~390); spiking when it reaches 20+ and drains between.
+            var stepsUp = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).Count(x => x);
+            var creeping = stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.Last() - lasts.First() >= 5;
+            var stuckHigh = series.All(x => x.last >= 20);
             var spikes = series.Count(x => x.peak >= 20);
-            string? pattern = risesInARow ? "creeping up across calls (a leak: it registers again without finishing)"
-                : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+)"
+            string? pattern = creeping ? "creeping up across calls (a leak: it registers again without finishing)"
+                : stuckHigh ? $"stuck high ({lasts.Min()}+ in every one of the last {series.Count} calls, never draining)"
+                : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+, draining between)"
                 : null;
             if (pattern == null) continue;
-            var plugin = rows.FirstOrDefault(r => r.entry == name)?.plugin;
+            var plugin = rows.FirstOrDefault(r => r.entry == name)?.plugin
+                ?? recent.Select(h => h["entries"]?[name]?["plugin"]?.ToString()).LastOrDefault(p => !string.IsNullOrEmpty(p));
             crossCall.Add(new { entry = name, plugin, pattern, lastCounts = lasts, peaks = series.Select(x => x.peak).ToList() });
             crossSummary.Add($"{name}{(plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})")} is {pattern}: " +
                              (risesInARow ? string.Join(" -> ", lasts) : "peaks " + string.Join(", ", series.Select(x => x.peak))) + ".");
@@ -250,12 +261,15 @@ public class PapyrusTools : ToolBase
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
             }));
         if (crossSummary.Count > 0) summary += " Across recent calls: " + string.Join(" ", crossSummary);
+        // Stacks the listed handlers don't account for (before queued stacks were named, ~14,000 of 14,500 were missing).
+        var listedTotal = perEntry.Values.Sum(v => v.Last());
+        var unattributed = Math.Max(0, running.Last() - listedTotal);
         return new
         {
             summary,
             acrossCalls = crossCall.Count > 0 ? crossCall : null,
             historyCalls = recent.Count,
-            runningStacks = new { first = running.First(), last = running.Last(), max = running.Max() },
+            runningStacks = new { first = running.First(), last = running.Last(), max = running.Max(), listedInEntryPoints = listedTotal, unattributed },
             waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },
             overstressedSamples = $"{overstressed} of {samples}",
             entryPoints = rows,
