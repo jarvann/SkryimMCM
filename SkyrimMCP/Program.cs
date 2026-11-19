@@ -18,7 +18,7 @@ class Program
             {
                 try
                 {
-                    var scan = Saves.EssScanner.Scan(path);
+                    var scan = Saves.EssScanner.Scan(path, questStages: Environment.GetEnvironmentVariable("SKYLINK_SCAN_STAGES") == "1");
                     Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(scan, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 }
                 catch (Exception ex) { Console.WriteLine($"{{\"file\": \"{Path.GetFileName(path)}\", \"error\": \"{ex.GetType().Name}: {ex.Message}\"}}"); }

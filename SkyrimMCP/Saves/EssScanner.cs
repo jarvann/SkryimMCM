@@ -45,7 +45,7 @@ public static class EssScanner
         return h;
     }
 
-    public static SaveScan Scan(string path)
+    public static SaveScan Scan(string path, bool questStages = false)
     {
         var file = File.ReadAllBytes(path);
         var scan = new SaveScan { File = Path.GetFileName(path), FileSizeMB = Math.Round(file.Length / 1048576.0, 1) };
@@ -105,24 +105,44 @@ public static class EssScanner
         }
 
         for (var i = 0; i < table1 + table2; i++) { b.I32(); b.Skip(b.I32()); }
+        if (questStages) scan.QuestStages = new Dictionary<string, List<int[]>>();
 
         var cfTypes = new Dictionary<int, (int count, long bytes)>();
         for (var i = 0; i < changeForms; i++)
         {
-            b.RefId();
-            b.I32();
+            var refId = b.RefId();
+            var changeFlags = b.I32();
             var typeField = b.U8();
             b.U8();
-            int len1;
+            int len1, len2;
             switch (typeField >> 6)
             {
-                case 0: len1 = b.U8(); b.U8(); break;
-                case 1: len1 = b.U16(); b.U16(); break;
-                case 2: len1 = b.I32(); b.I32(); break;
+                case 0: len1 = b.U8(); len2 = b.U8(); break;
+                case 1: len1 = b.U16(); len2 = b.U16(); break;
+                case 2: len1 = b.I32(); len2 = b.I32(); break;
                 default: throw new FormatException($"change form {i}: bad length size");
             }
-            b.Skip(len1);
             var t = typeField & 0x3F;
+            // FEAT-263: a quest's stage list with each stage's status (CHANGE_QUEST_STAGES, flag bit 31): the record of stages
+            // done that the engine's in-memory list didn't give (it read back only zeros).
+            if (scan.QuestStages != null && t == 8 && (changeFlags & unchecked((int)0x80000000)) != 0)
+            {
+                try
+                {
+                    var data = len2 > 0 ? Inflate(body, b.Pos, len1, len2) : body.AsSpan(b.Pos, len1).ToArray();
+                    var q = new Buf(data, 0, data.Length);
+                    if ((changeFlags & 1) != 0) { q.I32(); q.U16(); }   // change form flags
+                    if ((changeFlags & 2) != 0) q.U16();                // quest flags
+                    if ((changeFlags & 4) != 0) q.F32();                // script delay
+                    var count = VsVal(q);
+                    var stages = new List<int[]>(count);
+                    for (var k = 0; k < count; k++) stages.Add([q.S16(), q.U8()]);
+                    var formId = ResolveRefId(refId, formIds);
+                    if (formId != 0) scan.QuestStages[formId.ToString("X8")] = stages;
+                }
+                catch (Exception ex) when (ex is FormatException or InvalidDataException) { }
+            }
+            b.Skip(len1);
             cfTypes.TryGetValue(t, out var cur);
             cfTypes[t] = (cur.count + 1, cur.bytes + len1);
         }
@@ -149,6 +169,30 @@ public static class EssScanner
         }
         if (!scan.PapyrusParsed && scan.PapyrusError == null) scan.PapyrusError = "no Papyrus section found";
         return scan;
+    }
+
+    static int VsVal(Buf b)
+    {
+        var first = b.U8();
+        return (first & 3) switch
+        {
+            0 => first >> 2,
+            1 => (first | (b.U8() << 8)) >> 2,
+            _ => (first | (b.U8() << 8) | (b.U8() << 16)) >> 2,
+        };
+    }
+
+    /// <summary>A save's 3-byte reference to a form ID (0 when it can't be resolved).</summary>
+    internal static int ResolveRefId(int refId, int[] formIds)
+    {
+        var value = refId & 0x3FFFFF;
+        return ((refId >> 22) & 3) switch
+        {
+            0 => value > 0 && value - 1 < formIds.Length ? formIds[value - 1] : 0,
+            1 => value,
+            2 => unchecked((int)0xFF000000) | value,
+            _ => 0,
+        };
     }
 
     static byte[] Inflate(byte[] src, int at, int length, int expected)
@@ -322,4 +366,7 @@ public sealed class SaveScan
     public List<ModCount> QueuedByPlugin { get; set; } = [];
     public List<ModCount> ThreadsByPlugin { get; set; } = [];
     public List<ModCount> FunctionMessagesByPlugin { get; set; } = [];
+
+    // FEAT-263: quest form ID (as in the save's load order) -> [stage, status] pairs, when asked for.
+    public Dictionary<string, List<int[]>>? QuestStages { get; set; }
 }
