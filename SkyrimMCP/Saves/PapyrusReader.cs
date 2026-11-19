@@ -352,6 +352,11 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             if (IsUndefinedScript(script)) undefinedBy[script] = undefinedBy.GetValueOrDefault(script) + 1;
             if (refId == 0) unattachedBy[script] = unattachedBy.GetValueOrDefault(script) + 1;
         }
+        foreach (var (_, refId) in _instances.Values)
+        {
+            var owner = PluginOfRef(refId) ?? (refId == 0 ? "(unattached)" : "(unresolved)");
+            scan.InstancesByPlugin[owner] = scan.InstancesByPlugin.GetValueOrDefault(owner) + 1;
+        }
         scan.UndefinedInstances = undefinedBy.Values.Sum();
         scan.UndefinedInstancesByScript = Top(undefinedBy, 25);
         scan.UnattachedInstances = unattachedBy.Values.Sum();

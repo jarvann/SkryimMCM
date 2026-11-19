@@ -123,6 +123,12 @@ public static class EssScanner
                 default: throw new FormatException($"change form {i}: bad length size");
             }
             var t = typeField & 0x3F;
+            // FEAT-269: change forms per plugin (what each mod's forms changed during play).
+            {
+                var fid = ResolveRefId(refId, formIds);
+                var owner = fid == 0 ? "(unresolved)" : PluginFor(fid, scan.Plugins, scan.LightPlugins) ?? "(plugin index past the list)";
+                scan.ChangeFormsByPlugin[owner] = scan.ChangeFormsByPlugin.GetValueOrDefault(owner) + 1;
+            }
             // FEAT-263: a quest's stage list with each stage's status (CHANGE_QUEST_STAGES, flag bit 31): the record of stages
             // done that the engine's in-memory list didn't give (it read back only zeros).
             if (scan.QuestStages != null && t == 8 && (changeFlags & unchecked((int)0x80000000)) != 0)
@@ -366,6 +372,10 @@ public sealed class SaveScan
     public List<ModCount> QueuedByPlugin { get; set; } = [];
     public List<ModCount> ThreadsByPlugin { get; set; } = [];
     public List<ModCount> FunctionMessagesByPlugin { get; set; } = [];
+
+    // FEAT-269: per plugin, change forms and script instances attached to its forms.
+    public Dictionary<string, int> ChangeFormsByPlugin { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> InstancesByPlugin { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     // FEAT-263: quest form ID (as in the save's load order) -> [stage, status] pairs, when asked for.
     public Dictionary<string, List<int[]>>? QuestStages { get; set; }

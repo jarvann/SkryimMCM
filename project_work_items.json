@@ -1398,6 +1398,21 @@
             }
           ],
           "targetRelease": "2.0"
+        },
+        {
+          "id": "FEAT-269",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Save against the current load order (collection updates)",
+          "description": "For Nexus collection updates: compare a save's plugin list with the current load order and say per plugin what changes and how much of the save it owns, so a player knows before loading whether an old save survives the update.",
+          "history": [
+            {
+              "datetime": "2026-11-20T04:00",
+              "note": "Built: CompareSaveToLoadOrder (live load order, or Plugins.txt with the game closed); removed plugins with footprint (change forms, script instances, threads, queued calls) and a risk; full<->light type changes; probable renames (a rename is a removal to the game); added; reordering counted as plugins out of order within each type. Offline pilot (`--migrate`): Save118 vs now 0/0; Arya's July saves vs now 2,079 removed (1,278 with no footprint, ~135 high: Nature of the Wild Lands, Extended Encounters, Dawn of Skyrim), 2,150 added, 3 probable renames. Not yet: script changes inside updated mods (needs a .pex/BSA reader)."
+            }
+          ],
+          "targetRelease": "1.4"
         }
       ]
     },
