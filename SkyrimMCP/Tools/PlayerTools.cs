@@ -74,10 +74,20 @@ public class PlayerTools : ToolBase
         {
             // Plugin 1.1.0+ reports its version and the game runtime; 1.2.0+ also its link time.
             var info = await _pipe.SendRequestAsync("ping");
+            // BUG-087: a stalled game thread (tasks ran, then stopped) usually means the window is unfocused. The plugin says so
+            // itself from this build; older host DLLs don't, so work it out here too.
+            string? stalled = null;
+            var gt = info?["diagnostics"]?["gameThread"];
+            if (info?["diagnostics"]?["problem"] == null && gt != null &&
+                (gt["pending"]?.GetValue<int>() ?? 0) > 0 && (gt["tasksRun"]?.GetValue<long>() ?? 0) > 0 &&
+                (gt["lastTaskRanSecondsAgo"] as JsonValue)?.GetValue<double>() > 5)
+                stalled = "The game has stopped running SkyLink's tasks. Usually its window is in the background and the game " +
+                          "pauses when unfocused: click into the game, or set bAlwaysActive=1 under [General] in Skyrim.ini.";
             return new
             {
                 connected = true,
-                message = "Connected to Skyrim via SKSE plugin",
+                message = stalled ?? "Connected to Skyrim via SKSE plugin",
+                stalled = stalled != null ? true : (bool?)null,
                 pluginVersion = info?["pluginVersion"]?.GetValue<string>(),
                 pluginBuilt = info?["pluginBuilt"]?.GetValue<string>(),
                 gameVersion = info?["gameVersion"]?.GetValue<string>(),

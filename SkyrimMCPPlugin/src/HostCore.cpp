@@ -338,6 +338,11 @@ namespace SkyrimMCP::HostCore {
             if (queued > 0 && run == 0) {
                 d["problem"] = "Game-thread calls are queued but none has ever run: SKSE is not running SkyLink's tasks. "
                                "Check that the SKSE version matches the game build and send the SKSE logs.";
+            } else if (g_pendingTasks.load() > 0 && last != 0 && (SteadyMs() - last) > 5000) {
+                // BUG-087: seen on a fresh GOG install: 3 tasks ran at start, then nothing while the window was unfocused.
+                d["problem"] = "The game has stopped running SkyLink's tasks (some ran earlier). Usually its window is in the "
+                               "background and the game pauses when unfocused: click into the game, or set bAlwaysActive=1 "
+                               "under [General] in Skyrim.ini. A menu or loading screen can also hold them.";
             }
             return d;
         }

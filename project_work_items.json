@@ -1624,7 +1624,7 @@
         {
           "id": "BUG-012",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "All data calls fail on GOG Skyrim SE",
           "description": "Nexus bug report from LennonStage (28 Apr 2026): GOG 1.6.1179, SKSE 2.2.6; ping works, every game-thread call fails. Cause unknown; the earlier 'Steam offsets on GOG' theory does not hold. Waiting on CheckConnection output, exact error text and the log from 'My Games\\Skyrim Special Edition GOG\\SKSE' (requested in the 1.1.0 sticky post). No GOG copy available for testing.",
           "history": [
@@ -1643,6 +1643,10 @@
             {
               "datetime": "2026-11-19T17:45",
               "note": "Cory bought Skyrim AE on GOG (2026-11-19): testable in the 1.4 round. GOG logs go under 'Skyrim Special Edition GOG' in My Games."
+            },
+            {
+              "datetime": "2026-11-19T09:00",
+              "note": "GOG 1.6.1179 (vanilla, SKSE 2.2.6 GOG, Address Library 1.6.1179) with the 1.3.0 release in MO2: connects, store detected as GOG, Address Library found, plugin and logic load. Game calls stalled only because the window was unfocused (BUG-087); data calls still to be confirmed with bAlwaysActive=1."
             }
           ],
           "targetRelease": "1.4"
@@ -4004,9 +4008,28 @@
             {
               "datetime": "2026-11-19T18:10",
               "note": "Also for 1.3.1: in the studio (1.3.0) brow_lightness read 0.625 and the brow colour a pale grey #857E80 while the brow shader was #4A2416: her fringe covers the brow line, so the brow sample picks up hair. Sample brow pixels away from hair, or flag 'brows obscured by hair' (hideHair: true is the workaround). Studio capture itself was fine: skin lightness 62.2, shape numbers unchanged from the night capture."
+            },
+            {
+              "datetime": "2026-11-19T09:00",
+              "note": "1.3.1 folded into 1.4 (Cory)."
             }
           ],
-          "targetRelease": "1.3.1"
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-087",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "An unfocused game stalls every call with only a generic timeout",
+          "description": "GOG test (2026-11-19, vanilla GOG 1.6.1179 + SKSE 2.2.6 GOG): the connection, store detection and Address Library worked, but every game call timed out: three tasks ran at start, then none while the window was unfocused (a fresh install has no bAlwaysActive). The timeout error now names the background window and bAlwaysActive; CheckConnection reports stalled with that advice when tasks ran and then stopped; the host diagnosis says the same (host DLL, next restart). Also checked: the GOG install's 1.3.0 build times differ from the Steam deploy but the code is identical (only build_release.ps1 and the tracker changed between them).",
+          "history": [
+            {
+              "datetime": "2026-11-19T09:00",
+              "note": "From the in-game agent's first GOG run."
+            }
+          ],
+          "targetRelease": "1.4"
         },
         {
           "id": "BUG-050",
