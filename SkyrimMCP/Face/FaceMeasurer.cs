@@ -688,7 +688,7 @@ public sealed class FaceMeasurer : IDisposable
 
     // ---- colour maths -----------------------------------------------------------------------------
 
-    private static class Color
+    internal static class Color
     {
         public static double[] SrgbToLab(double r, double g, double b)
         {

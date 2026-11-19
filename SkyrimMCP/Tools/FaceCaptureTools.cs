@@ -194,6 +194,8 @@ public class FaceCaptureTools : ToolBase
                     warning = aim?["aimed"]?.GetValue<bool>() == false
                         ? "The camera may not be pointing at the face (alignment below 0.95): check the image."
                         : null,
+                    // BUG-086: the dark warnings were only in MeasureFace; a capture in a dim inn (face lightness 11) said nothing.
+                    lighting = Math.Abs(angleDeg) <= 50 ? CheckLighting(shot) : null,
                 }),
             });
             return shot;
@@ -239,6 +241,34 @@ public class FaceCaptureTools : ToolBase
             return $"ok (face at {x:0.00}, {y:0.00}, {size:0.00} of the frame)";
         }
         catch (Exception ex) { return "Framing not checked: " + ex.Message; }
+    }
+
+    // Lightness (CIE L*, 0-100) of the middle of the face: below 15 colour numbers mean nothing, below 30 they're unreliable.
+    private static string? CheckLighting(CallToolResult shot)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        string? preview = null;
+        foreach (var block in shot.Content.OfType<TextContentBlock>())
+        {
+            try { preview ??= JsonNode.Parse(block.Text)?["preview"]?["file"]?.GetValue<string>(); }
+            catch (JsonException) { }
+        }
+        if (preview == null || !File.Exists(preview)) return null;
+        try
+        {
+            var face = SkyrimMCP.Face.FaceMeasurer.Shared.LocateFace(preview);
+            if (face == null) return null;
+            var (x, y, size) = face.Value;
+            var img = SkyrimMCP.Face.RgbImage.Load(preview);
+            var px = new List<double[]>();
+            img.SampleDisc(x * img.W, y * img.H, Math.Max(2, size * img.W * 0.2), px);
+            if (px.Count == 0) return null;
+            var l = px.Select(p => SkyrimMCP.Face.FaceMeasurer.Color.SrgbToLab(p[0], p[1], p[2])[0]).OrderBy(v => v).ElementAt(px.Count / 2);
+            return l < 15 ? $"very dark (face lightness {l:0} of 100): colour numbers are meaningless at this level; capture in the studio (StudioGo) or in daylight"
+                 : l < 30 ? $"dark (face lightness {l:0} of 100): colours are unreliable; the studio gives comparable light"
+                 : $"ok (face lightness {l:0} of 100)";
+        }
+        catch (Exception) { return null; }
     }
 
     // A square on the middle of the screen, 90% of its height: the head sits in the centre at the default distance.
