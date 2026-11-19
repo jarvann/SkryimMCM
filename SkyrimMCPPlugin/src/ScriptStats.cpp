@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <format>
 #include <vector>
 
 // windows.h (pulled in through SKSE) defines GetObject as GetObjectA, which hides Variable::GetObject.
@@ -165,8 +166,14 @@ namespace SkyrimMCP::ScriptStats {
         for (const auto& [entry, plugins] : entryOwners) {
             std::vector<std::pair<std::string, int>> sorted(plugins.begin(), plugins.end());
             std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+            // FEAT-268: up to 5 by name, then the rest summed, so the counts add up (37 MCM menus each own one stack).
             json list = json::array();
-            for (std::size_t i = 0; i < sorted.size() && i < 3; ++i) list.push_back({{"plugin", sorted[i].first}, {"stacks", sorted[i].second}});
+            int rest = 0, restPlugins = 0;
+            for (std::size_t i = 0; i < sorted.size(); ++i) {
+                if (i < 5) list.push_back({{"plugin", sorted[i].first}, {"stacks", sorted[i].second}});
+                else { rest += sorted[i].second; ++restPlugins; }
+            }
+            if (restPlugins > 0) list.push_back({{"plugin", std::format("{} more plugins", restPlugins)}, {"stacks", rest}});
             owners[entry] = list;
         }
         result["entryPointOwners"] = owners;

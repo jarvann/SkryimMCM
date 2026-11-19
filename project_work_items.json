@@ -1249,6 +1249,10 @@
             {
               "datetime": "2026-11-19T15:05",
               "note": "Agent reruns: headline and growth fixes work; magic effect still blank. Confirmed both runs reported the defining plugin (GetFile(0)); the names changed because different objects ran the handlers between samples. Now each owner reads 'X, last changed by Y' when an override exists; an object that is gone (OnEffectFinish after the effect ended) reads '(owner gone: <script>)'; an active effect with no source reads so."
+            },
+            {
+              "datetime": "2026-11-19T16:00",
+              "note": "Busy test (Solitude): arrival overstressed 10 of 12 samples; Vampire Feed Decals ~180 stacks then drained; Exalted Enemies A0_Transcend spiked to 132, 53, 54 (periodic); MCM OnConfigManagerReady a one-time 37. Magic effects, owner gone and defined/last changed by all work live. Fixed: samples during a loading screen are skipped instead of failing the call; owners list up to 5 plugins plus 'N more plugins' with their stacks, taken from the busiest sample; each pile-up is classed burst, periodic or runaway and the summary uses the peak; no double parentheses. Also the launcher's retry message warns the call may already have run (launcher updates when Claude Desktop is closed)."
             }
           ],
           "targetRelease": "1.4"
