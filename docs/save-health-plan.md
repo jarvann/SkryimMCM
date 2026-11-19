@@ -25,6 +25,35 @@ installed tool, and `scripts/save-scan/` already drives its library headlessly.
   limits that cause problems.
 - Grouped by plugin where the script can be traced to one, so the reply says "left over from <mod>" rather than raw names.
 
+## Script stacks (the main use)
+
+Stacks are the main thing Cory cleans: they pile up and **destroy FPS**. A stack is a script call in progress; when a mod
+loops, waits on something that never comes, or keeps starting the same handler, hundreds of copies of one function sit in
+the save and the live game, all competing for the script engine's time each frame.
+
+**Live first (no save edit):** `GetScriptStats` already reads the running Papyrus VM: running stacks, latent waits,
+overstress, and the busiest scripts, entry points and functions. A new `StackReport` builds on it:
+- Samples the VM for a few seconds and reports stack counts per script and function, how fast they grow, and the
+  plugin each script comes from.
+- Flags **runaway stacks**: many copies of the same function (e.g. 20 or more), a count that keeps growing between
+  samples, or stacks waiting on latent calls for a long time. Shows overstress and per-frame script load next to it so
+  the FPS link is visible.
+- Says what it means in plain language ("<mod>'s OnUpdate is running 340 times at once and growing").
+
+**Cleaning stacks (save edit and reload):** the engine can't kill a running stack from outside safely, so cleaning
+terminates them in a copy of a fresh save, then loads it (`CleanAndReload`). Stack findings get their own levels:
+
+| Stack finding | Level | Notes |
+|---|---|---|
+| Stacks of scripts **no longer installed** | Safe | Nothing can finish them |
+| **Runaway duplicates** of an installed script (same function, many copies, growing) | Caution | The usual FPS killer. Terminating them stops the pile-up; the mod re-runs its handler on its next event. Warn that the mod may lose whatever that call was doing, and that the pile-up will return if the mod keeps looping (then the mod itself is the fix: update, configure or remove). |
+| A few stacks of an installed script, not growing | Risky | Probably doing real work; listed only |
+| Stacks of **quest scripts** (attached to a running quest), especially main quest and faction lines | Risky | Killing one can leave the quest stuck at a stage; item by item only, with the quest named |
+| Base game and DLC script stacks | Never | Reported only |
+
+After a stack clean the tool re-checks live: `StackReport` again after the reload, to show whether the pile-up is gone
+and whether it is coming back.
+
 ## What is safe to clean
 
 Every finding gets a risk level, and the reply says what could break for each one before anything is cleaned.
@@ -55,6 +84,8 @@ Rules that go with the levels:
 
 ## Build order
 
+0. **`StackReport` (live)** on top of `GetScriptStats`: per-script and per-function counts, growth between samples,
+   plugin, runaway flags. No save involved, so it ships first and is useful on its own. About 1-2 hours.
 1. **Native scan (C#)**: ESS header and plugin list, LZ4, the Papyrus section (script, struct and reference
    definitions, instances, arrays, active scripts, messages), the unattached and undefined checks. Verified against the
    ReSaver scan (`scripts/save-scan`) on at least ten saves, Steam and GOG. About 3-5 hours of Claude time.
