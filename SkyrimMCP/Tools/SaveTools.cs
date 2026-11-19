@@ -131,6 +131,22 @@ public class SaveTools : ToolBase
         }
         catch (Exception) { }
 
+        // Live owners (as StackReport names them: for a magic effect, the effect's plugin) for handlers running now, so CheckSave
+        // and StackReport can be read together. The save itself only knows the object a script runs on.
+        Dictionary<string, string>? liveOwners = null;
+        if (made != null)
+        {
+            try
+            {
+                var live = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 });
+                if (live?["entryPointOwners"] is JsonObject o)
+                    liveOwners = o.Where(kv => kv.Value is JsonArray { Count: > 0 })
+                        .ToDictionary(kv => kv.Key.Replace(" (queued)", ""), kv => ((JsonArray)kv.Value!)[0]?["plugin"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception) { }
+        }
+        object Handler(NameCount n) => new { name = n.Name, count = n.Count, runningOn = n.RunningOn,
+                                             liveOwner = liveOwners != null && liveOwners.TryGetValue(n.Name, out var lo) ? lo : null };
         return new
         {
             summary = Summarise(scan, missing),
@@ -147,9 +163,9 @@ public class SaveTools : ToolBase
                 suspendedThreads = scan.SuspendedThreads,
                 terminatedThreads = scan.TerminatedThreads,
                 queuedCalls = scan.SuspendedStacks1 + scan.SuspendedStacks2,
-                queuedByFunction = scan.QueuedCalls.Take(20),
+                queuedByFunction = scan.QueuedCalls.Take(20).Select(Handler),
                 queuedByMod = scan.QueuedByPlugin,
-                threadsByEntryPoint = scan.ThreadsByEntryPoint.Take(20),
+                threadsByEntryPoint = scan.ThreadsByEntryPoint.Take(20).Select(Handler),
                 threadsByMod = scan.ThreadsByPlugin,
                 threadsByTopFrame = scan.ThreadsByTopFrame,
                 functionMessages = scan.FunctionMessages,
@@ -169,7 +185,7 @@ public class SaveTools : ToolBase
             pluginsNotLoaded = missing,
             plugins = new { full = scan.Plugins.Count, light = scan.LightPlugins.Count },
             biggestChangeForms = scan.ChangeFormsByType,
-            note = "Read-only: nothing was changed. Undefined = the save holds data for scripts whose files the game couldn't find when it saved (usually a removed mod). " +
+            note = "Read-only: nothing was changed. runningOn = the plugin of the object a script runs on (an effect's actor, the player = Skyrim.esm), not necessarily the mod that defines the script; liveOwner (when the handler is running now) is what StackReport shows. Undefined = the save holds data for scripts whose files the game couldn't find when it saved (usually a removed mod). " +
                    "Unattached instances are often harmless leftovers. Credit: the scan follows ReSaver (FallrimTools, Mark Fairchild).",
         };
     }
@@ -208,17 +224,24 @@ public class SaveTools : ToolBase
         }
     }
 
-    sealed record CleanPlan(List<string> Args, List<object> Items, List<string> Warnings, string? Error);
+    sealed record CleanPlan(List<string> Args, List<object> Items, List<string> Warnings, string? Error)
+    {
+        public HashSet<string> Mods { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<string> Handlers { get; } = [];
+    }
 
     static CleanPlan Plan(SaveScan scan, string levels, string? stacks)
     {
         var args = new List<string>();
         var items = new List<object>();
         var warnings = new List<string>();
+        var mods = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var handlers = new List<string>();
         var lv = levels.ToLowerInvariant();
         if (scan.UndefinedScripts.Count > 0 || scan.UndefinedThreads > 0)
         {
-            items.Add(new { level = "safe", what = $"script data of {scan.UndefinedScripts.Count} scripts with no script file ({scan.UndefinedInstances} instances), and {scan.UndefinedThreads} threads running them",
+            items.Add(new { level = "safe", what = $"script data of {scan.UndefinedScripts.Count} scripts with no script file ({scan.UndefinedInstances} instances)" +
+                                                     (scan.UndefinedThreads > 0 ? $", and {scan.UndefinedThreads} threads running them (terminated)" : ""),
                             examples = scan.UndefinedScripts.Take(10), couldBreak = "nothing that still works: the game can't run these scripts. If you reinstall the mod later it starts fresh." });
             args.Add("--undefined");
         }
@@ -234,7 +257,7 @@ public class SaveTools : ToolBase
         {
             if (Regex.IsMatch(n, @"\.(esp|esm|esl)$", RegexOptions.IgnoreCase))
             {
-                var all = scan.QueuedCalls.Concat(scan.ThreadsByEntryPoint).Where(x => string.Equals(x.Plugin, n, StringComparison.OrdinalIgnoreCase))
+                var all = scan.QueuedCalls.Concat(scan.ThreadsByEntryPoint).Where(x => string.Equals(x.RunningOn, n, StringComparison.OrdinalIgnoreCase))
                     .Select(x => x.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (all.Count == 0) return new CleanPlan(args, items, warnings, $"No queued calls or threads from {n} in this save.");
                 names.AddRange(all);
@@ -252,7 +275,9 @@ public class SaveTools : ToolBase
                 return new CleanPlan(args, items, warnings,
                     $"No stacks of '{name}' in this save. Its queued calls and threads are named like: " +
                     string.Join(", ", scan.QueuedCalls.Concat(scan.ThreadsByEntryPoint).Select(x => x.Name).Distinct().Take(10)));
-            var plugin = queued?.Plugin ?? running?.Plugin;
+            var plugin = queued?.RunningOn ?? running?.RunningOn;
+            if (plugin != null && !plugin.StartsWith("(")) mods.Add(plugin);
+            handlers.Add(name);
             items.Add(new { level = "caution", what = $"{name}{(plugin != null ? $" ({plugin})" : "")}: {queued?.Count ?? 0} queued calls and {running?.Count ?? 0} running threads",
                             couldBreak = "whatever those calls were doing is dropped; the mod runs its handler again on its next event. If the mod keeps piling up, the stacks come back (then the mod is the fix: update, configure or remove it)." });
             if (plugin != null && BaseGamePlugins.Contains(plugin, StringComparer.OrdinalIgnoreCase))
@@ -265,7 +290,10 @@ public class SaveTools : ToolBase
             args.Add(name);
         }
         if (args.Count == 0) return new CleanPlan(args, items, warnings, "Nothing to clean at these levels (name pile-ups to clean with stacks, from CheckSave).");
-        return new CleanPlan(args, items, warnings, null);
+        var plan = new CleanPlan(args, items, warnings, null);
+        plan.Mods.UnionWith(mods);
+        plan.Handlers.AddRange(handlers);
+        return plan;
     }
 
     static async Task<(bool ok, List<string> lines)> RunCleaner(string resaver, string input, string output, List<string> args)
@@ -304,10 +332,12 @@ public class SaveTools : ToolBase
     {
         var path = ResolveSave(saveName);
         if (path == null) return new { error = $"No save matching '{saveName}' in {SaveFolder()}. ListSaves shows them." };
-        return await CleanFile(path, levels, stacks, dryRun);
+        return await CleanFile(path, levels, stacks, dryRun, new CleanInfo());
     }
 
-    async Task<object> CleanFile(string path, string levels, string? stacks, bool dryRun)
+    sealed class CleanInfo { public List<string> Handlers = []; public List<string> StillActive = []; }
+
+    async Task<object> CleanFile(string path, string levels, string? stacks, bool dryRun, CleanInfo info)
     {
         SaveScan scan;
         try { scan = await Task.Run(() => EssScanner.Scan(path)); }
@@ -315,6 +345,24 @@ public class SaveTools : ToolBase
         if (!scan.PapyrusParsed) return new { error = $"The script section of {Path.GetFileName(path)} couldn't be read ({scan.PapyrusError}); it won't be cleaned." };
         var plan = Plan(scan, levels, stacks);
         if (plan.Error != null) return new { error = plan.Error, save = Path.GetFileNameWithoutExtension(path) };
+        info.Handlers.AddRange(plan.Handlers);
+        // Cleaning a pile-up whose mod is still running buys about a minute (seen in game: Aniya back to ~1,700 copies in 40 s).
+        if (plan.Mods.Count > 0)
+        {
+            try
+            {
+                var lo = await _pipe.SendRequestAsync("get_load_order");
+                if (lo?["mods"] is JsonArray loaded)
+                {
+                    var names = new HashSet<string>(loaded.Select(m => m?["name"]?.ToString() ?? ""), StringComparer.OrdinalIgnoreCase);
+                    info.StillActive.AddRange(plan.Mods.Where(m => names.Contains(m) && !BaseGamePlugins.Contains(m, StringComparer.OrdinalIgnoreCase)));
+                }
+            }
+            catch (Exception) { }
+            if (info.StillActive.Count > 0)
+                plan.Warnings.Insert(0, $"{string.Join(", ", info.StillActive)} is still loaded: if it keeps causing the pile-up, the stacks come back within a minute or two of loading the cleaned save. " +
+                                        "Stop the cause too: update or reconfigure the mod, stop the quest that drives it (StopQuest), or disable the mod before playing on.");
+        }
         if (dryRun)
             return new { dryRun = true, save = Path.GetFileNameWithoutExtension(path), wouldClean = plan.Items, warnings = plan.Warnings,
                          note = "Nothing changed. Run again with dryRun=false after the player agrees; the cleaned copy is a new save and the original stays." };
@@ -331,11 +379,20 @@ public class SaveTools : ToolBase
         }
         SaveScan? after = null;
         try { after = await Task.Run(() => EssScanner.Scan(output)); } catch (Exception) { }
+        int Num(string key) => lines.FirstOrDefault(l => l.StartsWith(key + ":")) is string l && int.TryParse(l[(key.Length + 1)..].Trim(), out var v) ? v : 0;
+        var queuedRemoved = Num("queuedRemoved");
+        var ownStacks = Num("threadOwnStacksRemoved");
+        var totals = plan.Handlers.Count == 0 ? null :
+            $"Removed {queuedRemoved} suspended stacks: {queuedRemoved - ownStacks} queued calls of the named handlers, and {ownStacks} stacks belonging to " +
+            $"their running threads (waiting inside a call, e.g. a native function) that had to go with them. {Num("threadsRemoved")} threads deleted" +
+            (Num("threadsTerminatedOnly") > 0 ? $", {Num("threadsTerminatedOnly")} terminated but kept (a pending call points at them)." : ".");
         return new
         {
             cleaned = Path.GetFileNameWithoutExtension(output),
             original = Path.GetFileNameWithoutExtension(path),
             removed = plan.Items,
+            totals,
+            stillActive = info.StillActive.Count > 0 ? info.StillActive : null,
             cleanerReport = lines,
             after = after == null ? null : new { threads = after.ActiveScripts, queuedCalls = after.SuspendedStacks1 + after.SuspendedStacks2, undefinedScripts = after.UndefinedScripts.Count, scriptSectionRead = after.PapyrusParsed },
             warnings = plan.Warnings,
@@ -358,7 +415,8 @@ public class SaveTools : ToolBase
         var path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
         if (path == null) return new { error = $"Saved as {made}, but the file didn't appear complete within 2 minutes; nothing was cleaned." };
 
-        var result = await CleanFile(path, levels, stacks, dryRun: !confirm);
+        var info = new CleanInfo();
+        var result = await CleanFile(path, levels, stacks, dryRun: !confirm, info);
         if (!confirm) return new { step = "preview", savedAs = made, plan = result, next = "If the player agrees, call CleanAndReload again with confirm=true (it saves again, so it cleans the game as it is then)." };
         var cleanedName = System.Text.Json.JsonSerializer.SerializeToNode(result)?["cleaned"]?.ToString();
         if (cleanedName == null) return new { step = "clean failed", savedAs = made, result };
@@ -380,11 +438,40 @@ public class SaveTools : ToolBase
             }
             catch (Exception) { }
         }
+        // Is the pile-up coming back? Two samples 20 seconds apart, counting the cleaned handlers (running and queued).
+        object? regrowth = null;
+        if (loaded && info.Handlers.Count > 0)
+        {
+            async Task<int?> Sample()
+            {
+                try
+                {
+                    var data = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 });
+                    var set = new HashSet<string>(info.Handlers, StringComparer.OrdinalIgnoreCase);
+                    return (data?["topEntryPoints"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                        .Where(e => set.Contains((e["name"]?.ToString() ?? "").Replace(" (queued)", "")))
+                        .Sum(e => e["stacks"]?.GetValue<int>() ?? 0);
+                }
+                catch (Exception) { return null; }
+            }
+            await Task.Delay(5000);
+            var first = await Sample();
+            await Task.Delay(20000);
+            var second = await Sample();
+            regrowth = new
+            {
+                after5s = first, after25s = second,
+                verdict = second is null ? "couldn't sample"
+                    : second >= 20 && second > (first ?? 0) ? $"coming back: {second} copies 25 s after loading. The cause is still running; stop it (see stillActive) before saving."
+                    : "not coming back so far; run StackReport again in a few minutes to be sure.",
+            };
+        }
         return new
         {
             step = loaded ? "done" : "loading (not confirmed after 3 minutes)",
             loaded = cleanedName,
             wayBack = made,
+            regrowth,
             result,
             next = "Run StackReport in a minute to check the pile-up is gone and isn't coming back. If anything seems wrong, load the way-back save.",
         };
@@ -396,10 +483,10 @@ public class SaveTools : ToolBase
         var queued = s.SuspendedStacks1 + s.SuspendedStacks2;
         // The plugin is where the script's object comes from. For the player and base-game objects that's Skyrim.esm even when
         // the script belongs to a mod (Ordinator's ORD_* effects on the player), so say that rather than blame the base game.
-        static string Mod(NameCount p) => p.Name.StartsWith("(") ? $"an unidentified mod ({p.Plugin})"
-            : BaseGamePlugins.Contains(p.Name, StringComparer.OrdinalIgnoreCase)
-                ? $"scripts on the player or base-game objects ({p.Plugin}; the scripts themselves may come from mods)"
-                : $"{p.Name} ({p.Plugin})";
+        static string Mod(ModCount p) => p.Plugin.StartsWith("(") ? $"an unidentified mod ({p.Handlers})"
+            : BaseGamePlugins.Contains(p.Plugin, StringComparer.OrdinalIgnoreCase)
+                ? $"scripts on the player or base-game objects ({p.Handlers}; the scripts themselves may come from mods)"
+                : $"objects from {p.Plugin} ({p.Handlers})";
         if (s.QueuedByPlugin.FirstOrDefault() is { Count: >= 100 } qp)
             parts.Add($"{queued} queued script calls are stored in this save; {qp.Count} of them come from {Mod(qp)}. " +
                       "A queue this size eats script time every frame and is a likely cause of low FPS.");

@@ -268,7 +268,11 @@ public sealed class SaveHeader
 }
 
 public sealed record ChangeFormType(string Type, int Count, double SizeMB);
-public sealed record NameCount(string Name, int Count, string? Plugin = null);
+// RunningOn: the plugin of the object the script runs on (the player and base-game objects are Skyrim.esm; an active magic
+// effect's script runs on the actor it's applied to), not necessarily the mod that defines the script.
+public sealed record NameCount(string Name, int Count, string? RunningOn = null);
+// Plugin totals: Plugin = where the objects come from, Handlers = how many handlers and the biggest.
+public sealed record ModCount(string Plugin, int Count, string Handlers);
 
 public sealed class SaveScan
 {
@@ -315,7 +319,7 @@ public sealed class SaveScan
     public List<NameCount> FunctionMessageCalls { get; set; } = [];
 
     // Totals per plugin (Name = plugin, Plugin field = how many handlers and the biggest one).
-    public List<NameCount> QueuedByPlugin { get; set; } = [];
-    public List<NameCount> ThreadsByPlugin { get; set; } = [];
-    public List<NameCount> FunctionMessagesByPlugin { get; set; } = [];
+    public List<ModCount> QueuedByPlugin { get; set; } = [];
+    public List<ModCount> ThreadsByPlugin { get; set; } = [];
+    public List<ModCount> FunctionMessagesByPlugin { get; set; } = [];
 }
