@@ -12,7 +12,7 @@ installed tool, and `scripts/save-scan/` already drives its library headlessly.
 | Tool | What it does | Writes? |
 |---|---|---|
 | `CheckSave(saveName?)` | With no name: makes a fresh save of the current game (`SkyLink_Check_<time>`), waits until the file is complete, then scans it. With a name: scans that save. Reports the findings in plain language with counts and the scripts or mods involved. | One new save (the check save), nothing else |
-| `CleanSave(saveName, what, dryRun=true)` | Removes the chosen problems from a **copy** (`<name>_cleaned`), never the original. `what`: unattached instances, undefined elements, undefined threads, or all safe ones. Dry run lists what would go. | A new save file |
+| `CleanSave(saveName, levels="safe", dryRun=true)` | Removes the chosen findings from a **copy** (`<name>_cleaned`), never the original. `levels`: safe (default), caution; risky items only when named one by one. Dry run lists what would go and what could break. | A new save file |
 | `CleanAndReload(what, confirm)` | The in-game flow: `CheckSave` (fresh save), `CleanSave` to a copy, load the copy, wait for the load, run `CheckSave` again on a new save to confirm the problems are gone. Needs the player's confirmation and the move safety rules (no menus, scenes, combat). | Two new saves and the cleaned copy |
 | `ListSaves(filter?)` | The save folder of the running game (Steam or GOG), newest first, with character ID, name, level, location, time. | No |
 
@@ -24,6 +24,24 @@ installed tool, and `scripts/save-scan/` already drives its library headlessly.
 - **Size and health**: broken or truncated Papyrus section, string table size, change form count, save size against the
   limits that cause problems.
 - Grouped by plugin where the script can be traced to one, so the reply says "left over from <mod>" rather than raw names.
+
+## What is safe to clean
+
+Every finding gets a risk level, and the reply says what could break for each one before anything is cleaned.
+
+| Level | Findings | Why | Default |
+|---|---|---|---|
+| **Safe** | Script data, instances, threads and messages belonging to scripts whose files are **no longer installed** (undefined), from a mod the player removed | Nothing in the game can run them any more; they only take space and cause errors on load | Offered; cleaned with one confirmation |
+| **Caution** | **Unattached instances of scripts that are still installed** | Often harmless leftovers, but a mod may still expect them (some mods keep instances on purpose, and an update mid-playthrough can leave them); removing one can stop that mod working until it re-initialises | Listed with the mod name; cleaned only if the player picks them, with a warning |
+| **Risky** | **Active or suspended script threads** (stacks) of installed scripts; data of scripts attached to a **running quest**, especially the main quest and faction lines | A thread is a script in the middle of running; killing it can leave a quest stuck at a stage or a mod half-configured, and the break may only show hours later | Listed, never part of "clean all safe"; each needs explicit confirmation and a warning naming the quest or mod |
+| **Never** | Base game and DLC scripts and change forms, the string table, anything the scanner can't attribute | Removing these breaks the game or the save outright | Reported only; the tool refuses to remove them |
+
+Rules that go with the levels:
+- A finding is only **Safe** when its script file is confirmed missing from the running game (loose and in archives), not just unknown to the scanner.
+- Each finding names its plugin when it can be traced, and whether that plugin is installed and enabled. A plugin that's still installed moves its findings out of Safe.
+- The dry run (default) prints, per level, the count, the mods involved and the possible breakage; `CleanSave` takes the levels to clean (`safe` by default) and refuses Risky items unless they are named one by one.
+- After cleaning, the player is told the original save is the way back, and to play a little and make a fresh save before deleting it.
+- The scan also warns about things cleaning can't fix: a mod updated mid-playthrough against its author's advice, a very large save, or a string table near its limit.
 
 ## Safety
 
