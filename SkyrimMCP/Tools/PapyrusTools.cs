@@ -108,6 +108,77 @@ public class PapyrusTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Find runaway Papyrus script stacks, the usual cause of script lag and FPS loss in a heavy load order (FEAT-268). " +
+        "Samples the live script engine several times (samples, default 6, intervalMs apart, default 1000) and reports, per " +
+        "entry point (the mod's event handler where each stack started): how many stacks, whether the count is growing, and the " +
+        "plugins that own the objects it runs on. Flags runaways (20 or more copies of one handler, or a count that keeps " +
+        "growing) and shows overstress and waiting function messages beside them. Read-only: nothing in the game changes. " +
+        "Clearing stacks needs a save edit and reload (planned: CleanAndReload); until then the fix is the mod itself " +
+        "(update, configure, or stop the feature that loops).")]
+    public async Task<object> StackReport(int samples = 6, int intervalMs = 1000, int top = 12)
+    {
+        samples = Math.Clamp(samples, 2, 20);
+        intervalMs = Math.Clamp(intervalMs, 200, 5000);
+        var perEntry = new Dictionary<string, List<int>>();
+        var owners = new Dictionary<string, JsonNode?>();
+        var running = new List<int>();
+        var waitingMessages = new List<int>();
+        var overstressed = 0;
+        for (var i = 0; i < samples; i++)
+        {
+            if (i > 0) await Task.Delay(intervalMs);
+            var data = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 });
+            if (data?["error"] != null) return DeserializeResponse(data);
+            running.Add(data?["runningStacks"]?.GetValue<int>() ?? 0);
+            waitingMessages.Add(data?["waitingFunctionMessages"]?.GetValue<int>() ?? 0);
+            if (data?["overstressed"]?.GetValue<bool>() == true) overstressed++;
+            var seen = new HashSet<string>();
+            foreach (var e in (data?["topEntryPoints"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+            {
+                var name = e["name"]?.ToString() ?? "?";
+                if (!perEntry.TryGetValue(name, out var counts)) perEntry[name] = counts = Enumerable.Repeat(0, i).ToList();
+                counts.Add(e["stacks"]?.GetValue<int>() ?? 0);
+                seen.Add(name);
+            }
+            foreach (var (name, counts) in perEntry) if (!seen.Contains(name)) counts.Add(0);
+            if (data?["entryPointOwners"] is JsonObject o)
+                foreach (var (name, list) in o) owners[name] = list?.DeepClone();
+        }
+
+        var rows = perEntry.Select(kv =>
+        {
+            var c = kv.Value;
+            var first = c.First();
+            var last = c.Last();
+            var max = c.Max();
+            var rising = c.Zip(c.Skip(1), (a, b) => b - a).Count(d => d > 0);
+            var falling = c.Zip(c.Skip(1), (a, b) => b - a).Count(d => d < 0);
+            var growing = last > first && rising > falling;
+            var runaway = max >= 20 || (growing && last - first >= 5);
+            var plugin = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null)?.FirstOrDefault()?["plugin"]?.ToString();
+            return new { entry = kv.Key, last, max, first, growing, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
+        }).OrderByDescending(r => r.runaway).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
+
+        var runaways = rows.Where(r => r.runaway).ToList();
+        var summary = runaways.Count == 0
+            ? "No runaway stacks: no handler has 20 or more copies or a steadily growing count."
+            : string.Join(" ", runaways.Select(r =>
+                $"{r.entry}{(r.plugin != null ? $" ({r.plugin})" : "")} is running {r.last} times at once{(r.growing ? $", up from {r.first} and growing" : "")}."));
+        return new
+        {
+            summary,
+            runningStacks = new { first = running.First(), last = running.Last(), max = running.Max() },
+            waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },
+            overstressedSamples = $"{overstressed} of {samples}",
+            entryPoints = rows,
+            sampled = $"{samples} samples, {intervalMs} ms apart",
+            note = "Some waiting stacks are normal (Utility.Wait, update loops). A handler with dozens or hundreds of copies, or one " +
+                   "that keeps growing, is a mod looping faster than it finishes: that eats script time every frame. Clearing them " +
+                   "needs a save edit and reload; fixing the mod (update, its MCM settings, or disabling the feature) stops it coming back.",
+        };
+    }
+
+    [McpServerTool]
     [Description("Papyrus script engine diagnostics, to find the mod behind script lag or a save that bloats. " +
         "Reports runningStacks (scripts active right now), how many wait on latent functions, waitingFunctionMessages, " +
         "overstressed, objectsWithScripts (game objects with scripts attached) and arrays, and the busiest scripts: topScripts (scripts on any running stack), " +

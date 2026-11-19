@@ -9,6 +9,11 @@
 #include <string>
 #include <vector>
 
+// windows.h (pulled in through SKSE) defines GetObject as GetObjectA, which hides Variable::GetObject.
+#ifdef GetObject
+#undef GetObject
+#endif
+
 namespace SkyrimMCP::ScriptStats {
 
     namespace {
@@ -42,6 +47,19 @@ namespace SkyrimMCP::ScriptStats {
             auto* fn = frame ? frame->owningFunction.get() : nullptr;
             const char* type = fn ? fn->GetObjectTypeName().c_str() : nullptr;
             return (type && type[0]) ? type : "?";
+        }
+
+        // FEAT-268: the plugin that owns the object a frame runs on (its "self"), so a runaway stack can be traced to a mod.
+        std::string OwnerPlugin(const RE::BSScript::StackFrame* frame) {
+            if (!frame) return {};
+            auto obj = frame->self.GetObject();
+            if (!obj) return {};
+            const auto handle = obj->GetHandle();
+            const auto formId = static_cast<RE::FormID>(handle & 0xFFFFFFFF);
+            auto* form = formId ? RE::TESForm::LookupByID(formId) : nullptr;
+            if (!form) return {};
+            if (auto* file = form->GetFile(0)) return std::string(file->GetFilename());
+            return (formId >> 24) == 0xFF ? "(created in game)" : "";
         }
 
         json TopN(const std::map<std::string, int>& counts, int top) {
@@ -80,6 +98,7 @@ namespace SkyrimMCP::ScriptStats {
         result["frozenStacks"] = impl->frozenStacksCount;
 
         std::map<std::string, int> byState, byCurrentFunction, byScript, byEntryPoint;
+        std::map<std::string, std::map<std::string, int>> entryOwners;
         std::size_t running = 0, latent = 0;
         {
             RE::BSSpinLockGuard guard(impl->runningStacksLock);
@@ -104,7 +123,9 @@ namespace SkyrimMCP::ScriptStats {
                     if (!bottom->previousFrame) break;
                     bottom = bottom->previousFrame;
                 }
-                ++byEntryPoint[FrameName(bottom)];
+                const auto entry = FrameName(bottom);
+                ++byEntryPoint[entry];
+                if (auto owner = OwnerPlugin(bottom); !owner.empty()) ++entryOwners[entry][owner];
                 for (const auto& s : scripts) ++byScript[s];
             }
         }
@@ -115,6 +136,16 @@ namespace SkyrimMCP::ScriptStats {
         result["topScripts"] = TopN(byScript, top);
         result["topEntryPoints"] = TopN(byEntryPoint, top);
         result["topCurrentFunctions"] = TopN(byCurrentFunction, top);
+        // FEAT-268: the plugins that own the objects each entry point runs on (most common first).
+        json owners = json::object();
+        for (const auto& [entry, plugins] : entryOwners) {
+            std::vector<std::pair<std::string, int>> sorted(plugins.begin(), plugins.end());
+            std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+            json list = json::array();
+            for (std::size_t i = 0; i < sorted.size() && i < 3; ++i) list.push_back({{"plugin", sorted[i].first}, {"stacks", sorted[i].second}});
+            owners[entry] = list;
+        }
+        result["entryPointOwners"] = owners;
         result["note"] =
             "A snapshot. Stacks waiting on a latent function (Utility.Wait, RegisterForSingleUpdate loops) are normal in small numbers; "
             "hundreds of stacks from one script, a high waitingFunctionMessages count or overstressed=true point to that mod as the cause of script lag. "
