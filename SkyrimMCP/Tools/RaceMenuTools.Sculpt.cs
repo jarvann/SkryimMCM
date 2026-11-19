@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using SkyrimMCP.Face;
@@ -258,7 +259,9 @@ public partial class RaceMenuTools
             };
         
         }
-        catch (Exception ex) { return new { error = "SculptFace: " + ex.Message }; }
+        // BUG-089 follow-up: a tool error like the other face tools, not a normal result with an error field.
+        catch (McpException ex) { throw new McpException("SculptFace: " + ex.Message); }
+        catch (Exception ex) { throw new McpException("SculptFace: " + ex.Message); }
     }
 
     // BUG-051: a number from the preset file (a JsonElement) or one written here (an int or long): GetValue<double>()

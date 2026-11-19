@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -174,6 +175,14 @@ namespace SkyrimMCP::CrashRecorder {
 
             // Keep the evidence from a session that crashed before this one overwrites it.
             if (PreviousSessionCrashed(current)) {
+                // FEAT-264: keep the last five unclean sessions (previous, previous-2 ... previous-5), so a short false start or a
+                // launch that died with Steam doesn't overwrite the record of a real crash.
+                for (int n = 4; n >= 1; --n) {
+                    const auto from = n == 1 ? previous : dir / std::format(L"crash-recorder-previous-{}.bin", n);
+                    const auto to = dir / std::format(L"crash-recorder-previous-{}.bin", n + 1);
+                    std::error_code mv;
+                    if (std::filesystem::exists(from, mv)) std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, mv);
+                }
                 if (CopyFileW(current.c_str(), previous.c_str(), FALSE)) {
                     SKSE::log::info("Crash recorder: the last session did not exit cleanly; kept its record as {}",
                         Text(previous));

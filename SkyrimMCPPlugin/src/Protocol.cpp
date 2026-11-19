@@ -257,7 +257,18 @@ namespace SkyrimMCP::Protocol {
 
         // FEAT-207: add missing items, equip and restore gold from a blueprint
         // BUG-088: the server keeps per-game state in the running game's own documents folder.
-        registry["get_game_folder"] = [](const std::string& id, const json&) {
+        // BUG-024: console moves (coc, cow, player.moveto) run the loading screen inside the call and time out though they work;
+        // start them on the next frame and let the server wait for the load.
+        registry["execute_command_async"] = [](const std::string& id, const json& params) {
+            const auto command = params.value("command", std::string());
+            if (command.empty()) return MakeResponse(id, false, {}, "Missing 'command' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            if (const auto blocked = Helpers::MoveBlocker(); !blocked.empty()) {
+                return MakeResponse(id, false, {}, blocked).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            }
+            TaskQueue::Post([command]() { Helpers::ExecuteConsoleCommand(command); });
+            return MakeResponse(id, true, {{"started", command}}).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+        };
+                registry["get_game_folder"] = [](const std::string& id, const json&) {
             const auto folder = Helpers::GameDocumentsFolder();
             const auto u8 = folder.u8string();
             std::string install;
