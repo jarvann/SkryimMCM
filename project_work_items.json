@@ -1174,6 +1174,51 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "FEAT-265",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Save health: native save scan (C#)",
+          "description": "Read a save natively: header, plugins, LZ4, the Papyrus section; report undefined scripts, unattached instances, undefined elements and threads, size and health, grouped by plugin. Verified against the ReSaver-based scripts/save-scan on ten or more saves (Steam and GOG). Plan: docs/save-health-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-19T13:00",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-266",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Save health: ListSaves and CheckSave (in-game check)",
+          "description": "ListSaves for the running game's save folder; CheckSave makes a fresh save of the current game, waits for the file to be complete, scans it and explains the findings. Plan: docs/save-health-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-19T13:00",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "FEAT-267",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Save health: CleanSave and CleanAndReload",
+          "description": "CleanSave writes a cleaned copy (never overwrites), dry run first, defaulting to ReSaver's safe removals; first through the installed ReSaver, later a native writer once it round-trips saves byte for byte. CleanAndReload: check, clean to a copy, load it (move safety rules), check again. Needs the player's confirmation. Credit ReSaver/FallrimTools (Apache-2.0). Plan: docs/save-health-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-19T13:00",
+              "note": "Asked for by Cory."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "FEAT-123",
           "type": "feature",
           "status": "complete",
