@@ -1229,7 +1229,7 @@
         {
           "id": "FEAT-268",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "StackReport: live runaway script stacks (FPS)",
           "description": "Cory's main save-cleaning target is script stacks, because they pile up and destroy FPS. StackReport samples the live Papyrus VM (building on GetScriptStats) and reports stack counts per script and function, growth between samples, the plugin each comes from, and flags runaway stacks (many copies of one function, growing, long latent waits), next to overstress. Cleaning them is a save edit plus reload (FEAT-267) with stack-specific risk levels: uninstalled = safe, runaway duplicates of installed scripts = caution (the usual FPS killer), a few non-growing stacks or quest-script stacks = risky, base game = never. Plan: docs/save-health-plan.md.",
@@ -1237,6 +1237,10 @@
             {
               "datetime": "2026-11-19T13:30",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T14:10",
+              "note": "StackReport built: samples get_script_stats, per entry point counts, growth, owning plugins (new entryPointOwners from each bottom frame's self object), runaway flags (20+ copies or steadily growing), overstress and waiting messages, plain-language summary."
             }
           ],
           "targetRelease": "1.4"
@@ -4178,7 +4182,7 @@
         {
           "id": "BUG-090",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Per-character data keyed by name and race only",
           "description": "Face state, brow colour, slider notes and references are keyed 'name|race', so two characters with the same name and race in one game share them (seen across games before BUG-088). Key by something specific to the character, e.g. the save's character ID (the hex ID in the .ess name).",
@@ -4194,6 +4198,10 @@
             {
               "datetime": "2026-11-19T13:30",
               "note": "GOG test: characterId matches save names (934E9087, 1E05C850), data stored by ID, a new character starts clean, swapping saves keeps them apart. Failed: at the main menu the ID still read the last character (the player record was the default Prisoner), and SetBrowColor stored a colour under it before failing on 3D not loaded, so the colour was applied to that character on its next load. Fixed: no character ID while the main menu, a loading screen or the character menu is open, or before the player's 3D and cell exist; SetBrowColor checks the character first and stores only after the colour applied; without RaceMenu its override step is reported once. Arya's migration still to test on Steam; the Khajiit second character didn't reproduce a same-race collision."
+            },
+            {
+              "datetime": "2026-11-19T14:10",
+              "note": "On Steam: Arya's ID 0369832C matches her saves; 23 notes and brow colour moved to id:0369832C byte-identical to the morning baseline; old entry marked migratedTo. All four tests pass on both games. Follow-up: the never-run alarm during a loading screen is suppressed (host, next restart)."
             }
           ],
           "targetRelease": "1.4"
