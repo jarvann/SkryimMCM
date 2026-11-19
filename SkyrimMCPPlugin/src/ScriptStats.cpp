@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <format>
 #include <vector>
 
@@ -92,6 +93,19 @@ namespace SkyrimMCP::ScriptStats {
             return (formId >> 24) == 0xFF ? "(created in game)" : "";
         }
 
+        // FEAT-268: the call a queued function message will make, as "Script.Function (queued)", plus its owner.
+        std::pair<std::string, std::string> DescribeQuery(RE::BSScript::Internal::IFuncCallQuery* query) {
+            if (!query) return {};
+            RE::BSScript::Internal::IFuncCallQuery::CallType callType{};
+            RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> type;
+            RE::BSFixedString fn;
+            RE::BSScript::Variable self;
+            RE::BSScrapArray<RE::BSScript::Variable> args;
+            if (!query->GetFunctionCallInfo(callType, type, fn, self, args)) return {};
+            const char* t = type ? type->GetName() : nullptr;
+            return {std::string(t && t[0] ? t : "?") + "." + (fn.c_str() && fn.c_str()[0] ? fn.c_str() : "?") + " (queued)", OwnerOf(self)};
+        }
+
         json TopN(const std::map<std::string, int>& counts, int top) {
             std::vector<std::pair<std::string, int>> sorted(counts.begin(), counts.end());
             std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
@@ -130,6 +144,20 @@ namespace SkyrimMCP::ScriptStats {
         std::map<std::string, int> byState, byCurrentFunction, byScript, byEntryPoint;
         std::map<std::string, std::map<std::string, int>> entryOwners;
         std::size_t running = 0, latent = 0, queued = 0;
+        // FEAT-268: pending function messages (the VM's queue and its overflow) hold the stack each call will run on and the
+        // call itself; a queued stack has no frames, so this is where its name comes from (the Aniya flood: ~11,000 queued).
+        std::unordered_map<const RE::BSScript::Stack*, std::pair<std::string, std::string>> queuedCalls;
+        std::size_t pendingMessages = 0;
+        {
+            for (auto* elem = impl->funcMsgQueue.head; elem && pendingMessages < 200000; elem = elem->next, ++pendingMessages) {
+                auto* msg = reinterpret_cast<RE::BSScript::Internal::FunctionMessage*>(elem->elem);
+                if (msg && msg->stack) queuedCalls[msg->stack.get()] = DescribeQuery(msg->funcQuery.get());
+            }
+            for (auto& msg : impl->overflowFuncMsgs) {
+                if (++pendingMessages > 200000) break;
+                if (msg.stack) queuedCalls[msg.stack.get()] = DescribeQuery(msg.funcQuery.get());
+            }
+        }
         {
             RE::BSSpinLockGuard guard(impl->runningStacksLock);
             running = impl->allRunningStacks.size();
@@ -149,7 +177,10 @@ namespace SkyrimMCP::ScriptStats {
                     ++queued;
                     std::string name = "(queued, function unknown)";
                     std::string owner;
-                    if (auto* tasklet = stack->owningTasklet.get()) {
+                    if (auto it = queuedCalls.find(stack); it != queuedCalls.end() && !it->second.first.empty()) {
+                        name = it->second.first;
+                        owner = it->second.second;
+                    } else if (auto* tasklet = stack->owningTasklet.get()) {
                         RE::BSScript::Internal::IFuncCallQuery::CallType callType{};
                         RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> type;
                         RE::BSFixedString fn;
@@ -183,6 +214,7 @@ namespace SkyrimMCP::ScriptStats {
 
         result["runningStacks"] = running;
         result["queuedStacks"] = queued;
+        result["pendingFunctionMessagesWalked"] = pendingMessages;
         result["waitingLatentReturns"] = latent;
         result["stacksByState"] = byState;
         result["topScripts"] = TopN(byScript, top);
