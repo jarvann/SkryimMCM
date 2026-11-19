@@ -69,6 +69,14 @@ namespace SkyrimMCP::Helpers {
     // BUG-090: the save system's character ID (the 8-digit hex in save file names, e.g. Save102_0369832C_...), which tells
     // two characters with the same name and race apart. Empty when there is none yet (the main menu).
     inline std::string CharacterId() {
+        // The save system keeps the last character's ID at the main menu and while the next save loads (seen in game: at the
+        // menu the ID still read the last character while the player record was the default Prisoner, and a write landed on
+        // that character). No ID at the main menu, during a load, or before the player's 3D exists.
+        // The character menu too: leaving it after naming a character gives a new ID (seen: 80D21D10 became 934E9087).
+        if (auto* ui = RE::UI::GetSingleton();
+            ui && (ui->IsMenuOpen("Main Menu") || ui->IsMenuOpen("Loading Menu") || ui->IsMenuOpen("RaceSex Menu"))) return {};
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player || !player->Get3D(false) || !player->GetParentCell()) return {};
         auto* saves = RE::BGSSaveLoadManager::GetSingleton();
         if (!saves || saves->currentCharacterID == 0) return {};
         return std::format("{:08X}", saves->currentCharacterID);
