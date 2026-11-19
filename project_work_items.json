@@ -1414,6 +1414,10 @@
             {
               "datetime": "2026-11-20T05:00",
               "note": "Script changes now compared: SkyrimMCP/Saves/ScriptFiles.cs indexes loose Data\\\\Scripts and every BSA's scripts folder (27,578 loose + 58,216 archived in 757 BSAs, 0.3 s; LZ4 frame or block, zlib for v104) and reads each .pex's own variables; the save's recorded variable lists are compared for scripts with instances: removed, retyped (Int/Float/Bool/String/arrays; saved type None ignored, object-to-object counted apart), added; scripts with no file. A baseline save made with the current mods removes noise (24 scripts differed even in a current save). Pilot: a current save 0 changes; Arya's July save 289 risky (e.g. bwcLightDamageSCRIPT inTrigger Bool -> Int; mineorefurniturescript lost PlayerREF on 2,971 instances), 279 only-added, 2,194 no longer installed. ~3 s a save. MO2 mod folders not searched yet."
+            },
+            {
+              "datetime": "2026-11-20T06:30",
+              "note": "MO2: the instance is found from LocalAppData\\\\ModOrganizer\\\\*\\\\ModOrganizer.ini (gamePath = the running game) or settings mo2Path; scripts are searched in Data, enabled mods by priority and overwrite; offline the profile's plugins.txt is used. GOG test: 62 loose + 15,162 archived scripts in 100 BSAs (0.26 s); GOG save 80/80 plugins, 5,136 scripts compared, 0 changed."
             }
           ],
           "targetRelease": "1.4"
