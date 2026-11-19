@@ -854,9 +854,19 @@ namespace SkyrimMCP::PlayerQueries {
                     e["magnitude"] = effect->effectItem.magnitude;
                     e["duration"] = effect->effectItem.duration;
                     e["area"] = effect->effectItem.area;
+                    // BUG-025: a console-made enchantment read magnitude 100 while the item card showed Turn Undead at level 0.
+                    // Report what decides the shown value: whether the effect has a magnitude at all, its archetype, cost.
+                    const auto& flags = effect->baseEffect->data.flags;
+                    if (flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoMagnitude)) e["noMagnitude"] = true;
+                    if (flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoDuration)) e["noDuration"] = true;
+                    e["archetype"] = Helpers::Utf8(effect->baseEffect->GetArchetypeAsString().c_str());
+                    e["cost"] = effect->cost;
+                    if (const char* d = effect->baseEffect->magicItemDescription.c_str(); d && d[0]) e["descriptionTemplate"] = Helpers::Utf8(d);
                     effects.push_back(e);
                 }
                 result["effects"] = effects;
+                result["note"] = "magnitude is the value stored in the enchantment; the item card fills <mag> in descriptionTemplate, " +
+                    std::string("which for player and console enchantments can differ (perks, charge, an effect with noMagnitude shows none).");
 
                 return result;
             }

@@ -46,10 +46,52 @@ public abstract class ToolBase
         };
     }
 
+    // null = not checked yet; false = MCM Recorder isn't installed (don't ask again this session).
+    private static bool? s_mcmRecorderInstalled;
+
+    /// <summary>The reason to wait when MCM Recorder is playing a recording, or null.</summary>
+    protected async Task<string?> McmRecorderPlaying()
+    {
+        if (s_mcmRecorderInstalled == false) return null;
+        try
+        {
+            var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "McmRecorder_Player", ["functionName"] = "IsPlayingRecording", ["args"] = new JsonArray(),
+            });
+            if (r?["error"] != null)
+            {
+                if (r["error"]!.ToString().Contains("not found", StringComparison.OrdinalIgnoreCase)) s_mcmRecorderInstalled = false;
+                return null;
+            }
+            s_mcmRecorderInstalled = true;
+            if (r?["result"] is not JsonValue v || !v.TryGetValue<bool>(out var playing) || !playing) return null;
+            string? name = null;
+            try
+            {
+                name = (await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = "McmRecorder_Player", ["functionName"] = "GetCurrentlyPlayingRecordingName", ["args"] = new JsonArray(),
+                }))?["result"]?.ToString();
+            }
+            catch (Exception) { }
+            return $"MCM Recorder is playing a recording{(string.IsNullOrEmpty(name) ? "" : $" ('{name}')")}: wait until it finishes";
+        }
+        catch (ModelContextProtocol.McpException ex) when (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            s_mcmRecorderInstalled = false;
+            return null;
+        }
+        catch (Exception) { return null; }
+    }
+
     protected async Task<string?> SafetyBlock(string kind, string? actorRef = null)
     {
         var reasons = new List<string>();
         var actor = string.IsNullOrWhiteSpace(actorRef) ? "player" : actorRef.Trim();
+        // FEAT-261: MCM Recorder plays recorded menu settings step by step; between steps no menu is open, so the menu checks
+        // pass, but a move, capture or face load would knock a step out.
+        if (kind != "actor" && await McmRecorderPlaying() is string recording) reasons.Add(recording);
         if (await InAnimationScene(actor) is string scene) reasons.Add(scene);
         if (kind != "actor")
         {
