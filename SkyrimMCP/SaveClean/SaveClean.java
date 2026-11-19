@@ -80,9 +80,10 @@ public class SaveClean {
             // A removed thread's own suspended stack (one waiting with no pending call, e.g. in a native call) must go too, or the
             // save keeps a stack pointing at a thread that no longer exists.
             Set<PapyrusElement> threadSet = new HashSet<>(threads);
+            int ownStacks = 0;
             for (Map<EID, SuspendedStack> table : Arrays.asList(papyrus.getSuspendedStacks1(), papyrus.getSuspendedStacks2())) {
                 for (SuspendedStack s : table.values()) {
-                    if (s.getThread() != null && threadSet.contains(s.getThread()) && !queued.contains(s)) queued.add(s);
+                    if (s.getThread() != null && threadSet.contains(s.getThread()) && !queued.contains(s)) { queued.add(s); ownStacks++; }
                 }
             }
             // A thread with a pending function message stays (terminated, not deleted): ReSaver can't delete the message, and a
@@ -99,6 +100,7 @@ public class SaveClean {
             for (Map.Entry<String, Integer> e : perName.entrySet()) System.out.println("stack: " + e.getKey() + " = " + e.getValue());
             System.out.println("threadsRemoved: " + removedThreads);
             System.out.println("queuedRemoved: " + removedQueued);
+            System.out.println("threadOwnStacksRemoved: " + ownStacks);
         }
 
         ESS.writeESS(ess, out, false);

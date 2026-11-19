@@ -225,7 +225,9 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             if (f == 0) { t.Entry = name; firstNonNativeZeroed = !native && zeroed; }
             t.Top = name;
             if (t.OwnerHandle == 0 && owner != 0) t.OwnerHandle = owner;
-            if (!native && IsUndefinedScript(script)) t.Undefined = true;
+            // ReSaver: a frame is undefined only when its script is in the save's definitions and is undefined there (a frame
+            // whose script isn't listed doesn't count). Counting unlisted ones reported 7 threads ReSaver doesn't clean.
+            if (!native && _scriptParent.TryGetValue(script, out var parent) && string.IsNullOrEmpty(parent) && !Native.Contains(script)) t.Undefined = true;
             if (!zeroed && !native) allZeroedOrNative = false;
         }
         t.Terminated = frames > 0 && firstNonNativeZeroed && allZeroedOrNative;
@@ -382,7 +384,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
         scan.FunctionMessagesByPlugin = ByPlugin(_messages, _messagePlugin);
     }
 
-    static List<NameCount> ByPlugin(Dictionary<string, int> d, Dictionary<string, string?> plugin)
+    static List<ModCount> ByPlugin(Dictionary<string, int> d, Dictionary<string, string?> plugin)
     {
         var totals = new Dictionary<string, (int count, int handlers, string first, int firstCount)>();
         foreach (var (name, count) in d)
@@ -392,7 +394,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             totals[p] = (cur.count + count, cur.handlers + 1, count > cur.firstCount ? name : cur.first, Math.Max(cur.firstCount, count));
         }
         return totals.OrderByDescending(kv => kv.Value.count).Take(10)
-            .Select(kv => new NameCount(kv.Key, kv.Value.count, kv.Value.handlers > 1 ? $"{kv.Value.handlers} handlers, most in {kv.Value.first}" : kv.Value.first))
+            .Select(kv => new ModCount(kv.Key, kv.Value.count, kv.Value.handlers > 1 ? $"{kv.Value.handlers} handlers, most in {kv.Value.first}" : kv.Value.first))
             .ToList();
     }
 
