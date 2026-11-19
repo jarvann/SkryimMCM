@@ -112,7 +112,8 @@ public class PapyrusTools : ToolBase
         "Samples the live script engine several times (samples, default 6, intervalMs apart, default 1000) and reports, per " +
         "entry point (the mod's event handler where each stack started): how many stacks, whether the count is growing, and the " +
         "plugins that own the objects it runs on. Flags runaways (20 or more copies of one handler, or a count that keeps " +
-        "growing) and shows overstress and waiting function messages beside them. Read-only: nothing in the game changes. " +
+        "growing) and shows overstress and waiting function messages beside them. Plugins read 'defined in X, last changed by Y' " +
+        "when another mod overrides the object (the overriding mod is often the cause). Read-only: nothing in the game changes. " +
         "Clearing stacks needs a save edit and reload (planned: CleanAndReload); until then the fix is the mod itself " +
         "(update, configure, or stop the feature that loops).")]
     public async Task<object> StackReport(int samples = 6, int intervalMs = 1000, int top = 12)
