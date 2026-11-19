@@ -111,8 +111,10 @@ public class PapyrusTools : ToolBase
     [Description("Find runaway Papyrus script stacks, the usual cause of script lag and FPS loss in a heavy load order (FEAT-268). " +
         "Samples the live script engine several times (samples, default 6, intervalMs apart, default 1000) and reports, per " +
         "entry point (the mod's event handler where each stack started): how many stacks, whether the count is growing, and the " +
-        "plugins that own the objects it runs on. Flags runaways (20 or more copies of one handler, or a count that keeps " +
-        "growing) and shows overstress and waiting function messages beside them. Plugins read 'defined in X, last changed by Y' " +
+        "plugins that own the objects it runs on. Each pile-up is classed: burst (one peak of 20+ that drains, e.g. after a load), " +
+        "periodic (rises to 20+ again and again: usually a mod sweeping nearby NPCs) or runaway (stays high or keeps growing: " +
+        "a loop that never finishes). Samples during a loading screen are skipped, not fatal. Overstress and waiting function " +
+        "messages are shown beside them. Plugins read 'defined in X, last changed by Y' " +
         "when another mod overrides the object (the overriding mod is often the cause). Read-only: nothing in the game changes. " +
         "Clearing stacks needs a save edit and reload (planned: CleanAndReload); until then the fix is the mod itself " +
         "(update, configure, or stop the feature that loops).")]
@@ -125,11 +127,18 @@ public class PapyrusTools : ToolBase
         var running = new List<int>();
         var waitingMessages = new List<int>();
         var overstressed = 0;
+        var skipped = 0;
+        var taken = 0;
         for (var i = 0; i < samples; i++)
         {
             if (i > 0) await Task.Delay(intervalMs);
-            var data = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 });
-            if (data?["error"] != null) return DeserializeResponse(data);
+            JsonNode? data;
+            // FEAT-268: during a loading screen the game thread doesn't answer; skip that sample and keep going (the load is
+            // exactly the window worth catching).
+            try { data = await _pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 200 }); }
+            catch (Exception) { skipped++; continue; }
+            if (data?["error"] != null) { skipped++; continue; }
+            taken++;
             running.Add(data?["runningStacks"]?.GetValue<int>() ?? 0);
             waitingMessages.Add(data?["waitingFunctionMessages"]?.GetValue<int>() ?? 0);
             if (data?["overstressed"]?.GetValue<bool>() == true) overstressed++;
@@ -137,14 +146,22 @@ public class PapyrusTools : ToolBase
             foreach (var e in (data?["topEntryPoints"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
             {
                 var name = e["name"]?.ToString() ?? "?";
-                if (!perEntry.TryGetValue(name, out var counts)) perEntry[name] = counts = Enumerable.Repeat(0, i).ToList();
+                if (!perEntry.TryGetValue(name, out var counts)) perEntry[name] = counts = Enumerable.Repeat(0, taken - 1).ToList();
                 counts.Add(e["stacks"]?.GetValue<int>() ?? 0);
                 seen.Add(name);
             }
             foreach (var (name, counts) in perEntry) if (!seen.Contains(name)) counts.Add(0);
             if (data?["entryPointOwners"] is JsonObject o)
-                foreach (var (name, list) in o) owners[name] = list?.DeepClone();
+                foreach (var (name, list) in o)
+                {
+                    // Keep the owners from the sample with the most stacks for that handler.
+                    var total = (list as JsonArray ?? new JsonArray()).Sum(x => x?["stacks"]?.GetValue<int>() ?? 0);
+                    if (!owners.TryGetValue(name, out var prev) || total > (prev as JsonArray ?? new JsonArray()).Sum(x => x?["stacks"]?.GetValue<int>() ?? 0))
+                        owners[name] = list?.DeepClone();
+                }
         }
+        if (taken == 0)
+            return new { error = "No sample could be taken: the game didn't answer (a loading screen the whole time, or paused). Try again once it has loaded." };
 
         var rows = perEntry.Select(kv =>
         {
@@ -157,20 +174,38 @@ public class PapyrusTools : ToolBase
             // Growing: up by at least 2 and rising in most intervals (3 -> 4 over six samples is jitter).
             var steps = Math.Max(1, c.Count - 1);
             var growing = last - first >= 2 && rising >= Math.Ceiling(steps * 0.6) && rising > falling;
-            var runaway = max >= 20 || (growing && last - first >= 5);
+            // FEAT-268: what kind of pile-up. runaway: stays high or keeps growing. periodic: rises to 20+ more than once, draining
+            // in between. burst: one big peak that drains.
+            var peaks = 0;
+            var armed = true;
+            foreach (var v in c)
+            {
+                if (armed && v >= 20) { peaks++; armed = false; }
+                else if (!armed && v < 10) armed = true;
+            }
+            string? kind = (growing && last - first >= 5) || (last >= 20 && last >= 0.75 * max) ? "runaway"
+                : peaks >= 2 ? "periodic"
+                : max >= 20 ? "burst"
+                : null;
+            var runaway = kind != null;
             // Headline: every real plugin among the owners; "(created in game)" only when there is nothing else.
             var ownerList = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null) ?? new JsonArray();
             var named = ownerList.Select(x => x?["plugin"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
             var real = named.Where(n => !n.StartsWith("(")).ToList();
             var plugin = real.Count > 0 ? string.Join(", ", real) : named.FirstOrDefault();
-            return new { entry = kv.Key, last, max, first, growing, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
+            return new { entry = kv.Key, last, max, first, growing, kind, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
         }).OrderByDescending(r => r.runaway).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
 
         var runaways = rows.Where(r => r.runaway).ToList();
+        static string Who(string? plugin) => plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})";
         var summary = runaways.Count == 0
-            ? "No runaway stacks: no handler has 20 or more copies or a steadily growing count."
-            : string.Join(" ", runaways.Select(r =>
-                $"{r.entry}{(r.plugin != null ? $" ({r.plugin})" : "")} is running {r.last} times at once{(r.growing ? $", up from {r.first} and growing" : "")}."));
+            ? "No pile-ups: no handler reached 20 copies or kept growing."
+            : string.Join(" ", runaways.OrderBy(r => r.kind == "runaway" ? 0 : r.kind == "periodic" ? 1 : 2).Select(r => r.kind switch
+            {
+                "runaway" => $"{r.entry}{Who(r.plugin)} is a runaway: {r.last} copies running now{(r.growing ? $", up from {r.first}" : "")} (peak {r.max}).",
+                "periodic" => $"{r.entry}{Who(r.plugin)} rises to {r.max} copies repeatedly and drains in between (periodic: a sweep over nearby objects?).",
+                _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
+            }));
         return new
         {
             summary,
@@ -178,7 +213,7 @@ public class PapyrusTools : ToolBase
             waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },
             overstressedSamples = $"{overstressed} of {samples}",
             entryPoints = rows,
-            sampled = $"{samples} samples, {intervalMs} ms apart",
+            sampled = $"{taken} samples, {intervalMs} ms apart" + (skipped > 0 ? $"; {skipped} skipped (loading screen or no answer)" : ""),
             note = "Some waiting stacks are normal (Utility.Wait, update loops). A handler with dozens or hundreds of copies, or one " +
                    "that keeps growing, is a mod looping faster than it finishes: that eats script time every frame. Clearing them " +
                    "needs a save edit and reload; fixing the mod (update, its MCM settings, or disabling the feature) stops it coming back.",

@@ -43,7 +43,9 @@ internal sealed class Launcher
     private const int QuietPeriodMs = 2000;
     private const int MaxCrashes = 3;
     private static readonly TimeSpan CrashWindow = TimeSpan.FromSeconds(60);
-    private const string RestartRetryMessage = "SkyLink server restarted for an update; please retry the call";
+    // The call may have reached the game before the restart (seen: a teleport happened, and "please retry" would have done it twice).
+    private const string RestartRetryMessage = "SkyLink's server restarted for an update while this call was in flight: it may " +
+        "already have run in the game. Check the game state before retrying (a teleport, item or face change may have happened).";
 
     private static readonly string Version = typeof(Launcher).Assembly
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
