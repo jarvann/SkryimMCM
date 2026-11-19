@@ -18,7 +18,8 @@ internal static class ToolParameterCheck
             {
                 var attr = m.GetCustomAttribute<McpServerToolAttribute>();
                 if (attr == null) continue;
-                var name = string.IsNullOrEmpty(attr.Name) ? m.Name : attr.Name;
+                // The SDK names tools in snake_case (ListSaves -> list_saves).
+                var name = string.IsNullOrEmpty(attr.Name) ? System.Text.Json.JsonNamingPolicy.SnakeCaseLower.ConvertName(m.Name) : attr.Name;
                 map[name] = m.GetParameters()
                     .Where(p => p.ParameterType != typeof(CancellationToken) && !p.ParameterType.Name.StartsWith("RequestContext", StringComparison.Ordinal)
                                 && !p.ParameterType.Name.StartsWith("IMcpServer", StringComparison.Ordinal) && !p.ParameterType.Name.StartsWith("McpServer", StringComparison.Ordinal)
