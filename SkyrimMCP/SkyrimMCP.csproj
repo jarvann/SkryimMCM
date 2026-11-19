@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <None Include="Models\*.onnx;Models\*.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="SaveClean\SaveClean.class" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- ONNX Runtime's package ships .lib import libraries next to its DLLs: not needed at run time. -->

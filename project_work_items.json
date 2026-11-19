@@ -1184,7 +1184,7 @@
         {
           "id": "FEAT-265",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Save health: native save scan (C#)",
           "description": "Read a save natively: header, plugins, LZ4, the Papyrus section; report undefined scripts, unattached instances, undefined elements and threads, size and health, grouped by plugin. Verified against the ReSaver-based scripts/save-scan on ten or more saves (Steam and GOG). Plan: docs/save-health-plan.md.",
@@ -1196,6 +1196,10 @@
             {
               "datetime": "2026-11-19T13:15",
               "note": "Safety levels added (Cory): Safe (data of scripts no longer installed), Caution (unattached instances of installed scripts), Risky (active threads, data tied to running quests), Never (base game, string table, unattributed). Each finding names its plugin and whether it's installed; dry run lists possible breakage per level; Risky only item by item. See docs/save-health-plan.md."
+            },
+            {
+              "datetime": "2026-11-19T22:00",
+              "note": "Built: SkyrimMCP/Saves (EssScanner, PapyrusReader), a port of ReSaver's read path for SE/AE: header, plugins, change forms, the Papyrus section through both suspended-stack tables. Matches ReSaver's counts exactly on 6 saves (strings, scripts, instances, references, arrays, threads, function messages, suspended stacks, change forms); reads all 6 in 2.5 s (ReSaver ~25 s each). Flood save: 9,154 queued AniyaFollower_FollowerOnHit.OnMagicEffectApply (Aniya Follower.esp). `dotnet SkyrimMCP.dll --scan-save <files>` for offline checks."
             }
           ],
           "targetRelease": "1.4"
@@ -1203,7 +1207,7 @@
         {
           "id": "FEAT-266",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Save health: ListSaves and CheckSave (in-game check)",
           "description": "ListSaves for the running game's save folder; CheckSave makes a fresh save of the current game, waits for the file to be complete, scans it and explains the findings. Plan: docs/save-health-plan.md.",
@@ -1211,6 +1215,10 @@
             {
               "datetime": "2026-11-19T13:00",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T22:00",
+              "note": "Built: ListSaves (header-only, character ID from the file name, current character marked) and CheckSave (fresh SkyLink_Check_<time> save by default, waits for a complete file, scan, plugins not loaded now, plain summary)."
             }
           ],
           "targetRelease": "1.4"
@@ -1218,7 +1226,7 @@
         {
           "id": "FEAT-267",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Save health: CleanSave and CleanAndReload",
           "description": "CleanSave writes a cleaned copy (never overwrites), dry run first, defaulting to ReSaver's safe removals; first through the installed ReSaver, later a native writer once it round-trips saves byte for byte. CleanAndReload: check, clean to a copy, load it (move safety rules), check again. Needs the player's confirmation. Credit ReSaver/FallrimTools (Apache-2.0). Plan: docs/save-health-plan.md.",
@@ -1230,6 +1238,10 @@
             {
               "datetime": "2026-11-19T13:15",
               "note": "Safety levels added (Cory): Safe (data of scripts no longer installed), Caution (unattached instances of installed scripts), Risky (active threads, data tied to running quests), Never (base game, string table, unattributed). Each finding names its plugin and whether it's installed; dry run lists possible breakage per level; Risky only item by item. See docs/save-health-plan.md."
+            },
+            {
+              "datetime": "2026-11-19T22:00",
+              "note": "Built: SaveClean.java (ReSaver library, headless; committed .class shipped in SkyLinkAI_Server\\\\SaveClean) with --undefined, --unattached, --stack <Script.Function> (deletes its queued calls and threads, plus the deleted threads' own suspended stacks; threads with a pending function message are only terminated); re-reads the output. Tools CleanSave (dry run default, levels, named stacks, warnings) and CleanAndReload (save, clean the copy, load it, wait via the host's gameLoads counter; confirm=false previews). Offline test on the flood save: 9,435 threads and 9,429 stacks removed, output re-reads in ReSaver and SkyLink (24 threads, 0 suspended). Server instructions: slow-game/FPS complaints lead to StackReport then CheckSave, a talk about the mods involved, tie-backs for mod developers, risks before any clean."
             }
           ],
           "targetRelease": "1.4"
