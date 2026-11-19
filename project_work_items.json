@@ -1139,6 +1139,10 @@
             {
               "datetime": "2026-11-20T00:40",
               "note": "Export and comparison tested in game (builds 118-119); apply stays 1.4."
+            },
+            {
+              "datetime": "2026-11-20T02:30",
+              "note": "stagesDone is back in the export, read from a save (FEAT-263)."
             }
           ],
           "targetRelease": "1.3"
@@ -1146,7 +1150,7 @@
         {
           "id": "FEAT-263",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Quest replay from a blueprint (dry run first)",
           "description": "Apply part of FEAT-262. Needs a reliable record of stages done first (executedStages read only zeros): the stage list from the plugin's QUST records plus Quest.GetStageDone, or the runtime stage flags. Then: start the quest so its aliases fill, replay the recorded stages in order with SetQuestStage (which verifies each), dry run per quest with warnings, main and faction lines flagged, a save first. Thane of Falkreath SetStage(200) on an unstarted quest was refused by the game.",
@@ -1154,6 +1158,10 @@
             {
               "datetime": "2026-11-19T11:00",
               "note": "Split from FEAT-262 for the 1.4 plan."
+            },
+            {
+              "datetime": "2026-11-20T02:30",
+              "note": "Source found: the save's QUST change forms (CHANGE_QUEST_STAGES, bit 31) hold every stage with a status byte (1 = done); Save118 has 1,077 quests with stage data (e.g. 00017F05 done 0,5,15,80,110,120). The scanner reads them (zlib per change form). Built: GetCharacterBlueprint(stagesFromSave=true) saves and adds stagesDone per quest (falls back to the newest save with a note); ReplayQuests(blueprintPath, quests: names|'list', confirm, allowMajor, previewSave): way-back save, plan of missing stages per quest, starts unstarted quests, sets stages ascending with a read-back check, stops a quest at the first refusal; main/faction/Civil War/DLC lines need allowMajor; up to ~40 stages a call. The save records which stages are done, not their order: replay is in stage order."
             }
           ],
           "targetRelease": "1.4"
