@@ -1246,6 +1246,10 @@
             {
               "datetime": "2026-11-19T22:00",
               "note": "Built: SaveClean.java (ReSaver library, headless; committed .class shipped in SkyLinkAI_Server\\\\SaveClean) with --undefined, --unattached, --stack <Script.Function> (deletes its queued calls and threads, plus the deleted threads' own suspended stacks; threads with a pending function message are only terminated); re-reads the output. Tools CleanSave (dry run default, levels, named stacks, warnings) and CleanAndReload (save, clean the copy, load it, wait via the host's gameLoads counter; confirm=false previews). Offline test on the flood save: 9,435 threads and 9,429 stacks removed, output re-reads in ReSaver and SkyLink (24 threads, 0 suspended). Server instructions: slow-game/FPS complaints lead to StackReport then CheckSave, a talk about the mods involved, tie-backs for mod developers, risks before any clean."
+            },
+            {
+              "datetime": "2026-11-19T23:30",
+              "note": "In-game test: CheckSave, dry run, clean and load all work (9,429 queued and threads removed; cleaned copy loads, 0 queued). Aniya still on -> ~1,694 copies back in 40 s. Fixed: still-loaded warning naming the mod, CleanAndReload samples the cleaned handlers 5 s and 25 s after loading (regrowth verdict); undefined threads use ReSaver's rule (the '7 threads' were scripts not listed in the save); per-function lists say runningOn, per-mod lists Plugin/Handlers; CheckSave adds liveOwner (StackReport's attribution) for handlers running now; removal totals explain the threads' own stacks (275 waiting in MagicEffect.HasKeyword)."
             }
           ],
           "targetRelease": "1.4"
