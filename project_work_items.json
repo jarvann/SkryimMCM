@@ -4095,7 +4095,7 @@
         {
           "id": "BUG-090",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Per-character data keyed by name and race only",
           "description": "Face state, brow colour, slider notes and references are keyed 'name|race', so two characters with the same name and race in one game share them (seen across games before BUG-088). Key by something specific to the character, e.g. the save's character ID (the hex ID in the .ess name).",
@@ -4103,6 +4103,10 @@
             {
               "datetime": "2026-11-19T11:00",
               "note": "Split from BUG-088 for the 1.4 plan."
+            },
+            {
+              "datetime": "2026-11-19T11:50",
+              "note": "Keyed by the save system's character ID (BGSSaveLoadManager::currentCharacterID, the hex in save names): get_appearance reports characterId; FaceState.Key returns 'id:<ID>' and, the first time, moves the old 'name|race' entry there and marks it migratedTo so a second same-named character doesn't take it; the plugin's reapply reads the id key, else an unmigrated (or own) legacy entry; no ID (main menu) means no key and a clear message, never a name fallback. Only face_state.json is per character (brow colour, slider notes); presets, studio trips, markers, the volume snapshot and settings are per game, not per character. Check: characterId matches the hex in the current save's file name."
             }
           ],
           "targetRelease": "1.4"

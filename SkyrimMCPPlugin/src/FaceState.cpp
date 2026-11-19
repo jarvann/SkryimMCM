@@ -44,11 +44,20 @@ namespace SkyrimMCP::FaceState {
             return {{"error", std::string("face_state.json unreadable: ") + e.what()}};
         }
 
-        // The key the server writes: player name and race name (FaceState.Key).
+        // The key the server writes (FaceState.Key): "id:<character ID>" (BUG-090). Data from before is under "name|race" until
+        // the server moves it; read that only if it hasn't been moved to another character.
         const char* name = player->GetName();
         const char* race = npc->GetRace() ? npc->GetRace()->GetName() : nullptr;
-        const std::string key = std::string(name ? name : "") + "|" + (race ? race : "");
-        if (!all.contains(key) || !all[key].is_object()) return {{"skipped", "nothing stored for " + key}};
+        const auto characterId = Helpers::CharacterId();
+        if (characterId.empty()) return {{"skipped", "no character ID yet"}};
+        std::string key = "id:" + characterId;
+        if (!all.contains(key) || !all[key].is_object()) {
+            const std::string legacy = std::string(name ? name : "") + "|" + (race ? race : "");
+            const bool usable = all.contains(legacy) && all[legacy].is_object() &&
+                                (!all[legacy].contains("migratedTo") || all[legacy]["migratedTo"] == characterId);
+            if (!usable) return {{"skipped", "nothing stored for " + key}};
+            key = legacy;
+        }
         const auto& entry = all[key];
 
         json result = {{"character", key}};

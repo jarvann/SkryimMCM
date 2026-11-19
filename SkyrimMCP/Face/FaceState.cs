@@ -16,13 +16,39 @@ public static class FaceState
     public static int FaceEdits;
     private static readonly object Lock = new();
 
-    /// <summary>The character key: name and race, from get_appearance.</summary>
+    /// <summary>
+    /// The character key (BUG-090): "id:" plus the save system's character ID from get_appearance, so two characters with the
+    /// same name and race don't share data. Null when there is no ID yet (the main menu): callers say so instead of falling
+    /// back to name and race. The first time a character is seen, data stored under its old "name|race" key is moved to its
+    /// ID and the old entry marked migratedTo, so a second character with the same name doesn't take it too.
+    /// </summary>
     public static string? Key(JsonNode? appearance)
     {
+        var id = appearance?["characterId"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(id)) return null;
+        var key = "id:" + id;
         var name = appearance?["name"]?.GetValue<string>();
         var race = appearance?["race"]?.GetValue<string>();
-        return string.IsNullOrEmpty(name) ? null : $"{name}|{race}";
+        if (string.IsNullOrEmpty(name)) return key;
+        var legacy = $"{name}|{race}";
+        lock (Lock)
+        {
+            var all = Load();
+            if (all[key] == null && all[legacy] is JsonObject old && old["migratedTo"] == null)
+            {
+                var moved = (JsonObject)old.DeepClone();
+                moved["migratedFrom"] = legacy;
+                all[key] = moved;
+                old["migratedTo"] = id;
+                Directory.CreateDirectory(SkyLinkSettings.Folder);
+                File.WriteAllText(FilePath, all.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            }
+        }
+        return key;
     }
+
+    public const string NoCharacterId = "No character ID yet (at the main menu, before a game is started or loaded): per-character " +
+        "settings are kept by character ID, so load or start a game first.";
 
     public static string? GetBrowColor(string? key)
     {

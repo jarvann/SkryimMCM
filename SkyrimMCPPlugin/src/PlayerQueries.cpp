@@ -479,6 +479,10 @@ namespace SkyrimMCP::PlayerQueries {
 
         json result;
         result["name"] = player->GetName() ? player->GetName() : "";
+        if (player->IsPlayerRef()) {
+            const auto id = Helpers::CharacterId();
+            result["characterId"] = id.empty() ? json(nullptr) : json(id);
+        }
         if (!player->IsPlayerRef()) {
             // An NPC's face comes from a pre-built FaceGen mesh named after the record that defines it. If it exists, a
             // head part changed at runtime no longer matches it and the face goes dark.
