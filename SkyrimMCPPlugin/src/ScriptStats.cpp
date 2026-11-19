@@ -49,7 +49,18 @@ namespace SkyrimMCP::ScriptStats {
             return (type && type[0]) ? type : "?";
         }
 
-        // FEAT-268: the plugin that owns the object a frame runs on (its "self"), so a runaway stack can be traced to a mod.
+        // FEAT-268: the plugin that defines the object a frame runs on (its "self"), and the last plugin that changed it when
+        // that differs ("Fading of Followers.esp, last changed by Ducki_Follower.esp"): the overriding mod is often the
+        // one behind a problem. GetFile(0) is the defining plugin, GetFile(-1) the last override.
+        std::string Describe(const RE::TESForm* form) {
+            auto* defined = form->GetFile(0);
+            auto* last = form->GetFile(-1);
+            if (!defined) return {};
+            std::string text(defined->GetFilename());
+            if (last && last != defined) text += ", last changed by " + std::string(last->GetFilename());
+            return text;
+        }
+
         std::string OwnerPlugin(const RE::BSScript::StackFrame* frame) {
             if (!frame) return {};
             auto obj = frame->self.GetObject();
@@ -58,14 +69,20 @@ namespace SkyrimMCP::ScriptStats {
             if (auto* active = static_cast<RE::ActiveEffect*>(obj->Resolve(RE::ActiveEffect::VMTYPEID))) {
                 const RE::TESForm* source = active->spell ? static_cast<const RE::TESForm*>(active->spell) : active->GetBaseObject();
                 if (source) {
-                    if (auto* file = source->GetFile(0)) return std::string(file->GetFilename());
+                    if (auto text = Describe(source); !text.empty()) return text;
                 }
+                return "(magic effect, source not found)";
             }
             const auto handle = obj->GetHandle();
             const auto formId = static_cast<RE::FormID>(handle & 0xFFFFFFFF);
             auto* form = formId ? RE::TESForm::LookupByID(formId) : nullptr;
-            if (!form) return {};
-            if (auto* file = form->GetFile(0)) return std::string(file->GetFilename());
+            if (!form) {
+                // OnEffectFinish and similar run after the effect is gone, so nothing is left to trace.
+                const auto* type = obj->GetTypeInfo();
+                const char* script = type ? type->GetName() : nullptr;
+                return std::string("(owner gone") + (script && script[0] ? std::string(": ") + script : "") + ")";
+            }
+            if (auto text = Describe(form); !text.empty()) return text;
             return (formId >> 24) == 0xFF ? "(created in game)" : "";
         }
 

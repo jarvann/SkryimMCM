@@ -1245,6 +1245,10 @@
             {
               "datetime": "2026-11-19T14:40",
               "note": "Quiet test on Steam: no runaways, plugin names right where checkable. Fixed: the headline lists every real plugin and uses (created in game) only alone; magic effect scripts are traced through the active effect to its spell or effect; growing needs a rise of 2+ in most intervals."
+            },
+            {
+              "datetime": "2026-11-19T15:05",
+              "note": "Agent reruns: headline and growth fixes work; magic effect still blank. Confirmed both runs reported the defining plugin (GetFile(0)); the names changed because different objects ran the handlers between samples. Now each owner reads 'X, last changed by Y' when an override exists; an object that is gone (OnEffectFinish after the effect ended) reads '(owner gone: <script>)'; an active effect with no source reads so."
             }
           ],
           "targetRelease": "1.4"
