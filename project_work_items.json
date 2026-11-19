@@ -1184,6 +1184,10 @@
             {
               "datetime": "2026-11-19T13:00",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T13:15",
+              "note": "Safety levels added (Cory): Safe (data of scripts no longer installed), Caution (unattached instances of installed scripts), Risky (active threads, data tied to running quests), Never (base game, string table, unattributed). Each finding names its plugin and whether it's installed; dry run lists possible breakage per level; Risky only item by item. See docs/save-health-plan.md."
             }
           ],
           "targetRelease": "1.4"
@@ -1214,6 +1218,10 @@
             {
               "datetime": "2026-11-19T13:00",
               "note": "Asked for by Cory."
+            },
+            {
+              "datetime": "2026-11-19T13:15",
+              "note": "Safety levels added (Cory): Safe (data of scripts no longer installed), Caution (unattached instances of installed scripts), Risky (active threads, data tied to running quests), Never (base game, string table, unattributed). Each finding names its plugin and whether it's installed; dry run lists possible breakage per level; Risky only item by item. See docs/save-health-plan.md."
             }
           ],
           "targetRelease": "1.4"
