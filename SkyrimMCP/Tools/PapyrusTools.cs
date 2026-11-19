@@ -130,6 +130,20 @@ public class PapyrusTools : ToolBase
         var overstressed = 0;
         var skipped = 0;
         var taken = 0;
+        var queuedLast = 0;
+        // FEAT-268: a paused game (console, map, a menu) runs no scripts, so frozen counts look like a calm game.
+        string? paused = null;
+        try
+        {
+            var menus = await _pipe.SendRequestAsync("get_menu_state");
+            if (menus?["gameIsPaused"]?.GetValue<bool>() == true)
+                paused = "The game is paused (" + string.Join(", ", (menus["openMenus"] as JsonArray ?? new JsonArray()).Select(m => m?.ToString())) +
+                         " open): scripts aren't running, so these counts are frozen. Close the menu and sample again.";
+        }
+        catch (Exception) { }
+        // A save load (or a new game) starts the history over: game time going backwards or jumping marks it.
+        double? gameDays = null;
+        try { gameDays = (await _pipe.SendRequestAsync("get_game_time"))?["daysPassed"]?.GetValue<double>(); } catch (Exception) { }
         for (var i = 0; i < samples; i++)
         {
             if (i > 0) await Task.Delay(intervalMs);
@@ -140,6 +154,7 @@ public class PapyrusTools : ToolBase
             catch (Exception) { skipped++; continue; }
             if (data?["error"] != null) { skipped++; continue; }
             taken++;
+            queuedLast = data?["queuedStacks"]?.GetValue<int>() ?? queuedLast;
             running.Add(data?["runningStacks"]?.GetValue<int>() ?? 0);
             waitingMessages.Add(data?["waitingFunctionMessages"]?.GetValue<int>() ?? 0);
             if (data?["overstressed"]?.GetValue<bool>() == true) overstressed++;
@@ -207,7 +222,18 @@ public class PapyrusTools : ToolBase
         // Only runs from the last 30 minutes count (a new session or a save load starts over).
         var cutoff = DateTime.Now.AddMinutes(-30);
         var recent = history.OfType<JsonObject>().Where(h => DateTime.TryParse(h["at"]?.ToString(), out var t) && t >= cutoff).ToList();
-        var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["entries"] = new JsonObject() };
+        string? historyBreak = null;
+        if (recent.Count > 0 && gameDays.HasValue && recent.Last()["gameDays"] is JsonValue lastDays)
+        {
+            var prevDays = lastDays.GetValue<double>();
+            // Back in time, or more than half a game day ahead in under 30 real minutes (a wait or a load): a different state.
+            if (gameDays.Value < prevDays - 0.0001 || gameDays.Value - prevDays > 0.5)
+            {
+                historyBreak = "A save was loaded (or time jumped) since the last call: the history starts over from here.";
+                recent.Clear();
+            }
+        }
+        var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["gameDays"] = gameDays, ["entries"] = new JsonObject() };
         foreach (var r in perEntry)
             if (r.Value.Max() >= 5)
                 ((JsonObject)thisRun["entries"]!)[r.Key] = new JsonObject
@@ -261,6 +287,7 @@ public class PapyrusTools : ToolBase
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
             }));
         if (crossSummary.Count > 0) summary += " Across recent calls: " + string.Join(" ", crossSummary);
+        if (paused != null) summary = paused + " " + summary;
         // Stacks the listed handlers don't account for (before queued stacks were named, ~14,000 of 14,500 were missing).
         var listedTotal = perEntry.Values.Sum(v => v.Last());
         var unattributed = Math.Max(0, running.Last() - listedTotal);
@@ -268,6 +295,9 @@ public class PapyrusTools : ToolBase
         {
             summary,
             acrossCalls = crossCall.Count > 0 ? crossCall : null,
+            paused,
+            historyBreak,
+            queuedStacks = queuedLast,
             historyCalls = recent.Count,
             runningStacks = new { first = running.First(), last = running.Last(), max = running.Max(), listedInEntryPoints = listedTotal, unattributed },
             waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },

@@ -1265,6 +1265,10 @@
             {
               "datetime": "2026-11-19T18:00",
               "note": "Aniya stress test: running stacks 79 -> 1,167 -> 9,720 -> 15,956 peak, plateau ~14,500, overstressed in every sample; Aniya's OnMagicEffectApply named and flagged (25 -> 39 -> 337 -> ~390). Gaps: ~14,000 stacks unnamed (queued stacks have no frames), labels at the extremes (Aniya 'spiking' though flat-high, wendigo flipped from creeping), acrossCalls lost plugin names. Built (not deployed): queued stacks named from their tasklet's GetFunctionCallInfo ('X.Fn (queued)' with owner), queuedStacks count, listed vs unattributed totals, 'stuck high' and creeping-beats-spiking labels, plugins kept in the history."
+            },
+            {
+              "datetime": "2026-11-19T19:00",
+              "note": "Flood retest: totals add up (0 unattributed) and creeping beats spiking, but queued stacks stayed '(queued, function unknown)' (1,062 -> 10,960) and queuedStacks wasn't passed on; the history mixed states across a save load; a paused game (console) looked calm. Built (not deployed): queued stacks named from the VM's pending function messages (funcMsgQueue and overflowFuncMsgs map each stack to its call), queuedStacks passed on, a paused warning from get_menu_state, and a history break when game time goes back or jumps (gameDays stored per run). TEST_StackFlood_Aniya_DO_NOT_PLAY saved for later tools."
             }
           ],
           "targetRelease": "1.4"
