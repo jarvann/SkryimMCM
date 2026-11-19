@@ -33,15 +33,37 @@ public partial class RaceMenuTools : ToolBase
 
     private async Task<JsonNode?> Papyrus(string className, string function, params JsonNode?[] args)
     {
-        var data = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+        JsonNode? data;
+        try
         {
-            ["className"] = className,
-            ["functionName"] = function,
-            ["args"] = new JsonArray(args.Select(a => a?.DeepClone()).ToArray()),
-        });
-        if (data?["error"] is JsonNode error) throw new McpException($"{className}.{function}: {error}");
+            data = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = className,
+                ["functionName"] = function,
+                ["args"] = new JsonArray(args.Select(a => a?.DeepClone()).ToArray()),
+            });
+        }
+        catch (McpException ex) when (MissingRaceMenuScript(className, ex.Message)) { throw new McpException(NoRaceMenu); }
+        if (data?["error"] is JsonNode error)
+        {
+            if (MissingRaceMenuScript(className, error.ToString())) throw new McpException(NoRaceMenu);
+            throw new McpException($"{className}.{function}: {error}");
+        }
         return data?["result"];
     }
+
+    // BUG-089: on a game without RaceMenu every RaceMenu tool (dry runs too) failed with "Function not found: CharGen.<x>. The
+    // installed version of this script has no global function...", which reads like an outdated RaceMenu.
+    private const string NoRaceMenu =
+        "RaceMenu isn't installed (skee64.dll isn't loaded, so its CharGen and NiOverride scripts don't exist): this tool needs " +
+        "it. Without RaceMenu these still work: CaptureFace, MeasureFace, MeasureProfile, MeasureBody, SetHairColor, " +
+        "SetSkinTone, SetHeadPart, RemoveHeadPart, GetAppearance. GetRaceMenuStatus shows what RaceMenu provides.";
+
+    private static bool MissingRaceMenuScript(string className, string message) =>
+        (className.Equals("CharGen", StringComparison.OrdinalIgnoreCase) || className.Equals("NiOverride", StringComparison.OrdinalIgnoreCase) ||
+         className.Equals("RaceMenu", StringComparison.OrdinalIgnoreCase)) &&
+        (message.Contains("Function not found", StringComparison.OrdinalIgnoreCase) || message.Contains("Script class not found", StringComparison.OrdinalIgnoreCase) ||
+         message.Contains("not in the loose-source catalog", StringComparison.OrdinalIgnoreCase));
 
     private static bool ManagedByOBody(JsonArray names, IEnumerable<string> keys) =>
         names.Any(n => n?.GetValue<string>() == "obody_processed") || keys.Any(k => k.Equals("OBody", StringComparison.OrdinalIgnoreCase));
@@ -64,12 +86,17 @@ public partial class RaceMenuTools : ToolBase
     // The whole reply (result, signature, target), for diagnosing a call that returns nothing.
     private async Task<JsonNode?> PapyrusRaw(string className, string function, params JsonNode?[] args)
     {
-        var data = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+        JsonNode? data;
+        try
         {
-            ["className"] = className,
-            ["functionName"] = function,
-            ["args"] = new JsonArray(args.Select(a => a?.DeepClone()).ToArray()),
-        });
+            data = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = className,
+                ["functionName"] = function,
+                ["args"] = new JsonArray(args.Select(a => a?.DeepClone()).ToArray()),
+            });
+        }
+        catch (McpException ex) when (MissingRaceMenuScript(className, ex.Message)) { throw new McpException(NoRaceMenu); }
         if (data?["error"] is JsonNode error) throw new McpException($"{className}.{function}: {error}");
         return data;
     }

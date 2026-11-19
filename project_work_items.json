@@ -4059,6 +4059,21 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "BUG-089",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Without RaceMenu, RaceMenu tools fail with a misleading 'function not found'",
+          "description": "Vanilla GOG check: GetRaceMenuStatus was clear (skee64 not loaded, CharGen and NiOverride not found), but SetFace and SculptFace dry runs failed with 'Function not found: CharGen.SaveCharacterPreset. The installed version of this script has no global function...' and GetBodyMorphs with the same for NiOverride.GetMorphNames, which reads like an outdated RaceMenu and points at get_script_functions. The RaceMenu tools' Papyrus helpers now turn a missing CharGen, NiOverride or RaceMenu script into one message: RaceMenu isn't installed, this tool needs it, and these still work (captures, measurements, SetHairColor, SetSkinTone, head parts, GetAppearance). Dry runs stop at the same point. RaceMenuSaveTints after the native colour tools already fails quietly.",
+          "history": [
+            {
+              "datetime": "2026-11-19T10:30",
+              "note": "From the in-game agent's vanilla GOG check."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "BUG-050",
           "type": "bug",
           "status": "complete",
