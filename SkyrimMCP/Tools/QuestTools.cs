@@ -24,9 +24,9 @@ public class QuestTools : ToolBase
         "each missing stage in order with SetQuestStage's check, stopping that quest at the first stage the game refuses. " +
         "Setting a stage runs its script, so rewards, items, world changes and follow-on quests happen as if played (unlike " +
         "CompleteQuest), but a stage that expects the player somewhere or an NPC alive can misfire. confirm=false (default) makes " +
-        "a way-back save and shows the plan; confirm=true makes another and runs it. Main, faction, Civil War and DLC lines " +
+        "a way-back save and shows the plan; confirm=true with previewSave reuses it (else saves again) and runs it, up to about 40 stages a call. Main, faction, Civil War and DLC lines " +
         "need allowMajor=true. Ask the player first, simple quests first.")]
-    public async Task<object> ReplayQuests(string blueprintPath, string quests, bool confirm = false, bool allowMajor = false)
+    public async Task<object> ReplayQuests(string blueprintPath, string quests, bool confirm = false, bool allowMajor = false, string? previewSave = null)
     {
         if (!File.Exists(blueprintPath)) return new { error = $"No blueprint at {blueprintPath}." };
         JsonNode? bp;
@@ -53,7 +53,7 @@ public class QuestTools : ToolBase
         }
 
         var wayBack = new SaveTools(_pipe);
-        var (save, stagesHere, note) = await wayBack.QuestStagesFromSave("SkyLink_BeforeQuestReplay");
+        var (save, stagesHere, note) = await wayBack.QuestStagesFromSave("SkyLink_BeforeQuestReplay", reuseSave: confirm ? previewSave : null);
         if (stagesHere == null) return new { error = "Couldn't read this game's quest stages: " + note };
         HashSet<int> DoneHere(string? id) =>
             id != null && stagesHere.TryGetValue(id.ToUpperInvariant().PadLeft(8, '0'), out var st)
@@ -93,9 +93,13 @@ public class QuestTools : ToolBase
             p.name, p.type, formId = p.id, startFirst = p.doneHere.Count == 0, stagesToSet = p.missing,
             warning = MajorTypes.Contains(p.type) ? $"{p.type} line: a misfiring stage can stall it; the way-back save is the fix." : null,
         }).ToList();
+        // Each stage takes about a second: keep one call well inside the 80-second limit.
+        var total = picked.Sum(p => p.missing.Count);
+        if (total > 40)
+            return new { error = $"{total} stages in one call is too many to finish in time: replay fewer quests per call (up to about 40 stages).", plan };
         if (!confirm)
             return new { preview = true, wayBackSave = save, note, plan,
-                         next = "Each stage runs its script as if played. If the player agrees, call again with confirm=true." };
+                         next = $"Each stage runs its script as if played. If the player agrees, call again with confirm=true and previewSave=\"{save}\" (reused within 10 minutes)." };
 
         if (await SafetyBlock("face") is string gateReason) return new { error = gateReason, wayBackSave = save };
         var results = new List<object>();

@@ -88,11 +88,14 @@ public class SaveTools : ToolBase
     /// label) or, if that fails or isn't wanted, the newest save of this character. The engine's in-memory list read only zeros.
     /// Keys are form IDs in that save's load order (the running game's, for a save made now).
     /// </summary>
-    internal async Task<(string? save, Dictionary<string, List<int[]>>? stages, string? note)> QuestStagesFromSave(string label, bool fresh = true)
+    internal async Task<(string? save, Dictionary<string, List<int[]>>? stages, string? note)> QuestStagesFromSave(string label, bool fresh = true, string? reuseSave = null)
     {
         string? path = null;
         string? note = null;
-        if (fresh)
+        // A save made moments ago (a preview's way-back save) instead of saving again.
+        if (reuseSave is { Length: > 0 } && ResolveSave(reuseSave) is string recent && File.GetLastWriteTime(recent) > DateTime.Now.AddMinutes(-10))
+            path = recent;
+        else if (fresh)
         {
             var name = $"{label}_{DateTime.Now:yyyyMMdd-HHmmss}";
             if (await RequestSave(_pipe, name) is string refused) note = "Couldn't save for the stages: " + refused;
