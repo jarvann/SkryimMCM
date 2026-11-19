@@ -44,8 +44,8 @@ public class SaveTools : ToolBase
     static readonly Regex GameMadeName = new(@"^(Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// Asks the game to save and waits until the file has started to appear; asks once more if it hasn't after 10 seconds. The
-    /// game sometimes drops a console save request (soon after a load, or next to another save: seen twice on 2026-11-19).
+    /// Asks the game to save and waits until the file has started to appear; asks once more if it hasn't after 6 seconds. Mods
+    /// can refuse saves (survival and save-limiting mods; seen twice on 2026-11-19), so a missing file is reported as not saved.
     /// Returns null when it started, or the reason it didn't.
     /// </summary>
     internal static async Task<string?> RequestSave(IPipeClient pipe, string name)
@@ -55,13 +55,15 @@ public class SaveTools : ToolBase
         {
             var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = name });
             if (started?["error"] != null) return started["error"]!.ToString();
-            for (var waited = 0; waited < 10_000; waited += 500)
+            for (var waited = 0; waited < 6_000; waited += 500)
             {
                 await Task.Delay(500);
                 if (File.Exists(file)) return null;
             }
         }
-        return $"the game didn't start writing '{name}' after two requests (20 seconds): it may be busy with another save or a load. Try again in a moment.";
+        return $"the game didn't save '{name}' (no file after two requests, 12 seconds). Most likely a mod blocked it: survival or " +
+               "save-limiting mods (Survival Mode, SaveReminder and the like) refuse saves under their own rules, console saves included; " +
+               "the game also won't save in combat, during a load or while another save is being written. Nothing else was done.";
     }
 
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
