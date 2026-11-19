@@ -67,11 +67,22 @@ public static class MigrationReport
 
         var added = current.Where(p => !savedNames.Contains(p.Name)).Select(p => p.Name).ToList();
 
-        // Order: positions among the plugins both lists share (full and light together, as the load order lists them).
-        var sharedSaved = saved.Where(x => now.ContainsKey(x.n)).Select(x => x.n).ToList();
-        var sharedNow = current.Where(p => savedNames.Contains(p.Name)).Select(p => p.Name).ToList();
-        var posNow = sharedNow.Select((n, i) => (n, i)).ToDictionary(t => t.n, t => t.i, StringComparer.OrdinalIgnoreCase);
-        var moved = sharedSaved.Select((n, i) => (n, i, j: posNow.TryGetValue(n, out var j) ? j : i)).Count(t => Math.Abs(t.i - t.j) > 0);
+        // Order: relative order within each type (full, light) among plugins both lists share. Counting every shift would flag a
+        // whole list after one insertion, so count plugins out of order (not on the longest run kept in the same order).
+        var nowIndex = current.Select((p, k) => (p.Name, k)).ToDictionary(t => t.Name, t => t.k, StringComparer.OrdinalIgnoreCase);
+        int OutOfOrder(IEnumerable<string> names)
+        {
+            var seq = names.Where(nowIndex.ContainsKey).Select(n => nowIndex[n]).ToList();
+            var tails = new List<int>();   // longest increasing subsequence
+            foreach (var v in seq)
+            {
+                var at = tails.BinarySearch(v);
+                if (at < 0) at = ~at;
+                if (at == tails.Count) tails.Add(v); else tails[at] = v;
+            }
+            return seq.Count - tails.Count;
+        }
+        var moved = OutOfOrder(scan.Plugins) + OutOfOrder(scan.LightPlugins);
 
         var high = removed.Count(r => r.risk == "high") + typeChanged.Count;
         var medium = removed.Count(r => r.risk == "medium");
@@ -87,13 +98,13 @@ public static class MigrationReport
             character = scan.Header.PlayerName,
             currentLoadOrder = currentSource,
             verdict,
-            counts = new { inSave = saved.Count, now = current.Count, removed = removed.Count, added = added.Count, typeChanged = typeChanged.Count, movedAmongShared = moved },
+            counts = new { inSave = saved.Count, now = current.Count, removed = removed.Count, added = added.Count, typeChanged = typeChanged.Count, reordered = moved },
             removed = removed.Where(r => r.risk != "low"),
             removedNoFootprint = removed.Where(r => r.risk == "low").Select(r => r.plugin),
             typeChanged,
             added = added.Take(100),
             addedNote = added.Count > 0 ? "New mods start fresh on load; scripted ones run their setup then. Usually fine; a few want a new game (their pages say so)." : null,
-            movedNote = moved > 0 ? $"{moved} plugins sit at a different place in the order: the game re-maps by name, so that alone is safe, unless a mod stores raw form IDs in its own data." : null,
+            movedNote = moved > 0 ? $"{moved} plugins load in a different order relative to the others: the game re-maps by name, so that alone is safe, but overrides now win differently (another mod's version of a record may apply)." : null,
             notChecked = "Script changes in updated mods (variables renamed or removed) and other mods' own saved data aren't compared yet.",
         };
     }
