@@ -1161,7 +1161,7 @@
         {
           "id": "FEAT-264",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Crash recorder keeps several previous sessions",
           "description": "Only one previous session is kept, so any later launch overwrites the record of a real crash: a short false-start session did it on 2026-11-18, and on 2026-11-19 a launch that died with Steam (the Steam client asserted on a stalled pipe while logging in; no Skyrim crash) replaced yesterday's 15:02 crash record. Keep the last five, named by start time, and have GetCrashLog list them.",
@@ -1173,6 +1173,10 @@
             {
               "datetime": "2026-11-19T17:00",
               "note": "Built (not deployed): the plugin keeps the last five unclean sessions (previous, previous-2..5); GetCrashLog lists the older ones. Host DLL: needs a game restart."
+            },
+            {
+              "datetime": "2026-11-19T21:00",
+              "note": "Tested after the restart: crash-recorder.bin, -previous.bin and -previous-2.bin kept; -previous-2 is the 10:29 quit-to-main-menu crash session."
             }
           ],
           "targetRelease": "1.4"
@@ -1233,7 +1237,7 @@
         {
           "id": "FEAT-268",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "StackReport: live runaway script stacks (FPS)",
           "description": "Cory's main save-cleaning target is script stacks, because they pile up and destroy FPS. StackReport samples the live Papyrus VM (building on GetScriptStats) and reports stack counts per script and function, growth between samples, the plugin each comes from, and flags runaway stacks (many copies of one function, growing, long latent waits), next to overstress. Cleaning them is a save edit plus reload (FEAT-267) with stack-specific risk levels: uninstalled = safe, runaway duplicates of installed scripts = caution (the usual FPS killer), a few non-growing stacks or quest-script stacks = risky, base game = never. Plan: docs/save-health-plan.md.",
@@ -1277,6 +1281,10 @@
             {
               "datetime": "2026-11-19T20:30",
               "note": "Retest #3: queued naming works. All 11,012 queued stacks named as Aniya's OnMagicEffectApply (Aniya Follower.esp); they live in the suspend queues (11,364 entries) not the function message queue (19). Totals add up; history break on the clean-save load; paused warning works. Built: the headline combines a handler's queued and running copies ('about 11,364 copies (11,012 waiting to start, 352 running)'). Load counter waits for a game restart."
+            },
+            {
+              "datetime": "2026-11-19T21:00",
+              "note": "Retest #4 after a restart passes everything: the history resets on every save load (including clean -> flood, time moving forward), the combined headline ('about 11288 copies (10907 waiting to start, 381 running)'), all queued stacks named, totals add up. Closed for 1.4. Test save TEST_StackFlood_Aniya_DO_NOT_PLAY kept for the clean-and-reload tools (FEAT-267)."
             }
           ],
           "targetRelease": "1.4"
