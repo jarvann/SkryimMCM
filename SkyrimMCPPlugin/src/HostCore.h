@@ -21,4 +21,7 @@ namespace SkyrimMCP::HostCore {
     // newer build has been deployed.
     std::string HandleRequest(const std::string& requestLine);
 
+    // FEAT-268: counts save loads and new games, so the server can tell one game state from the next.
+    void NoteGameLoaded();
+
 }

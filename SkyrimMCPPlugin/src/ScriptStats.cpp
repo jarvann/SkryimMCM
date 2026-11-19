@@ -158,6 +158,31 @@ namespace SkyrimMCP::ScriptStats {
                 if (msg.stack) queuedCalls[msg.stack.get()] = DescribeQuery(msg.funcQuery.get());
             }
         }
+        // The retest found none of the ~11,000 queued stacks in the function message queue: stacks waiting to start (or to
+        // resume) sit in the suspend queues instead, each with its call. Walk both ring buffers and their overflow arrays.
+        std::size_t suspendedWalked = 0;
+        {
+            RE::BSSpinLockGuard suspendGuard(impl->suspendQueueLock);
+            auto walkRing = [&](const auto& queue) {
+                constexpr std::uint32_t kSize = 128;
+                const auto* entries = reinterpret_cast<const RE::BSScript::Internal::SuspendedStack*>(queue.queueBuffer);
+                const auto count = std::min<std::uint32_t>(queue.numEntries, kSize);
+                for (std::uint32_t i = 0; i < count; ++i) {
+                    const auto& e = entries[(queue.popIdx + i) % kSize];
+                    ++suspendedWalked;
+                    if (e.stack) queuedCalls[e.stack.get()] = DescribeQuery(e.funcCallQuery.get());
+                }
+            };
+            walkRing(impl->suspendQueue1);
+            walkRing(impl->suspendQueue2);
+            for (const auto* arr : {&impl->overflowSuspendArray1, &impl->overflowSuspendArray2}) {
+                for (const auto& e : *arr) {
+                    if (++suspendedWalked > 200000) break;
+                    if (e.stack) queuedCalls[e.stack.get()] = DescribeQuery(e.funcCallQuery.get());
+                }
+            }
+        }
+        std::size_t queuedNamed = 0;
         {
             RE::BSSpinLockGuard guard(impl->runningStacksLock);
             running = impl->allRunningStacks.size();
@@ -178,6 +203,7 @@ namespace SkyrimMCP::ScriptStats {
                     std::string name = "(queued, function unknown)";
                     std::string owner;
                     if (auto it = queuedCalls.find(stack); it != queuedCalls.end() && !it->second.first.empty()) {
+                        ++queuedNamed;
                         name = it->second.first;
                         owner = it->second.second;
                     } else if (auto* tasklet = stack->owningTasklet.get()) {
@@ -214,7 +240,9 @@ namespace SkyrimMCP::ScriptStats {
 
         result["runningStacks"] = running;
         result["queuedStacks"] = queued;
-        result["pendingFunctionMessagesWalked"] = pendingMessages;
+        // Diagnostics for naming queued stacks: how many entries each source had, and how many queued stacks matched one.
+        result["queuedDiagnostics"] = {{"functionMessages", pendingMessages}, {"suspendedEntries", suspendedWalked},
+                                       {"callsFound", queuedCalls.size()}, {"queuedNamed", queuedNamed}};
         result["waitingLatentReturns"] = latent;
         result["stacksByState"] = byState;
         result["topScripts"] = TopN(byScript, top);
