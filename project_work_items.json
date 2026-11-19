@@ -4565,6 +4565,10 @@
             {
               "datetime": "2026-11-20T01:30",
               "note": "Retest passes: IdProbe3 loaded, the game cleared the ID 6 s after post-load and the re-check restored 0369832C; IdProbe4 written straight after a load with the CHID record. Mods can refuse saves (a drawn weapon blocks it in this load order): saves now sheathe first and report a refused save in ~12 s naming likely causes; CleanAndReload stops if its way-back save isn't written. Log says 'none' for saves without the record (host, next restart)."
+            },
+            {
+              "datetime": "2026-11-20T01:45",
+              "note": "Verified: SheatheProbe saved first time with a spell readied (refused before auto-sheathe); SheatheProbe2 with a weapon out, reply carries the 'sheathed' line. ArchiveSaves dry run lists 22 saves correctly, keeps the newest and the flood test save."
             }
           ],
           "targetRelease": "1.4"
