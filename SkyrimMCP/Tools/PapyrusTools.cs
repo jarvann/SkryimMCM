@@ -240,7 +240,7 @@ public class PapyrusTools : ToolBase
                 ?? recent.Select(h => h["entries"]?[name]?["plugin"]?.ToString()).LastOrDefault(p => !string.IsNullOrEmpty(p));
             crossCall.Add(new { entry = name, plugin, pattern, lastCounts = lasts, peaks = series.Select(x => x.peak).ToList() });
             crossSummary.Add($"{name}{(plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})")} is {pattern}: " +
-                             (risesInARow ? string.Join(" -> ", lasts) : "peaks " + string.Join(", ", series.Select(x => x.peak))) + ".");
+                             (creeping ? string.Join(" -> ", lasts) : "peaks " + string.Join(", ", series.Select(x => x.peak))) + ".");
         }
         recent.Add(thisRun);
         try
