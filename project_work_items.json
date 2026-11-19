@@ -4122,6 +4122,10 @@
             {
               "datetime": "2026-11-19T11:50",
               "note": "Keyed by the save system's character ID (BGSSaveLoadManager::currentCharacterID, the hex in save names): get_appearance reports characterId; FaceState.Key returns 'id:<ID>' and, the first time, moves the old 'name|race' entry there and marks it migratedTo so a second same-named character doesn't take it; the plugin's reapply reads the id key, else an unmigrated (or own) legacy entry; no ID (main menu) means no key and a clear message, never a name fallback. Only face_state.json is per character (brow colour, slider notes); presets, studio trips, markers, the volume snapshot and settings are per game, not per character. Check: characterId matches the hex in the current save's file name."
+            },
+            {
+              "datetime": "2026-11-19T13:30",
+              "note": "GOG test: characterId matches save names (934E9087, 1E05C850), data stored by ID, a new character starts clean, swapping saves keeps them apart. Failed: at the main menu the ID still read the last character (the player record was the default Prisoner), and SetBrowColor stored a colour under it before failing on 3D not loaded, so the colour was applied to that character on its next load. Fixed: no character ID while the main menu, a loading screen or the character menu is open, or before the player's 3D and cell exist; SetBrowColor checks the character first and stores only after the colour applied; without RaceMenu its override step is reported once. Arya's migration still to test on Steam; the Khajiit second character didn't reproduce a same-race collision."
             }
           ],
           "targetRelease": "1.4"

@@ -803,6 +803,9 @@ public partial class RaceMenuTools
             return new { error = "color must be #RRGGBB or 'hair'" };
 
         var appearance = await _pipe.SendRequestAsync("get_appearance");
+        // BUG-090: check the character first; nothing is stored or overridden without one.
+        var key = SkyrimMCP.Face.FaceState.Key(appearance);
+        if (key == null) return new { error = SkyrimMCP.Face.FaceState.NoCharacterId };
         var isFemale = appearance?["sex"]?.GetValue<string>() == "female";
         var brows = (appearance?["headParts"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
             .Where(p => p["type"]?.GetValue<int>() == 6)
@@ -815,6 +818,7 @@ public partial class RaceMenuTools
         var persisted = new List<object>();
         foreach (var node in brows)
         {
+            if (persisted.Count == 1 && persisted[0] is string) break;  // RaceMenu missing: said once
             try
             {
                 if (reset) await Papyrus("NiOverride", "RemoveNodeOverride", "player", isFemale, node, KeyTintColor, -1);
@@ -823,14 +827,18 @@ public partial class RaceMenuTools
                     : (await Papyrus("NiOverride", "GetNodeOverrideInt", "player", isFemale, node, KeyTintColor, -1))?.GetValue<int>();
                 persisted.Add(new { node, stored = stored.HasValue ? $"#{stored.Value & 0xFFFFFF:X6}" : null });
             }
+            catch (McpException ex) when (ex.Message == NoRaceMenu)
+            {
+                persisted.Clear();
+                persisted.Add("skipped: RaceMenu isn't installed (the colour still applies for this session)");
+            }
             catch (McpException ex) { persisted.Add(new { node, error = ex.Message }); }
         }
 
         JsonNode? applied;
-        var key = SkyrimMCP.Face.FaceState.Key(appearance);
-        if (key == null) return new { error = SkyrimMCP.Face.FaceState.NoCharacterId };
         var browColor = reset ? null : "#" + hex;
-        SkyrimMCP.Face.FaceState.SetBrowColor(key, browColor);
+        // Apply first and store only once it took (it used to store, then fail on "3D isn't loaded", leaving the colour to be
+        // applied on the next load).
         if (reset)
         {
             applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
@@ -840,6 +848,7 @@ public partial class RaceMenuTools
             applied = await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["color"] = browColor });
         }
         if (applied?["error"] is JsonNode error) return new { error = error.ToString(), persisted };
+        SkyrimMCP.Face.FaceState.SetBrowColor(key, browColor);
         await NotifyInGame(reset ? "Brows follow the hair colour again" : "Brow colour set");
         return new
         {
