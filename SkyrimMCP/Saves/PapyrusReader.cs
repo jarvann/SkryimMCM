@@ -388,7 +388,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
         foreach (var (name, count) in d)
         {
             var p = plugin.GetValueOrDefault(name) ?? "(mod unknown)";
-            var cur = totals.GetValueOrDefault(p, (0, 0, name, 0));
+            var cur = totals.TryGetValue(p, out var had) ? had : (count: 0, handlers: 0, first: name, firstCount: 0);
             totals[p] = (cur.count + count, cur.handlers + 1, count > cur.firstCount ? name : cur.first, Math.Max(cur.firstCount, count));
         }
         return totals.OrderByDescending(kv => kv.Value.count).Take(10)
