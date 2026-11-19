@@ -48,7 +48,10 @@ public class SaveTools : ToolBase
     /// can refuse saves (survival and save-limiting mods; seen twice on 2026-11-19), so a missing file is reported as not saved.
     /// Returns null when it started, or the reason it didn't.
     /// </summary>
-    internal static async Task<string?> RequestSave(IPipeClient pipe, string name)
+    internal static async Task<string?> RequestSave(IPipeClient pipe, string name) => (await RequestSaveEx(pipe, name)).error;
+
+    /// <summary>As RequestSave, also saying whether a drawn weapon or spell was sheathed first.</summary>
+    internal static async Task<(string? error, bool sheathed)> RequestSaveEx(IPipeClient pipe, string name)
     {
         var file = Path.Combine(SaveFolder(), name + ".ess");
         // A drawn weapon or spell is enough for some load orders to refuse the save (seen in game): sheathe first and wait for it.
@@ -67,17 +70,17 @@ public class SaveTools : ToolBase
         for (var attempt = 1; attempt <= 2; attempt++)
         {
             var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = name });
-            if (started?["error"] != null) return started["error"]!.ToString();
+            if (started?["error"] != null) return (started["error"]!.ToString(), sheathed);
             for (var waited = 0; waited < 6_000; waited += 500)
             {
                 await Task.Delay(500);
-                if (File.Exists(file)) return null;
+                if (File.Exists(file)) return (null, sheathed);
             }
         }
-        return $"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}). Most likely a mod blocked it: survival or " +
+        return ($"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}). Most likely a mod blocked it: survival or " +
                "save-limiting mods (Survival Mode, SaveReminder and the like) refuse saves under their own rules, console saves included; " +
                "the game also won't save in combat, during a load or while another save is being written. In some load orders a drawn " +
-               "weapon or readied spell blocks it too: SkyLink sheathes before saving, so check it stayed sheathed. Nothing else was done.";
+               "weapon or readied spell blocks it too: SkyLink sheathes before saving, so check it stayed sheathed. Nothing else was done.", sheathed);
     }
 
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }

@@ -264,8 +264,14 @@ public class UtilityTools : ToolBase
         if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
         saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
 
-        if (await SaveTools.RequestSave(_pipe, saveName) is string notStarted) return new { success = false, error = notStarted };
-        return new { success = true, message = $"Game saved as: {saveName} (the game finishes writing it in the background)." };
+        var (notStarted, sheathed) = await SaveTools.RequestSaveEx(_pipe, saveName);
+        if (notStarted != null) return new { success = false, error = notStarted };
+        return new
+        {
+            success = true,
+            message = $"Game saved as: {saveName} (the game finishes writing it in the background).",
+            sheathed = sheathed ? "A weapon or spell was out: it was sheathed first so the game would save (draw it again yourself)." : null,
+        };
     }
 
     [McpServerTool]
