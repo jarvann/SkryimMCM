@@ -16,8 +16,17 @@ public static class SkyLinkSettings
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
-    public static string Folder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition", "SkyLinkAI");
+    // BUG-088: the running game's own documents folder (the GOG game uses "Skyrim Special Edition GOG"), set by PipeClient
+    // when it connects; the Steam folder until then. Face state, studio trips and markers were shared between games.
+    public static string? GameDocumentsFolder { get; set; }
+
+    // BUG-088: the running game's install folder (from the plugin), so a server installed in the Steam game still reads the
+    // GOG game's files when the GOG game is the one connected.
+    public static string? GameInstallFolder { get; set; }
+
+    public static string Folder => GameDocumentsFolder is { Length: > 0 } game
+        ? Path.Combine(game, "SkyLinkAI")
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition", "SkyLinkAI");
 
     public static string FilePath => Path.Combine(Folder, "settings.json");
 
@@ -61,6 +70,7 @@ public static class SkyLinkSettings
         var s = Load();
         if (Str(s, "skyrimPath") is string configured) return (configured, "settings.json skyrimPath");
         if (Environment.GetEnvironmentVariable("SKYRIM_PATH") is string env && env.Length > 0) return (env, "SKYRIM_PATH variable");
+        if (GameInstallFolder is { Length: > 0 } running && Directory.Exists(running)) return (running, "the running game");
 
         foreach (var candidate in new[] { Environment.GetEnvironmentVariable("SKYLINK_SERVER_SOURCE"), typeof(SkyLinkSettings).Assembly.Location })
         {

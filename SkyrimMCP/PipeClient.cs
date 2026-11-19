@@ -50,6 +50,26 @@ public class PipeClient : IPipeClient
         }
     }
 
+    // BUG-088: ask the newly connected game which documents folder it uses (Steam and GOG differ). Runs inside the send lock,
+    // right after connecting. Older plugins don't know the action: the default folder stays.
+    private async Task LearnGameFolderAsync()
+    {
+        try
+        {
+            var request = new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["action"] = "get_game_folder", ["params"] = new JsonObject() };
+            await _writer!.WriteLineAsync(request.ToJsonString());
+            await _writer.FlushAsync();
+            using var cts = new CancellationTokenSource(5000);
+            var line = await _reader!.ReadLineAsync(cts.Token);
+            var data = string.IsNullOrEmpty(line) ? null : JsonNode.Parse(line)?["data"];
+            var folder = data?["folder"]?.GetValue<string>();
+            var game = data?["gameFolder"]?.GetValue<string>();
+            SkyLinkSettings.GameDocumentsFolder = string.IsNullOrWhiteSpace(folder) ? null : folder;
+            SkyLinkSettings.GameInstallFolder = string.IsNullOrWhiteSpace(game) ? null : game;
+        }
+        catch (Exception) { /* keep the default folder */ }
+    }
+
     /// <summary>
     /// Send a request to the SKSE plugin and wait for a response
     /// </summary>
@@ -79,6 +99,7 @@ public class PipeClient : IPipeClient
                     {
                         throw new McpException(DescribeConnectFailure());
                     }
+                    await LearnGameFolderAsync();
                 }
 
                 try

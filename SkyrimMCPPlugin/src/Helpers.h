@@ -13,6 +13,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <filesystem>
 #include <utility>
 #include <vector>
 #include <unordered_map>
@@ -56,6 +57,13 @@ namespace SkyrimMCP::Helpers {
             else { out += static_cast<char>(0xE0 | (cp >> 12)); out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
         }
         return out;
+    }
+
+    // BUG-088: this game's own "My Games" folder (Skyrim Special Edition, ... GOG, VR): SKSE's log folder's parent. State kept
+    // under a fixed "Skyrim Special Edition" path was shared between the Steam and GOG games.
+    inline std::filesystem::path GameDocumentsFolder() {
+        if (auto logDir = SKSE::log::log_directory()) return logDir->parent_path();
+        return {};
     }
 
     inline RE::FormID ParseFormId(const std::string& text) {

@@ -13,6 +13,7 @@
 #include <SKSE/SKSE.h>
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <unordered_map>
 
@@ -255,7 +256,15 @@ namespace SkyrimMCP::Protocol {
         };
 
         // FEAT-207: add missing items, equip and restore gold from a blueprint
-        registry["export_quests"] = [](const std::string& id, const json&) {
+        // BUG-088: the server keeps per-game state in the running game's own documents folder.
+        registry["get_game_folder"] = [](const std::string& id, const json&) {
+            const auto folder = Helpers::GameDocumentsFolder();
+            const auto u8 = folder.u8string();
+            std::string install;
+            try { const auto c = std::filesystem::current_path().u8string(); install.assign(c.begin(), c.end()); } catch (...) {}
+            return MakeResponse(id, true, {{"folder", std::string(u8.begin(), u8.end())}, {"gameFolder", install}}).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+        };
+                registry["export_quests"] = [](const std::string& id, const json&) {
             return GameThread(id, []() {
                 auto q = PlayerQueries::ExportQuests();
                 BlueprintManager::AddPortableIds(q);

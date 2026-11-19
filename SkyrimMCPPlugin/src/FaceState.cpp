@@ -3,6 +3,7 @@
 
 #include "AppearanceManager.h"
 #include "FaceState.h"
+#include "Helpers.h"
 
 #include <ShlObj.h>
 
@@ -19,6 +20,8 @@ namespace SkyrimMCP::FaceState {
             // The same folder the server uses (Environment.SpecialFolder.MyDocuments, which follows OneDrive redirection).
             if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents)) && documents) {
                 path = std::filesystem::path(documents) / "My Games" / "Skyrim Special Edition" / "SkyLinkAI" / "face_state.json";
+                // BUG-088: the running game's own folder (the GOG game has its own).
+                if (auto game = Helpers::GameDocumentsFolder(); !game.empty()) path = game / "SkyLinkAI" / "face_state.json";
             }
             if (documents) CoTaskMemFree(documents);
             return path;
