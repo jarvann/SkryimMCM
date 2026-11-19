@@ -256,7 +256,9 @@ public class SaveTools : ToolBase
             items.Add(new { level = "caution", what = $"{name}{(plugin != null ? $" ({plugin})" : "")}: {queued?.Count ?? 0} queued calls and {running?.Count ?? 0} running threads",
                             couldBreak = "whatever those calls were doing is dropped; the mod runs its handler again on its next event. If the mod keeps piling up, the stacks come back (then the mod is the fix: update, configure or remove it)." });
             if (plugin != null && BaseGamePlugins.Contains(plugin, StringComparer.OrdinalIgnoreCase))
-                warnings.Add($"{name} runs on an object from {plugin}: the script may still come from a mod, but if it's a base game script (quests, the main story), don't clean it.");
+                warnings.Add($"{name} runs on the player or a base-game object ({plugin}). If it's a base-game script (defaultsetstagealiasscript and other default*/quest scripts are), " +
+                             "deleting its queued calls can skip the quest stage one of them would have set. With thousands of copies nearly all are duplicates of one event, " +
+                             "but check the quests involved afterwards; usually another mod is feeding it (a magic effect applied over and over to the player).");
             if (name.Contains("quest", StringComparison.OrdinalIgnoreCase) || name.StartsWith("QF_", StringComparison.OrdinalIgnoreCase))
                 warnings.Add($"{name} looks like a quest script: cleaning it can leave that quest stuck at a stage.");
             args.Add("--stack");
@@ -392,7 +394,12 @@ public class SaveTools : ToolBase
     {
         var parts = new List<string>();
         var queued = s.SuspendedStacks1 + s.SuspendedStacks2;
-        static string Mod(NameCount p) => p.Name.StartsWith("(") ? $"an unidentified mod ({p.Plugin})" : $"{p.Name} ({p.Plugin})";
+        // The plugin is where the script's object comes from. For the player and base-game objects that's Skyrim.esm even when
+        // the script belongs to a mod (Ordinator's ORD_* effects on the player), so say that rather than blame the base game.
+        static string Mod(NameCount p) => p.Name.StartsWith("(") ? $"an unidentified mod ({p.Plugin})"
+            : BaseGamePlugins.Contains(p.Name, StringComparer.OrdinalIgnoreCase)
+                ? $"scripts on the player or base-game objects ({p.Plugin}; the scripts themselves may come from mods)"
+                : $"{p.Name} ({p.Plugin})";
         if (s.QueuedByPlugin.FirstOrDefault() is { Count: >= 100 } qp)
             parts.Add($"{queued} queued script calls are stored in this save; {qp.Count} of them come from {Mod(qp)}. " +
                       "A queue this size eats script time every frame and is a likely cause of low FPS.");

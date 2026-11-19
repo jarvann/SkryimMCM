@@ -1200,6 +1200,10 @@
             {
               "datetime": "2026-11-19T22:00",
               "note": "Built: SkyrimMCP/Saves (EssScanner, PapyrusReader), a port of ReSaver's read path for SE/AE: header, plugins, change forms, the Papyrus section through both suspended-stack tables. Matches ReSaver's counts exactly on 6 saves (strings, scripts, instances, references, arrays, threads, function messages, suspended stacks, change forms); reads all 6 in 2.5 s (ReSaver ~25 s each). Flood save: 9,154 queued AniyaFollower_FollowerOnHit.OnMagicEffectApply (Aniya Follower.esp). `dotnet SkyrimMCP.dll --scan-save <files>` for offline checks."
+            },
+            {
+              "datetime": "2026-11-19T23:00",
+              "note": "Pilot on 20 more saves (Papyrus Data Transfer backups, Saves\\\\_Backup restored from OneDrive, a GOG save; 2.8-23.7 MB, 2020-2026): every count and finding matches ReSaver (26 saves in all). Real pile-ups found: 94,814 queued stacks (defaultsetstagealiasscript.OnMagicEffectApply 86,668 on the player, Ordinator ORD_* ~7,200), 26,358, 11,200 from SimpleItemSpawner.esp over 17 chest handlers, DynDOLOD OnCellAttach pending calls 18,291 and 10,149. Added: totals per mod, pending-call floods reported as not cleanable, stacks can name a whole mod, wording for scripts on the player/base-game objects. Cleaner tested offline on the SimpleItemSpawner save: 11,199 threads and stacks removed, re-reads in both."
             }
           ],
           "targetRelease": "1.4"
