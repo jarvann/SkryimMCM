@@ -289,14 +289,34 @@ public class PapyrusTools : ToolBase
 
         var runaways = rows.Where(r => r.runaway).ToList();
         static string Who(string? plugin) => plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})";
+        // A handler appears twice when its copies are both waiting to start ("X (queued)") and running ("X"): one headline with
+        // the total, or a reader takes the running 352 for the size of an 11,364-copy flood.
+        const string QueuedTag = " (queued)";
+        string Base(string e) => e.EndsWith(QueuedTag) ? e[..^QueuedTag.Length] : e;
+        var combined = new List<string>();
+        var combinedBases = new HashSet<string>();
+        foreach (var g in runaways.GroupBy(r => Base(r.entry)).Where(g => g.Any(r => r.entry.EndsWith(QueuedTag))))
+        {
+            var queuedRow = rows.FirstOrDefault(r => r.entry == g.Key + QueuedTag);
+            var startedRow = rows.FirstOrDefault(r => r.entry == g.Key);
+            var q = queuedRow?.last ?? 0;
+            var st = startedRow?.last ?? 0;
+            var firstTotal = (queuedRow?.first ?? 0) + (startedRow?.first ?? 0);
+            var plugin = queuedRow?.plugin ?? startedRow?.plugin;
+            var grew = (queuedRow?.growing ?? false) || (startedRow?.growing ?? false);
+            combined.Add($"{g.Key}{Who(plugin)} is a runaway: about {q + st} copies ({q} waiting to start, {st} running)" +
+                         (grew && q + st > firstTotal ? $", up from {firstTotal}." : "."));
+            combinedBases.Add(g.Key);
+        }
+        var singles = runaways.Where(r => !combinedBases.Contains(Base(r.entry))).ToList();
         var summary = runaways.Count == 0
             ? "No pile-ups: no handler reached 20 copies or kept growing."
-            : string.Join(" ", runaways.OrderBy(r => r.kind == "runaway" ? 0 : r.kind == "periodic" ? 1 : 2).Select(r => r.kind switch
+            : string.Join(" ", combined.Concat(singles.OrderBy(r => r.kind == "runaway" ? 0 : r.kind == "periodic" ? 1 : 2).Select(r => r.kind switch
             {
                 "runaway" => $"{r.entry}{Who(r.plugin)} is a runaway: {r.last} copies running now{(r.growing ? $", up from {r.first}" : "")} (peak {r.max}).",
                 "periodic" => $"{r.entry}{Who(r.plugin)} rises to {r.max} copies repeatedly and drains in between (periodic: a sweep over nearby objects?).",
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
-            }));
+            })));
         if (crossSummary.Count > 0) summary += " Across recent calls: " + string.Join(" ", crossSummary);
         if (paused != null) summary = paused + " " + summary;
         // Stacks the listed handlers don't account for (before queued stacks were named, ~14,000 of 14,500 were missing).
