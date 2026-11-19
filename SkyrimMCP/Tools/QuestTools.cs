@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Server;
 
@@ -11,6 +12,119 @@ namespace SkyrimMCP.Tools;
 public class QuestTools : ToolBase
 {
     public QuestTools(IPipeClient pipe) : base(pipe) { }
+
+    // FEAT-263: quest types whose lines hold the story together; replaying them needs allowMajor.
+    static readonly HashSet<string> MajorTypes = new(StringComparer.OrdinalIgnoreCase)
+        { "main", "College of Winterhold", "Thieves Guild", "Dark Brotherhood", "Companions", "Civil War", "Dawnguard", "Dragonborn" };
+
+    [McpServerTool]
+    [Description("Replay quest progress from a character blueprint (exported with stages done, 1.4+) into this game, quest by quest. " +
+        "quests: comma-separated quest names or editor IDs from the blueprint, or 'list' to see which quests have stages done " +
+        "there that aren't done here. For each quest it starts the quest if it hasn't started (so its aliases fill), then sets " +
+        "each missing stage in order with SetQuestStage's check, stopping that quest at the first stage the game refuses. " +
+        "Setting a stage runs its script, so rewards, items, world changes and follow-on quests happen as if played (unlike " +
+        "CompleteQuest), but a stage that expects the player somewhere or an NPC alive can misfire. confirm=false (default) makes " +
+        "a way-back save and shows the plan; confirm=true makes another and runs it. Main, faction, Civil War and DLC lines " +
+        "need allowMajor=true. Ask the player first, simple quests first.")]
+    public async Task<object> ReplayQuests(string blueprintPath, string quests, bool confirm = false, bool allowMajor = false)
+    {
+        if (!File.Exists(blueprintPath)) return new { error = $"No blueprint at {blueprintPath}." };
+        JsonNode? bp;
+        try { bp = JsonNode.Parse(await File.ReadAllTextAsync(blueprintPath)); }
+        catch (JsonException ex) { return new { error = "The blueprint isn't valid JSON: " + ex.Message }; }
+        var there = (bp?["quests"]?["completed"] as JsonArray ?? new JsonArray()).Concat(bp?["quests"]?["running"] as JsonArray ?? new JsonArray())
+            .OfType<JsonObject>().Where(q => q["stagesDone"] is JsonArray).ToList();
+        if (there.Count == 0)
+            return new { error = "This blueprint has no stages done (exported before 1.4, or with stagesFromSave=false). Export it again from the other character." };
+
+        // Map the blueprint's plugin + local ID to this game's form ID.
+        var lo = await _pipe.SendRequestAsync("get_load_order");
+        var mods = (lo?["mods"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .GroupBy(m => m["name"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        string? Resolve(JsonObject q)
+        {
+            if (q["formIdSource"] is JsonObject src && src["plugin"]?.ToString() is string plugin && src["localId"]?.ToString() is string local)
+            {
+                if (!mods.TryGetValue(plugin, out var m) || m["prefix"]?.ToString() is not string prefix) return null;
+                var id = Convert.ToUInt32(local, 16);
+                return prefix.Length == 5 ? $"{prefix}{id & 0xFFF:X3}" : $"{prefix}{id & 0xFFFFFF:X6}";
+            }
+            return q["formId"]?.ToString();
+        }
+
+        var wayBack = new SaveTools(_pipe);
+        var (save, stagesHere, note) = await wayBack.QuestStagesFromSave("SkyLink_BeforeQuestReplay");
+        if (stagesHere == null) return new { error = "Couldn't read this game's quest stages: " + note };
+        HashSet<int> DoneHere(string? id) =>
+            id != null && stagesHere.TryGetValue(id.ToUpperInvariant().PadLeft(8, '0'), out var st)
+                ? st.Where(x => x[1] == 1).Select(x => x[0]).ToHashSet() : [];
+
+        var rows = there.Select(q =>
+        {
+            var id = Resolve(q);
+            var done = DoneHere(id);
+            var missing = (q["stagesDone"] as JsonArray)!.Select(n => n!.GetValue<int>()).Where(x => !done.Contains(x)).OrderBy(x => x).ToList();
+            return new { q, id, name = q["name"]?.ToString() ?? "", editorId = q["editorId"]?.ToString(), type = q["type"]?.ToString() ?? "",
+                         doneHere = done, missing };
+        }).Where(r => r.missing.Count > 0).ToList();
+
+        if (quests.Trim().Equals("list", StringComparison.OrdinalIgnoreCase))
+            return new
+            {
+                wayBackSave = save, note,
+                candidates = rows.OrderBy(r => MajorTypes.Contains(r.type)).ThenBy(r => r.name)
+                    .Select(r => new { r.name, r.editorId, r.type, major = MajorTypes.Contains(r.type) ? true : (bool?)null,
+                                       notInThisGame = r.id == null ? true : (bool?)null, stagesToSet = r.missing }),
+            };
+
+        var wanted = quests.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var picked = new List<(string name, string? editorId, string type, string? id, HashSet<int> doneHere, List<int> missing)>();
+        foreach (var w in wanted)
+        {
+            var r = rows.FirstOrDefault(x => x.name.Equals(w, StringComparison.OrdinalIgnoreCase) || string.Equals(x.editorId, w, StringComparison.OrdinalIgnoreCase));
+            if (r == null) return new { error = $"'{w}' has no stages to replay (not in the blueprint, or already done here). ReplayQuests(quests: 'list') shows them." };
+            if (r.id == null) return new { error = $"'{w}' comes from a plugin that isn't loaded in this game." };
+            if (MajorTypes.Contains(r.type) && !allowMajor) return new { error = $"'{w}' is a {r.type} quest: replaying it can break that line if a stage misfires. Pass allowMajor=true once the player agrees." };
+            picked.Add((r.name, r.editorId, r.type, r.id, r.doneHere, r.missing));
+        }
+
+        var plan = picked.Select(p => new
+        {
+            p.name, p.type, formId = p.id, startFirst = p.doneHere.Count == 0, stagesToSet = p.missing,
+            warning = MajorTypes.Contains(p.type) ? $"{p.type} line: a misfiring stage can stall it; the way-back save is the fix." : null,
+        }).ToList();
+        if (!confirm)
+            return new { preview = true, wayBackSave = save, note, plan,
+                         next = "Each stage runs its script as if played. If the player agrees, call again with confirm=true." };
+
+        if (await SafetyBlock("face") is string gateReason) return new { error = gateReason, wayBackSave = save };
+        var results = new List<object>();
+        foreach (var p in picked)
+        {
+            var log = new List<object>();
+            string status = "done";
+            if (p.doneHere.Count == 0)
+            {
+                var started = await _pipe.SendRequestAsync("start_quest", new JsonObject { ["formId"] = p.id });
+                log.Add(new { start = started?["started"]?.GetValue<bool>() });
+                await Task.Delay(1000);
+            }
+            foreach (var stage in p.missing)
+            {
+                await _pipe.SendRequestAsync("set_quest_stage", new JsonObject { ["formId"] = p.id, ["stage"] = stage });
+                await Task.Delay(600);
+                var after = await _pipe.SendRequestAsync("get_quest_stages", new JsonObject { ["formId"] = p.id });
+                var now = after?["currentStage"]?.GetValue<int>();
+                // A lower stage set after a higher one doesn't move the current stage; ascending order keeps this check exact.
+                var ok = now >= stage;
+                log.Add(new { stage, stageNow = now, applied = ok });
+                if (!ok) { status = $"stopped at stage {stage}: the game didn't apply it (aliases empty, or the stage needs something this game doesn't have)"; break; }
+            }
+            results.Add(new { p.name, formId = p.id, status, steps = log });
+        }
+        return new { wayBackSave = save, results,
+                     next = "Check the journal and nearby NPCs; if something misfired, load the way-back save. Then save from the game menu." };
+    }
 
     [McpServerTool]
     [Description("Set a quest's stage (formId, stage), then read it back and report whether the game applied it (applied, stageNow). " +
