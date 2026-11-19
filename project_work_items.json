@@ -4557,6 +4557,10 @@
             {
               "datetime": "2026-11-20T00:30",
               "note": "In-game test disproved the file-name theory: any save written by the console save command (SaveGame, CheckSave, CleanAndReload) loads back with ID 0, whatever its name; only game-made saves keep it. Built: the host keeps the ID in SkyLink's co-save record ('SKLK'/'CHID') and restores it at kPostLoadGame when the game has 0 (host change: game restart); GetAppearance reports characterIdLost; set_character_id + RepairCharacterId (from the newest game-made save of the same player name); save names back to plain labels (the game-format names copied stale fields and misled ListSaves); ListSaves only reads IDs from game-made names; clearer NoCharacterId message."
+            },
+            {
+              "datetime": "2026-11-20T01:00",
+              "note": "Retest: the CHID record is written (IdProbe3.skse: SKLK/CHID = 0369832C) and RepairCharacterId works (face data back), but the restore never fired: at kPostLoadGame the game still held the previous ID and zeroed it later. Now: logs both values at post-load, re-checks on the game thread at +0.5..+20 s and sets the ID when the game has 0; a save made while lost also fixes it first. Also: SaveGame/CheckSave/CleanAndReload re-request a save the game dropped (no file after 10 s), seen twice."
             }
           ],
           "targetRelease": "1.4"

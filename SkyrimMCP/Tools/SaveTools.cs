@@ -43,6 +43,27 @@ public class SaveTools : ToolBase
 
     static readonly Regex GameMadeName = new(@"^(Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// Asks the game to save and waits until the file has started to appear; asks once more if it hasn't after 10 seconds. The
+    /// game sometimes drops a console save request (soon after a load, or next to another save: seen twice on 2026-11-19).
+    /// Returns null when it started, or the reason it didn't.
+    /// </summary>
+    internal static async Task<string?> RequestSave(IPipeClient pipe, string name)
+    {
+        var file = Path.Combine(SaveFolder(), name + ".ess");
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = name });
+            if (started?["error"] != null) return started["error"]!.ToString();
+            for (var waited = 0; waited < 10_000; waited += 500)
+            {
+                await Task.Delay(500);
+                if (File.Exists(file)) return null;
+            }
+        }
+        return $"the game didn't start writing '{name}' after two requests (20 seconds): it may be busy with another save or a load. Try again in a moment.";
+    }
+
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
 
     // Queued calls and the mod with the most, for marking way-back saves that still hold a flood (about 0.5 s a save).
@@ -176,12 +197,11 @@ public class SaveTools : ToolBase
         {
             if (await SafetyBlock("save") is string blocked) return new { error = blocked };
             made = $"SkyLink_Check_{DateTime.Now:yyyyMMdd-HHmmss}";
-            var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
-            if (started?["error"] != null) return DeserializeResponse(started);
+            if (await RequestSave(_pipe, made) is string notStarted) return new { error = $"Couldn't save for the check: {notStarted}" };
             // Under the bridge's 80-second limit: a long save is reported, not waited out.
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(55));
+            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(50));
             if (path == null)
-                return new { error = $"Saving as {made}: the file wasn't complete after 55 seconds (a big save, or the save didn't start). Try CheckSave(\"{made}\") in a moment; if the file never appears, save again." };
+                return new { error = $"Saving as {made}: the file wasn't complete after a minute (a big save, or the save didn't start). Try CheckSave(\"{made}\") in a moment; if the file never appears, save again." };
         }
         else
         {
@@ -500,9 +520,8 @@ public class SaveTools : ToolBase
         else
         {
             made = $"SkyLink_BeforeClean_{DateTime.Now:yyyyMMdd-HHmmss}";
-            var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
-            if (started?["error"] != null) return DeserializeResponse(started);
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(55));
+            if (await RequestSave(_pipe, made) is string notStarted) return new { error = $"Couldn't make the way-back save: {notStarted} Nothing was cleaned." };
+            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(50));
             if (path == null) return new { error = $"Saving as {made}: the file wasn't complete after 55 seconds; nothing was cleaned. Run CleanAndReload again with previewSave=\"{made}\" once it exists." };
         }
 

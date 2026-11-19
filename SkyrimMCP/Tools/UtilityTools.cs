@@ -264,20 +264,8 @@ public class UtilityTools : ToolBase
         if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
         saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
 
-        await _pipe.SendRequestAsync("save_game", new JsonObject
-        {
-            ["saveName"] = saveName
-        });
-
-        // Report only a save that exists: a save started while another was being written produced no file (seen in game).
-        var file = Path.Combine(SaveTools.SaveFolder(), saveName + ".ess");
-        for (var waited = 0; waited < 45_000; waited += 500)
-        {
-            await Task.Delay(500);
-            if (File.Exists(file) && new FileInfo(file).Length > 0)
-                return new { success = true, message = $"Game saved as: {saveName}" };
-        }
-        return new { success = false, error = $"The save '{saveName}' didn't appear in {SaveTools.SaveFolder()} within 45 seconds (another save in progress, or the game refused). Try again." };
+        if (await SaveTools.RequestSave(_pipe, saveName) is string notStarted) return new { success = false, error = notStarted };
+        return new { success = true, message = $"Game saved as: {saveName} (the game finishes writing it in the background)." };
     }
 
     [McpServerTool]
