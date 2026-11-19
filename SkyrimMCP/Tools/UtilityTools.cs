@@ -255,33 +255,16 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Save the game. Automatically generates a descriptive save name from player name, level, and location. " +
-        "Creates both .ess and .skse co-save files. You can provide a custom save name or leave it blank for auto-naming. " +
+    [Description("Save the game (with no name: SkyLink<date-time>). " +
+        "Creates both .ess and .skse co-save files. A name you give becomes the start of the file name (letters, digits and " +
+        "dashes), followed by the character ID and the game's other fields, so loading it keeps the character ID. " +
         "CAUTION: Always save before performing risky operations like quest stage manipulation or teleporting.")]
     public async Task<object> SaveGame(string? saveName = null)
     {
-        // If no name provided, build one from player info
-        if (string.IsNullOrWhiteSpace(saveName))
-        {
-            try
-            {
-                var playerData = await _pipe.SendRequestAsync("get_player_info");
-                var name = playerData?["name"]?.GetValue<string>() ?? "Player";
-                var level = playerData?["level"]?.GetValue<int>() ?? 0;
-                var cell = playerData?["cellName"]?.GetValue<string>() ?? "Unknown";
-                var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-
-                // Clean invalid filename characters
-                name = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
-                cell = string.Join("_", cell.Split(Path.GetInvalidFileNameChars()));
-
-                saveName = $"MCP_{name}_Lv{level}_{cell}_{timestamp}";
-            }
-            catch
-            {
-                saveName = $"MCP_Save_{DateTime.Now:yyyyMMdd-HHmmss}";
-            }
-        }
+        // The game reads the character ID from a save's file name when it loads it; a custom name has none, so loading one left
+        // the character ID at 00000000 for every later save (2026-11-19). Names are the label plus the game's own fields.
+        var label = string.IsNullOrWhiteSpace(saveName) ? $"SkyLink{DateTime.Now:yyyyMMdd-HHmmss}" : saveName;
+        saveName = await new SaveTools(_pipe).GameStyleName(label);
 
         await _pipe.SendRequestAsync("save_game", new JsonObject
         {

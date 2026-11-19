@@ -1250,6 +1250,10 @@
             {
               "datetime": "2026-11-19T23:30",
               "note": "In-game test: CheckSave, dry run, clean and load all work (9,429 queued and threads removed; cleaned copy loads, 0 queued). Aniya still on -> ~1,694 copies back in 40 s. Fixed: still-loaded warning naming the mod, CleanAndReload samples the cleaned handlers 5 s and 25 s after loading (regrowth verdict); undefined threads use ReSaver's rule (the '7 threads' were scripts not listed in the save); per-function lists say runningOn, per-mod lists Plugin/Handlers; CheckSave adds liveOwner (StackReport's attribution) for handlers running now; removal totals explain the threads' own stacks (275 waiting in MagicEffect.HasKeyword)."
+            },
+            {
+              "datetime": "2026-11-19T23:59",
+              "note": "Retest: preview warning, regrowth (247 -> 1,374, 'coming back'), totals all pass; StopQuest then drained it fully. Fixed: stillActive leads the preview; liveOwner was always missing (duplicate X / 'X (queued)' keys threw); one way-back save per cleanup (previewSave); ListSaves scan:true and madeBySkyLink; new ArchiveSaves (moves to Saves\\\\SkyLink_Archive, never deletes)."
             }
           ],
           "targetRelease": "1.4"
@@ -2437,7 +2441,7 @@
         {
           "id": "BUG-024",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Console teleport reports a timeout even when it works",
           "description": "ExecuteConsoleCommand with a teleport (coc/moveto into another cell) reports the 5-second game-thread timeout although the teleport happens: the loading screen blocks the game thread before the task returns. Should detect the loading screen and report 'teleport started' instead.",
           "history": [
@@ -2448,6 +2452,10 @@
             {
               "datetime": "2026-11-19T17:00",
               "note": "Built (not deployed): ExecuteConsoleCommand with coc, cow, centeroncell, centeronworld or player.moveto applies the move rules, starts the command on the next frame (execute_command_async) and waits up to 20 s for the cell to change."
+            },
+            {
+              "datetime": "2026-11-19T23:59",
+              "note": "Tested: coc riverwood waited out the load and reported Riverwood (Skyrim)."
             }
           ],
           "targetRelease": "1.4"
@@ -4194,6 +4202,10 @@
             {
               "datetime": "2026-11-19T17:00",
               "note": "Built (not deployed): very dark (skin L* under 15) and dark (under 30) lighting warnings; a 'forehead covered' warning when the forehead above the brows doesn't look like skin (brows likely under hair). The camera refusal naming the message box was already fixed by BUG-080's named menus."
+            },
+            {
+              "datetime": "2026-11-19T23:59",
+              "note": "CaptureFace had no lighting check (capture in the Winking Skeever, face brightness 11/100, warning null): added 'lighting' with the same thresholds."
             }
           ],
           "targetRelease": "1.4"
@@ -4522,6 +4534,21 @@
             {
               "datetime": "2026-11-19T11:00",
               "note": "Shipped in 1.3.0 as FindHairstyles (contact sheets, BSA reader); tracker entry was stale."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-091",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Loading a custom-named save drops the character ID to 00000000",
+          "description": "Autosaves made after loading custom-named saves (Arya_clean_after_StackTest_..., SkyLink_Check_...) carried character ID 00000000. Likely the game takes the ID from the file name when it loads a save. Breaks BUG-090's per-character data and the load menu's character grouping.",
+          "history": [
+            {
+              "datetime": "2026-11-19T23:59",
+              "note": "Reported by the in-game agent (Autosave101/102_00000000 at 13:41 and 13:56). Built (not yet confirmed in game): SaveGame, CheckSave and CleanAndReload name saves <label>_<characterID>_<rest of the newest real save's name>; cleaned copies insert 'Cleaned' into the first field. Test: load such a save, check GetAppearance characterId and the next autosave's name."
             }
           ],
           "targetRelease": "1.4"

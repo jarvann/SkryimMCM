@@ -38,7 +38,41 @@ public class SaveTools : ToolBase
     }
 
     static bool IsSkyLinkSave(string file) =>
-        file.StartsWith("SkyLink_", StringComparison.OrdinalIgnoreCase) || file.Contains("_cleaned", StringComparison.OrdinalIgnoreCase);
+        file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
+
+    static readonly Regex EngineName = new(@"^([^_]+)_([0-9A-F]{8})_(.+)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// A save name the game can read the character ID from. The game takes it from the file name when it loads a save: a custom
+    /// name (SkyLink_Check_..., Arya_clean_...) has none, so after loading one the character ID was 00000000 and every later save
+    /// carried it (seen 2026-11-19). The name is the label (no underscores) followed by the rest of the newest real save of this
+    /// character: its ID, flags, name and the other fields the game expects.
+    /// </summary>
+    internal async Task<string> GameStyleName(string label)
+    {
+        label = Regex.Replace(label, "[^A-Za-z0-9-]", "");
+        string? currentId = null;
+        string? player = null;
+        try { currentId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+        try { player = (await _pipe.SendRequestAsync("get_player_info"))?["name"]?.ToString(); } catch (Exception) { }
+        var folder = SaveFolder();
+        if (Directory.Exists(folder))
+        {
+            foreach (var f in new DirectoryInfo(folder).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc).Take(400))
+            {
+                var m = EngineName.Match(Path.GetFileNameWithoutExtension(f.Name));
+                if (!m.Success || m.Groups[2].Value == "00000000") continue;
+                if (currentId is { Length: 8 } ? !m.Groups[2].Value.Equals(currentId, StringComparison.OrdinalIgnoreCase)
+                    : player == null || !string.Equals(SafeHeader(f.FullName)?.PlayerName, player, StringComparison.Ordinal)) continue;
+                var name = $"{label}_{m.Groups[2].Value}_{m.Groups[3].Value}";
+                for (var i = 2; File.Exists(Path.Combine(folder, name + ".ess")); i++) name = $"{label}{i}_{m.Groups[2].Value}_{m.Groups[3].Value}";
+                return name;
+            }
+        }
+        return label;   // no real save of this character yet: the plain label
+    }
+
+    static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
 
     // Queued calls and the mod with the most, for marking way-back saves that still hold a flood (about 0.5 s a save).
     static object? QuickStacks(string path)
@@ -56,7 +90,7 @@ public class SaveTools : ToolBase
     [McpServerTool]
     [Description("Move saves out of the save folder into Saves\\SkyLink_Archive (with their .skse co-saves), so they stop cluttering " +
         "the load menu without being deleted: move them back by hand to restore. names: comma-separated save names, or 'skylink' " +
-        "for every save SkyLink made (SkyLink_Check_*, SkyLink_BeforeClean_*, *_cleaned) older than olderThanMinutes. dryRun " +
+        "for every save SkyLink made (SkyLinkCheck*, SkyLinkBeforeClean*, *Cleaned*, and older SkyLink_* names) older than olderThanMinutes. dryRun " +
         "(default true) lists what would move. Never moves the newest save. Use ListSaves(scan: true) first to see which way-back " +
         "saves still hold a stack flood.")]
     public Task<object> ArchiveSaves(string names, int olderThanMinutes = 30, bool dryRun = true)
@@ -155,7 +189,7 @@ public class SaveTools : ToolBase
 
     [McpServerTool]
     [Description("Check a save for problems with SkyLink's own save scanner (based on ReSaver's). With no saveName it first " +
-        "saves the current game as SkyLink_Check_<time> and scans that, so the result is the game as it is now; with a name " +
+        "saves the current game as SkyLinkCheck<time>_<character ID>_... and scans that, so the result is the game as it is now; with a name " +
         "it scans that save (ListSaves shows them). Reports: script stacks stored in the save (running threads and queued calls " +
         "by function and mod: a big queue is the usual FPS killer), script leftovers from removed or changed mods (undefined " +
         "scripts and instances), unattached instances, plugins the save uses that aren't loaded now, and sizes. Read-only: " +
@@ -167,7 +201,7 @@ public class SaveTools : ToolBase
         if (string.IsNullOrWhiteSpace(saveName))
         {
             if (await SafetyBlock("save") is string blocked) return new { error = blocked };
-            made = $"SkyLink_Check_{DateTime.Now:yyyyMMdd-HHmmss}";
+            made = await GameStyleName($"SkyLinkCheck{DateTime.Now:yyyyMMdd-HHmmss}");
             var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
             if (started?["error"] != null) return DeserializeResponse(started);
             path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
@@ -288,9 +322,12 @@ public class SaveTools : ToolBase
     {
         var dir = Path.GetDirectoryName(original)!;
         var bare = Path.GetFileNameWithoutExtension(original);
+        // Keep the game-style tail (character ID and the rest) so the cleaned save still carries the character ID.
+        var m = EngineName.Match(bare);
         for (var i = 1; ; i++)
         {
-            var name = i == 1 ? $"{bare}_cleaned" : $"{bare}_cleaned{i}";
+            var tag = i == 1 ? "Cleaned" : $"Cleaned{i}";
+            var name = m.Success ? $"{m.Groups[1].Value}{tag}_{m.Groups[2].Value}_{m.Groups[3].Value}" : $"{bare}_{tag.ToLowerInvariant()}";
             if (!File.Exists(Path.Combine(dir, name + ".ess"))) return Path.Combine(dir, name + ".ess");
         }
     }
@@ -491,7 +528,7 @@ public class SaveTools : ToolBase
         }
         else
         {
-            made = $"SkyLink_BeforeClean_{DateTime.Now:yyyyMMdd-HHmmss}";
+            made = await GameStyleName($"SkyLinkBeforeClean{DateTime.Now:yyyyMMdd-HHmmss}");
             var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
             if (started?["error"] != null) return DeserializeResponse(started);
             path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
