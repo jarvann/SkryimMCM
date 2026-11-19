@@ -206,6 +206,18 @@ public class PlayerTools : ToolBase
     public async Task<object> GetCharacterBlueprint(string? outputPath = null, bool stagesFromSave = true)
     {
         var data = await _pipe.SendRequestAsync("get_character_blueprint");
+        // FEAT-121: which shout words were unlocked (no native read; Papyrus Game.IsWordUnlocked).
+        if (data?["shouts"]?["shouts"] is JsonArray exportShouts)
+            foreach (var w in exportShouts.OfType<JsonObject>().SelectMany(sh => (sh["words"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()))
+            {
+                if (w["formId"]?.ToString() is not string wid) continue;
+                try
+                {
+                    var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject { ["className"] = "Game", ["functionName"] = "IsWordUnlocked", ["args"] = new JsonArray(wid) });
+                    if (r?["result"] is JsonValue v && v.TryGetValue<bool>(out var unlocked)) w["unlocked"] = unlocked;
+                }
+                catch (Exception) { }
+            }
         // FEAT-263: stages done per quest come from a save (the engine's in-memory list read only zeros): a save made now.
         if (stagesFromSave && data?["quests"] is JsonObject quests)
         {
@@ -261,14 +273,17 @@ public class PlayerTools : ToolBase
     [McpServerTool]
     [Description("Apply the inventory, equipment and gold of a character blueprint file (from GetCharacterBlueprint) to the player. " +
         "dryRun defaults to TRUE: first show the player what would change, then call again with dryRun=false once they agree. " +
-        "sections (comma-separated, default 'inventory,equipment,gold'; add 'quests' to compare the blueprint's quest progress " +
+        "sections (comma-separated, default 'inventory,equipment,gold'; also 'skills' (raises skills below the blueprint's base " +
+        "levels; lowerSkills=true also lowers), 'level' (raises the level; perk points and level-up choices aren't given), " +
+        "'perks', 'spells' and 'shouts' (adds the ones she lacks; shout words the other character had unlocked are taught and " +
+        "unlocked), all add-only; add 'quests' to compare the blueprint's quest progress " +
         "with this game's: listed only, never applied). Only missing items are added (blueprint count minus what " +
         "the player has); nothing is ever removed, and gold only goes up unless exactGold=true. Then the blueprint's equipped " +
         "armor and weapons are equipped (an item to equip that she lacks is added, even with only the equipment section; spells she " +
         "doesn't know are skipped, since spells aren't restored; worn items not in the blueprint stay on). Items are found by plugin name and local ID, so a different load order works; " +
         "items from plugins that aren't loaded, items created in game, and blueprints from before 1.3 whose form IDs now point at " +
         "a different item are listed as unresolved. Player-made enchantments are not restored (the plain item is added).")]
-    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false)
+    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false, bool lowerSkills = false)
     {
         JsonNode? blueprint;
         try
@@ -293,11 +308,49 @@ public class PlayerTools : ToolBase
             ["exactGold"] = exactGold,
             ["inventory"] = bp["inventory"]?["items"]?.DeepClone() ?? new JsonArray(),
             ["equipped"] = bp["equipped"]?["equipped"]?.DeepClone() ?? new JsonArray(),
+            // FEAT-121
+            ["skills"] = bp["skills"]?["skills"]?.DeepClone() ?? new JsonArray(),
+            ["perks"] = bp["perks"]?["perks"]?.DeepClone() ?? new JsonArray(),
+            ["spells"] = bp["spells"]?["spells"]?.DeepClone() ?? new JsonArray(),
+            ["shouts"] = bp["shouts"]?["shouts"]?.DeepClone() ?? new JsonArray(),
+            ["lowerSkills"] = lowerSkills,
         };
+        if ((bp["skills"]?["playerLevel"] ?? bp["character"]?["level"]) is JsonNode lvl) parms["level"] = lvl.DeepClone();
         if (bp["gold"]?["gold"] is JsonNode gold) parms["gold"] = gold.DeepClone();
 
         var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
         if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
+        // FEAT-121: shout words the other character had unlocked are taught and unlocked through Papyrus (no native call).
+        object? words = null;
+        if (sections.Contains("shouts", StringComparison.OrdinalIgnoreCase) && bp["shouts"]?["shouts"] is JsonArray shoutList)
+        {
+            var resolve = await PortableResolver();
+            var taught = new List<string>();
+            var skipped = 0;
+            foreach (var w in shoutList.OfType<JsonObject>().SelectMany(sh => (sh["words"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()))
+            {
+                if (w["unlocked"]?.GetValue<bool>() != true) { skipped++; continue; }
+                if (resolve(w) is not string id) continue;
+                if (!dryRun)
+                {
+                    try
+                    {
+                        await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject { ["className"] = "Game", ["functionName"] = "TeachWord", ["args"] = new JsonArray(id) });
+                        await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject { ["className"] = "Game", ["functionName"] = "UnlockWord", ["args"] = new JsonArray(id) });
+                    }
+                    catch (Exception) { continue; }
+                }
+                taught.Add(w["name"]?.ToString() ?? id);
+            }
+            words = new
+            {
+                taughtAndUnlocked = taught,
+                notUnlockedThere = skipped,
+                note = skipped > 0 && taught.Count == 0 && shoutList.Count > 0 && !shoutList.OfType<JsonObject>().Any(sh => (sh["words"] as JsonArray)?.OfType<JsonObject>().Any(x => x["unlocked"] != null) == true)
+                    ? "This blueprint doesn't record which words were unlocked (exported before 1.4): export it again to bring words across."
+                    : null,
+            };
+        }
         var result = DeserializeResponse(data);
         return new
         {
@@ -305,6 +358,7 @@ public class PlayerTools : ToolBase
             exportedBy = bp["exportSource"]?.GetValue<string>(),
             portableIds = bp["formatVersion"]?.GetValue<int>() >= 2,
             result,
+            shoutWords = words,
             quests = questReport,
         };
     }
