@@ -47,6 +47,9 @@ These are the things that went wrong today when they were not followed.
 16. **A passing score is not a result.** Before reporting a build, look at the picture the player will see and say plainly whether it looks like the target. Do not let the table stand in for that judgement.
 17. **Ignore lid-edge rows when the eyes are small in the picture, and in probes.** On a smiling photo they read far off and dominate the failures; in `ProbeSliders` they moved 4 to 10% for sliders that cannot touch the eyes.
 18. **Keep the player's hands off the mouse during captures.** A moved mouse gives an off-centre frame or "No face found". Retake; do not compare a capture whose framing is not "ok".
+19. **Read the `lighting` line on every capture (1.4).** Face lightness under 15 is "very dark" and under 30 "dark": colour numbers mean nothing there (a night capture read skin lightness 5.6, a dim inn 9). The studio reads about 62 to 65. Go to the studio rather than compare.
+20. **Hide the hair when the forehead is covered (1.4).** `MeasureFace` warns "forehead covered" when the skin above the brows doesn't look like skin: the brow colour and brow measures are then reading a fringe. Capture with `hideHair: true`.
+21. **If a face tool says the character ID was lost, repair it first (1.4).** Per-character settings (brow colour, slider notes) are kept by character ID. Loading a save made with the console `save` command before 1.4 leaves the ID at 00000000; `RepairCharacterId` puts it back, and from 1.4 SkyLink restores it after every load. Never write face settings while `GetAppearance` shows `characterIdLost`.
 
 ## Procedure A: tune an existing face toward a reference
 
@@ -183,7 +186,7 @@ A useful check from that build: two photos of the same person taken about 24 yea
 2. **Likeness.** Proportions, colouring and light are solved; soft tissue is reachable but weak. What separates a matching build from a recognisable one is still unmeasured: cheek and lid volume, smile shape, hairstyle.
 3. **Profile measurement.** `MeasureProfile` exists and fails; untested beyond that.
 4. **Body silhouette widths.** Joint ratios work; chest, waist and hip widths are unreliable with long hair, skirts and arms at the sides.
-5. **A light check in the tools.** `StudioGo` or `CaptureFace` should warn when a player light spell is active.
+5. **A light check in the tools.** Done in 1.4 for darkness (`lighting` on every capture) and in 1.3 for light spells (`lightSpell`); a check for other bright sources in the studio is still missing.
 6. **Illustration and full-figure controls.** Not yet run.
 
 ## Files and presets
@@ -199,4 +202,9 @@ A useful check from that build: two photos of the same person taken about 24 yea
 
 - `MeasureProfile` returns null for a measure with no face vertex under its landmarks instead of failing (BUG-055).
 - Lid-edge measures need four times the noise floor in probes and four times the tolerance in comparisons; body silhouette widths are reported under `silhouette_unproven` and not compared.
-- Brow colour after a game load is restored by the host DLL (BUG-050's longer retry still needs a deploy with Skyrim closed).
+- Brow colour after a game load is restored by the host DLL (BUG-050), keyed by character ID (BUG-090), which the host keeps in its co-save record from 1.4 (BUG-091).
+
+## Dev notes (1.4)
+
+- `CaptureFace` reports `lighting` (face lightness from the centre of the detected face, CIE L*); `MeasureFace` adds dark and covered-forehead warnings (BUG-086).
+- Saving through SkyLink sheathes a drawn weapon or spell first, because in some load orders it blocks saves; the reply says so.
