@@ -12,6 +12,21 @@ class Program
     {
         // FEAT-265: `dotnet SkyrimMCP.dll --scan-save <file.ess> [...]` prints the native save scan as JSON and exits (used to
         // check the scanner against ReSaver on real saves without the game).
+        // FEAT-269: `--migrate <Plugins.txt> <game folder> <file.ess> [...]`: each save against that load order.
+        if (args.Length >= 4 && args[0] == "--migrate")
+        {
+            var current = Saves.MigrationReport.FromPluginsTxt(args[1], args[2]);
+            foreach (var path in args.Skip(3))
+            {
+                try
+                {
+                    var report = Saves.MigrationReport.Build(Saves.EssScanner.Scan(path), current, args[1]);
+                    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                }
+                catch (Exception ex) { Console.WriteLine($"{{\"file\": \"{Path.GetFileName(path)}\", \"error\": \"{ex.GetType().Name}: {ex.Message}\"}}"); }
+            }
+            return;
+        }
         if (args.Length >= 2 && args[0] == "--scan-save")
         {
             foreach (var path in args.Skip(1))

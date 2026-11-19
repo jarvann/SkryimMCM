@@ -682,6 +682,37 @@ public class SaveTools : ToolBase
         return new { repaired = true, characterId = id, next = "Make a save from the game menu (Esc > Save): it carries the ID again, and SkyLink's co-save keeps it from now on." };
     }
 
+    [McpServerTool]
+    [Description("Check whether a save will survive the current load order, for collection or mod-list updates (FEAT-269). " +
+        "Compares the save's plugin list with the plugins loaded now (or, with the game closed, Plugins.txt): removed mods with " +
+        "how much of the save each one owns (changed forms, script instances, running threads, queued calls) and a risk for " +
+        "each, mods that changed between full and light (an ESP compacted to ESL renumbers its forms), added mods, and moved " +
+        "ones (the game re-maps by name, so moving alone is safe). Read-only. Changed scripts inside updated mods aren't " +
+        "compared yet. saveName: as ListSaves shows it.")]
+    public async Task<object> CompareSaveToLoadOrder(string saveName)
+    {
+        var path = ResolveSave(saveName);
+        if (path == null) return new { error = $"No save matching '{saveName}' in {SaveFolder()}. ListSaves shows them." };
+        List<MigrationReport.CurrentPlugin>? current = null;
+        string source = "the running game";
+        try
+        {
+            var lo = await _pipe.SendRequestAsync("get_load_order");
+            if (lo?["mods"] is JsonArray mods && mods.Count > 0)
+                current = mods.OfType<JsonObject>().Select(m => new MigrationReport.CurrentPlugin(m["name"]?.ToString() ?? "", m["type"]?.ToString() == "esl")).ToList();
+        }
+        catch (Exception) { }
+        if (current == null)
+        {
+            var txt = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skyrim Special Edition", "Plugins.txt");
+            if (!File.Exists(txt)) return new { error = "The game isn't running and Plugins.txt wasn't found: start the game, or run this from the main menu." };
+            current = MigrationReport.FromPluginsTxt(txt, SkyLinkSettings.SkyrimPath().Path);
+            source = txt + " (game closed: full or light not known, so type changes aren't checked)";
+        }
+        try { return MigrationReport.Build(await Task.Run(() => EssScanner.Scan(path)), current, source); }
+        catch (Exception ex) { return new { error = $"Couldn't read {Path.GetFileName(path)}: {ex.Message}" }; }
+    }
+
     static string Summarise(SaveScan s, List<string>? missing)
     {
         var parts = new List<string>();
