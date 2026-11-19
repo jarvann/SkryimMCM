@@ -113,7 +113,8 @@ public class PapyrusTools : ToolBase
         "entry point (the mod's event handler where each stack started): how many stacks, whether the count is growing, and the " +
         "plugins that own the objects it runs on. Each pile-up is classed: burst (one peak of 20+ that drains, e.g. after a load), " +
         "periodic (rises to 20+ again and again: usually a mod sweeping nearby NPCs) or runaway (stays high or keeps growing: " +
-        "a loop that never finishes). Samples during a loading screen are skipped, not fatal. Overstress and waiting function " +
+        "a loop that never finishes). It also remembers the last calls (30 minutes) and flags handlers creeping up call after call " +
+        "(a leak) or spiking again and again: call it a few times over several minutes to catch those. Samples during a loading screen are skipped, not fatal. Overstress and waiting function " +
         "messages are shown beside them. Plugins read 'defined in X, last changed by Y' " +
         "when another mod overrides the object (the overriding mod is often the cause). Read-only: nothing in the game changes. " +
         "Clearing stacks needs a save edit and reload (planned: CleanAndReload); until then the fix is the mod itself " +
@@ -196,6 +197,48 @@ public class PapyrusTools : ToolBase
             return new { entry = kv.Key, last, max, first, growing, kind, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
         }).OrderByDescending(r => r.runaway).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
 
+        // FEAT-268: a short history across calls (per game folder), so slow patterns show: a handler creeping up call after call
+        // (a leak: mihail_wendigo 2 -> 10 -> 12 -> 14 -> 24 -> 31) or spiking again and again over minutes (Exalted Enemies
+        // 132, 53, 54, 47). One call's window is only ~10-25 s.
+        var historyFile = Path.Combine(SkyLinkSettings.Folder, "stack_history.json");
+        JsonArray history;
+        try { history = File.Exists(historyFile) ? JsonNode.Parse(await File.ReadAllTextAsync(historyFile)) as JsonArray ?? new JsonArray() : new JsonArray(); }
+        catch (Exception) { history = new JsonArray(); }
+        // Only runs from the last 30 minutes count (a new session or a save load starts over).
+        var cutoff = DateTime.Now.AddMinutes(-30);
+        var recent = history.OfType<JsonObject>().Where(h => DateTime.TryParse(h["at"]?.ToString(), out var t) && t >= cutoff).ToList();
+        var thisRun = new JsonObject { ["at"] = DateTime.Now.ToString("s"), ["entries"] = new JsonObject() };
+        foreach (var r in perEntry)
+            if (r.Value.Max() >= 5) ((JsonObject)thisRun["entries"]!)[r.Key] = new JsonObject { ["peak"] = r.Value.Max(), ["last"] = r.Value.Last() };
+        var crossCall = new List<object>();
+        var crossSummary = new List<string>();
+        foreach (var name in perEntry.Keys)
+        {
+            var series = recent.Select(h => h["entries"]?[name]).Where(e => e != null)
+                .Select(e => (peak: e!["peak"]!.GetValue<int>(), last: e["last"]!.GetValue<int>())).ToList();
+            var cur = (peak: perEntry[name].Max(), last: perEntry[name].Last());
+            series.Add(cur);
+            if (series.Count < 3) continue;
+            var lasts = series.Select(x => x.last).ToList();
+            var risesInARow = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).All(x => x) && lasts.Last() - lasts.First() >= 5;
+            var spikes = series.Count(x => x.peak >= 20);
+            string? pattern = risesInARow ? "creeping up across calls (a leak: it registers again without finishing)"
+                : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+)"
+                : null;
+            if (pattern == null) continue;
+            var plugin = rows.FirstOrDefault(r => r.entry == name)?.plugin;
+            crossCall.Add(new { entry = name, plugin, pattern, lastCounts = lasts, peaks = series.Select(x => x.peak).ToList() });
+            crossSummary.Add($"{name}{(plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})")} is {pattern}: " +
+                             (risesInARow ? string.Join(" -> ", lasts) : "peaks " + string.Join(", ", series.Select(x => x.peak))) + ".");
+        }
+        recent.Add(thisRun);
+        try
+        {
+            Directory.CreateDirectory(SkyLinkSettings.Folder);
+            await File.WriteAllTextAsync(historyFile, new JsonArray(recent.TakeLast(20).Select(x => (JsonNode?)x.DeepClone()).ToArray()).ToJsonString());
+        }
+        catch (Exception) { }
+
         var runaways = rows.Where(r => r.runaway).ToList();
         static string Who(string? plugin) => plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})";
         var summary = runaways.Count == 0
@@ -206,9 +249,12 @@ public class PapyrusTools : ToolBase
                 "periodic" => $"{r.entry}{Who(r.plugin)} rises to {r.max} copies repeatedly and drains in between (periodic: a sweep over nearby objects?).",
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
             }));
+        if (crossSummary.Count > 0) summary += " Across recent calls: " + string.Join(" ", crossSummary);
         return new
         {
             summary,
+            acrossCalls = crossCall.Count > 0 ? crossCall : null,
+            historyCalls = recent.Count,
             runningStacks = new { first = running.First(), last = running.Last(), max = running.Max() },
             waitingFunctionMessages = new { last = waitingMessages.Last(), max = waitingMessages.Max() },
             overstressedSamples = $"{overstressed} of {samples}",
