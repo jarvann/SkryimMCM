@@ -17,6 +17,9 @@
 #   SKYLINK_WSL_DRIVE       Windows drive mapped to the WSL root (default W:, `net use W: \\wsl.localhost\Ubuntu-24.04`)
 #   SKYLINK_LOCAL_SRC       Windows mirror of the sources (default C:\src\skylink-hr)
 #   SKYLINK_BUILD_DIR       Windows build folder (default C:\build\skylink-hr)
+#   SKYLINK_PLUGINS_DIR     Windows SKSE\Plugins folder to deploy to (default: the Steam game's Data\SKSE\Plugins).
+#                           For the GOG test game in MO2: the mod's own folder, e.g.
+#                           C:\Users\cory\AppData\Local\ModOrganizer\Skyrim Special Edition\mods\SkyLinkAI\SKSE\Plugins
 #
 # Logs go to <worktree>/.build-logs/. The summary lines (errors, what was deployed) are printed at the end.
 # Messages that are normal: "Host DLL changed but is in use" (only its build timestamp changed, unless
@@ -44,6 +47,8 @@ WORKTREE=${SKYLINK_BUILD_WORKTREE:-$REPO-build}
 DRIVE=${SKYLINK_WSL_DRIVE:-W:}
 LOCAL_SRC=${SKYLINK_LOCAL_SRC:-'C:\src\skylink-hr'}
 BUILD_DIR=${SKYLINK_BUILD_DIR:-'C:\build\skylink-hr'}
+PLUGINS_ARG=""
+[ -n "$SKYLINK_PLUGINS_DIR" ] && PLUGINS_ARG="-SkyrimPlugins '$SKYLINK_PLUGINS_DIR'"
 
 if [ ! -d "$WORKTREE" ]; then
     echo "Creating build worktree $WORKTREE"
@@ -70,7 +75,7 @@ git -C "$WORKTREE" log --oneline -1 > "$LOG"
 WIN_WORKTREE="$DRIVE${WORKTREE//\//\\}"
 cd /mnt/c || exit 1
 timeout 1500 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-    "Set-Location '$WIN_WORKTREE'; .\\build_plugin.ps1 $MODE $CONFIGURE -LocalSrc '$LOCAL_SRC' -BuildDir '$BUILD_DIR'" >> "$LOG" 2>&1
+    "Set-Location '$WIN_WORKTREE'; .\\build_plugin.ps1 $MODE $CONFIGURE -LocalSrc '$LOCAL_SRC' -BuildDir '$BUILD_DIR' $PLUGINS_ARG" >> "$LOG" 2>&1
 STATUS=$?
 echo "exit $STATUS" >> "$LOG"
 
