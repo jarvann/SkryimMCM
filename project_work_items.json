@@ -2462,13 +2462,17 @@
         {
           "id": "BUG-023",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Unknown tool parameter returns an error with no message",
           "description": "Calling a tool with a parameter it doesn't have returns an error without any text (seen 2026-11-16 by the in-game agent). Should name the unknown parameter and list the valid ones.",
           "history": [
             {
               "datetime": "2026-11-16T19:00",
               "note": "Reported from the build 16 retest session."
+            },
+            {
+              "datetime": "2026-11-20T05:30",
+              "note": "Built: a tool-call filter (SDK AddCallToolFilter) checks argument names against each tool's parameters (snake_case tool names, as the SDK publishes them) and returns 'list_saves has no parameter 'Limit' (did you mean 'limit'?), 'folderz'. Its parameters: filter, limit, scan.'; an exception with an empty message gets one. Verified over stdio against the built server."
             }
           ],
           "targetRelease": "1.4"
