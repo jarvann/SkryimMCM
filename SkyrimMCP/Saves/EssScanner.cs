@@ -45,10 +45,11 @@ public static class EssScanner
         return h;
     }
 
-    public static SaveScan Scan(string path, bool questStages = false)
+    public static SaveScan Scan(string path, bool questStages = false, bool scriptMembers = false)
     {
         var file = File.ReadAllBytes(path);
         var scan = new SaveScan { File = Path.GetFileName(path), FileSizeMB = Math.Round(file.Length / 1048576.0, 1) };
+        if (scriptMembers) scan.ScriptMembers = new(StringComparer.OrdinalIgnoreCase);
         var r = new Buf(file, 0, file.Length);
         scan.Header = ReadHeader(r);
         r.Skip(4 * scan.Header.ShotWidth * scan.Header.ShotHeight);
@@ -372,6 +373,10 @@ public sealed class SaveScan
     public List<ModCount> QueuedByPlugin { get; set; } = [];
     public List<ModCount> ThreadsByPlugin { get; set; } = [];
     public List<ModCount> FunctionMessagesByPlugin { get; set; } = [];
+
+    // FEAT-269: each script's own variables as the save recorded them (name, type), and instances per script, when asked for.
+    public Dictionary<string, List<string[]>>? ScriptMembers { get; set; }
+    public Dictionary<string, int> InstancesByScript { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     // FEAT-269: per plugin, change forms and script instances attached to its forms.
     public Dictionary<string, int> ChangeFormsByPlugin { get; set; } = new(StringComparer.OrdinalIgnoreCase);

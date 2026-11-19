@@ -67,7 +67,9 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             var parent = Str();
             _scriptParent[name] = parent;
             var members = b.I32();
-            for (var m = 0; m < members; m++) { Str(); Str(); }
+            List<string[]>? list = scan.ScriptMembers != null ? new List<string[]>(members) : null;
+            for (var m = 0; m < members; m++) { var mn = Str(); var mt = Str(); list?.Add([mn, mt]); }
+            if (list != null) scan.ScriptMembers![name] = list;
         }
         scan.Scripts = n;
 
@@ -352,6 +354,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             if (IsUndefinedScript(script)) undefinedBy[script] = undefinedBy.GetValueOrDefault(script) + 1;
             if (refId == 0) unattachedBy[script] = unattachedBy.GetValueOrDefault(script) + 1;
         }
+        foreach (var (script, _) in _instances.Values) scan.InstancesByScript[script] = scan.InstancesByScript.GetValueOrDefault(script) + 1;
         foreach (var (_, refId) in _instances.Values)
         {
             var owner = PluginOfRef(refId) ?? (refId == 0 ? "(unattached)" : "(unresolved)");

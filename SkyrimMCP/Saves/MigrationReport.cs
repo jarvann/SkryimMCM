@@ -25,7 +25,57 @@ public static class MigrationReport
         return list.GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
     }
 
-    public static object Build(SaveScan scan, List<CurrentPlugin> current, string currentSource)
+    /// <summary>The BSA owners in load order, for ScriptFiles.Build (later archives win).</summary>
+    public static List<string> ArchiveOrder(List<CurrentPlugin> current) => current.Select(p => Path.GetFileNameWithoutExtension(p.Name)).ToList();
+
+    /// <summary>
+    /// Scripts whose installed version has different variables than the save recorded: removed (their saved values are dropped),
+    /// retyped (the riskiest) or added (start at their defaults: usually harmless). Only scripts with instances in the save.
+    /// </summary>
+    public static object CompareScripts(SaveScan scan, ScriptFiles.Index index)
+    {
+        var changed = new List<(string script, int instances, List<string> removed, List<string> retyped, List<string> added)>();
+        var missing = new List<(string script, int instances)>();
+        var compared = 0;
+        foreach (var (script, members) in scan.ScriptMembers ?? [])
+        {
+            var instances = scan.InstancesByScript.GetValueOrDefault(script);
+            if (instances == 0) continue;
+            List<ScriptFiles.Variable>? vars;
+            try { vars = ScriptFiles.ReadVariables(index, script); } catch (Exception ex) when (ex is IOException or InvalidDataException) { vars = null; }
+            if (vars == null) { missing.Add((script, instances)); continue; }
+            compared++;
+            var saved = members.GroupBy(m => m[0], StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First()[1], StringComparer.OrdinalIgnoreCase);
+            var now = vars.GroupBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Type, StringComparer.OrdinalIgnoreCase);
+            var removed = saved.Keys.Where(k => !now.ContainsKey(k)).ToList();
+            var added = now.Keys.Where(k => !saved.ContainsKey(k)).ToList();
+            var retyped = saved.Where(kv => now.TryGetValue(kv.Key, out var t) && !t.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))
+                .Select(kv => $"{kv.Key}: {kv.Value} -> {now[kv.Key]}").ToList();
+            if (removed.Count + added.Count + retyped.Count > 0) changed.Add((script, instances, removed, retyped, added));
+        }
+        static string Clean(string v) => v.StartsWith("::") && v.EndsWith("_var") ? v[2..^4] : v;   // a property's hidden variable
+        var risky = changed.Where(c => c.removed.Count + c.retyped.Count > 0).OrderByDescending(c => c.retyped.Count).ThenByDescending(c => c.instances).ToList();
+        var onlyAdded = changed.Where(c => c.removed.Count + c.retyped.Count == 0).ToList();
+        return new
+        {
+            compared,
+            changedRisky = risky.Count,
+            changedOnlyAdded = onlyAdded.Count,
+            scriptFileMissing = missing.Count,
+            changed = risky.Take(40).Select(c => new
+            {
+                c.script, c.instances,
+                removed = c.removed.Select(Clean).Take(10), retyped = c.retyped.Take(10).Select(Clean), added = c.added.Select(Clean).Take(10),
+            }),
+            onlyAddedExamples = onlyAdded.OrderByDescending(c => c.instances).Take(10).Select(c => c.script),
+            missingExamples = missing.OrderByDescending(m => m.instances).Take(15).Select(m => $"{m.script} ({m.instances})"),
+            note = "Retyped variables are the riskiest (the saved value no longer fits); removed ones lose their saved value, which " +
+                   "breaks a mod that relied on it; added ones start at their defaults, usually fine. Scripts with no file are " +
+                   "leftovers of removed mods (CleanSave levels='safe' after loading). Scripts from MO2 mod folders aren't searched.",
+        };
+    }
+
+    public static object Build(SaveScan scan, List<CurrentPlugin> current, string currentSource, object? scripts = null)
     {
         var now = current.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
         var savedFull = scan.Plugins.Select((n, i) => (n, i, light: false));
@@ -119,7 +169,10 @@ public static class MigrationReport
             added = added.Take(100),
             addedNote = added.Count > 0 ? "New mods start fresh on load; scripted ones run their setup then. Usually fine; a few want a new game (their pages say so)." : null,
             movedNote = moved > 0 ? $"{moved} plugins load in a different order relative to the others: the game re-maps by name, so that alone is safe, but overrides now win differently (another mod's version of a record may apply)." : null,
-            notChecked = "Script changes in updated mods (variables renamed or removed) and other mods' own saved data aren't compared yet.",
+            scripts,
+            notChecked = scripts == null
+                ? "Script changes in updated mods weren't compared (scripts: true compares them, 10-60 s). Other mods' own saved data (SKSE co-save) isn't compared."
+                : "Other mods' own saved data (SKSE co-save) isn't compared.",
         };
     }
 }

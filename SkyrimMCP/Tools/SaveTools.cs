@@ -687,9 +687,10 @@ public class SaveTools : ToolBase
         "Compares the save's plugin list with the plugins loaded now (or, with the game closed, Plugins.txt): removed mods with " +
         "how much of the save each one owns (changed forms, script instances, running threads, queued calls) and a risk for " +
         "each, mods that changed between full and light (an ESP compacted to ESL renumbers its forms), added mods, and moved " +
-        "ones (the game re-maps by name, so moving alone is safe). Read-only. Changed scripts inside updated mods aren't " +
-        "compared yet. saveName: as ListSaves shows it.")]
-    public async Task<object> CompareSaveToLoadOrder(string saveName)
+        "ones (the game re-maps by name, so moving alone is safe). scripts: true also compares each script's variables in the " +
+        "save with the installed script files (loose and in BSAs; slower): removed or retyped variables are what breaks a " +
+        "save after a mod update. Read-only. saveName: as ListSaves shows it.")]
+    public async Task<object> CompareSaveToLoadOrder(string saveName, bool scripts = false)
     {
         var path = ResolveSave(saveName);
         if (path == null) return new { error = $"No save matching '{saveName}' in {SaveFolder()}. ListSaves shows them." };
@@ -709,7 +710,17 @@ public class SaveTools : ToolBase
             current = MigrationReport.FromPluginsTxt(txt, SkyLinkSettings.SkyrimPath().Path);
             source = txt + " (game closed: full or light not known, so type changes aren't checked)";
         }
-        try { return MigrationReport.Build(await Task.Run(() => EssScanner.Scan(path)), current, source); }
+        try
+        {
+            return await Task.Run(() =>
+            {
+                var scan = EssScanner.Scan(path, scriptMembers: scripts);
+                object? scriptReport = null;
+                if (scripts && SkyLinkSettings.DataPath() is string data)
+                    scriptReport = MigrationReport.CompareScripts(scan, ScriptFiles.Build(data, MigrationReport.ArchiveOrder(current)));
+                return MigrationReport.Build(scan, current, source, scriptReport);
+            });
+        }
         catch (Exception ex) { return new { error = $"Couldn't read {Path.GetFileName(path)}: {ex.Message}" }; }
     }
 

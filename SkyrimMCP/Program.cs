@@ -16,11 +16,17 @@ class Program
         if (args.Length >= 4 && args[0] == "--migrate")
         {
             var current = Saves.MigrationReport.FromPluginsTxt(args[1], args[2]);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var index = Saves.ScriptFiles.Build(Path.Combine(args[2], "Data"), Saves.MigrationReport.ArchiveOrder(current));
+            Console.Error.WriteLine($"script index: {index.Loose.Count} loose, {index.Archived.Count} in {index.Archives} archives, {index.Errors.Count} errors, {sw.ElapsedMilliseconds} ms");
             foreach (var path in args.Skip(3))
             {
                 try
                 {
-                    var report = Saves.MigrationReport.Build(Saves.EssScanner.Scan(path), current, args[1]);
+                    sw.Restart();
+                    var scan = Saves.EssScanner.Scan(path, scriptMembers: true);
+                    var report = Saves.MigrationReport.Build(scan, current, args[1], Saves.MigrationReport.CompareScripts(scan, index));
+                    Console.Error.WriteLine($"{Path.GetFileName(path)}: {sw.ElapsedMilliseconds} ms");
                     Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 }
                 catch (Exception ex) { Console.WriteLine($"{{\"file\": \"{Path.GetFileName(path)}\", \"error\": \"{ex.GetType().Name}: {ex.Message}\"}}"); }
