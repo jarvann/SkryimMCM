@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <format>
 #include <set>
 #include <string>
@@ -190,6 +191,84 @@ namespace SkyrimMCP::BlueprintManager {
             report["gold"] = {{"before", current}, {"target", target}, {"change", change}};
         }
 
+        // FEAT-121: skills, level, perks, spells and shouts. Only ever raises or adds: nothing is lowered or removed unless
+        // lowerSkills is set (skills only). Spells come before equipment so a spell in her hands can be equipped.
+        if (sections.contains("skills")) {
+            static const std::pair<const char*, RE::ActorValue> kSkills[] = {
+                {"oneHanded", RE::ActorValue::kOneHanded}, {"twoHanded", RE::ActorValue::kTwoHanded}, {"archery", RE::ActorValue::kArchery},
+                {"block", RE::ActorValue::kBlock}, {"smithing", RE::ActorValue::kSmithing}, {"heavyArmor", RE::ActorValue::kHeavyArmor},
+                {"lightArmor", RE::ActorValue::kLightArmor}, {"pickpocket", RE::ActorValue::kPickpocket}, {"lockpicking", RE::ActorValue::kLockpicking},
+                {"sneak", RE::ActorValue::kSneak}, {"alchemy", RE::ActorValue::kAlchemy}, {"speech", RE::ActorValue::kSpeech},
+                {"alteration", RE::ActorValue::kAlteration}, {"conjuration", RE::ActorValue::kConjuration}, {"destruction", RE::ActorValue::kDestruction},
+                {"illusion", RE::ActorValue::kIllusion}, {"restoration", RE::ActorValue::kRestoration}, {"enchanting", RE::ActorValue::kEnchanting},
+            };
+            const bool lower = params.value("lowerSkills", false);
+            auto* avo = player->AsActorValueOwner();
+            json changed = json::array(), same = json::array();
+            for (const auto& entry : params.value("skills", json::array())) {
+                if (!entry.is_object()) continue;
+                const auto name = entry.value("name", "");
+                const float target = entry.value("baseLevel", entry.value("level", 0.0f));
+                const auto it = std::find_if(std::begin(kSkills), std::end(kSkills), [&](const auto& k) { return name == k.first; });
+                if (it == std::end(kSkills) || !avo || target <= 0) continue;
+                const float now = avo->GetBaseActorValue(it->second);
+                if (std::abs(target - now) < 0.5f || (target < now && !lower)) { same.push_back(name); continue; }
+                if (!dryRun) avo->SetBaseActorValue(it->second, target);
+                changed.push_back({{"skill", name}, {"from", now}, {"to", target}});
+            }
+            report["skills"] = {{"changed", changed}, {"unchanged", same.size()},
+                                {"note", lower ? "Skills set to the blueprint's base levels." : "Only skills below the blueprint's were raised (lowerSkills=true also lowers)."}};
+        }
+
+        if (sections.contains("level") && params.contains("level")) {
+            const int target = params.value("level", 0);
+            auto* base = player->GetActorBase();
+            const int now = player->GetLevel();
+            if (base && target > now) {
+                if (!dryRun) base->actorData.level = static_cast<std::uint16_t>(target);
+                report["level"] = {{"from", now}, {"to", target}, {"note", "Perk points and the level-up health, magicka and stamina choices aren't given: set those with the player."}};
+            } else {
+                report["level"] = {{"from", now}, {"to", now}, {"note", "Already at or above the blueprint's level; levels are never lowered."}};
+            }
+        }
+
+        auto addForms = [&](const char* key, const char* section, auto has, auto add) {
+            json added = json::array(), already = json::array(), unresolved = json::array();
+            for (const auto& entry : params.value(key, json::array())) {
+                if (!entry.is_object()) continue;
+                std::string how;
+                auto* form = Resolve(entry, how);
+                if (!form) { auto l = Label(entry); l["reason"] = how; unresolved.push_back(l); continue; }
+                if (has(form)) { already.push_back(entry.value("name", "")); continue; }
+                if (!dryRun && !add(form)) { auto l = Label(entry); l["reason"] = "the game refused it"; unresolved.push_back(l); continue; }
+                added.push_back(entry.value("name", ""));
+            }
+            report[section] = {{"added", added}, {"alreadyKnown", already.size()}, {"unresolved", unresolved}};
+        };
+
+        if (sections.contains("perks")) {
+            addForms("perks", "perks",
+                [&](RE::TESForm* f) { auto* perk = f->As<RE::BGSPerk>(); return !perk || player->HasPerk(perk); },
+                [&](RE::TESForm* f) { player->AddPerk(f->As<RE::BGSPerk>()); return true; });
+        }
+        if (sections.contains("spells")) {
+            addForms("spells", "spells",
+                [&](RE::TESForm* f) { auto* spell = f->As<RE::SpellItem>(); return !spell || player->HasSpell(spell); },
+                [&](RE::TESForm* f) { return player->AddSpell(f->As<RE::SpellItem>()); });
+        }
+        if (sections.contains("shouts")) {
+            // The shout itself; its words are taught and unlocked by the server through Papyrus (Game.TeachWord/UnlockWord).
+            addForms("shouts", "shouts",
+                [&](RE::TESForm* f) {
+                    auto* shout = f->As<RE::TESShout>();
+                    if (!shout) return true;
+                    auto* list = player->GetActorBase() ? player->GetActorBase()->GetSpellList() : nullptr;
+                    if (list) for (std::uint32_t i = 0; i < list->numShouts; ++i) if (list->shouts[i] == shout) return true;
+                    return false;
+                },
+                [&](RE::TESForm* f) { return player->AddShout(f->As<RE::TESShout>()); });
+        }
+
         if (sections.contains("equipment")) {
             json toEquip = json::array(), unresolved = json::array(), planned = json::array(), alreadyEquipped = json::array();
             json spellsSkipped = json::array();
@@ -239,7 +318,7 @@ namespace SkyrimMCP::BlueprintManager {
             report["equipment"] = equipReport;
         }
 
-        if (sections.contains("inventory") || sections.contains("equipment") || sections.contains("gold")) {
+        if (!sections.empty()) {
             report["note"] = dryRun ? std::string("Nothing was changed. Call again with dryRun=false to apply.") +
                                           (sections.contains("equipment") ? " Items marked added would be added to equip them." : "")
                                     : "Only missing items were added (and one of each item to be equipped); nothing was removed or unequipped.";

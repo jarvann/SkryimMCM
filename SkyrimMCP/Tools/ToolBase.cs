@@ -23,6 +23,29 @@ public abstract class ToolBase
     /// "actor" (moving someone else): that actor not in an animation scene. Returns the reason it can't run, or null.
     /// Reads (inventory, quests, morphs...) have no gate.
     /// </summary>
+    /// <summary>
+    /// Maps a blueprint entry's plugin + local ID (formIdSource) to this game's form ID through the load order; falls back to the
+    /// raw formId. Null when the plugin isn't loaded.
+    /// </summary>
+    protected async Task<Func<JsonObject, string?>> PortableResolver()
+    {
+        JsonNode? lo = null;
+        try { lo = await _pipe.SendRequestAsync("get_load_order"); } catch (Exception) { }
+        var mods = (lo?["mods"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .GroupBy(m => m["name"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First()["prefix"]?.ToString(), StringComparer.OrdinalIgnoreCase);
+        return entry =>
+        {
+            if (entry["formIdSource"] is JsonObject src && src["plugin"]?.ToString() is string plugin && src["localId"]?.ToString() is string local)
+            {
+                if (!mods.TryGetValue(plugin, out var prefix) || prefix == null) return null;
+                var id = Convert.ToUInt32(local, 16);
+                return prefix.Length == 5 ? $"{prefix}{id & 0xFFF:X3}" : $"{prefix}{id & 0xFFFFFF:X6}";
+            }
+            return entry["formId"]?.ToString();
+        };
+    }
+
     protected async Task<string?> SafetyBlock(string kind, string? actorRef = null)
     {
         var reasons = new List<string>();
