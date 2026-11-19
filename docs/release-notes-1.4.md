@@ -17,7 +17,9 @@ carry a character's skills, perks, spells, shouts and quest progress to another 
   of removed mods (safe), unattached instances (caution), and named pile-ups or a whole mod's. CleanAndReload saves, cleans,
   loads the copy and checks whether the pile-up returns; if the mod causing it is still running it says so.
 - **CompareSaveToLoadOrder.** For collection updates: which of a save's plugins are gone, renamed (to the game, a removal),
-  changed between full and light, added or reordered, and how much of the save each removed one owns.
+  changed between full and light, added or reordered, and how much of the save each removed one owns. With `scripts: true`
+  it also compares every script's variables in the save with the installed script files (loose and in BSAs): removed or
+  retyped variables are what breaks a save after a mod update.
 - **ArchiveSaves** moves test and way-back saves to `Saves\SkyLink_Archive`; nothing is deleted.
 - The AI offers these when the player says the game is slow or the FPS drop, talks through the mods involved (and, for mod
   authors, ties findings to their own work), and explains the risks before any clean.

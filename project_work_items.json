@@ -1410,6 +1410,10 @@
             {
               "datetime": "2026-11-20T04:00",
               "note": "Built: CompareSaveToLoadOrder (live load order, or Plugins.txt with the game closed); removed plugins with footprint (change forms, script instances, threads, queued calls) and a risk; full<->light type changes; probable renames (a rename is a removal to the game); added; reordering counted as plugins out of order within each type. Offline pilot (`--migrate`): Save118 vs now 0/0; Arya's July saves vs now 2,079 removed (1,278 with no footprint, ~135 high: Nature of the Wild Lands, Extended Encounters, Dawn of Skyrim), 2,150 added, 3 probable renames. Not yet: script changes inside updated mods (needs a .pex/BSA reader)."
+            },
+            {
+              "datetime": "2026-11-20T05:00",
+              "note": "Script changes now compared: SkyrimMCP/Saves/ScriptFiles.cs indexes loose Data\\\\Scripts and every BSA's scripts folder (27,578 loose + 58,216 archived in 757 BSAs, 0.3 s; LZ4 frame or block, zlib for v104) and reads each .pex's own variables; the save's recorded variable lists are compared for scripts with instances: removed, retyped (Int/Float/Bool/String/arrays; saved type None ignored, object-to-object counted apart), added; scripts with no file. A baseline save made with the current mods removes noise (24 scripts differed even in a current save). Pilot: a current save 0 changes; Arya's July save 289 risky (e.g. bwcLightDamageSCRIPT inTrigger Bool -> Int; mineorefurniturescript lost PlayerREF on 2,971 instances), 279 only-added, 2,194 no longer installed. ~3 s a save. MO2 mod folders not searched yet."
             }
           ],
           "targetRelease": "1.4"

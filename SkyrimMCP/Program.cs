@@ -12,20 +12,22 @@ class Program
     {
         // FEAT-265: `dotnet SkyrimMCP.dll --scan-save <file.ess> [...]` prints the native save scan as JSON and exits (used to
         // check the scanner against ReSaver on real saves without the game).
-        // FEAT-269: `--migrate <Plugins.txt> <game folder> <file.ess> [...]`: each save against that load order.
-        if (args.Length >= 4 && args[0] == "--migrate")
+        // FEAT-269: `--migrate <Plugins.txt> <game folder> <baseline.ess|-> <file.ess> [...]`: each save against that load order;
+        // the baseline is a save made with it (its script differences are treated as noise).
+        if (args.Length >= 5 && args[0] == "--migrate")
         {
             var current = Saves.MigrationReport.FromPluginsTxt(args[1], args[2]);
+            var baseline = args[3] == "-" ? null : Saves.EssScanner.Scan(args[3], scriptMembers: true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var index = Saves.ScriptFiles.Build(Path.Combine(args[2], "Data"), Saves.MigrationReport.ArchiveOrder(current));
             Console.Error.WriteLine($"script index: {index.Loose.Count} loose, {index.Archived.Count} in {index.Archives} archives, {index.Errors.Count} errors, {sw.ElapsedMilliseconds} ms");
-            foreach (var path in args.Skip(3))
+            foreach (var path in args.Skip(4))
             {
                 try
                 {
                     sw.Restart();
                     var scan = Saves.EssScanner.Scan(path, scriptMembers: true);
-                    var report = Saves.MigrationReport.Build(scan, current, args[1], Saves.MigrationReport.CompareScripts(scan, index));
+                    var report = Saves.MigrationReport.Build(scan, current, args[1], Saves.MigrationReport.CompareScripts(scan, index, baseline));
                     Console.Error.WriteLine($"{Path.GetFileName(path)}: {sw.ElapsedMilliseconds} ms");
                     Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 }

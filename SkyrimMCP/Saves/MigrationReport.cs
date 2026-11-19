@@ -32,15 +32,30 @@ public static class MigrationReport
     /// Scripts whose installed version has different variables than the save recorded: removed (their saved values are dropped),
     /// retyped (the riskiest) or added (start at their defaults: usually harmless). Only scripts with instances in the save.
     /// </summary>
-    public static object CompareScripts(SaveScan scan, ScriptFiles.Index index)
+    public static object CompareScripts(SaveScan scan, ScriptFiles.Index index, SaveScan? baseline = null)
     {
+        // A save made with the current mods should match its scripts; whatever still differs there is noise (file resolution,
+        // scripts patched without the save refreshing its record): drop those scripts from the old save's list.
+        var noise = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (baseline?.ScriptMembers != null)
+            foreach (var (script, members) in baseline.ScriptMembers)
+            {
+                if (baseline.InstancesByScript.GetValueOrDefault(script) == 0) continue;
+                List<ScriptFiles.Variable>? v;
+                try { v = ScriptFiles.ReadVariables(index, script); } catch (Exception ex) when (ex is IOException or InvalidDataException) { v = null; }
+                if (v == null) continue;
+                var a = new HashSet<string>(members.Select(m => m[0] + ":" + m[1]), StringComparer.OrdinalIgnoreCase);
+                var b = new HashSet<string>(v.Select(x => x.Name + ":" + x.Type), StringComparer.OrdinalIgnoreCase);
+                if (!a.SetEquals(b)) noise.Add(script);
+            }
         var changed = new List<(string script, int instances, List<string> removed, List<string> retyped, List<string> added)>();
         var missing = new List<(string script, int instances)>();
         var compared = 0;
+        var objectTypeChanges = 0;
         foreach (var (script, members) in scan.ScriptMembers ?? [])
         {
             var instances = scan.InstancesByScript.GetValueOrDefault(script);
-            if (instances == 0) continue;
+            if (instances == 0 || noise.Contains(script)) continue;
             List<ScriptFiles.Variable>? vars;
             try { vars = ScriptFiles.ReadVariables(index, script); } catch (Exception ex) when (ex is IOException or InvalidDataException) { vars = null; }
             if (vars == null) { missing.Add((script, instances)); continue; }
@@ -49,8 +64,19 @@ public static class MigrationReport
             var now = vars.GroupBy(v => v.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Type, StringComparer.OrdinalIgnoreCase);
             var removed = saved.Keys.Where(k => !now.ContainsKey(k)).ToList();
             var added = now.Keys.Where(k => !saved.ContainsKey(k)).ToList();
-            var retyped = saved.Where(kv => now.TryGetValue(kv.Key, out var t) && !t.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))
-                .Select(kv => $"{kv.Key}: {kv.Value} -> {now[kv.Key]}").ToList();
+            // A saved type of None means the save couldn't resolve it then (its script wasn't loaded): not a change. One object
+            // type to another (ObjectReference -> Actor) usually keeps the value: noted, not counted as risky. Changes involving
+            // Int/Float/Bool/String or arrays drop or misread the value.
+            static bool Plain(string t) => t.EndsWith("[]") || t is "int" or "float" or "bool" or "string" ||
+                                           t.Equals("Int", StringComparison.OrdinalIgnoreCase) || t.Equals("Float", StringComparison.OrdinalIgnoreCase) ||
+                                           t.Equals("Bool", StringComparison.OrdinalIgnoreCase) || t.Equals("String", StringComparison.OrdinalIgnoreCase);
+            var retyped = new List<string>();
+            foreach (var (k, was) in saved)
+            {
+                if (!now.TryGetValue(k, out var t) || t.Equals(was, StringComparison.OrdinalIgnoreCase) || was.Equals("None", StringComparison.OrdinalIgnoreCase)) continue;
+                if (Plain(was) || Plain(t)) retyped.Add($"{k}: {was} -> {t}");
+                else objectTypeChanges++;
+            }
             if (removed.Count + added.Count + retyped.Count > 0) changed.Add((script, instances, removed, retyped, added));
         }
         static string Clean(string v) => v.StartsWith("::") && v.EndsWith("_var") ? v[2..^4] : v;   // a property's hidden variable
@@ -59,8 +85,11 @@ public static class MigrationReport
         return new
         {
             compared,
+            baseline = baseline?.File,
+            ignoredAsNoise = noise.Count,
             changedRisky = risky.Count,
             changedOnlyAdded = onlyAdded.Count,
+            objectTypeChanges,
             scriptFileMissing = missing.Count,
             changed = risky.Take(40).Select(c => new
             {
