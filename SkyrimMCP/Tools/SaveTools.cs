@@ -147,10 +147,14 @@ public class SaveTools : ToolBase
                 suspendedThreads = scan.SuspendedThreads,
                 terminatedThreads = scan.TerminatedThreads,
                 queuedCalls = scan.SuspendedStacks1 + scan.SuspendedStacks2,
-                queuedByFunction = scan.QueuedCalls,
-                threadsByEntryPoint = scan.ThreadsByEntryPoint,
+                queuedByFunction = scan.QueuedCalls.Take(20),
+                queuedByMod = scan.QueuedByPlugin,
+                threadsByEntryPoint = scan.ThreadsByEntryPoint.Take(20),
+                threadsByMod = scan.ThreadsByPlugin,
                 threadsByTopFrame = scan.ThreadsByTopFrame,
                 functionMessages = scan.FunctionMessages,
+                functionMessagesByFunction = scan.FunctionMessageCalls,
+                functionMessagesByMod = scan.FunctionMessagesByPlugin,
             },
             leftovers = new
             {
@@ -224,10 +228,26 @@ public class SaveTools : ToolBase
                             couldBreak = "a mod that still expects them may stop working until it sets itself up again" });
             args.Add("--unattached");
         }
-        foreach (var name in (stacks ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        // A plugin name (Mod.esp) stands for every handler of that mod with queued calls or threads in the save.
+        var names = new List<string>();
+        foreach (var n in (stacks ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Regex.IsMatch(n, @"\.(esp|esm|esl)$", RegexOptions.IgnoreCase))
+            {
+                var all = scan.QueuedCalls.Concat(scan.ThreadsByEntryPoint).Where(x => string.Equals(x.Plugin, n, StringComparison.OrdinalIgnoreCase))
+                    .Select(x => x.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (all.Count == 0) return new CleanPlan(args, items, warnings, $"No queued calls or threads from {n} in this save.");
+                names.AddRange(all);
+            }
+            else names.Add(n);
+        }
+        foreach (var name in names.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var queued = scan.QueuedCalls.FirstOrDefault(q => q.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             var running = scan.ThreadsByEntryPoint.FirstOrDefault(q => q.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (queued == null && running == null && scan.FunctionMessageCalls.Any(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                return new CleanPlan(args, items, warnings,
+                    $"'{name}' is only in the pending function calls, which ReSaver can't remove. The fix is the mod (update, settings, regenerate its output); cleaning won't help.");
             if (queued == null && running == null)
                 return new CleanPlan(args, items, warnings,
                     $"No stacks of '{name}' in this save. Its queued calls and threads are named like: " +
@@ -273,7 +293,8 @@ public class SaveTools : ToolBase
     [Description("Clean a COPY of a save (written as <save>_cleaned; the original is never changed and stays the way back). " +
         "levels: 'safe' (default) = script data of scripts whose files are gone, from removed mods; 'caution' adds unattached " +
         "instances. stacks: comma-separated pile-ups to remove, named exactly as CheckSave lists them (Script.Function, e.g. " +
-        "AniyaFollower_FollowerOnHit.OnMagicEffectApply): their queued calls and running threads are deleted. dryRun (default " +
+        "AniyaFollower_FollowerOnHit.OnMagicEffectApply), or a mod's plugin name (Mod.esp) for all of its handlers: their " +
+        "queued calls and running threads are deleted. dryRun (default " +
         "true) only lists what would go and what could break. Editing a save is risky: tell the player what could break and get " +
         "their agreement first. Needs ReSaver (FallrimTools) installed; set its folder with SetSkyLinkSetting('resaverPath') if " +
         "it isn't found. CleanAndReload does save, clean and load in one go.")]
@@ -371,12 +392,16 @@ public class SaveTools : ToolBase
     {
         var parts = new List<string>();
         var queued = s.SuspendedStacks1 + s.SuspendedStacks2;
-        if (s.QueuedCalls.FirstOrDefault() is { Count: >= 100 } q)
-            parts.Add($"{queued} queued script calls are stored in this save; {q.Count} of them are {q.Name}{(q.Plugin != null ? $" ({q.Plugin})" : "")}. " +
+        static string Mod(NameCount p) => p.Name.StartsWith("(") ? $"an unidentified mod ({p.Plugin})" : $"{p.Name} ({p.Plugin})";
+        if (s.QueuedByPlugin.FirstOrDefault() is { Count: >= 100 } qp)
+            parts.Add($"{queued} queued script calls are stored in this save; {qp.Count} of them come from {Mod(qp)}. " +
                       "A queue this size eats script time every frame and is a likely cause of low FPS.");
         else if (queued >= 500) parts.Add($"{queued} queued script calls are stored in this save (a lot).");
-        if (s.ThreadsByEntryPoint.FirstOrDefault() is { Count: >= 50 } t)
-            parts.Add($"{s.ActiveScripts} script threads are running in the save; {t.Count} started in {t.Name}{(t.Plugin != null ? $" ({t.Plugin})" : "")}.");
+        if (s.FunctionMessagesByPlugin.FirstOrDefault() is { Count: >= 100 } fp)
+            parts.Add($"{s.FunctionMessages} script calls are waiting to start; {fp.Count} from {Mod(fp)}. " +
+                      "These can't be removed by cleaning (ReSaver can't delete pending calls): the fix is the mod itself (update, settings, or regenerate its output).");
+        if (s.ThreadsByPlugin.FirstOrDefault() is { Count: >= 50 } tp)
+            parts.Add($"{s.ActiveScripts} script threads are in the save; {tp.Count} started in {Mod(tp)}.");
         if (s.UndefinedScripts.Count > 0)
             parts.Add($"{s.UndefinedScripts.Count} scripts in the save have no script file (leftovers of removed or changed mods), with {s.UndefinedInstances} instances" +
                       (s.UndefinedThreads > 0 ? $" and {s.UndefinedThreads} running threads" : "") + ".");

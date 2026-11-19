@@ -313,4 +313,9 @@ public sealed class SaveScan
     public List<NameCount> ThreadsByTopFrame { get; set; } = [];
     public List<NameCount> QueuedCalls { get; set; } = [];
     public List<NameCount> FunctionMessageCalls { get; set; } = [];
+
+    // Totals per plugin (Name = plugin, Plugin field = how many handlers and the biggest one).
+    public List<NameCount> QueuedByPlugin { get; set; } = [];
+    public List<NameCount> ThreadsByPlugin { get; set; } = [];
+    public List<NameCount> FunctionMessagesByPlugin { get; set; } = [];
 }

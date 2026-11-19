@@ -16,6 +16,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
     readonly Dictionary<string, int> _queued = new();
     readonly Dictionary<string, string?> _queuedPlugin = new();
     readonly Dictionary<string, int> _messages = new();
+    readonly Dictionary<string, string?> _messagePlugin = new();
     readonly HashSet<int> _suspendedIds = [];
 
     sealed class Thread
@@ -129,7 +130,7 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
         {
             var flag = b.S8();
             if (flag <= 2) b.I32();
-            if (b.U8() != 0) Count(_messages, null, ReadMessageData());
+            if (b.U8() != 0) Count(_messages, _messagePlugin, ReadMessageData());
         }
         scan.FunctionMessages = fm;
 
@@ -370,10 +371,29 @@ internal sealed class PapyrusReader(EssScanner.Buf b, SaveScan scan, List<string
             }
             if (t.Top != null) byTop[t.Top] = byTop.GetValueOrDefault(t.Top) + 1;
         }
-        scan.ThreadsByEntryPoint = Top(byEntry, 20, entryPlugin);
+        scan.ThreadsByEntryPoint = Top(byEntry, 300, entryPlugin);
         scan.ThreadsByTopFrame = Top(byTop, 20);
-        scan.QueuedCalls = Top(_queued, 20, _queuedPlugin);
-        scan.FunctionMessageCalls = Top(_messages, 10);
+        scan.QueuedCalls = Top(_queued, 300, _queuedPlugin);
+        scan.FunctionMessageCalls = Top(_messages, 10, _messagePlugin);
+        // A pile-up can be spread over many handlers of one mod (SimpleItemSpawnerChest1..16.OnItemRemoved, ~700 each): totals
+        // per plugin show it as one problem.
+        scan.QueuedByPlugin = ByPlugin(_queued, _queuedPlugin);
+        scan.ThreadsByPlugin = ByPlugin(byEntry, entryPlugin);
+        scan.FunctionMessagesByPlugin = ByPlugin(_messages, _messagePlugin);
+    }
+
+    static List<NameCount> ByPlugin(Dictionary<string, int> d, Dictionary<string, string?> plugin)
+    {
+        var totals = new Dictionary<string, (int count, int handlers, string first, int firstCount)>();
+        foreach (var (name, count) in d)
+        {
+            var p = plugin.GetValueOrDefault(name) ?? "(mod unknown)";
+            var cur = totals.GetValueOrDefault(p, (0, 0, name, 0));
+            totals[p] = (cur.count + count, cur.handlers + 1, count > cur.firstCount ? name : cur.first, Math.Max(cur.firstCount, count));
+        }
+        return totals.OrderByDescending(kv => kv.Value.count).Take(10)
+            .Select(kv => new NameCount(kv.Key, kv.Value.count, kv.Value.handlers > 1 ? $"{kv.Value.handlers} handlers, most in {kv.Value.first}" : kv.Value.first))
+            .ToList();
     }
 
     static List<NameCount> Top(Dictionary<string, int> d, int n, Dictionary<string, string?>? plugin = null) =>
