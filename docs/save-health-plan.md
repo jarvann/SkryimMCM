@@ -7,6 +7,20 @@ workflow always ends with a load.
 Inspired by ReSaver (FallrimTools, by Mark Fairchild, Apache-2.0), which remains the reference: its source ships with the
 installed tool, and `scripts/save-scan/` already drives its library headlessly.
 
+## Status (2026-11-19)
+
+Built: the native scan (matches ReSaver's counts on six saves), `ListSaves`, `CheckSave`, `CleanSave` and `CleanAndReload`
+(cleaning runs ReSaver's own library through `SkyrimMCP/SaveClean/SaveClean.java`). Not yet tested in game.
+
+## When the AI offers it
+
+The server instructions tell the AI: when the player says the game is slow, stuttering or the FPS are dropping, offer
+`StackReport` first, then `CheckSave`; explain the findings naming the mods, and talk about those mods (what they do, whether
+they're still needed, settings, updates, known conflicts). If the player develops mods, ask which ones and tie the findings back
+to that work. Before any clean, say that it edits saved game data, what could break, that the original save is kept as the way
+back, and that a pile-up returns if the mod keeps causing it. The cleanup cycle (`CleanAndReload`) saves, cleans a copy and
+loads it in one go after the player agrees.
+
 ## Tools
 
 | Tool | What it does | Writes? |
