@@ -199,12 +199,25 @@ public class PlayerTools : ToolBase
         "IMPORTANT: Pass an outputPath to write the blueprint directly to a file on disk — the data is too large " +
         "for the MCP response. Example outputPath: 'C:\\Users\\<you>\\Documents\\blueprint.json'. " +
         "Every form ID also carries its plugin name and local ID (formIdSource), so ApplyBlueprint still finds modded items after a load-order change. " +
-        "Also records quest progress (quests completed or started, with current stage, objectives seen with their state, and " +
-        "type) and notCaptured: what a blueprint " +
+        "Also records quest progress (quests completed or started, with current stage, the stages done (read from a save made " +
+        "at export: stagesFromSave, default true), objectives seen with their state, and type; ReplayQuests uses it) and " +
+        "notCaptured: what a blueprint " +
         "can't hold (quest rewards and world changes, map markers, crime, other mods' script state).")]
-    public async Task<object> GetCharacterBlueprint(string? outputPath = null)
+    public async Task<object> GetCharacterBlueprint(string? outputPath = null, bool stagesFromSave = true)
     {
         var data = await _pipe.SendRequestAsync("get_character_blueprint");
+        // FEAT-263: stages done per quest come from a save (the engine's in-memory list read only zeros): a save made now.
+        if (stagesFromSave && data?["quests"] is JsonObject quests)
+        {
+            var (save, stages, note) = await new SaveTools(_pipe).QuestStagesFromSave("SkyLink_Blueprint");
+            if (stages != null)
+                foreach (var list in new[] { quests["completed"], quests["running"] }.OfType<JsonArray>())
+                    foreach (var q in list.OfType<JsonObject>())
+                        if (q["formId"]?.ToString() is string id && stages.TryGetValue(id.ToUpperInvariant().PadLeft(8, '0'), out var st))
+                            q["stagesDone"] = new JsonArray(st.Where(x => x[1] == 1).Select(x => (JsonNode)x[0]).ToArray());
+            quests["stagesSource"] = save;
+            if (note != null) quests["stagesNote"] = note;
+        }
 
         if (!string.IsNullOrEmpty(outputPath) && data != null)
         {
@@ -454,8 +467,8 @@ public class PlayerTools : ToolBase
                 await File.WriteAllTextAsync(blueprintPath, jsonString);
             }
 
-            // Save the game
-            await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = baseName });
+            // Save the game (sheathes first; reports a save a mod refused)
+            if (await SaveTools.RequestSave(_pipe, baseName) is string refused) return new { error = "Blueprint written, but the game didn't save: " + refused, blueprintPath };
 
             await NotifyInGame("Snapshot saved");
 

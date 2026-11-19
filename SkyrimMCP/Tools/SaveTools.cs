@@ -83,6 +83,48 @@ public class SaveTools : ToolBase
                "weapon or readied spell blocks it too: SkyLink sheathes before saving, so check it stayed sheathed. Nothing else was done.", sheathed);
     }
 
+    /// <summary>
+    /// FEAT-263: every quest's stages with done flags (status 1 = done), read from a save: fresh (saved now, under the given
+    /// label) or, if that fails or isn't wanted, the newest save of this character. The engine's in-memory list read only zeros.
+    /// Keys are form IDs in that save's load order (the running game's, for a save made now).
+    /// </summary>
+    internal async Task<(string? save, Dictionary<string, List<int[]>>? stages, string? note)> QuestStagesFromSave(string label, bool fresh = true, string? reuseSave = null)
+    {
+        string? path = null;
+        string? note = null;
+        // A save made moments ago (a preview's way-back save) instead of saving again.
+        if (reuseSave is { Length: > 0 } && ResolveSave(reuseSave) is string recent && File.GetLastWriteTime(recent) > DateTime.Now.AddMinutes(-10))
+            path = recent;
+        else if (fresh)
+        {
+            var name = $"{label}_{DateTime.Now:yyyyMMdd-HHmmss}";
+            if (await RequestSave(_pipe, name) is string refused) note = "Couldn't save for the stages: " + refused;
+            else
+            {
+                path = await WaitForCompleteSave(Path.Combine(SaveFolder(), name + ".ess"), TimeSpan.FromSeconds(45));
+                if (path == null) note = $"The save {name} wasn't complete in time.";
+            }
+        }
+        if (path == null)
+        {
+            string? currentId = null;
+            try { currentId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+            var newest = Directory.Exists(SaveFolder())
+                ? new DirectoryInfo(SaveFolder()).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc)
+                    .FirstOrDefault(f => currentId == null || f.Name.Contains(currentId, StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (newest == null) return (null, null, (note ?? "") + " No save of this character to read stages from.");
+            path = newest.FullName;
+            note = (note == null ? "" : note + " ") + $"Stages are as of the newest save, {Path.GetFileNameWithoutExtension(path)} ({newest.LastWriteTime:HH:mm}): anything done since isn't included.";
+        }
+        try
+        {
+            var scan = await Task.Run(() => EssScanner.Scan(path, questStages: true));
+            return (Path.GetFileNameWithoutExtension(path), scan.QuestStages, note);
+        }
+        catch (Exception ex) { return (null, null, $"Couldn't read {Path.GetFileName(path)}: {ex.Message}"); }
+    }
+
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
 
     // Queued calls and the mod with the most, for marking way-back saves that still hold a flood (about 0.5 s a save).
