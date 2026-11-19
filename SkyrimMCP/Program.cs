@@ -74,6 +74,7 @@ class Program
                 // Tells the AI to check the guidebook (UESP) before answering game help questions (FEAT-221).
                 options.ServerInstructions = Tools.GuidebookTools.ServerInstructions;
             })
+            .AddCallToolFilter(ToolParameterCheck.Filter)   // BUG-023
             .WithStdioServerTransport()
             .WithToolsFromAssembly();
 
