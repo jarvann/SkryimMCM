@@ -4042,7 +4042,7 @@
         {
           "id": "BUG-088",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Steam and GOG games share SkyLink's per-game state",
           "description": "GOG test (1.3.0): CaptureFace on the vanilla GOG character applied browColor #4A2416, the colour set on yesterday's Steam character, also 'Adventurer|Breton'. The plugin's face_state.json and the server's state (face state, studio trips, markers, references, settings) all lived under a fixed 'My Games\\Skyrim Special Edition', while the GOG game uses 'Skyrim Special Edition GOG' (its crash recorder was already there). Now the plugin uses SKSE's log folder's parent for face_state.json, a new get_game_folder action reports that folder and the game's install folder, and the server asks for them when it connects: SkyLinkSettings.Folder follows the running game, and SkyrimPath uses the running game's install folder (so a server installed in the Steam game reads the GOG game's files). Not done: per-character data is still keyed by name and race, so two same-named characters in one game share it.",
@@ -4050,6 +4050,10 @@
             {
               "datetime": "2026-11-19T09:40",
               "note": "From the in-game agent's GOG release check."
+            },
+            {
+              "datetime": "2026-11-19T10:00",
+              "note": "On GOG: logic reloaded from the MO2 mod folder (reloads 1), CaptureFace returned browColor null: the Steam state no longer reaches the GOG game. Same-name characters within one game still share state (open)."
             }
           ],
           "targetRelease": "1.4"
