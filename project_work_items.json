@@ -1159,6 +1159,21 @@
           "targetRelease": "1.4"
         },
         {
+          "id": "FEAT-264",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Crash recorder keeps several previous sessions",
+          "description": "Only one previous session is kept, so any later launch overwrites the record of a real crash: a short false-start session did it on 2026-11-18, and on 2026-11-19 a launch that died with Steam (the Steam client asserted on a stalled pipe while logging in; no Skyrim crash) replaced yesterday's 15:02 crash record. Keep the last five, named by start time, and have GetCrashLog list them.",
+          "history": [
+            {
+              "datetime": "2026-11-19T12:00",
+              "note": "From the in-game agent's crash investigation."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
           "id": "FEAT-123",
           "type": "feature",
           "status": "complete",
