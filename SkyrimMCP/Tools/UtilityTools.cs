@@ -255,24 +255,29 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
-    [Description("Save the game (with no name: SkyLink<date-time>). " +
-        "Creates both .ess and .skse co-save files. A name you give becomes the start of the file name (letters, digits and " +
-        "dashes), followed by the character ID and the game's other fields, so loading it keeps the character ID. " +
+    [Description("Save the game (with no name: SkyLink_<date-time>), .ess plus the .skse co-save; waits until the file exists. " +
+        "This is the console save: the game itself doesn't keep the character ID in such a save, so SkyLink stores it in its " +
+        "co-save record and puts it back on load (BUG-091). For a save to keep with no mods involved, save from the game menu. " +
         "CAUTION: Always save before performing risky operations like quest stage manipulation or teleporting.")]
     public async Task<object> SaveGame(string? saveName = null)
     {
-        // The game reads the character ID from a save's file name when it loads it; a custom name has none, so loading one left
-        // the character ID at 00000000 for every later save (2026-11-19). Names are the label plus the game's own fields.
-        var label = string.IsNullOrWhiteSpace(saveName) ? $"SkyLink{DateTime.Now:yyyyMMdd-HHmmss}" : saveName;
-        saveName = await new SaveTools(_pipe).GameStyleName(label);
+        if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
+        saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
 
         await _pipe.SendRequestAsync("save_game", new JsonObject
         {
             ["saveName"] = saveName
         });
 
-        // Notification is handled by the plugin after save completes
-        return new { success = true, message = $"Game saved as: {saveName}" };
+        // Report only a save that exists: a save started while another was being written produced no file (seen in game).
+        var file = Path.Combine(SaveTools.SaveFolder(), saveName + ".ess");
+        for (var waited = 0; waited < 45_000; waited += 500)
+        {
+            await Task.Delay(500);
+            if (File.Exists(file) && new FileInfo(file).Length > 0)
+                return new { success = true, message = $"Game saved as: {saveName}" };
+        }
+        return new { success = false, error = $"The save '{saveName}' didn't appear in {SaveTools.SaveFolder()} within 45 seconds (another save in progress, or the game refused). Try again." };
     }
 
     [McpServerTool]

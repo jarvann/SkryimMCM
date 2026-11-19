@@ -47,8 +47,9 @@ public static class FaceState
         return key;
     }
 
-    public const string NoCharacterId = "No character ID yet (at the main menu, before a game is started or loaded): per-character " +
-        "settings are kept by character ID, so load or start a game first.";
+    public const string NoCharacterId = "No character ID: per-character settings are kept by character ID. At the main menu, " +
+        "load or start a game first. With a game loaded, the game has lost its character ID (00000000, from loading a save made " +
+        "with the console save command): RepairCharacterId puts it back.";
 
     public static string? GetBrowColor(string? key)
     {

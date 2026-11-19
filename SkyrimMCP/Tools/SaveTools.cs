@@ -13,7 +13,8 @@ public class SaveTools : ToolBase
 {
     public SaveTools(IPipeClient pipe) : base(pipe) { }
 
-    static readonly Regex CharacterIdInName = new(@"_([0-9A-F]{8})_", RegexOptions.Compiled);
+    // Only names the game made carry a character ID that loading restores (BUG-091: a console-made save named like one doesn't).
+    static readonly Regex CharacterIdInName = new(@"^(?:Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>The running game's save folder: Documents\My Games\&lt;game&gt;\ plus sLocalSavePath (default Saves\).</summary>
     internal static string SaveFolder()
@@ -40,37 +41,7 @@ public class SaveTools : ToolBase
     static bool IsSkyLinkSave(string file) =>
         file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
 
-    static readonly Regex EngineName = new(@"^([^_]+)_([0-9A-F]{8})_(.+)$", RegexOptions.Compiled);
-
-    /// <summary>
-    /// A save name the game can read the character ID from. The game takes it from the file name when it loads a save: a custom
-    /// name (SkyLink_Check_..., Arya_clean_...) has none, so after loading one the character ID was 00000000 and every later save
-    /// carried it (seen 2026-11-19). The name is the label (no underscores) followed by the rest of the newest real save of this
-    /// character: its ID, flags, name and the other fields the game expects.
-    /// </summary>
-    internal async Task<string> GameStyleName(string label)
-    {
-        label = Regex.Replace(label, "[^A-Za-z0-9-]", "");
-        string? currentId = null;
-        string? player = null;
-        try { currentId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
-        try { player = (await _pipe.SendRequestAsync("get_player_info"))?["name"]?.ToString(); } catch (Exception) { }
-        var folder = SaveFolder();
-        if (Directory.Exists(folder))
-        {
-            foreach (var f in new DirectoryInfo(folder).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc).Take(400))
-            {
-                var m = EngineName.Match(Path.GetFileNameWithoutExtension(f.Name));
-                if (!m.Success || m.Groups[2].Value == "00000000") continue;
-                if (currentId is { Length: 8 } ? !m.Groups[2].Value.Equals(currentId, StringComparison.OrdinalIgnoreCase)
-                    : player == null || !string.Equals(SafeHeader(f.FullName)?.PlayerName, player, StringComparison.Ordinal)) continue;
-                var name = $"{label}_{m.Groups[2].Value}_{m.Groups[3].Value}";
-                for (var i = 2; File.Exists(Path.Combine(folder, name + ".ess")); i++) name = $"{label}{i}_{m.Groups[2].Value}_{m.Groups[3].Value}";
-                return name;
-            }
-        }
-        return label;   // no real save of this character yet: the plain label
-    }
+    static readonly Regex GameMadeName = new(@"^(Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     static SaveHeader? SafeHeader(string path) { try { return EssScanner.ReadHeader(path); } catch (Exception) { return null; } }
 
@@ -80,8 +51,11 @@ public class SaveTools : ToolBase
         try
         {
             var s = EssScanner.Scan(path);
-            var top = s.QueuedByPlugin.FirstOrDefault();
-            return new { queued = s.SuspendedStacks1 + s.SuspendedStacks2, threads = s.ActiveScripts, topMod = top == null ? null : $"{top.Plugin} {top.Count}",
+            // Queued calls and threads together per mod: the wendigo's 280 threads wait inside a native call, not in the queue.
+            var perMod = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in s.QueuedByPlugin.Concat(s.ThreadsByPlugin)) perMod[m.Plugin] = perMod.GetValueOrDefault(m.Plugin) + m.Count;
+            var top = perMod.OrderByDescending(kv => kv.Value).FirstOrDefault();
+            return new { queued = s.SuspendedStacks1 + s.SuspendedStacks2, threads = s.ActiveScripts, topMod = top.Key == null ? null : $"{top.Key} {top.Value}",
                          flood = s.SuspendedStacks1 + s.SuspendedStacks2 >= 1000 ? true : (bool?)null };
         }
         catch (Exception ex) { return new { error = ex.Message }; }
@@ -90,7 +64,7 @@ public class SaveTools : ToolBase
     [McpServerTool]
     [Description("Move saves out of the save folder into Saves\\SkyLink_Archive (with their .skse co-saves), so they stop cluttering " +
         "the load menu without being deleted: move them back by hand to restore. names: comma-separated save names, or 'skylink' " +
-        "for every save SkyLink made (SkyLinkCheck*, SkyLinkBeforeClean*, *Cleaned*, and older SkyLink_* names) older than olderThanMinutes. dryRun " +
+        "for every save SkyLink made (SkyLink_*, SkyLinkCheck*, SkyLinkBeforeClean*, *_cleaned, *Cleaned*) older than olderThanMinutes. dryRun " +
         "(default true) lists what would move. Never moves the newest save. Use ListSaves(scan: true) first to see which way-back " +
         "saves still hold a stack flood.")]
     public Task<object> ArchiveSaves(string names, int olderThanMinutes = 30, bool dryRun = true)
@@ -189,7 +163,7 @@ public class SaveTools : ToolBase
 
     [McpServerTool]
     [Description("Check a save for problems with SkyLink's own save scanner (based on ReSaver's). With no saveName it first " +
-        "saves the current game as SkyLinkCheck<time>_<character ID>_... and scans that, so the result is the game as it is now; with a name " +
+        "saves the current game as SkyLink_Check_<time> and scans that, so the result is the game as it is now; with a name " +
         "it scans that save (ListSaves shows them). Reports: script stacks stored in the save (running threads and queued calls " +
         "by function and mod: a big queue is the usual FPS killer), script leftovers from removed or changed mods (undefined " +
         "scripts and instances), unattached instances, plugins the save uses that aren't loaded now, and sizes. Read-only: " +
@@ -201,12 +175,13 @@ public class SaveTools : ToolBase
         if (string.IsNullOrWhiteSpace(saveName))
         {
             if (await SafetyBlock("save") is string blocked) return new { error = blocked };
-            made = await GameStyleName($"SkyLinkCheck{DateTime.Now:yyyyMMdd-HHmmss}");
+            made = $"SkyLink_Check_{DateTime.Now:yyyyMMdd-HHmmss}";
             var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
             if (started?["error"] != null) return DeserializeResponse(started);
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
+            // Under the bridge's 80-second limit: a long save is reported, not waited out.
+            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(55));
             if (path == null)
-                return new { error = $"Saved as {made}, but the file didn't appear complete in {SaveFolder()} within 2 minutes. Try CheckSave(\"{made}\") in a moment." };
+                return new { error = $"Saving as {made}: the file wasn't complete after 55 seconds (a big save, or the save didn't start). Try CheckSave(\"{made}\") in a moment; if the file never appears, save again." };
         }
         else
         {
@@ -234,7 +209,6 @@ public class SaveTools : ToolBase
         // Live owners (as StackReport names them: for a magic effect, the effect's plugin) for handlers running now, so CheckSave
         // and StackReport can be read together. The save itself only knows the object a script runs on.
         Dictionary<string, string>? liveOwners = null;
-        if (made != null)
         {
             try
             {
@@ -322,12 +296,9 @@ public class SaveTools : ToolBase
     {
         var dir = Path.GetDirectoryName(original)!;
         var bare = Path.GetFileNameWithoutExtension(original);
-        // Keep the game-style tail (character ID and the rest) so the cleaned save still carries the character ID.
-        var m = EngineName.Match(bare);
         for (var i = 1; ; i++)
         {
-            var tag = i == 1 ? "Cleaned" : $"Cleaned{i}";
-            var name = m.Success ? $"{m.Groups[1].Value}{tag}_{m.Groups[2].Value}_{m.Groups[3].Value}" : $"{bare}_{tag.ToLowerInvariant()}";
+            var name = i == 1 ? $"{bare}_cleaned" : $"{bare}_cleaned{i}";
             if (!File.Exists(Path.Combine(dir, name + ".ess"))) return Path.Combine(dir, name + ".ess");
         }
     }
@@ -528,11 +499,11 @@ public class SaveTools : ToolBase
         }
         else
         {
-            made = await GameStyleName($"SkyLinkBeforeClean{DateTime.Now:yyyyMMdd-HHmmss}");
+            made = $"SkyLink_BeforeClean_{DateTime.Now:yyyyMMdd-HHmmss}";
             var started = await _pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = made });
             if (started?["error"] != null) return DeserializeResponse(started);
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(120));
-            if (path == null) return new { error = $"Saved as {made}, but the file didn't appear complete within 2 minutes; nothing was cleaned." };
+            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(55));
+            if (path == null) return new { error = $"Saving as {made}: the file wasn't complete after 55 seconds; nothing was cleaned. Run CleanAndReload again with previewSave=\"{made}\" once it exists." };
         }
 
         var info = new CleanInfo();
@@ -595,6 +566,40 @@ public class SaveTools : ToolBase
             result,
             next = "Run StackReport in a minute to check the pile-up is gone and isn't coming back. If anything seems wrong, load the way-back save.",
         };
+    }
+
+    [McpServerTool]
+    [Description("Put back a lost character ID (BUG-091). Loading a save made with the console save command (SkyLink's own saves " +
+        "before 1.4, or 'save <name>' typed in the console) leaves the game's character ID at 00000000; every save after that " +
+        "carries it, the load menu stops grouping them with the character, and per-character settings (face colours) can't be " +
+        "found. This sets it from the newest save the game itself made for this character (Save/Autosave/Quicksave files), or " +
+        "from characterId if given. Only acts when the ID is lost. Save from the game menu afterwards.")]
+    public async Task<object> RepairCharacterId(string? characterId = null)
+    {
+        var appearance = await _pipe.SendRequestAsync("get_appearance");
+        if (appearance?["characterIdLost"]?.GetValue<bool>() != true)
+            return new { ok = true, characterId = appearance?["characterId"]?.ToString(), note = "The character ID isn't lost: nothing to repair." };
+        var player = appearance?["name"]?.ToString();
+        var id = characterId?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(id))
+        {
+            var folder = SaveFolder();
+            var found = new List<(string id, string save, DateTime when)>();
+            foreach (var f in new DirectoryInfo(folder).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc).Take(500))
+            {
+                var m = GameMadeName.Match(f.Name);
+                if (!m.Success || m.Groups[2].Value == "00000000") continue;
+                if (!string.Equals(SafeHeader(f.FullName)?.PlayerName, player, StringComparison.Ordinal)) continue;
+                found.Add((m.Groups[2].Value.ToUpperInvariant(), Path.GetFileNameWithoutExtension(f.Name), f.LastWriteTime));
+            }
+            var ids = found.GroupBy(x => x.id).Select(g => new { characterId = g.Key, newestSave = g.First().save, saved = g.First().when.ToString("yyyy-MM-dd HH:mm"), saves = g.Count() }).ToList();
+            if (ids.Count == 0) return new { error = $"No save made by the game for '{player}' with a character ID. Give characterId (8 hex digits) if you know it." };
+            if (ids.Count > 1) return new { error = $"More than one character named '{player}' has saves: pick one and call again with characterId.", characters = ids };
+            id = ids[0].characterId;
+        }
+        var set = await _pipe.SendRequestAsync("set_character_id", new JsonObject { ["characterId"] = id });
+        if (set?["error"] != null) return DeserializeResponse(set);
+        return new { repaired = true, characterId = id, next = "Make a save from the game menu (Esc > Save): it carries the ID again, and SkyLink's co-save keeps it from now on." };
     }
 
     static string Summarise(SaveScan s, List<string>? missing)

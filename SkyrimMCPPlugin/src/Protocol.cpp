@@ -99,6 +99,18 @@ namespace SkyrimMCP::Protocol {
         noParam("get_known_enchantments", []() { return GameInterface::GetKnownEnchantments(); });
         noParam("get_skill_levels", []() { return GameInterface::GetSkillLevels(); });
         noParam("get_perks", []() { return GameInterface::GetPerks(); });
+        // BUG-091: put a lost character ID back (RepairCharacterId); only when the game has none, never over a real one.
+        registry["set_character_id"] = [](const std::string& id, const json& params) {
+            const auto hex = params.value("characterId", std::string());
+            if (hex.size() != 8 || !std::all_of(hex.begin(), hex.end(), [](unsigned char c) { return std::isxdigit(c) != 0; }))
+                return MakeResponse(id, false, {}, "characterId must be 8 hex digits").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+            const auto value = static_cast<std::uint32_t>(std::stoul(hex, nullptr, 16));
+            return GameThread(id, [value]() -> json {
+                if (!Helpers::CharacterIdLost()) return {{"error", "The game has a character ID (or no game is loaded): nothing to repair."}};
+                RE::BGSSaveLoadManager::GetSingleton()->currentCharacterID = value;
+                return {{"characterId", std::format("{:08X}", value)}, {"repaired", true}};
+            });
+        };
         registry["get_appearance"] = [](const std::string& id, const json& params) {
             const auto refId = params.value("refId", std::string());
             return GameThread(id, [refId]() { return GameInterface::GetAppearance(refId); });
