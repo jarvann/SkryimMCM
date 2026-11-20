@@ -5,9 +5,10 @@
 #   scripts/pipe-call.sh ping
 #   scripts/pipe-call.sh get_script_functions '{"className":"NiOverride"}'
 #
-# The plugin serves one client at a time: this only connects while no MCP server holds the pipe
-# (Claude Desktop closed, or its server stopped). Read-only actions are safe at any time; anything
-# that changes the game acts on it for real.
+# From 1.5 the plugin serves up to 4 clients at once (INFRA-023), so this works while Claude Desktop is
+# connected; requests from different clients take turns. Older plugins serve one client: then this only
+# connects while no MCP server holds the pipe. Read-only actions are safe at any time; anything that
+# changes the game acts on it for real.
 set -euo pipefail
 
 action="${1:?usage: pipe-call.sh <action> [params-json] [timeout-ms]}"

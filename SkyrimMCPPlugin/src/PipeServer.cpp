@@ -48,6 +48,34 @@ namespace SkyrimMCP {
         if (_thread.joinable()) {
             _thread.join();
         }
+
+        // Disconnecting a client's pipe makes its blocked ReadFile fail, so its thread ends.
+        std::list<Client> clients;
+        {
+            std::scoped_lock lock(_clientsMutex);
+            for (auto& c : _clients) {
+                if (!c.finished) DisconnectNamedPipe(static_cast<HANDLE>(c.pipe));
+            }
+            clients.splice(clients.end(), _clients);
+        }
+        for (auto& c : clients) {
+            if (c.thread.joinable()) c.thread.join();
+        }
+    }
+
+    void PipeServer::ReapFinishedClients() {
+        std::list<Client> done;
+        {
+            std::scoped_lock lock(_clientsMutex);
+            for (auto it = _clients.begin(); it != _clients.end();) {
+                auto next = std::next(it);
+                if (it->finished) done.splice(done.end(), _clients, it);
+                it = next;
+            }
+        }
+        for (auto& c : done) {
+            if (c.thread.joinable()) c.thread.join();
+        }
     }
 
     void PipeServer::ServerLoop() {
@@ -81,14 +109,31 @@ namespace SkyrimMCP {
                 break;
             }
 
-            if (connected) {
-                SKSE::log::info("Client connected to pipe");
-                HandleClient(static_cast<PipeHandle>(pipe));
-                SKSE::log::info("Client disconnected");
+            if (!connected) {
+                CloseHandle(pipe);
+                continue;
             }
 
-            DisconnectNamedPipe(pipe);
-            CloseHandle(pipe);
+            ReapFinishedClients();
+            std::scoped_lock lock(_clientsMutex);
+            if (_clients.size() >= MAX_CLIENTS) {
+                SKSE::log::warn("Pipe client refused: {} clients already connected", _clients.size());
+                DisconnectNamedPipe(pipe);
+                CloseHandle(pipe);
+                continue;
+            }
+            auto& client = _clients.emplace_back();
+            client.pipe = static_cast<PipeHandle>(pipe);
+            SKSE::log::info("Client connected to pipe ({} connected)", _clients.size());
+            client.thread = std::thread([this, &client]() {
+                HandleClient(client.pipe);
+                SKSE::log::info("Client disconnected");
+                // Under the lock, so Stop never disconnects a handle that is already closed.
+                std::scoped_lock done(_clientsMutex);
+                DisconnectNamedPipe(static_cast<HANDLE>(client.pipe));
+                CloseHandle(static_cast<HANDLE>(client.pipe));
+                client.finished = true;
+            });
         }
 
         SKSE::log::info("Pipe server thread stopped");

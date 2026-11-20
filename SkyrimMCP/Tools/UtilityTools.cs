@@ -254,6 +254,24 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("What SkyLink has cost the game this session (INFRA-007), for 'does this mod hurt my FPS?': game-thread time " +
+        "(the part a player can feel: it comes out of frames) in total and per tool action, the longest single task (one long " +
+        "task is a hitch), and how long the AI waited. shareOfGameTime is game-thread time divided by time since the game started " +
+        "(0.001 = 0.1%). Read-only, answered without touching the game thread.")]
+    public async Task<object> GetSkyLinkCost()
+    {
+        var data = await _pipe.SendRequestAsync("get_skylink_cost");
+        if (data is JsonObject o && o["shareOfGameTime"] is JsonValue v && v.TryGetValue<double>(out var share))
+        {
+            var longest = o["longestTaskMs"]?.GetValue<double>() ?? 0;
+            o["summary"] = $"SkyLink used {o["gameThreadMsTotal"]} ms of game-thread time in {Math.Round(o["sinceGameStartSeconds"]?.GetValue<double>() ?? 0)} s " +
+                $"({share * 100:0.###}% of the time). Longest single task: {longest:0.#} ms ({o["longestTaskAction"]})" +
+                (longest > 16 ? ", long enough to drop a frame at 60 FPS: that tool causes a brief hitch when used." : ", shorter than a 60 FPS frame.");
+        }
+        return DeserializeResponse(data);
+    }
+
+    [McpServerTool]
     [Description("List all installed SKSE plugins with integration potential. " +
         "Identifies plugins like ConsoleUtilSSE, HDT-SMP, PapyrusUtil, RaceMenu, TrueHUD, etc. " +
         "and notes which ones have APIs that could extend MCP capabilities.")]

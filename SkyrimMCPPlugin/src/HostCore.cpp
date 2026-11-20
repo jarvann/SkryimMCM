@@ -25,6 +25,9 @@
 #include <format>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace SkyrimMCP::HostCore {
 
@@ -46,6 +49,42 @@ namespace SkyrimMCP::HostCore {
         std::atomic<std::uint64_t> g_tasksRun{ 0 };
         std::atomic<std::int64_t> g_lastTaskRunMs{ 0 };  // steady clock, 0 = never
         std::atomic<std::uint32_t> g_gameLoads{ 0 };
+
+        // INFRA-007: what SkyLink costs the game. Game-thread time is the part a player can feel (it comes out of a frame);
+        // wall time is how long the AI waited. Each task is charged to the request that queued it: the pipe thread
+        // queues it, so a thread-local holds the action being served.
+        struct ActionCost {
+            std::uint64_t calls = 0;
+            std::uint64_t wallMsTotal = 0;
+            std::uint64_t wallMsMax = 0;
+            std::uint64_t tasks = 0;
+            std::uint64_t gameUsTotal = 0;
+            std::uint64_t gameUsMax = 0;
+        };
+        std::mutex g_costMutex;
+        std::unordered_map<std::string, ActionCost> g_costs;
+        const auto g_costSince = std::chrono::steady_clock::now();
+        thread_local std::string t_currentAction;
+
+        void ChargeGameThread(const std::string& action, std::uint64_t us) {
+            std::scoped_lock lock(g_costMutex);
+            auto& c = g_costs[action.empty() ? "(other)" : action];
+            ++c.tasks;
+            c.gameUsTotal += us;
+            c.gameUsMax = std::max(c.gameUsMax, us);
+        }
+
+        void ChargeRequest(const std::string& action, std::uint64_t wallMs) {
+            std::scoped_lock lock(g_costMutex);
+            auto& c = g_costs[action];
+            ++c.calls;
+            c.wallMsTotal += wallMs;
+            c.wallMsMax = std::max(c.wallMsMax, wallMs);
+        }
+
+        // INFRA-023: more than one client can connect, but the logic DLL's handlers were written for one at a time.
+        // Requests that reach the logic DLL take turns; ping and poll_events (host only) don't wait.
+        std::mutex g_requestTurn;
 
         std::int64_t SteadyMs() {
             return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -74,14 +113,18 @@ namespace SkyrimMCP::HostCore {
                     SKSE::log::error("SKSE task interface is not available: game-thread calls cannot run");
                     return 1;
                 }
-                tasks->AddTask([fn, ctx]() {
+                tasks->AddTask([fn, ctx, action = t_currentAction]() {
                     struct Done {
+                        const std::string& action;
+                        std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
                         ~Done() {
+                            ChargeGameThread(action, static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                std::chrono::steady_clock::now() - started).count()));
                             ++g_tasksRun;
                             g_lastTaskRunMs = SteadyMs();
                             --g_pendingTasks;
                         }
-                    } done;
+                    } done{ action };
                     try {
                         fn(ctx);
                     } catch (...) {
@@ -362,6 +405,32 @@ namespace SkyrimMCP::HostCore {
             return Respond(id, true, info);
         }
 
+        std::string Cost(const std::string& id) {
+            json actions = json::array();
+            std::uint64_t gameUs = 0, worstUs = 0, tasks = 0;
+            std::string worstAction;
+            {
+                std::scoped_lock lock(g_costMutex);
+                std::vector<std::pair<std::string, ActionCost>> sorted(g_costs.begin(), g_costs.end());
+                std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second.gameUsTotal > b.second.gameUsTotal; });
+                for (const auto& [name, c] : sorted) {
+                    gameUs += c.gameUsTotal;
+                    tasks += c.tasks;
+                    if (c.gameUsMax > worstUs) { worstUs = c.gameUsMax; worstAction = name; }
+                    if (actions.size() < 40) {
+                        actions.push_back({{"action", name}, {"calls", c.calls}, {"gameThreadMs", c.gameUsTotal / 1000.0},
+                                           {"longestGameThreadMs", c.gameUsMax / 1000.0}, {"tasks", c.tasks},
+                                           {"waitMsTotal", c.wallMsTotal}, {"waitMsLongest", c.wallMsMax}});
+                    }
+                }
+            }
+            const auto seconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - g_costSince).count() / 1000.0;
+            json data = {{"sinceGameStartSeconds", seconds}, {"gameThreadMsTotal", gameUs / 1000.0}, {"tasks", tasks},
+                         {"shareOfGameTime", seconds > 0 ? (gameUs / 1e6) / seconds : 0.0},
+                         {"longestTaskMs", worstUs / 1000.0}, {"longestTaskAction", worstAction}, {"actions", actions}};
+            return Respond(id, true, data);
+        }
+
         std::string PollEvents(const std::string& id, const json& params) {
             auto events = EventSystem::GetSingleton().DrainEvents();
             auto includeTypes = params.value("eventTypes", json::array());
@@ -451,6 +520,7 @@ namespace SkyrimMCP::HostCore {
                 if (action == "ping") return Ping(id);
                 if (action == "poll_events") return PollEvents(id, request.value("params", json::object()));
                 if (action == "reload_plugin") return Reload(id);
+                if (action == "get_skylink_cost") return Cost(id);
                 if (action == "get_game_safety" && LoadingScreenWatcher::Get().Active()) return LoadingScreenSafety(id);
 
                 if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
@@ -539,6 +609,9 @@ namespace SkyrimMCP::HostCore {
 
         if (!RecordsRequest(action)) return Dispatch(requestLine, request, id, action);
 
+        std::scoped_lock turn(g_requestTurn);
+        t_currentAction = action;
+
         // Crash recorder: an entry before the request runs, so a call that crashes the game
         // is still on record, and one with the outcome once it returns.
         RecordRequestStart(action, request);
@@ -547,6 +620,8 @@ namespace SkyrimMCP::HostCore {
         const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - started).count();
         RecordRequestEnd(action, response, static_cast<long long>(elapsedMs));
+        ChargeRequest(action, static_cast<std::uint64_t>(elapsedMs));
+        t_currentAction.clear();
         return response;
     }
 
