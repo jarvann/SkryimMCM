@@ -27,6 +27,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 #include <unordered_map>
 
@@ -91,39 +92,56 @@ namespace SkyrimMCP::HostCore {
         std::mutex g_blockMutex;
         std::set<std::uint64_t> g_blockedHandles;
         std::atomic<bool> g_blockTaskQueued{ false };
+        std::atomic<bool> g_blockThreadRunning{ false };
         std::atomic<std::uint64_t> g_blockRemoved{ 0 };
 
-        void PruneBlockedUpdates();
-
-        void QueuePrune() {
-            if (g_blockTaskQueued.exchange(true)) return;
-            if (auto* tasks = SKSE::GetTaskInterface()) tasks->AddTask([]() { PruneBlockedUpdates(); });
-            else g_blockTaskQueued = false;
+        bool AnyBlocked() {
+            std::scoped_lock lock(g_blockMutex);
+            return !g_blockedHandles.empty();
         }
 
+        // One pass on the game thread. It must NOT queue itself again: SKSE runs queued tasks until its queue is empty, so a
+        // task that re-adds itself never lets the frame end (round B: the game froze, "not responding", memory climbing).
         void PruneBlockedUpdates() {
-            g_blockTaskQueued = false;
             std::set<std::uint64_t> blocked;
             {
                 std::scoped_lock lock(g_blockMutex);
                 blocked = g_blockedHandles;
             }
-            if (blocked.empty()) return;
-            if (auto* vm = RE::SkyrimVM::GetSingleton()) {
-                auto& data = vm->GetVMRuntimeData();
-                RE::BSSpinLockGuard guard(data.queuedOnUpdateEventLock);
-                for (auto* regs : {&data.queuedOnUpdateEvents, &data.queuedOnUpdateGameEvents}) {
-                    if (regs->size() > 500000) break;   // layout doesn't match: leave it alone
-                    for (auto i = regs->size(); i-- > 0;) {
-                        const auto& r = (*regs)[i];
-                        if (r && blocked.contains(r->handle)) {
-                            regs->erase(regs->begin() + i);
-                            ++g_blockRemoved;
+            if (!blocked.empty()) {
+                if (auto* vm = RE::SkyrimVM::GetSingleton()) {
+                    auto& data = vm->GetVMRuntimeData();
+                    RE::BSSpinLockGuard guard(data.queuedOnUpdateEventLock);
+                    for (auto* regs : {&data.queuedOnUpdateEvents, &data.queuedOnUpdateGameEvents}) {
+                        if (regs->size() > 500000) break;   // layout doesn't match: leave it alone
+                        for (auto i = regs->size(); i-- > 0;) {
+                            const auto& r = (*regs)[i];
+                            if (r && blocked.contains(r->handle)) {
+                                regs->erase(regs->begin() + i);
+                                ++g_blockRemoved;
+                            }
                         }
                     }
                 }
             }
-            QueuePrune();   // next frame
+            g_blockTaskQueued = false;
+        }
+
+        // A host thread (the host DLL never unloads) queues one pass every 100 ms while anything is blocked, and never more than
+        // one at a time. The script re-registers one second ahead, so 100 ms catches every registration before it fires.
+        void StartBlockThread() {
+            if (g_blockThreadRunning.exchange(true)) return;
+            std::thread([]() {
+                while (AnyBlocked()) {
+                    if (!g_blockTaskQueued.exchange(true)) {
+                        if (auto* tasks = SKSE::GetTaskInterface()) tasks->AddTask([]() { PruneBlockedUpdates(); });
+                        else g_blockTaskQueued = false;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+                g_blockThreadRunning = false;
+                if (AnyBlocked()) StartBlockThread();   // a block added just as the thread was ending
+            }).detach();
         }
 
         json BlockUpdates(const json& params) {
@@ -136,7 +154,7 @@ namespace SkyrimMCP::HostCore {
                 }
                 now = g_blockedHandles.size();
             }
-            if (now > 0) QueuePrune();
+            if (now > 0) StartBlockThread();
             return {{"blocked", now}, {"removedSoFar", g_blockRemoved.load()}};
         }
 
