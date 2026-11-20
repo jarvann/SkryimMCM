@@ -332,12 +332,29 @@ public class PlayerTools : ToolBase
             catch (Exception) { return []; }
         }
         var controlsBefore = dryRun ? [] : await DisabledControls();
+        // Quests running before, to name the ones the apply set off (Magic Student starts once she knows a ward: 2026-11-20).
+        async Task<Dictionary<string, string>> RunningQuests()
+        {
+            try
+            {
+                var q = await _pipe.SendRequestAsync("export_quests");
+                return (q?["running"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                    .GroupBy(x => x["formId"]?.ToString() ?? "").ToDictionary(g => g.Key, g => g.First()["name"]?.ToString() ?? g.Key);
+            }
+            catch (Exception) { return []; }
+        }
+        var questsBefore = dryRun ? [] : await RunningQuests();
         var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
         if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
         object? controls = null;
+        object? questsStarted = null;
         if (!dryRun)
         {
             await Task.Delay(3000);
+            var startedNow = (await RunningQuests()).Where(kv => !questsBefore.ContainsKey(kv.Key)).Select(kv => kv.Value).ToList();
+            if (startedNow.Count > 0)
+                questsStarted = new { quests = startedNow.Take(20),
+                                      note = "Started during or just after the apply: quests that trigger on a known spell, skill level or level (a mage's ward practice, trainers, radiant jobs). One that holds the controls shows under controls." };
             var turnedOff = (await DisabledControls()).Except(controlsBefore).ToList();
             if (turnedOff.Count > 0)
             {
@@ -400,6 +417,7 @@ public class PlayerTools : ToolBase
             result,
             shoutWords = words,
             controls,
+            questsStarted,
             quests = questReport,
         };
     }
