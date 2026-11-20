@@ -40,6 +40,15 @@ public class UtilityTools : ToolBase
             o["moveBlockers"] = new JsonArray(blockers.Select(b => (JsonNode?)JsonValue.Create(b)).ToArray());
             o["canMovePlayer"] = false;
         }
+        // FEAT-261: MCM Recorder playing or recording blocks moves too; the top-level answer said canMovePlayer true meanwhile.
+        if (await McmRecorderPlaying() is string mcm)
+        {
+            var blockers = (o["moveBlockers"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").ToList();
+            blockers.Insert(0, mcm);
+            o["moveBlockers"] = new JsonArray(blockers.Select(b => (JsonNode?)JsonValue.Create(b)).ToArray());
+            o["canMovePlayer"] = false;
+            o["mcmRecorder"] = mcm;
+        }
         o["safeMeans"] = "safe: reads and simple changes can run. Moving her, captures and face edits have stricter rules: see " +
                          "canMovePlayer, or pass action.";
         if (string.IsNullOrWhiteSpace(action)) return DeserializeResponse(o);
