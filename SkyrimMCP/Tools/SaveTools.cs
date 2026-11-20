@@ -58,13 +58,18 @@ public class SaveTools : ToolBase
         var sheathed = false;
         try
         {
-            for (var i = 0; i < 8; i++)
+            // Wait until the weapon state reads sheathed (0), not just "not drawn": a save asked for mid-animation was refused
+            // although the reply said it had sheathed (2026-11-20). Then a short settle.
+            for (var i = 0; i < 12; i++)
             {
                 var s = await pipe.SendRequestAsync("sheathe");
-                if (s?["wasDrawn"]?.GetValue<bool>() != true) break;
-                sheathed = true;
+                var drawn = s?["wasDrawn"]?.GetValue<bool>() == true;
+                var state = s?["weaponState"]?.GetValue<int>() ?? 0;
+                if (drawn) sheathed = true;
+                if (!drawn && state == 0) break;
                 await Task.Delay(500);
             }
+            if (sheathed) await Task.Delay(700);
         }
         catch (Exception) { }
         for (var attempt = 1; attempt <= 2; attempt++)
