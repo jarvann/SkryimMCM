@@ -65,7 +65,22 @@ public abstract class ToolBase
                 return null;
             }
             s_mcmRecorderInstalled = true;
-            if (r?["result"] is not JsonValue v || !v.TryGetValue<bool>(out var playing) || !playing) return null;
+            if (r?["result"] is not JsonValue v || !v.TryGetValue<bool>(out var playing) || !playing)
+            {
+                // A recording session: whoever records is changing mods' settings in their menus (2026-11-20: face edits were
+                // allowed meanwhile).
+                try
+                {
+                    var rec = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "McmRecorder_Recorder", ["functionName"] = "IsRecording", ["args"] = new JsonArray(),
+                    });
+                    if (rec?["result"] is JsonValue rv && rv.TryGetValue<bool>(out var recording) && recording)
+                        return "MCM Recorder is recording settings: finish or stop the recording first";
+                }
+                catch (Exception) { }
+                return null;
+            }
             string? name = null;
             try
             {
