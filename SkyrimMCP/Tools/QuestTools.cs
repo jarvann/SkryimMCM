@@ -125,10 +125,17 @@ public class QuestTools : ToolBase
             if (p.doneHere.Count == 0)
             {
                 var started = await _pipe.SendRequestAsync("start_quest", new JsonObject { ["formId"] = p.id });
-                log.Add(new { start = started?["started"]?.GetValue<bool>() });
+                var didStart = started?["started"]?.GetValue<bool>() == true;
+                log.Add(new { start = didStart });
+                const string why = "Required aliases fill only when their conditions hold: some only near their location (when that area is " +
+                                   "loaded), some only from the story manager (bounties, radiant jobs), when the giver offers the quest.";
+                // The game refuses to start a quest whose required aliases can't fill (round 2026-11-20: start false).
+                if (!didStart)
+                {
+                    results.Add(new { p.name, formId = p.id, status = "skipped: the game wouldn't start it, so its required aliases couldn't fill. " + why, steps = log });
+                    continue;
+                }
                 await Task.Delay(1000);
-                // A story-manager quest (a Jarl's bounty) started cold fills none of its required aliases, and its stages then do
-                // nothing (round 2026-11-20): stop it again rather than set stages into an empty quest.
                 try
                 {
                     var aliases = await _pipe.SendRequestAsync("get_quest_aliases", new JsonObject { ["formId"] = p.id });
@@ -138,8 +145,8 @@ public class QuestTools : ToolBase
                     if (empty.Count > 0)
                     {
                         await _pipe.SendRequestAsync("stop_quest", new JsonObject { ["formId"] = p.id });
-                        results.Add(new { p.name, formId = p.id, status = "skipped: started, but its required aliases stayed empty (" + string.Join(", ", empty.Take(5)) +
-                            "), so its stages couldn't run; stopped again. Quests like this (bounties, radiant jobs) start from the story manager, when their giver offers them.", steps = log });
+                        results.Add(new { p.name, formId = p.id, status = "skipped: it started, but required aliases stayed empty (" + string.Join(", ", empty.Take(5)) +
+                            "), so its stages couldn't run; stopped again. " + why, steps = log });
                         continue;
                     }
                 }
