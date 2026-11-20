@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 304,
+    "totalItems": 305,
     "completed": 267,
     "completedPartial": 2,
     "implementedUntested": 6,
     "inProgress": 0,
-    "planned": 29,
+    "planned": 30,
     "bugs": 95
   },
   "phases": [
@@ -5430,6 +5430,21 @@
             }
           ],
           "targetRelease": "1.6"
+        },
+        {
+          "id": "FEAT-289",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Save rules from save-limiting mods, checked before saving",
+          "description": "Detect save-related mods (load order, SKSE DLLs, MCM menus: save, autosave, survival in the name, plus a short known list), read their rules from config files (the existing SKSE config readers), MCM values (MCM Helper through the Papyrus bridge) or game state (globals, quest stages), and turn them into plain rules. SaveGame, RestartGame and CleanAndReload check them before saving and a refused save names the mod and rule; 'why can't I save?' gets an answer. Unknown mods: show their save-related settings generically.",
+          "history": [
+            {
+              "datetime": "2026-11-20T19:15",
+              "note": "Cory's idea; the Tester and dev agreed on 1.6 (1.5's save diagnosis covers combat, overload and a drawn weapon). Estimate 6-10 human hours; Claude ~1-1.5 h, 0.4-0.6M tokens."
+            }
+          ],
+          "targetRelease": "1.6"
         }
       ]
     }
@@ -6305,7 +6320,8 @@
         "FEAT-282",
         "FEAT-283",
         "FEAT-284",
-        "FEAT-285"
+        "FEAT-285",
+        "FEAT-289"
       ],
       "estimate": "70-110 human hours; Claude 7-10 h, 3-4M tokens. The FaceGen writer (FEAT-281) is the main unknown: spike it first.",
       "broughtForward": "FEAT-122 and INFRA-024 from 2.0 (dependencies of the character loop)",
