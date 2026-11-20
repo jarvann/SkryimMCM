@@ -182,7 +182,8 @@ namespace SkyrimMCP {
         inline json StopIdle(const std::string& refId = "") { return NPCManager::StopIdle(refId); }
 
         // === World (WorldManager) ===
-        inline json Teleport(const std::string& cellId) { return WorldManager::Teleport(cellId); }
+        inline json Teleport(const std::string& cellId, const std::string& method = "coc") { return WorldManager::Teleport(cellId, method); }
+        inline json LoadingMenu(bool show) { return WorldManager::LoadingMenu(show); }
         inline json GetWeather() { return WorldManager::GetWeather(); }
         inline json SetWeather(const std::string& weatherFormIdOrName) { return WorldManager::SetWeather(weatherFormIdOrName); }
         inline json ListWeathers() { return WorldManager::ListWeathers(); }

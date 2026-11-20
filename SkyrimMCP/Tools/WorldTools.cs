@@ -110,9 +110,13 @@ public class WorldTools : ToolBase
         "where she is, and lists followers left far away (MoveActorTo brings them). Refused, with the reason, while she isn't free " +
         "to move: a pausing menu, combat, dialogue, a scene or script-held controls (cutscenes, OStim), furniture, a mount, " +
         "ragdoll, falling, bleeding out or holding an object; GetGameSafety shows canMovePlayer beforehand. Player homes (breezehome, honeyside, proudspire manor, vlindrel hall, " +
-        "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names.")]
-    public async Task<object> Teleport(string location)
+        "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names. method (experimental, FEAT-258): 'coc' " +
+        "(default, the console move), 'center' (the same move without the console) or 'loadingscreen' (opens the game's " +
+        "loading screen first, then moves; closed after arrival if still up). Report how each looked.")]
+    public async Task<object> Teleport(string location, string method = "coc")
     {
+        method = method.Trim().ToLowerInvariant();
+        if (method is not ("coc" or "center" or "loadingscreen")) return new { error = "method must be coc (default), center or loadingscreen" };
         if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
         var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
@@ -139,7 +143,7 @@ public class WorldTools : ToolBase
         }
 
         var cellId = SkyrimOffsets.GetLocationCellId(location) ?? location.Trim();
-        var data = await _pipe.SendRequestAsync("teleport", new JsonObject { ["cellId"] = cellId });
+        var data = await _pipe.SendRequestAsync("teleport", new JsonObject { ["cellId"] = cellId, ["method"] = method });
         if (data?["error"] != null) return DeserializeResponse(data);
         markerId = data?["markerId"]?.ToString();
         if (markerId != null)
@@ -156,7 +160,14 @@ public class WorldTools : ToolBase
             Directory.CreateDirectory(SkyLinkSettings.Folder);
             await File.WriteAllTextAsync(backFile, new JsonObject { ["markerId"] = markerId, ["from"] = before?["cellName"]?.DeepClone() }.ToJsonString());
         }
-        return await ArrivalReply(location, cellId, await WaitForArrival(fromCell), followersBefore);
+        var arrived = await WaitForArrival(fromCell);
+        // FEAT-258 experiment: if the loading screen opened on purpose is still up after arrival, close it.
+        if (method == "loadingscreen")
+        {
+            await Task.Delay(1000);
+            try { await _pipe.SendRequestAsync("loading_menu", new JsonObject { ["show"] = false }); } catch (Exception) { }
+        }
+        return await ArrivalReply(location, cellId, arrived, followersBefore);
     }
 
     // BUG-071: waits out the frozen screen (the game thread doesn't answer during it); the new cell, or null after 20 s.

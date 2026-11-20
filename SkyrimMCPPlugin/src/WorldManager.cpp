@@ -47,7 +47,19 @@ namespace SkyrimMCP::WorldManager {
         }
     }
 
-    json Teleport(const std::string& cellId) {
+    // FEAT-258 experiment: the loading screen shown on purpose around a native move. Shown by the server before the move and
+    // hidden after arrival if the game didn't close it itself.
+    json LoadingMenu(bool show) {
+        auto* queue = RE::UIMessageQueue::GetSingleton();
+        if (!queue) return {{"error", "UI message queue not available"}};
+        auto* ui = RE::UI::GetSingleton();
+        const bool open = ui && ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
+        if (show && !open) queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+        if (!show && open) queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kHide, nullptr);
+        return {{"wasOpen", open}, {"requested", show ? "show" : "hide"}};
+    }
+
+    json Teleport(const std::string& cellId, const std::string& method) {
         // coc is kept as console command — MoveTo_Impl is private, and coc handles
         // all cell loading/transition logic (loading screens, cell attach, navmesh)
         // that direct MoveTo doesn't. coc is a valid script command, not batch.
@@ -73,9 +85,22 @@ namespace SkyrimMCP::WorldManager {
                 }
             }
         }
-        TaskQueue::Post([cellId]() { Helpers::ExecuteConsoleCommand("coc " + cellId); });
+        // FEAT-258: how to move. coc (default, as before): the console command, which freezes the frame during the load.
+        // center: the native CenterOnCell coc itself calls, without the console. loadingscreen: show the Loading Menu, then
+        // CenterOnCell on a later frame, so the game may draw its loading screen as fast travel does.
+        if (method == "center") {
+            TaskQueue::Post([cellId]() { if (auto* p = RE::PlayerCharacter::GetSingleton()) p->CenterOnCell(cellId.c_str()); });
+        } else if (method == "loadingscreen") {
+            TaskQueue::Post([cellId]() {
+                if (auto* queue = RE::UIMessageQueue::GetSingleton())
+                    queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+                TaskQueue::Post([cellId]() { if (auto* p = RE::PlayerCharacter::GetSingleton()) p->CenterOnCell(cellId.c_str()); });
+            });
+        } else {
+            TaskQueue::Post([cellId]() { Helpers::ExecuteConsoleCommand("coc " + cellId); });
+        }
         json result = {{"moving", true}, {"cell", cellId}, {"targetFormId", std::format("{:08X}", target->GetFormID())},
-                       {"markerId", markerId}};
+                       {"markerId", markerId}, {"method", method}};
         if (const char* name = target->GetName(); name && name[0]) result["targetName"] = name;
         return result;
     }

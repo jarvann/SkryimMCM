@@ -504,7 +504,12 @@ namespace SkyrimMCP::Protocol {
         registry["teleport"] = [](const std::string& id, const json& params) {
             std::string cellId = params.value("cellId", "");
             if (cellId.empty()) return MakeResponse(id, false, {}, "Missing 'cellId' parameter").dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
-            return GameThread(id, [cellId]() { return GameInterface::Teleport(cellId); });
+            const std::string method = params.value("method", std::string("coc"));
+            return GameThread(id, [cellId, method]() { return GameInterface::Teleport(cellId, method); });
+        };
+        registry["loading_menu"] = [](const std::string& id, const json& params) {
+            const bool show = params.value("show", false);
+            return GameThread(id, [show]() { return GameInterface::LoadingMenu(show); });
         };
 
         registry["set_quest_stage"] = [](const std::string& id, const json& params) {
