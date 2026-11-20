@@ -1174,6 +1174,10 @@
             {
               "datetime": "2026-11-20T02:30",
               "note": "Source found: the save's QUST change forms (CHANGE_QUEST_STAGES, bit 31) hold every stage with a status byte (1 = done); Save118 has 1,077 quests with stage data (e.g. 00017F05 done 0,5,15,80,110,120). The scanner reads them (zlib per change form). Built: GetCharacterBlueprint(stagesFromSave=true) saves and adds stagesDone per quest (falls back to the newest save with a note); ReplayQuests(blueprintPath, quests: names|'list', confirm, allowMajor, previewSave): way-back save, plan of missing stages per quest, starts unstarted quests, sets stages ascending with a read-back check, stops a quest at the first refusal; main/faction/Civil War/DLC lines need allowMajor; up to ~40 stages a call. The save records which stages are done, not their order: replay is in stage order."
+            },
+            {
+              "datetime": "2026-11-20T12:30",
+              "note": "Round: list 88 candidates, preview for Favor154 works; SetQuestStage reported applied:false for 0006F211 though it reached 255 (one read at 500 ms): stage reads now poll up to ~4 s (SetQuestStage and ReplayQuests); replay cap 25 stages a call."
             }
           ],
           "targetRelease": "1.4"
@@ -4640,6 +4644,10 @@
             {
               "datetime": "2026-11-20T01:45",
               "note": "Verified: SheatheProbe saved first time with a spell readied (refused before auto-sheathe); SheatheProbe2 with a weapon out, reply carries the 'sheathed' line. ArchiveSaves dry run lists 22 saves correctly, keeps the newest and the flood test save."
+            },
+            {
+              "datetime": "2026-11-20T12:30",
+              "note": "Auto-sheathe saved mid-animation once (refused although the reply said sheathed): now waits for weapon state 0 (sheathed) and settles 0.7 s."
             }
           ],
           "targetRelease": "1.4"
