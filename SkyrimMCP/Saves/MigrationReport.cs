@@ -10,14 +10,17 @@ public static class MigrationReport
 
     static readonly string[] Implicit = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
 
-    /// <summary>Vortex/MO2-style Plugins.txt (active lines start with '*') plus the base game and Creation Club files.</summary>
-    public static List<CurrentPlugin> FromPluginsTxt(string pluginsTxt, string? gameFolder)
+    /// <summary>
+    /// Vortex/MO2-style Plugins.txt (active lines start with '*') plus the base game and Creation Club files. A null
+    /// pluginsTxt is a game with no list yet (vanilla): only the base game and Creation Club files.
+    /// </summary>
+    public static List<CurrentPlugin> FromPluginsTxt(string? pluginsTxt, string? gameFolder)
     {
         var list = Implicit.Select(n => new CurrentPlugin(n, false)).ToList();
         if (gameFolder != null && File.Exists(Path.Combine(gameFolder, "Skyrim.ccc")))
             list.AddRange(File.ReadAllLines(Path.Combine(gameFolder, "Skyrim.ccc")).Where(l => l.Trim().Length > 0)
                 .Select(l => new CurrentPlugin(l.Trim(), null)));
-        foreach (var line in File.ReadAllLines(pluginsTxt))
+        foreach (var line in pluginsTxt == null ? [] : File.ReadAllLines(pluginsTxt))
         {
             var l = line.Trim();
             if (l.StartsWith('*')) list.Add(new CurrentPlugin(l[1..].Trim(), null));
