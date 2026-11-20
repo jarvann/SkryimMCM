@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 293,
+    "totalItems": 298,
     "completed": 247,
     "completedPartial": 2,
     "implementedUntested": 4,
     "inProgress": 0,
-    "planned": 39,
+    "planned": 45,
     "bugs": 93
   },
   "phases": [
@@ -1147,14 +1147,6 @@
               "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ]
-        },
-        {
-          "id": "FEAT-122",
-          "type": "feature",
-          "status": "designed",
-          "title": "Spawn NPC from blueprint",
-          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face \u2014 RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy.",
-          "targetRelease": "2.0"
         },
         {
           "id": "FEAT-262",
@@ -3572,25 +3564,6 @@
           "targetRelease": "1.3"
         },
         {
-          "id": "FEAT-256",
-          "type": "feature",
-          "status": "planned",
-          "priority": "medium",
-          "title": "Regenerate an NPC's face after a head part change",
-          "description": "Changing a head part on an NPC with a pre-built FaceGen mesh gives the dark-face fault (BUG-064: Lucien's hair). A real fix rebuilds the face: write a new FaceGeom NIF (head parts with morphs applied) and FaceTint DDS for the NPC, as the Creation Kit's Export FaceGen does, into an override folder, then rebuild his 3D. Needs: reading every head part NIF and its TRI morphs (FEAT-254 readers), writing SSE NIF, tint layer compositing to DDS. Interim: wigs (equippable hair).",
-          "history": [
-            {
-              "datetime": "2026-11-19T12:15",
-              "note": "From the Lucien hair test; after 1.3."
-            },
-            {
-              "datetime": "2026-11-20T19:00",
-              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
-            }
-          ],
-          "targetRelease": "1.5"
-        },
-        {
           "id": "FEAT-257",
           "type": "feature",
           "status": "complete",
@@ -4639,48 +4612,6 @@
           "targetRelease": "1.3"
         },
         {
-          "id": "FEAT-231",
-          "type": "feature",
-          "status": "planned",
-          "priority": "low",
-          "title": "Face builder M4: slider response map",
-          "description": "For the current head, nudge each relevant slider both ways, capture, and record which ratios move and by how much; cache per head and slider set; drop sliders with no measurable effect. Test: NSK_EyeAngle labelled as corner tilt, EFM_Eyelid_Lower as no effect on the player's head.",
-          "history": [
-            {
-              "datetime": "2026-11-16T23:00",
-              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
-            },
-            {
-              "datetime": "2026-11-20T19:00",
-              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
-            }
-          ],
-          "targetRelease": "1.5"
-        },
-        {
-          "id": "FEAT-232",
-          "type": "feature",
-          "status": "planned",
-          "priority": "low",
-          "title": "Face builder M5: fitting loop, plus the agent skill",
-          "description": "Given a reference and the response map: pick the slider changes that most reduce the largest differences, apply, capture, re-measure, repeat in small clamped steps until improvement stalls; save a named preset at each accepted step; return before/after/reference crops with the ratio table. The in-game agent writes the usage skill once M1-M3 tool names exist. Open questions for the player: reference kinds (in-game character, render, photo), whether makeup and head parts may change or shape only, whether hair may be hidden during captures.",
-          "history": [
-            {
-              "datetime": "2026-11-16T23:00",
-              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
-            },
-            {
-              "datetime": "2026-11-17T00:00",
-              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
-            },
-            {
-              "datetime": "2026-11-20T19:00",
-              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
-            }
-          ],
-          "targetRelease": "1.5"
-        },
-        {
           "id": "FEAT-233",
           "type": "feature",
           "status": "complete",
@@ -4702,25 +4633,6 @@
             }
           ],
           "targetRelease": "1.3"
-        },
-        {
-          "id": "FEAT-235",
-          "type": "feature",
-          "status": "planned",
-          "priority": "high",
-          "title": "Face builder: offline face model",
-          "description": "Rebuild the face outside the game: read chargen TRI files (base + vanilla morphs), RaceMenu extension TRIs and slider definitions (meshes\\actors\\character\\FaceGenMorphs\\<plugin>\\morphs.ini, races.ini, sliders\\*.ini; some sets are in BSAs, so a BSA v105 reader), .jslot presets (sliders, tints, head parts, sculpt) and tint masks; reconstruct the mesh (base + morphs + extensions + sculpt), composite tints, and software-render front, three-quarter and profile views for landmark measurement. Validate against RaceMenu's exported head (SKSE\\Plugins\\CharGen\\<name>.nif). Critical path for the offline fitting loop.",
-          "history": [
-            {
-              "datetime": "2026-11-17T00:00",
-              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
-            },
-            {
-              "datetime": "2026-11-20T19:00",
-              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
-            }
-          ],
-          "targetRelease": "1.5"
         },
         {
           "id": "FEAT-236",
@@ -4821,7 +4733,7 @@
       "name": "v1.5 \u2014 Build and install mods, crash and runaway care",
       "priority": "medium",
       "status": "planned",
-      "estimate": "80-130 human hours; Claude 7-11 h, 3-4.5M tokens. Includes the 5 items slipped from 1.4 (the face builder offline model and fitting loop are the largest) and 4 unparked items; FEAT-277 may make FEAT-278 unneeded.",
+      "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "items": [
         {
           "id": "FEAT-270",
@@ -4987,6 +4899,237 @@
             }
           ],
           "targetRelease": "1.5"
+        }
+      ]
+    },
+    {
+      "phase": 18,
+      "name": "v1.6 \u2014 Characters: face builder, NPCs and followers from blueprints",
+      "priority": "high",
+      "status": "planned",
+      "estimate": "70-110 human hours; Claude 7-10 h, 3-4M tokens. The FaceGen writer (FEAT-281) is the main unknown: spike it first.",
+      "items": [
+        {
+          "id": "FEAT-122",
+          "type": "feature",
+          "status": "planned",
+          "title": "Spawn NPC from blueprint",
+          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face \u2014 RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy. 1.6 scope: spawn the NPC in the running game as a preview (runtime base from INFRA-024, recreated on load until it is exported by FEAT-283), with the face from the blueprint written by FEAT-281 so it never shows the grey or dark face.",
+          "targetRelease": "1.6",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Moved from 2.0 to 1.6, the Characters release (Cory)."
+            }
+          ],
+          "priority": "high",
+          "dependsOn": [
+            "INFRA-024",
+            "FEAT-281"
+          ]
+        },
+        {
+          "id": "FEAT-256",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Regenerate an NPC's face after a head part change",
+          "description": "Changing a head part on an NPC with a pre-built FaceGen mesh gives the dark-face fault (BUG-064: Lucien's hair). A real fix rebuilds the face: write a new FaceGeom NIF (head parts with morphs applied) and FaceTint DDS for the NPC, as the Creation Kit's Export FaceGen does, into an override folder, then rebuild his 3D. Needs: reading every head part NIF and its TRI morphs (FEAT-254 readers), writing SSE NIF, tint layer compositing to DDS. Interim: wigs (equippable hair).",
+          "history": [
+            {
+              "datetime": "2026-11-19T12:15",
+              "note": "From the Lucien hair test; after 1.3."
+            },
+            {
+              "datetime": "2026-11-20T19:00",
+              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-281",
+            "FEAT-254"
+          ]
+        },
+        {
+          "id": "FEAT-231",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Face builder M4: slider response map",
+          "description": "For the current head, nudge each relevant slider both ways, capture, and record which ratios move and by how much; cache per head and slider set; drop sliders with no measurable effect. Test: NSK_EyeAngle labelled as corner tilt, EFM_Eyelid_Lower as no effect on the player's head.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-20T19:00",
+              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-235"
+          ]
+        },
+        {
+          "id": "FEAT-232",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Face builder M5: fitting loop, plus the agent skill",
+          "description": "Given a reference and the response map: pick the slider changes that most reduce the largest differences, apply, capture, re-measure, repeat in small clamped steps until improvement stalls; save a named preset at each accepted step; return before/after/reference crops with the ratio table. The in-game agent writes the usage skill once M1-M3 tool names exist. Open questions for the player: reference kinds (in-game character, render, photo), whether makeup and head parts may change or shape only, whether hair may be hidden during captures.",
+          "history": [
+            {
+              "datetime": "2026-11-16T23:00",
+              "note": "Proposed by the in-game agent after a long face-tuning session (face_builder_build_brief_2026-11-16.md and face_management_notes_2026-11-16.md in <Skyrim>\\_Claude)."
+            },
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
+            },
+            {
+              "datetime": "2026-11-20T19:00",
+              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-231"
+          ]
+        },
+        {
+          "id": "FEAT-235",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Face builder: offline face model",
+          "description": "Rebuild the face outside the game: read chargen TRI files (base + vanilla morphs), RaceMenu extension TRIs and slider definitions (meshes\\actors\\character\\FaceGenMorphs\\<plugin>\\morphs.ini, races.ini, sliders\\*.ini; some sets are in BSAs, so a BSA v105 reader), .jslot presets (sliders, tints, head parts, sculpt) and tint masks; reconstruct the mesh (base + morphs + extensions + sculpt), composite tints, and software-render front, three-quarter and profile views for landmark measurement. Validate against RaceMenu's exported head (SKSE\\Plugins\\CharGen\\<name>.nif). Critical path for the offline fitting loop.",
+          "history": [
+            {
+              "datetime": "2026-11-17T00:00",
+              "note": "Player's answers (2026-11-16): references can be another in-game character, a render or a photo, so support all; full edit (shape, head parts, makeup tints, overlays and tattoos); hiding hair during captures is fine as an option; work offline first (build and test a full model against the baseline, then write a preset that loads right first time, or set live sliders until it matches); never cycle through hairs in game. Plan: docs/face-builder-plan.md."
+            },
+            {
+              "datetime": "2026-11-20T19:00",
+              "note": "Slipped from 1.4; moved to 1.5 (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-254"
+          ]
+        },
+        {
+          "id": "FEAT-281",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "FaceGen writer: head mesh NIF and tint DDS for an NPC",
+          "description": "Write what the Creation Kit's Export FaceGen writes: the FaceGeom NIF (head parts with their morphs and sculpt applied) and the FaceTint DDS, under meshes\\actors\\character\\FaceGenData\\FaceGeom\\<plugin>\\<formid>.nif and the matching textures folder, so the game uses them instead of the grey or dark face. Shared by FEAT-256 (fix a changed NPC), FEAT-122 (spawned NPC) and FEAT-283 (exported follower). Starts with a spike: write one NPC's head and see it load in game without the dark face; check nifly's licence (GPL-3.0 would put the NIF code in the GPL plugin side, not the MIT server) against writing a small NIF writer of our own; check whether RaceMenu's head export can be pointed at an NPC.",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "The shared core of the Characters release: once it exists, most of FEAT-122 and FEAT-256 is done."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-254"
+          ]
+        },
+        {
+          "id": "INFRA-024",
+          "type": "infrastructure",
+          "status": "planned",
+          "priority": "high",
+          "title": "Runtime NPC base creation",
+          "description": "Create a new NPC base form at runtime by copying a template (race and sex matching the blueprint) through the form factory, then set its face data, head parts, tints, skills, perks, spells, factions and outfit from the blueprint. Runtime forms aren't kept in saves, so SkyLink records them in its co-save and recreates them on load until the character is exported as a plugin (FEAT-283). Host-side form allocation, reusable later by the runtime spell and enchantment creators (FEAT-126/127, 2.0).",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Brought forward from 2.0: FEAT-122 needs it (Cory: bring 2.0 items forward when 1.6 depends on them)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-282",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Create a follower from a blueprint",
+          "description": "Make a spawned NPC a working follower: the vanilla follower factions and a follower-capable voice type so the game's own recruit dialogue works, sensible combat style and outfit, and a check for follower frameworks (Nether's Follower Framework, AFT, EFF) so they see it. Says plainly when the chosen voice type has no follower lines. Uses the game's own follower packages; custom AI packages are out of scope (2.1).",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Part of the character loop: description or photo, then face, then NPC, then follower, then mod."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-122"
+          ]
+        },
+        {
+          "id": "FEAT-283",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Export a character as a standalone follower mod",
+          "description": "Turn a spawned NPC or follower into a real mod: an NPC record and a placement in a light plugin (FEAT-273), the FaceGen files (FEAT-281), any RaceMenu overlays baked or listed as requirements, masters checked (FEAT-274), installed through the mod manager (FEAT-275) and packaged as a zip the player could share (FEAT-270's packaging). Then restart or main-menu reload (FEAT-278 / FEAT-277), load the save and check the NPC from the plugin replaced the runtime preview. This closes the loop and is the bridge to 2.1.",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Cory: 'I would love to see that loop closed completely.'"
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-122",
+            "FEAT-281",
+            "FEAT-273",
+            "FEAT-274",
+            "FEAT-275"
+          ]
+        },
+        {
+          "id": "FEAT-284",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Character loop end to end: from a description or photo to a follower mod",
+          "description": "The acceptance test and agent skill for 1.6: the player describes a character or gives a photo; the AI builds the face (fitting loop FEAT-232, offline model FEAT-235), writes a blueprint, spawns the NPC (FEAT-122), makes it a follower (FEAT-282) and exports it as a mod (FEAT-283), checking each step in game. Answers DutchiesCanadian's 'create characters using a description'.",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:15",
+              "note": "Defines 'done' for the Characters release."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-232",
+            "FEAT-282",
+            "FEAT-283"
+          ]
         }
       ]
     }
@@ -5792,10 +5935,11 @@
       "items": [
         "FEAT-015",
         "FEAT-113",
-        "FEAT-256",
-        "FEAT-231",
-        "FEAT-232",
-        "FEAT-235",
+        "FEAT-254",
+        "BUG-081",
+        "BUG-082",
+        "BUG-087",
+        "BUG-093",
         "FEAT-270",
         "FEAT-271",
         "FEAT-272",
@@ -5809,16 +5953,43 @@
         "FEAT-280",
         "INFRA-005",
         "INFRA-007",
-        "INFRA-023",
-        "BUG-093"
+        "INFRA-023"
       ],
-      "estimate": "80-130 human hours; Claude 7-11 h, 3-4.5M tokens. Includes the 5 items slipped from 1.4 (the face builder offline model and fitting loop are the largest) and 4 unparked items; FEAT-277 may make FEAT-278 unneeded.",
+      "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "testRemediation": [
         "FEAT-254",
         "BUG-081",
         "BUG-082",
         "BUG-087"
-      ]
+      ],
+      "order": "Ships before 1.6 (decided 2026-11-20)"
+    },
+    "1.6": {
+      "theme": "Characters: finish the face builder; NPCs and followers from blueprints; export a character as a follower mod",
+      "decided": "2026-11-20",
+      "items": [
+        "FEAT-122",
+        "FEAT-256",
+        "FEAT-231",
+        "FEAT-232",
+        "FEAT-235",
+        "FEAT-281",
+        "INFRA-024",
+        "FEAT-282",
+        "FEAT-283",
+        "FEAT-284"
+      ],
+      "estimate": "70-110 human hours; Claude 7-10 h, 3-4M tokens. The FaceGen writer (FEAT-281) is the main unknown: spike it first.",
+      "broughtForward": "FEAT-122 and INFRA-024 from 2.0 (dependencies of the character loop)",
+      "doneWhen": "FEAT-284: a description or photo becomes an installed follower mod, checked in game"
+    },
+    "2.1": {
+      "theme": "Build a mod from inside Skyrim in real time, test through it, then package it with the Creation Kit",
+      "recorded": "2026-11-20",
+      "source": "Cory: 'can we build a mod from inside of skyrim in realtime, test through it, and then package it in Creation Kit'",
+      "buildsOn": "1.5 mod-building chain (FEAT-270..278) and 1.6's character export (FEAT-283)",
+      "note": "Cory expects AI packages to be the hardest part.",
+      "items": []
     }
   }
 }
