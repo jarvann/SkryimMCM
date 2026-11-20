@@ -7,7 +7,7 @@
 # SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
-    [string]$Version = "1.3.0",
+    [string]$Version = "1.4.0",
     [string]$OutputDir = "release",
     [string]$VcpkgRoot = "C:\vcpkg"
 )
@@ -111,14 +111,18 @@ and earlier.
 3. Ask Claude to interact with your game!
 
 ## Features
-- About 150 MCP tools for reading and changing game state
+- About 160 MCP tools for reading and changing game state
 - Player stats, inventory, spells, perks, shouts, appearance
 - Quests, NPCs, followers, weather, world objects, containers, teleport
 - Combat analysis, event system, crash log
 - Face builder (experimental, needs RaceMenu): captures, measurement against a
   photo, sliders, makeup, hair and brow colour, sculpt, a lit studio room
 - Hair picker and body measurement (experimental)
-- Character blueprint export (with quest progress) and apply (items, gear, gold)
+- Character blueprint export (with quest stages done) and apply (items, gear,
+  gold, skills, level, perks, spells, shouts); quest replay
+- Save health (new in 1.4): live script pile-ups by mod, save check and clean
+  (cleaning needs ReSaver), old saves against a changed load order
+- Teleports show the game's loading screen
 - Safety rules: moves, captures and face edits refuse in menus, scenes,
   combat, furniture and similar states, with the reason
 - Papyrus VM bridge and form search
@@ -130,6 +134,8 @@ and earlier.
 - Face and pose models: Google MediaPipe (Apache-2.0), see SkyLinkAI_Server\Models\NOTICE.txt
 - ONNX Runtime by Microsoft (MIT)
 - Guidebook answers from UESP (CC BY-SA 2.5), fetched on demand
+- Save reading follows ReSaver (FallrimTools by Mark Fairchild, Apache-2.0); cleaning
+  runs an installed ReSaver's own library. See SkyLinkAI_Server\NOTICE-ReSaver.txt
 
 ## License
 - SkyrimMCPPlugin.dll and SkyLinkAI\SkyLinkLogic.dll: GPL-3.0-or-later (statically link CommonLibSSE-NG)

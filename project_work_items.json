@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-16",
+  "lastUpdated": "2026-11-20",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
