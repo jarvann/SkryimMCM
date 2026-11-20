@@ -92,6 +92,9 @@ public static class SkyLinkSettings
     /// </summary>
     public static (string? Folder, string? Profile) Mo2Instance()
     {
+        // A game started without MO2 (running while MO2 isn't) reads the real Data folder and its own Plugins.txt, whatever MO2
+        // instance points at its folder (round B: InstallPlugin wrote to MO2's profile while the GOG game ran directly).
+        if (RunningWithoutMo2()) return (null, null);
         var s = Load();
         if (Str(s, "mo2Path") is string configured) return (configured, Str(s, "mo2Profile"));
         var game = SkyrimPath().Path;
@@ -113,6 +116,16 @@ public static class SkyLinkSettings
         return (null, null);
 
         static string Unwrap(string v) => v.StartsWith("@ByteArray(") && v.EndsWith(")") ? v[11..^1] : v;
+    }
+
+    internal static bool RunningWithoutMo2()
+    {
+        try
+        {
+            return System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Length > 0
+                && System.Diagnostics.Process.GetProcessesByName("ModOrganizer").Length == 0;
+        }
+        catch (Exception) { return false; }
     }
 
     /// <summary>Folders that hold game files, lowest priority first: Data, then MO2's enabled mods by priority, then overwrite.</summary>
