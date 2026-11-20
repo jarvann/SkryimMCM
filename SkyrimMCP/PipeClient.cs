@@ -137,6 +137,7 @@ public class PipeClient : IPipeClient
             if (!success)
             {
                 var error = response["error"]?.GetValue<string>() ?? "Unknown error from SKSE plugin";
+                if (error.Contains("timed out", StringComparison.OrdinalIgnoreCase) && GameDownNote() is string down) error = down + " (" + error + ")";
                 throw new McpException(error);
             }
 
@@ -145,12 +146,12 @@ public class PipeClient : IPipeClient
         catch (OperationCanceledException)
         {
             Disconnect();
-            throw new McpException("Timed out waiting for response from SKSE plugin - game may be loading or paused");
+            throw new McpException(GameDownNote() ?? "Timed out waiting for response from SKSE plugin - game may be loading or paused");
         }
         catch (IOException)
         {
             Disconnect();
-            throw new McpException("Lost connection to Skyrim - the game may have been closed");
+            throw new McpException(GameDownNote() ?? "Lost connection to Skyrim - the game may have been closed");
         }
         finally
         {
@@ -161,6 +162,28 @@ public class PipeClient : IPipeClient
     /// <summary>
     /// Why the pipe didn't answer, as far as the server can tell from outside the game (FEAT-210).
     /// </summary>
+    /// <summary>
+    /// Why the game stopped answering, if it's the game itself: gone (closed or crashed) or not responding (frozen, or writing a
+    /// crash report). Null when Skyrim is running normally. After a crash the plugin's pipe can still answer for a while and
+    /// report game-thread timeouts, which read like a slow load (seen 2026-11-19).
+    /// </summary>
+    internal static string? GameDownNote()
+    {
+        try
+        {
+            var procs = System.Diagnostics.Process.GetProcessesByName("SkyrimSE");
+            if (procs.Length == 0) return "Skyrim isn't running any more: it closed or crashed (Crash Logger writes its report to Documents\\My Games\\<game>\\SKSE; GetCrashLog reads it).";
+            foreach (var p in procs)
+            {
+                p.Refresh();
+                if (!p.HasExited && p.MainWindowHandle != IntPtr.Zero && !p.Responding)
+                    return "Skyrim isn't responding (frozen, or crashed and writing a crash report). If it doesn't recover within a minute, it has crashed: GetCrashLog reads the report.";
+            }
+        }
+        catch (Exception) { }
+        return null;
+    }
+
     internal static string DescribeConnectFailure()
     {
         bool running;
