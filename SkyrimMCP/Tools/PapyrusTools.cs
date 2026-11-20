@@ -267,7 +267,10 @@ public class PapyrusTools : ToolBase
             // Creeping wins over spiking when the counts rise most of the time (68 -> 71 -> 75 with the odd dip); stuck high
             // when every call stays at 20+ and never drains (Aniya flat at ~390); spiking when it reaches 20+ and drains between.
             var stepsUp = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).Count(x => x);
-            var creeping = stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.Last() - lasts.First() >= 5;
+            // Rising overall with the odd dip (182 -> 180 -> 184 -> 196 read "stuck high" in round B): half the steps up is enough
+            // when the rise is clear.
+            var creeping = (stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.Last() - lasts.First() >= 5)
+                        || (stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.5) && lasts.Last() - lasts.First() >= 10);
             var stuckHigh = series.All(x => x.last >= 20);
             // High but falling call after call (round A: 180 -> 170 -> 160 read "never draining"): it is draining, slowly.
             var stepsDown = lasts.Zip(lasts.Skip(1), (a, b) => b < a).Count(x => x);
@@ -358,8 +361,13 @@ public class PapyrusTools : ToolBase
         "can come back on the next load if the mod registers again; the lasting fix is the mod (update or configure it) or a " +
         "script patch (CompileScript, PackageOverrideMod). Can stop a mod feature that relied on that update, so ask the player " +
         "first and name the mod. dryRun (default true) lists the objects only.")]
-    public async Task<object> StopRunaway(string entry, bool dryRun = true, bool gameTime = false, int limit = 50)
+    public async Task<object> StopRunaway(string entry, bool dryRun = true, bool gameTime = false, int limit = 50, bool release = false)
     {
+        if (release)
+        {
+            var r = await _pipe.SendRequestAsync("block_updates", new JsonObject { ["clear"] = true });
+            return new { released = true, block = DeserializeResponse(r), note = "Those objects can register for updates again (the mod's feature works again)." };
+        }
         if (string.IsNullOrWhiteSpace(entry)) return new { error = "entry is empty: pass a handler from StackReport, e.g. MyScript.OnUpdate" };
         var found = await _pipe.SendRequestAsync("find_stack_objects", new JsonObject { ["entry"] = entry.Trim(), ["limit"] = Math.Clamp(limit, 1, 200) });
         if (found?["error"] != null) return DeserializeResponse(found);
@@ -385,6 +393,13 @@ public class PapyrusTools : ToolBase
         }
         var removed = passes.Sum();
         var stillComing = passes.Skip(4).Sum();
+
+        // Round B: copies still running re-register as they finish (the wendigo loop one second later), long after any short
+        // watch. Block these objects' update registrations for the rest of the session (until a save loads or release=true).
+        JsonNode? block = null;
+        string? blockError = null;
+        try { block = await _pipe.SendRequestAsync("block_updates", new JsonObject { ["handles"] = handles.DeepClone() }); }
+        catch (ModelContextProtocol.McpException ex) { blockError = ex.Message; }
         int? after = null;
         try
         {
@@ -402,11 +417,15 @@ public class PapyrusTools : ToolBase
             perPass = passes,
             // The VM's whole update table, not these objects' share (round A: 176 next to 2 objects looked wrong).
             vmUpdateRegistrationsTotal = first?["registrationsBefore"],
-            reading = removed == 0
-                ? "None of these objects had an update registration: the loop isn't an OnUpdate re-registering itself (it may be events or a Wait loop), so this can't stop it. The lasting fix is the mod or a script patch."
-                : stillComing > 0
-                    ? $"Removed {removed} registration(s), but queued OnUpdates were still re-registering in the last passes: run StopRunaway again in a minute, once more of the queue has drained."
-                    : $"Removed {removed} update registration(s) and none came back: those objects get no more OnUpdate calls.",
+            blockedUntilNextLoad = block != null,
+            block = block != null ? DeserializeResponse(block) : blockError != null ? "the plugin can't block yet (it needs the newer plugin DLL and a game restart): " + blockError : null,
+            reading = block != null
+                ? $"Removed {removed} registration(s) and blocked these {objects.Count} object(s) from registering again until the next save load " +
+                  "(StopRunaway with release: true lifts it sooner). Copies still running finish without starting new ones, so the count should stop " +
+                  "rising and fall over the next minutes: check with StackReport. The mod's feature on these objects is off meanwhile."
+                : removed == 0
+                    ? "None of these objects had an update registration in the last 10 s: the loop may not be an OnUpdate re-registering itself (events or a Wait loop), and the block isn't available on this plugin build."
+                    : $"Removed {removed} registration(s) in 10 s ({(stillComing > 0 ? "some were still coming back" : "none came back in that time")}), but copies still running re-register as they finish: without the block (newer plugin DLL) this can't hold. Check with StackReport.",
             note = "This stops new OnUpdate calls; it doesn't end stacks already running. Those finish at their own pace (often minutes for " +
                    "a long loop), so stacksAfter5s barely moves: judge it with StackReport over the next minutes (falling = stopped). " +
                    "If the count climbs back, the mod re-registers from another event: the lasting fix is the mod itself or a script patch.",
