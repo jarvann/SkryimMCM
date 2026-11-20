@@ -118,6 +118,10 @@ public class CrashTools : ToolBase
             sections = output,
             recent,
             windowsDump,
+            // FEAT-287: a second opinion from a dedicated analyzer with a much larger signature set (the player pastes the log).
+            secondOpinion = file.Name.StartsWith("crash-", StringComparison.OrdinalIgnoreCase)
+                ? $"For a second opinion, the player can paste this report into Phostwood's Crash Log Analyzer (https://phostwood.github.io/crash-analyzer/), which knows many more crash signatures: {file.FullName}"
+                : null,
             skylinkRecorder = recorder,
         });
     }
