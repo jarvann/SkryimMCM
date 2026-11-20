@@ -182,6 +182,7 @@ dotnet build SkyLinkLauncher
 - Face and pose landmark models: Google [MediaPipe](https://ai.google.dev/edge/mediapipe) Face Landmarker and Pose Landmarker (Apache-2.0), converted to ONNX unchanged; see `Models\NOTICE.txt`
 - [ONNX Runtime](https://onnxruntime.ai/) by Microsoft (MIT)
 - Guidebook content from [UESP](https://en.uesp.net/) (CC BY-SA 2.5), fetched on demand
+- [YamlDotNet](https://github.com/aaubry/YamlDotNet) by Antoine Aubry and contributors (MIT), to read the player's own LOOT masterlist (never shipped with SkyLink)
 
 ## License
 

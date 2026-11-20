@@ -82,6 +82,66 @@ public class PluginTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("What LOOT's masterlist says (FEAT-286), read from the player's own LOOT install: for one plugin, its requirements " +
+        "(and whether they're installed), incompatibilities (and whether they're active), LOOT's messages that apply, dirty edits " +
+        "matched by the file's checksum (with the cleaning tool to use) and links. With no plugin, scans the whole load order and " +
+        "lists the problems: active incompatible pairs, missing requirements, warnings and errors, and dirty plugins " +
+        "(checkDirty: true checksums each plugin LOOT has dirty records for; slower on big lists). Messages whose condition " +
+        "SkyLink can't evaluate (versions, checksums) come with the condition and 'applies: null'. Says how old the masterlist is. " +
+        "Needs LOOT installed (loot.github.io). Read-only.")]
+    public async Task<object> GetLootNotes(string? plugin = null, bool checkDirty = true, int page = 1, int pageSize = 40)
+    {
+        return await Task.Run<object>(() =>
+        {
+            LootMasterlist? ml;
+            try { ml = LootMasterlist.Load(); }
+            catch (Exception ex) { return new { error = "Couldn't read LOOT's masterlist: " + ex.Message }; }
+            if (ml == null) return new { lootFound = false, note = "LOOT's masterlist wasn't found (%LOCALAPPDATA%\\LOOT\\games\\Skyrim Special Edition). Install LOOT and run it once; SkyLink then reads its notes." };
+            var lo = LoadOrder.Read();
+            if (plugin != null)
+            {
+                var name = Path.GetFileName(plugin.Trim());
+                return new { masterlist = ml.Age(), notes = ml.NotesFor(name, lo, checkDirty) };
+            }
+
+            var problems = new List<object>();
+            int known = 0, dirtyCount = 0, incCount = 0, reqCount = 0, warnCount = 0;
+            foreach (var p in lo.Active)
+            {
+                if (!ml.EntriesFor(p).Any()) continue;
+                known++;
+                var n = System.Text.Json.JsonSerializer.SerializeToNode(ml.NotesFor(p, lo, checkDirty))!;
+                var inc = n["activeIncompatibilities"]?.GetValue<int>() ?? 0;
+                var req = n["missingRequirements"]?.GetValue<int>() ?? 0;
+                var dirty = n["dirty"] is System.Text.Json.Nodes.JsonArray d && d.Count > 0;
+                var serious = (n["messages"] as System.Text.Json.Nodes.JsonArray)?.Where(m => m?["type"]?.ToString() is "warn" or "error" && m?["applies"]?.GetValue<bool?>() == true).ToList() ?? [];
+                if (inc == 0 && req == 0 && !dirty && serious.Count == 0) continue;
+                incCount += inc > 0 ? 1 : 0; reqCount += req > 0 ? 1 : 0; dirtyCount += dirty ? 1 : 0; warnCount += serious.Count > 0 ? 1 : 0;
+                problems.Add(new
+                {
+                    plugin = p,
+                    incompatibleWith = (n["incompatibilities"] as System.Text.Json.Nodes.JsonArray)?.Where(x => x?["active"]?.GetValue<bool>() == true).Select(x => x?["name"]?.ToString()),
+                    missing = (n["requirements"] as System.Text.Json.Nodes.JsonArray)?.Where(x => x?["present"]?.GetValue<bool>() == false).Select(x => x?["name"]?.ToString()),
+                    dirty = dirty ? n["dirty"] : null,
+                    warnings = serious.Select(m => m?["text"]?.ToString()),
+                });
+            }
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 5, 200);
+            return new
+            {
+                masterlist = ml.Age(),
+                activePlugins = lo.Active.Count,
+                knownToLoot = known,
+                summary = $"{incCount} plugins with an active incompatibility, {reqCount} missing a requirement, {dirtyCount} dirty, {warnCount} with a LOOT warning or error.",
+                page, pages = (problems.Count + pageSize - 1) / pageSize,
+                problems = problems.Skip((page - 1) * pageSize).Take(pageSize),
+                note = "LOOT's notes are community knowledge, not checks of the files' contents (except dirty edits, matched by checksum).",
+            };
+        });
+    }
+
+    [McpServerTool]
     [Description("Check a plugin's masters before installing or enabling it (FEAT-274): each master missing (no file), disabled, " +
         "or loading after the plugin, in plain terms, with what to do. Works on a plugin already in the load order (by name) or " +
         "on a downloaded file not installed yet (full path); for one not installed it checks the masters as if the plugin were " +
