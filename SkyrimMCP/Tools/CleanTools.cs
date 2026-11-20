@@ -97,7 +97,7 @@ public class CleanTools : ToolBase
             File.Copy(c.path, Path.Combine(backupDir, c.plugin), overwrite: true);
             var logBefore = File.Exists(log) ? new FileInfo(log).Length : 0;
             var args = $"-qac -autoexit -autoload \"{c.plugin}\"" + (data != null ? $" -D:\"{data}\"" : "");
-            var run = await ModBuildTools.RunProcess(xedit, args, Path.GetDirectoryName(xedit)!, TimeSpan.FromMinutes(15));
+            var run = await RunMinimized(xedit, args, TimeSpan.FromMinutes(15));
             var after = await Task.Run(() => ml.CleaningFor(c.plugin, c.path));
             string? logTail = null;
             int? removed = null, undeleted = null;
@@ -114,11 +114,14 @@ public class CleanTools : ToolBase
                 }
             }
             catch (IOException) { }
+            if (after.Crc != c.info.Crc) RecordCleaning(c.plugin, c.info.Crc, after.Crc, Path.Combine(backupDir, c.plugin));
             results.Add(new
             {
                 plugin = c.plugin,
                 changed = after.Crc != c.info.Crc,
-                matchesLootClean = after.KnownClean,
+                // Round B: false read as a failed clean when LOOT simply has no clean checksum for the plugin.
+                matchesLootClean = after.CleanCrcs.Count == 0 ? (bool?)null : after.KnownClean,
+                lootCleanChecksum = after.CleanCrcs.Count == 0 ? "LOOT has no clean checksum for this plugin, so the result can't be matched against one" : null,
                 stillDirtyPerLoot = after.Dirty,
                 removedRecords = removed,
                 undeletedReferences = undeleted,
@@ -134,9 +137,53 @@ public class CleanTools : ToolBase
             backups = backupDir,
             results,
             undo = "To undo, copy a plugin back from the backups folder over the cleaned one.",
+            window = "SSEEdit opens (minimized) for a few seconds per plugin and closes by itself; leave it to finish.",
             note = "matchesLootClean: the cleaned file now has a checksum LOOT knows as clean. Changed but not matching can still be fine " +
                    "(a different SSEEdit version); unchanged means SSEEdit didn't save (see logTail).",
         };
+    }
+
+    // SSEEdit is a window program: started minimized so it doesn't pop up over the game or the desktop (round B). Its results
+    // come from its log, so no output needs capturing.
+    static async Task<ModBuildTools.ProcessResult> RunMinimized(string exe, string args, TimeSpan timeout)
+    {
+        using var proc = Process.Start(new ProcessStartInfo(exe, args)
+        {
+            WorkingDirectory = Path.GetDirectoryName(exe)!,
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Minimized,
+        })!;
+        using var cts = new CancellationTokenSource(timeout);
+        try { await proc.WaitForExitAsync(cts.Token); return new(proc.ExitCode, "", false); }
+        catch (OperationCanceledException) { try { proc.Kill(entireProcessTree: true); } catch (Exception) { } return new(-1, "", true); }
+    }
+
+    // ---- SkyLink's own cleaning record, so later checks know a file is SkyLink's cleaned output (round B) ----
+
+    internal static string CleaningLogPath => Path.Combine(ModBuildTools.BuildRoot, "cleaning-log.json");
+
+    static void RecordCleaning(string plugin, uint before, uint after, string backup)
+    {
+        try
+        {
+            var log = File.Exists(CleaningLogPath) ? JsonNode.Parse(File.ReadAllText(CleaningLogPath)) as JsonArray ?? new JsonArray() : new JsonArray();
+            log.Add(new JsonObject { ["plugin"] = plugin, ["before"] = $"{before:X8}", ["after"] = $"{after:X8}", ["at"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), ["backup"] = backup });
+            Directory.CreateDirectory(Path.GetDirectoryName(CleaningLogPath)!);
+            File.WriteAllText(CleaningLogPath, log.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception) { }
+    }
+
+    /// <summary>The cleaning record whose output checksum is this file's, if SkyLink cleaned it.</summary>
+    internal static JsonObject? CleanedBySkyLink(string plugin, uint crc)
+    {
+        try
+        {
+            if (!File.Exists(CleaningLogPath)) return null;
+            return (JsonNode.Parse(File.ReadAllText(CleaningLogPath)) as JsonArray)?.OfType<JsonObject>()
+                .LastOrDefault(e => string.Equals(e["plugin"]?.ToString(), plugin, StringComparison.OrdinalIgnoreCase) && e["after"]?.ToString() == $"{crc:X8}");
+        }
+        catch (Exception) { return null; }
     }
 
     static string Mo2Instructions(string? xedit) =>
