@@ -4060,7 +4060,7 @@
         {
           "id": "FEAT-261",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Treat a running MCM Recorder playback as not safe",
           "description": "MCM Recorder drives mods' settings menus step by step; between steps no menu may be open, so the checks would allow a face load or a move that could knock a step out. Look for a running state its script exposes (McmRecorder) and add it to the move, camera and face rules.",
@@ -4072,6 +4072,10 @@
             {
               "datetime": "2026-11-20T06:00",
               "note": "Built: the move, camera and face rules (and GetGameSafety) call McmRecorder_Player.IsPlayingRecording() (a global in MCM Recorder's scripts, backed by JDB) and refuse with the recording's name while it plays; a game without MCM Recorder is remembered as such after the first 'not found'."
+            },
+            {
+              "datetime": "2026-11-20T16:00",
+              "note": "Tested: DOMAIN Easy and Visceral Mode played from SkyLink (McmRecorder_Player.PlayRecording); values changed as recorded (fXPLevelUpMult 30->20, then Base 425->500, Mult 30); the guard refused face tools during playback naming the recording and released after. Follow-ups built: call_papyrus_function 'wait': false (PlayRecording blocks for the whole recording; the 5 s wait timed out); ListMcmRecordings and PlayMcmRecording (start, poll IsPlayingRecording); face edits refused with a pausing menu open (Journal/MCM was allowed)."
             }
           ],
           "targetRelease": "1.4"

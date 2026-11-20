@@ -127,6 +127,9 @@ public abstract class ToolBase
             // BUG-081: a mod's modal menu or a message box is waiting on the player (MCM Recorder, a start-up mod setting her
             // up): don't rebuild her head underneath it.
             if (kind == "face") reasons.AddRange(blockers.Where(b => b.Contains("mod's menu") || b.Contains("message box")));
+            // Face edits with the Journal/MCM (or another pausing menu) open were allowed (2026-11-20): someone may be changing a
+            // mod's settings by hand, and RaceMenu's own menu writes the same data.
+            if (kind == "face") reasons.AddRange(blockers.Where(b => b.Contains("a menu is open") || (b.Contains(" is open (") && !b.Contains("OStim"))));
         }
         if (reasons.Count == 0) return null;
         var text = "Not now: " + string.Join("; ", reasons.Distinct()) + ".";

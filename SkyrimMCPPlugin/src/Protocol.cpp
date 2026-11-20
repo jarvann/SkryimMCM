@@ -198,7 +198,7 @@ namespace SkyrimMCP::Protocol {
             // executes on the game thread. If we block the game thread waiting for
             // the result, we deadlock. Call directly from the pipe thread instead.
             std::string target = params.value("target", "");
-            auto result = GameInterface::CallPapyrusFunction(className, functionName, args, target);
+            auto result = GameInterface::CallPapyrusFunction(className, functionName, args, target, params.value("wait", true));
             if (result.contains("error"))
                 return MakeResponse(id, false, {}, result["error"].get<std::string>()).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
             return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";

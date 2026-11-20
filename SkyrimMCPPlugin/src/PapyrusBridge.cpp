@@ -465,7 +465,8 @@ namespace SkyrimMCP::PapyrusBridge {
     json CallPapyrusFunction(const std::string& className,
                               const std::string& functionName,
                               const json& args,
-                              const std::string& target) {
+                              const std::string& target,
+                              bool wait) {
         auto* vm = RE::SkyrimVM::GetSingleton();
         auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;
         if (!impl) {
@@ -578,6 +579,12 @@ namespace SkyrimMCP::PapyrusBridge {
 
         if (!dispatched) {
             return {{"error", "Failed to dispatch Papyrus call: " + signature}};
+        }
+
+        // A long latent function (MCM Recorder's PlayRecording runs the whole recording before it returns) timed out at 5 s
+        // although it kept running: wait=false starts it and returns. The callback lives in the host, so nothing dangles.
+        if (!wait) {
+            return {{"started", true}, {"className", className}, {"functionName", functionName}, {"signature", signature}};
         }
 
         // Wait for result with timeout
