@@ -212,7 +212,9 @@ namespace SkyrimMCP::QuestManager {
             result["currentStage"] = quest->GetCurrentStageID();
             result["isActive"] = quest->IsActive();
             result["isCompleted"] = quest->IsCompleted();
-            result["isRunning"] = quest->IsRunning();
+            // CommonLib's IsRunning only checks "not starting or stopping"; a stopped quest read as running while Papyrus's
+            // Quest.IsRunning said false (2026-11-20). Running needs the enabled flag too, as Papyrus checks.
+            result["isRunning"] = quest->IsEnabled() && quest->IsRunning();
 
             json objectives = json::array();
             for (auto& obj : quest->objectives) {

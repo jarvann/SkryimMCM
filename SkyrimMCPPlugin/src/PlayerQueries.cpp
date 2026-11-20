@@ -617,7 +617,7 @@ namespace SkyrimMCP::PlayerQueries {
             for (auto& obj : quest->objectives) {
                 if (obj && obj->initialized && static_cast<int>(obj->state.get()) != 0) { shownObjective = true; break; }
             }
-            const bool live = !done && quest->IsRunning() && (quest->IsActive() || quest->GetCurrentStageID() > 0 || shownObjective);
+            const bool live = !done && quest->IsEnabled() && quest->IsRunning() && (quest->IsActive() || quest->GetCurrentStageID() > 0 || shownObjective);
             if (!done && !live) continue;
             const auto t = static_cast<int>(quest->GetType());
             json q = {{"formId", std::format("{:08X}", quest->GetFormID())}, {"name", Helpers::Utf8(name)},
