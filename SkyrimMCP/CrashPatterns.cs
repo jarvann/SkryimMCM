@@ -35,6 +35,11 @@ public static class CrashPatterns
             "RaceMenu (skee64) applies body morphs and normal maps to an actor's body and worn meshes on a worker thread; when the actor's 3D or equipment changes mid-task it reads freed data. A body-preset mod (OBody and the like) assigning morphs as NPCs load triggers it; it is timing-dependent, so a retry often loads fine.",
             "Update RaceMenu for the game version. If one NPC keeps triggering it (named in POSSIBLE RELEVANT OBJECTS), exclude that NPC or its plugin from the body-preset mod's distribution.",
             "medium", "Seen 2026-11-20 on a community report (Skyrim 1.7.104, OBody NG 5.2.1, an NPC from an added-NPC mod wearing an amulet)."),
+        new("souls-map-terrain-lod", "Skyrim Souls RE's map menu updating distant terrain",
+            [@"SkyrimSoulsRE\.dll\+", @"MapMenuEx", @"BGSTerrainManager"],
+            "With the map menu unpaused, Skyrim Souls RE keeps the terrain manager updating; the crash came while distant terrain (LOD) models were loading through that hook.",
+            "Set the map menu back to paused in Skyrim Souls RE's settings and see if these stop. Plugins named in the report (often an occlusion plugin) are likely only the last to edit the worldspace.",
+            "medium", "Seen 2026-11-18 on a community report (Skyrim 1.7.104)."),
         new("mesh-material-load", "A mesh's material or textures failed to load",
             [@"107719\+0x", @"BSLightingShaderMaterial", @"BSShaderTextureSet"],
             "The game crashed loading a model's shader material: usually a broken or mismatched mesh (a .nif pointing at a bad texture set) in a mod that replaces landscape or architecture.",
@@ -71,8 +76,27 @@ public static class CrashPatterns
             .OrderByDescending(g => g.Count()).Select(g => new { plugin = g.Key, mentions = g.Count() }).Take(8).ToList();
         var meshes = Regex.Matches(objects, @"""(?<m>[^""]+\.nif)""", RegexOptions.IgnoreCase)
             .Select(m => m.Groups["m"].Value).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
-        if (plugins.Count > 0) notes.Add($"Plugins named near the crash: {string.Join(", ", plugins.Select(p => p.plugin))}. The first is the strongest lead, though a base-game object can appear when a mod changed it.");
+        if (plugins.Count > 0)
+        {
+            // Crash Logger names the last plugin that changed an object. Patchers and occlusion plugins edit every cell or the whole
+            // worldspace, so they appear next to almost any crash while the world loads without being the cause.
+            static bool CatchAll(string p) => Regex.IsMatch(p, @"occlusion|synthesis|bashed patch|smashed|\bpatch\.es[mp]$|^Skyrim\.esm$|^Update\.esm$", RegexOptions.IgnoreCase);
+            var leads = plugins.Where(p => !CatchAll(p.plugin)).Select(p => p.plugin).ToList();
+            var catchAll = plugins.Where(p => CatchAll(p.plugin)).Select(p => p.plugin).ToList();
+            if (leads.Count > 0) notes.Add($"Plugins named near the crash: {string.Join(", ", leads)}. The first is the strongest lead, though a base-game object can appear when a mod changed it.");
+            if (catchAll.Count > 0) notes.Add($"{string.Join(", ", catchAll)} {(catchAll.Count == 1 ? "edits" : "edit")} the whole world or every cell, so {(catchAll.Count == 1 ? "it shows" : "they show")} up next to most world-loading crashes: probably not the cause on its own.");
+        }
         if (meshes.Count > 0) notes.Add($"Meshes named near the crash: {string.Join(", ", meshes)}. A broken mesh crashes when its cell loads; find which mod provides it.");
+
+        // Memory pressure: Windows' physical memory nearly full makes allocations fail during loads.
+        var ram = Regex.Match(text, @"PHYSICAL MEMORY: (?<used>[\d.]+) GB/(?<total>[\d.]+) GB");
+        if (ram.Success && double.TryParse(ram.Groups["used"].Value, System.Globalization.CultureInfo.InvariantCulture, out var used)
+            && double.TryParse(ram.Groups["total"].Value, System.Globalization.CultureInfo.InvariantCulture, out var total) && total > 0 && used / total >= 0.92)
+            notes.Add($"Windows' memory was almost full when it crashed ({used:0.#} of {total:0.#} GB): allocations fail more easily during loads. Close background programs, or lighten textures and the load order.");
+        var vram = Regex.Match(text, @"GPU MEMORY: (?<used>[\d.]+)/(?<total>[\d.]+) GB");
+        if (vram.Success && double.TryParse(vram.Groups["used"].Value, System.Globalization.CultureInfo.InvariantCulture, out var vu)
+            && double.TryParse(vram.Groups["total"].Value, System.Globalization.CultureInfo.InvariantCulture, out var vt) && vt > 0 && vu / vt >= 0.92)
+            notes.Add($"Video memory was almost full ({vu:0.#} of {vt:0.#} GB): texture-heavy setups crash in the driver or while loading at this point.");
 
         var uptime = Regex.Match(text, @"Process Uptime: (?<h>\d+):(?<m>\d+):(?<s>\d+)");
         if (uptime.Success && int.Parse(uptime.Groups["h"].Value) == 0 && int.Parse(uptime.Groups["m"].Value) < 2)
