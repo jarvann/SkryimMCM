@@ -28,6 +28,12 @@ namespace SkyrimMCP::HostFaceRefresh {
             for (const int delayMs : { 3000, 5000, 7000, 15000, 30000 }) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
                 if (s_generation.load() != generation) return;  // a newer trigger will do it
+                // A request during a loading screen waits out the 5 s game-thread timeout (seen in GetSkyLinkCost) and, with
+                // requests taking turns (INFRA-023), holds up the AI's calls meanwhile. Skip this try; the later ones run.
+                if (HostCore::LoadingScreenActive()) {
+                    SKSE::log::info("Face state refresh ({}): skipped during a loading screen", reason);
+                    continue;
+                }
                 const auto request = std::format(R"({{"id":"face-refresh-{}","action":"reapply_face_state","params":{{"reason":"{}"}}}})",
                                                  generation, reason);
                 const auto reply = HostCore::HandleRequest(request);
