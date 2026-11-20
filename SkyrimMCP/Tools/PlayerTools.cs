@@ -275,7 +275,8 @@ public class PlayerTools : ToolBase
         "dryRun defaults to TRUE: first show the player what would change, then call again with dryRun=false once they agree. " +
         "sections (comma-separated, default 'inventory,equipment,gold'; also 'skills' (raises skills below the blueprint's base " +
         "levels; lowerSkills=true also lowers), 'level' (raises the level; perk points and level-up choices aren't given), " +
-        "'perks', 'spells' and 'shouts' (adds the ones she lacks; shout words the other character had unlocked are taught and " +
+        "'perks', 'spells' (spellKinds, default 'spell,power,lesserPower'; add 'ability' for abilities, which include racial " +
+        "ones, vampirism and mods' blessings; 'disease' and 'addiction' exist too) and 'shouts' (adds the ones she lacks; shout words the other character had unlocked are taught and " +
         "unlocked), all add-only; add 'quests' to compare the blueprint's quest progress " +
         "with this game's: listed only, never applied). Only missing items are added (blueprint count minus what " +
         "the player has); nothing is ever removed, and gold only goes up unless exactGold=true. Then the blueprint's equipped " +
@@ -283,7 +284,7 @@ public class PlayerTools : ToolBase
         "doesn't know are skipped, since spells aren't restored; worn items not in the blueprint stay on). Items are found by plugin name and local ID, so a different load order works; " +
         "items from plugins that aren't loaded, items created in game, and blueprints from before 1.3 whose form IDs now point at " +
         "a different item are listed as unresolved. Player-made enchantments are not restored (the plain item is added).")]
-    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false, bool lowerSkills = false)
+    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false, bool lowerSkills = false, string spellKinds = "spell,power,lesserPower")
     {
         JsonNode? blueprint;
         try
@@ -311,7 +312,12 @@ public class PlayerTools : ToolBase
             // FEAT-121
             ["skills"] = bp["skills"]?["skills"]?.DeepClone() ?? new JsonArray(),
             ["perks"] = bp["perks"]?["perks"]?.DeepClone() ?? new JsonArray(),
-            ["spells"] = bp["spells"]?["spells"]?.DeepClone() ?? new JsonArray(),
+            // Castable spells and powers only by default: Arya's export held 1,421 "spells", including abilities (racial,
+            // vampirism, mods' blessings), diseases and addictions, which shouldn't be handed to another character unasked.
+            ["spells"] = new JsonArray((bp["spells"]?["spells"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                .Where(sp => spellKinds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Contains(sp["type"]?.ToString() ?? "spell", StringComparer.OrdinalIgnoreCase))
+                .Select(sp => (JsonNode)sp.DeepClone()).ToArray()),
             ["shouts"] = bp["shouts"]?["shouts"]?.DeepClone() ?? new JsonArray(),
             ["lowerSkills"] = lowerSkills,
         };
