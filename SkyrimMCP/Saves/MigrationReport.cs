@@ -91,13 +91,13 @@ public static class MigrationReport
             changedOnlyAdded = onlyAdded.Count,
             objectTypeChanges,
             scriptFileMissing = missing.Count,
-            changed = risky.Take(40).Select(c => new
+            changed = risky.Take(20).Select(c => new
             {
                 c.script, c.instances,
-                removed = c.removed.Select(Clean).Take(10), retyped = c.retyped.Take(10).Select(Clean), added = c.added.Select(Clean).Take(10),
+                removed = c.removed.Select(Clean).Take(5), retyped = c.retyped.Take(5).Select(Clean), added = c.added.Select(Clean).Take(5),
             }),
             onlyAddedExamples = onlyAdded.OrderByDescending(c => c.instances).Take(10).Select(c => c.script),
-            missingExamples = missing.OrderByDescending(m => m.instances).Take(15).Select(m => $"{m.script} ({m.instances})"),
+            missingExamples = missing.OrderByDescending(m => m.instances).Take(10).Select(m => $"{m.script} ({m.instances})"),
             note = "Retyped variables are the riskiest (the saved value no longer fits); removed ones lose their saved value, which " +
                    "breaks a mod that relied on it; added ones start at their defaults, usually fine. Scripts with no file are " +
                    "leftovers of removed mods (CleanSave levels='safe' after loading). Scripts from MO2 mod folders aren't searched.",
@@ -114,13 +114,11 @@ public static class MigrationReport
 
         int Get(Dictionary<string, int> d, string k) => d.TryGetValue(k, out var v) ? v : 0;
         int ModCount(List<ModCount> l, string k) => l.FirstOrDefault(x => x.Plugin.Equals(k, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
-        object Footprint(string n) => new
+        string Footprint(string n)
         {
-            changeForms = Get(scan.ChangeFormsByPlugin, n),
-            scriptInstances = Get(scan.InstancesByPlugin, n),
-            threads = ModCount(scan.ThreadsByPlugin, n),
-            queuedCalls = ModCount(scan.QueuedByPlugin, n),
-        };
+            var running = ModCount(scan.ThreadsByPlugin, n) + ModCount(scan.QueuedByPlugin, n);
+            return $"{Get(scan.ChangeFormsByPlugin, n)} changed forms, {Get(scan.InstancesByPlugin, n)} script instances" + (running > 0 ? $", {running} threads/queued calls" : "");
+        }
 
         var removed = saved.Where(x => !now.ContainsKey(x.n)).Select(x =>
         {
@@ -128,20 +126,15 @@ public static class MigrationReport
             var inst = Get(scan.InstancesByPlugin, x.n);
             var running = ModCount(scan.ThreadsByPlugin, x.n) + ModCount(scan.QueuedByPlugin, x.n);
             var risk = running > 0 || inst > 50 || cf > 500 ? "high" : inst > 0 || cf > 0 ? "medium" : "low";
-            var why = risk switch
-            {
-                "high" => "the save holds a lot of this mod's state (script data, running scripts or many changed forms): expect leftovers, and quests or other mods that relied on it may stall. Clean leftovers after loading (CheckSave, CleanSave levels='safe').",
-                "medium" => "some of its forms or scripts are in the save: the game drops its forms on load and leaves its script data as leftovers (cleanable).",
-                _ => "nothing of it is in the save: removing it is safe for this save.",
-            };
-            return new { plugin = x.n, wasLight = x.light, risk, size = cf + inst + running, footprint = Footprint(x.n), why };
+            // Compact: one line per plugin (the round's July save gave a 311 KB reply with the reason repeated 2,000 times).
+            return new { plugin = x.n, risk, size = cf + inst + running,
+                         footprint = $"{cf} changed forms, {inst} script instances" + (running > 0 ? $", {running} threads/queued calls" : "") };
         }).OrderBy(r => r.risk == "high" ? 0 : r.risk == "medium" ? 1 : 2).ThenByDescending(r => r.size).ToList();
 
         var typeChanged = saved.Where(x => now.TryGetValue(x.n, out var c) && c.Light is bool l && l != x.light)
             .Select(x => new
             {
                 plugin = x.n, was = x.light ? "light" : "full", now = x.light ? "full" : "light", footprint = Footprint(x.n),
-                why = "if the update compacted its form IDs to make it light, every form of it in the save points at the wrong thing or nothing: high risk unless the author says the IDs were kept.",
             }).ToList();
 
         var added = current.Where(p => !savedNames.Contains(p.Name)).Select(p => p.Name).ToList();
@@ -183,24 +176,38 @@ public static class MigrationReport
                 ? $"Probably playable: {medium} removed mods left some data in the save; expect leftovers to clean (CheckSave, CleanSave levels='safe')."
                 : "Safe on plugins: nothing removed has data in this save. (Changed scripts in updated mods can still matter; not checked yet.)";
 
+        var highList = removed.Where(r => r.risk == "high").ToList();
+        var mediumList = removed.Where(r => r.risk == "medium").ToList();
+        var lowList = removed.Where(r => r.risk == "low").ToList();
+        var summary = $"{saved.Count} plugins in the save, {current.Count} now: {removed.Count} removed ({highList.Count} high risk, {mediumList.Count} medium, " +
+                      $"{lowList.Count} with nothing in the save), {renamed.Count} probably renamed, {typeChanged.Count} changed full/light, {added.Count} added, {moved} reordered.";
         return new
         {
+            verdict,
+            summary,
             save = scan.File,
             character = scan.Header.PlayerName,
             currentLoadOrder = currentSource,
-            verdict,
-            counts = new { inSave = saved.Count, now = current.Count, removed = removed.Count, probablyRenamed = renamed.Count, added = added.Count, typeChanged = typeChanged.Count, reordered = moved },
-            probablyRenamed = renamed.Take(100),
-            renamedNote = renamed.Count > 0 ? "To the game a renamed plugin is removed plus a new one: its forms and script data in the save don't carry over to the new name. Where the risk is high, the rename matters as much as a removal." : null,
-            removed = removed.Where(r => r.risk != "low"),
-            removedNoFootprint = removed.Where(r => r.risk == "low").Select(r => r.plugin),
-            typeChanged,
-            added = added.Take(100),
-            addedNote = added.Count > 0 ? "New mods start fresh on load; scripted ones run their setup then. Usually fine; a few want a new game (their pages say so)." : null,
-            movedNote = moved > 0 ? $"{moved} plugins load in a different order relative to the others: the game re-maps by name, so that alone is safe, but overrides now win differently (another mod's version of a record may apply)." : null,
+            legend = new
+            {
+                high = "the save holds a lot of the mod's state (script data, running scripts, many changed forms): expect leftovers; quests or mods that relied on it may stall. After loading: CheckSave, CleanSave levels='safe'.",
+                medium = "some of its forms or scripts are in the save: the game drops its forms and leaves script leftovers (cleanable).",
+                renamed = "a rename is a removal to the game: its data doesn't carry over to the new name.",
+                typeChanged = "an ESP compacted into an ESL (or back) renumbers its forms: every saved form of it points at the wrong thing unless the author kept the IDs.",
+                reordered = "safe on its own (the game re-maps by name), but overrides now win differently.",
+                added = "new mods start fresh on load; a few want a new game (their pages say so).",
+            },
+            highRisk = highList.Take(30),
+            highRiskMore = highList.Count > 30 ? highList.Count - 30 : (int?)null,
+            mediumRisk = mediumList.Take(20),
+            mediumRiskMore = mediumList.Count > 20 ? mediumList.Count - 20 : (int?)null,
+            removedNoFootprint = new { count = lowList.Count, examples = lowList.Take(15).Select(r => r.plugin) },
+            probablyRenamed = renamed.Take(20).Select(r => new { r.from, r.to, r.risk }),
+            typeChanged = typeChanged.Take(20),
+            added = new { count = added.Count, examples = added.Take(15) },
             scripts,
             notChecked = scripts == null
-                ? "Script changes in updated mods weren't compared (scripts: true compares them, 10-60 s). Other mods' own saved data (SKSE co-save) isn't compared."
+                ? "Script changes in updated mods weren't compared (scripts: true compares them). Other mods' own saved data (SKSE co-save) isn't compared."
                 : "Other mods' own saved data (SKSE co-save) isn't compared.",
         };
     }

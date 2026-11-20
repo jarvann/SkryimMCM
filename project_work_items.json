@@ -1109,6 +1109,10 @@
             {
               "datetime": "2026-11-20T12:00",
               "note": "Apply on the Adventurer (not saved, crash later): level 4, skills 100, ~510 perks, ~900 spells. 10 perks 'not found' in loaded plugins: light plugins numbered outside FE by a plugin extender (Ascension 01EA6006, Vokriinator Black E820F14C); fallback added: the raw form ID if it still belongs to the named plugin. Added-lists show the form ID (empty perk names, multi-rank perks). 8 SB_* perks came from another mod during the apply. A script held the controls afterwards (EnablePlayerControls freed them; likely the OStim scene starting)."
+            },
+            {
+              "datetime": "2026-11-20T13:00",
+              "note": "Round complete: apply kept on the Adventurer (Save4, level 4). Mouse look and activate dead after each apply: the vanilla Magic Student encounter (WIChangeLocation04) starts once she knows a ward and holds the controls; it isn't SkyLink. Apply now reports quests started during/after it and restores controls switched off meanwhile (EnablePlayerControls), saying which."
             }
           ]
         },
@@ -1178,6 +1182,10 @@
             {
               "datetime": "2026-11-20T12:30",
               "note": "Round: list 88 candidates, preview for Favor154 works; SetQuestStage reported applied:false for 0006F211 though it reached 255 (one read at 500 ms): stage reads now poll up to ~4 s (SetQuestStage and ReplayQuests); replay cap 25 stages a call."
+            },
+            {
+              "datetime": "2026-11-20T13:00",
+              "note": "Round: Kolskeggr Mine replayed 10 -> 100 cleanly; Favor154 (Jarl bounty) refused, empty aliases. Replay now checks required aliases after starting a quest and stops/skips it when they stay empty. GetQuestStages' executed/waiting lists labelled as not a done record (Kolskeggr at 100 still listed 15, 20, 100 as waiting)."
             }
           ],
           "targetRelease": "1.4"
@@ -1430,6 +1438,10 @@
             {
               "datetime": "2026-11-20T06:30",
               "note": "MO2: the instance is found from LocalAppData\\\\ModOrganizer\\\\*\\\\ModOrganizer.ini (gamePath = the running game) or settings mo2Path; scripts are searched in Data, enabled mods by priority and overwrite; offline the profile's plugins.txt is used. GOG test: 62 loose + 15,162 archived scripts in 100 BSAs (0.26 s); GOG save 80/80 plugins, 5,136 scripts compared, 0 changed."
+            },
+            {
+              "datetime": "2026-11-20T13:00",
+              "note": "Round: numbers match on the current and a July save; the reply was 311 KB. Now summary and verdict first, one legend, one-line footprints, capped lists (30 high, 20 medium, 15 examples)."
             }
           ],
           "targetRelease": "1.4"

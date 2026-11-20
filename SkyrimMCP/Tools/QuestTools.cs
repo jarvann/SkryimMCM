@@ -127,6 +127,23 @@ public class QuestTools : ToolBase
                 var started = await _pipe.SendRequestAsync("start_quest", new JsonObject { ["formId"] = p.id });
                 log.Add(new { start = started?["started"]?.GetValue<bool>() });
                 await Task.Delay(1000);
+                // A story-manager quest (a Jarl's bounty) started cold fills none of its required aliases, and its stages then do
+                // nothing (round 2026-11-20): stop it again rather than set stages into an empty quest.
+                try
+                {
+                    var aliases = await _pipe.SendRequestAsync("get_quest_aliases", new JsonObject { ["formId"] = p.id });
+                    var empty = (aliases?["aliases"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+                        .Where(a => a["type"]?.ToString() == "reference" && a["optional"]?.GetValue<bool>() != true && a["filled"]?.GetValue<bool>() == false)
+                        .Select(a => a["name"]?.ToString()).ToList();
+                    if (empty.Count > 0)
+                    {
+                        await _pipe.SendRequestAsync("stop_quest", new JsonObject { ["formId"] = p.id });
+                        results.Add(new { p.name, formId = p.id, status = "skipped: started, but its required aliases stayed empty (" + string.Join(", ", empty.Take(5)) +
+                            "), so its stages couldn't run; stopped again. Quests like this (bounties, radiant jobs) start from the story manager, when their giver offers them.", steps = log });
+                        continue;
+                    }
+                }
+                catch (Exception) { }
             }
             foreach (var stage in p.missing)
             {

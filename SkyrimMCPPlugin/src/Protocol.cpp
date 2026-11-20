@@ -99,6 +99,21 @@ namespace SkyrimMCP::Protocol {
         noParam("get_known_enchantments", []() { return GameInterface::GetKnownEnchantments(); });
         noParam("get_skill_levels", []() { return GameInterface::GetSkillLevels(); });
         noParam("get_perks", []() { return GameInterface::GetPerks(); });
+        // Which player controls a script has switched off (mouse look dead in game but fine in menus after a blueprint apply,
+        // 2026-11-20: a script disabled looking and never gave it back).
+        noParam("get_controls", []() -> json {
+            auto* map = RE::ControlMap::GetSingleton();
+            if (!map) return {{"error", "Control map not available"}};
+            using F = RE::UserEvents::USER_EVENT_FLAG;
+            static const std::pair<const char*, F> kControls[] = {
+                {"movement", F::kMovement}, {"looking", F::kLooking}, {"activate", F::kActivate}, {"menu", F::kMenu},
+                {"console", F::kConsole}, {"pov", F::kPOVSwitch}, {"fighting", F::kFighting}, {"sneaking", F::kSneaking},
+                {"mainFour", F::kMainFour}, {"wheelZoom", F::kWheelZoom}, {"jumping", F::kJumping},
+            };
+            json off = json::array();
+            for (const auto& [name, flag] : kControls) if (!map->AreControlsEnabled(flag)) off.push_back(name);
+            return {{"disabled", off}};
+        });
         // BUG-091 follow-up: a drawn weapon or spell blocks saving in some load orders; SaveGame sheathes first.
         noParam("sheathe", []() -> json {
             auto* player = RE::PlayerCharacter::GetSingleton();
