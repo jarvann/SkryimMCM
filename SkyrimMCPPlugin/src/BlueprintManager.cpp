@@ -60,6 +60,17 @@ namespace SkyrimMCP::BlueprintManager {
                             return form;
                         }
                     } catch (...) {}
+                    // Same game, plugin extenders: some load orders number light plugins outside FE (01EA6006 for
+                    // Ascension.esp, seen 2026-11-20), and the plugin + local ID didn't find them. The raw form ID, if it still
+                    // belongs to that plugin, is the same form.
+                    RE::FormID raw = 0;
+                    if (ParseHexId(entry.value("formId", json()), raw)) {
+                        if (auto* form = RE::TESForm::LookupByID(raw); form && form->GetFile(0) &&
+                            std::string_view(form->GetFile(0)->GetFilename()) == plugin) {
+                            how = "formId (same plugin)";
+                            return form;
+                        }
+                    }
                     how = "not found in " + plugin;
                     return nullptr;
                 }
@@ -241,7 +252,12 @@ namespace SkyrimMCP::BlueprintManager {
                 if (!form) { auto l = Label(entry); l["reason"] = how; unresolved.push_back(l); continue; }
                 if (has(form)) { already.push_back(entry.value("name", "")); continue; }
                 if (!dryRun && !add(form)) { auto l = Label(entry); l["reason"] = "the game refused it"; unresolved.push_back(l); continue; }
-                added.push_back(entry.value("name", ""));
+                // Empty names (six perks) and multi-rank perks that share a name read badly: add the form ID.
+                std::string label = entry.value("name", "");
+                const char* edid = form->GetFormEditorID();
+                if (label.empty()) label = edid && edid[0] ? edid : std::format("{:08X}", form->GetFormID());
+                else label += std::format(" [{:08X}]", form->GetFormID());
+                added.push_back(label);
             }
             report[section] = {{"added", added}, {"alreadyKnown", already.size()}, {"unresolved", unresolved}};
         };

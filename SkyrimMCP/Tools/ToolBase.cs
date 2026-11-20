@@ -92,6 +92,17 @@ public abstract class ToolBase
         // FEAT-261: MCM Recorder plays recorded menu settings step by step; between steps no menu is open, so the menu checks
         // pass, but a move, capture or face load would knock a step out.
         if (kind != "actor" && await McmRecorderPlaying() is string recording) reasons.Add(recording);
+        // An OStim scene seen through its menu (OStim's API can report none while its scene runs): blocks every kind,
+        // moving another actor too.
+        if (kind == "actor")
+        {
+            try
+            {
+                var safety = await _pipe.SendRequestAsync("get_game_safety");
+                reasons.AddRange((safety?["moveBlockers"] as JsonArray ?? new JsonArray()).Select(b => b?.ToString() ?? "").Where(b => b.Contains("OStim scene is running")));
+            }
+            catch (Exception) { }
+        }
         if (await InAnimationScene(actor) is string scene) reasons.Add(scene);
         if (kind != "actor")
         {

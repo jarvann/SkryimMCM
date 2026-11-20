@@ -133,6 +133,8 @@ public class NPCTools : ToolBase
         "Optional refId targets a specific NPC — leave empty for the player.")]
     public async Task<object> StopIdle(string? refId = null)
     {
+        // 2026-11-20: StopIdle forced the default pose under a running OStim scene and OStim crashed the game.
+        if (await SafetyBlock("actor", refId) is string gateReason) return new { error = gateReason };
         var data = await _pipe.SendRequestAsync("stop_idle", new JsonObject
         {
             ["refId"] = refId ?? ""

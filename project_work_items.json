@@ -1105,6 +1105,10 @@
             {
               "datetime": "2026-11-20T11:00",
               "note": "Export on Arya: 1,421 spells (all kinds), 729 perks, 243 quests (238 with stagesDone). Spells now apply castable kinds only by default (spellKinds 'spell,power,lesserPower'): abilities (racial, vampirism, blessings), diseases and addictions are opt-in. Arya has no shouts, so words can't be checked on her."
+            },
+            {
+              "datetime": "2026-11-20T12:00",
+              "note": "Apply on the Adventurer (not saved, crash later): level 4, skills 100, ~510 perks, ~900 spells. 10 perks 'not found' in loaded plugins: light plugins numbered outside FE by a plugin extender (Ascension 01EA6006, Vokriinator Black E820F14C); fallback added: the raw form ID if it still belongs to the named plugin. Added-lists show the form ID (empty perk names, multi-rank perks). 8 SB_* perks came from another mod during the apply. A script held the controls afterwards (EnablePlayerControls freed them; likely the OStim scene starting)."
             }
           ]
         },
@@ -4636,6 +4640,21 @@
             {
               "datetime": "2026-11-20T01:45",
               "note": "Verified: SheatheProbe saved first time with a spell readied (refused before auto-sheathe); SheatheProbe2 with a weapon out, reply carries the 'sheathed' line. ArchiveSaves dry run lists 22 saves correctly, keeps the newest and the flood test save."
+            }
+          ],
+          "targetRelease": "1.4"
+        },
+        {
+          "id": "BUG-092",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "StopIdle under a running OStim scene crashed OStim",
+          "description": "An OStim scene ran on the Adventurer while OStim's API reported none (OActor.GetSceneID -1, OThread.GetThreadCount 0, isInOStimScene false); StopIdle forced the default pose and OStim.dll crashed in SceneMenu::BuildMenuData (null scene data).",
+          "history": [
+            {
+              "datetime": "2026-11-20T12:00",
+              "note": "Built: an open menu named like OStim's (contains 'ostim', or SceneMenu) is a blocker for moves, captures and face edits, and for actor actions; StopIdle now applies the actor rule."
             }
           ],
           "targetRelease": "1.4"
