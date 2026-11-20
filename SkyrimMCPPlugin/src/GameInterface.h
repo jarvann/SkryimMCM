@@ -156,7 +156,22 @@ namespace SkyrimMCP {
                 auto* word = form->As<RE::TESWordOfPower>();
                 if (word) {
                     player->UnlockWord(word);
-                    return {{"unlocked", true}, {"formId", formIdHex}, {"name", word->GetName()}, {"type", "word"}};
+                    // A word alone left the shout out of the magic menu (2026-11-20): add the shout it belongs to if she lacks it.
+                    json shoutAdded = nullptr;
+                    if (auto* dh = RE::TESDataHandler::GetSingleton()) {
+                        for (auto* sh : dh->GetFormArray<RE::TESShout>()) {
+                            if (!sh) continue;
+                            bool has = false;
+                            for (int i = 0; i < 3; i++) if (sh->variations[i].word == word) has = true;
+                            if (!has) continue;
+                            bool known = false;
+                            if (auto* list = player->GetActorBase() ? player->GetActorBase()->GetSpellList() : nullptr)
+                                for (std::uint32_t i = 0; i < list->numShouts; ++i) if (list->shouts[i] == sh) known = true;
+                            if (!known && player->AddShout(sh)) shoutAdded = sh->GetName();
+                            break;
+                        }
+                    }
+                    return {{"unlocked", true}, {"formId", formIdHex}, {"name", word->GetName()}, {"type", "word"}, {"shoutAdded", shoutAdded}};
                 }
 
                 return {{"error", "Not a shout or word of power: " + formIdHex}};
