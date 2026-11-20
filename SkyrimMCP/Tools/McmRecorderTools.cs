@@ -26,7 +26,8 @@ public class McmRecorderTools : ToolBase
         {
             var r = await Call("McmRecorder_RecordingFiles", "GetRecordingNames", new JsonArray());
             if (r?["error"] != null) return new { error = "MCM Recorder isn't installed or didn't answer: " + r["error"] };
-            var names = (r?["result"] as JsonArray ?? new JsonArray()).Select(n => n?.ToString()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+            // Vortex leaves a "__folder_managed_by_vortex" marker in the recordings folder: not a recording.
+            var names = (r?["result"] as JsonArray ?? new JsonArray()).Select(n => n?.ToString()).Where(n => !string.IsNullOrEmpty(n) && !n!.StartsWith("__")).ToList();
             return new { count = names.Count, recordings = names };
         }
         catch (ModelContextProtocol.McpException ex) { return new { error = "MCM Recorder isn't installed or didn't answer: " + ex.Message }; }
@@ -36,7 +37,9 @@ public class McmRecorderTools : ToolBase
     [Description("Play an MCM Recorder recording by name (ListMcmRecordings shows them): it sets the recorded MCM options in each mod's " +
         "menu, step by step. Starts it, then waits up to waitSeconds (default 45) for it to finish and says whether it did; a long " +
         "one keeps playing after the reply. While it plays, moves, captures and face edits are refused. Refused in combat, scenes " +
-        "or with a menu open. Changed settings stay only if the player saves afterwards.")]
+        "or with a menu open. Changed settings stay only if the player saves afterwards. Sliders and text replay as fixed values, " +
+        "but toggles and cycling options are recorded as clicks: each replay clicks them again from wherever they are now, so " +
+        "playing the same recording twice can undo or change those (tell the player before replaying one twice).")]
     public async Task<object> PlayMcmRecording(string recordingName, int waitSeconds = 45)
     {
         if (await SafetyBlock("face") is string blocked) return new { error = blocked };

@@ -4076,6 +4076,10 @@
             {
               "datetime": "2026-11-20T16:00",
               "note": "Tested: DOMAIN Easy and Visceral Mode played from SkyLink (McmRecorder_Player.PlayRecording); values changed as recorded (fXPLevelUpMult 30->20, then Base 425->500, Mult 30); the guard refused face tools during playback naming the recording and released after. Follow-ups built: call_papyrus_function 'wait': false (PlayRecording blocks for the whole recording; the 5 s wait timed out); ListMcmRecordings and PlayMcmRecording (start, poll IsPlayingRecording); face edits refused with a pausing menu open (Journal/MCM was allowed)."
+            },
+            {
+              "datetime": "2026-11-20T17:00",
+              "note": "Round trip passes: recording started/stopped from SkyLink, file captured Atlas clicks and Simply Balanced 150, PlayMcmRecording finished with no timeout, values confirmed in the MCM. Fixes: ListMcmRecordings hides Vortex's __folder_managed_by_vortex; PlayMcmRecording warns that toggles/cycles replay as clicks; a recording session (McmRecorder_Recorder.IsRecording) also blocks moves, captures and face edits."
             }
           ],
           "targetRelease": "1.4"
