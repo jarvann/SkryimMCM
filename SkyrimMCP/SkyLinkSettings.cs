@@ -39,6 +39,7 @@ public static class SkyLinkSettings
         ["mo2Profile"] = "MO2 profile to take the mod order from. Defaults to the only profile, or 'Default'.",
         ["resaverPath"] = "ReSaver (FallrimTools) folder, the one with ReSaver.exe and target\\ReSaver.jar; CleanSave and CleanAndReload use its library.",
         ["extraConfigFolders"] = "More folders to search for SKSE plugin config files, as a list, searched first.",
+        ["creationKitPath"] = "Folder of the Creation Kit (the one with 'Papyrus Compiler'), when GetCreationKit doesn't find it.",
     };
 
     public static JsonObject Load()

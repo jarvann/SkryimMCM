@@ -705,7 +705,7 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set one SkyLink setting (see GetSkyLinkSettings for the list): skyrimPath, dataPath, mo2Path, mo2Profile, " +
-        "or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
+        "resaverPath, creationKitPath, or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
         "Use this for MO2 or Wabbajack setups where config files aren't in the game's own Data folder.")]
     public Task<object> SetSkyLinkSetting(string key, string? value = null)
     {
@@ -736,6 +736,8 @@ public class UtilityTools : ToolBase
                 return Task.FromResult<object>(new { error = $"{folder} has no 'mods' folder; pass the MO2 instance folder" });
             if (key == "skyrimPath" && !File.Exists(Path.Combine(folder, "SkyrimSE.exe")) && !File.Exists(Path.Combine(folder, "SkyrimVR.exe")))
                 return Task.FromResult<object>(new { error = $"{folder} has no SkyrimSE.exe; pass the game folder" });
+            if (key == "creationKitPath" && !File.Exists(Path.Combine(folder, "Papyrus Compiler", "PapyrusCompiler.exe")))
+                return Task.FromResult<object>(new { error = $"{folder} has no Papyrus Compiler\\PapyrusCompiler.exe; pass the Creation Kit's folder" });
             settings[key] = folder;
         }
 
