@@ -155,6 +155,10 @@ public partial class ModBuildTools : ToolBase
         var ck = FindCreationKit(out _);
         if (ck == null) return new { error = "No Creation Kit found, so scripts can't be compiled. GetCreationKit explains how to install it." };
 
+        // The base game's sources are needed to compile anything: unpack them first if they aren't yet.
+        object? prepared = null;
+        if (!VanillaState(ck).ready && VanillaState(ck).archive != null) prepared = await PrepareScriptSources(dryRun: false);
+
         var projectName = SafeName(project ?? name);
         var dir = Path.Combine(BuildRoot, projectName);
         var srcDir = Path.Combine(dir, "Source", "Scripts");
@@ -208,6 +212,7 @@ public partial class ModBuildTools : ToolBase
         return new
         {
             compiled = built && run.ExitCode == 0,
+            sourcesPrepared = prepared,
             pex = built ? pex : null,
             project = projectName,
             projectFolder = dir,
@@ -415,13 +420,16 @@ public partial class ModBuildTools : ToolBase
         return list.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    static string VanillaFolder(CreationKit ck) => Path.Combine(BuildRoot, "vanilla-sources-" + ck.Edition);
+    // Per machine, not per game: the same Creation Kit's sources serve the Steam and GOG games (round A unpacked them twice).
+    static string VanillaFolder(CreationKit ck) =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SkyLinkAI", "vanilla-sources-" + ck.Edition);
 
     static (bool ready, string? folder, string? archive) VanillaState(CreationKit? ck)
     {
         if (ck == null) return (false, null, null);
         // Already unpacked by the Creation Kit itself, or by PrepareScriptSources.
-        foreach (var root in new[] { Path.Combine(ck.Folder, "Data", "Source", "Scripts"), Path.Combine(ck.Folder, "Data", "Scripts", "Source"), VanillaFolder(ck) })
+        foreach (var root in new[] { Path.Combine(ck.Folder, "Data", "Source", "Scripts"), Path.Combine(ck.Folder, "Data", "Scripts", "Source"), VanillaFolder(ck),
+                                     Path.Combine(BuildRoot, "vanilla-sources-" + ck.Edition) })
         {
             var found = FolderWith(root, "Actor.psc", depth: 3);
             if (found != null && File.Exists(Path.Combine(found, "Quest.psc"))) return (true, found, null);

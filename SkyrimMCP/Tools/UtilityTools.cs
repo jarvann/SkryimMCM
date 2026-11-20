@@ -782,7 +782,15 @@ public class UtilityTools : ToolBase
         {
             return Task.FromResult<object>(new { error = $"Could not save settings: {ex.Message}" });
         }
-        return GetSkyLinkSettings();
+        // Settings are kept per game (Steam and GOG have their own). Which one is decided by the game SkyLink last connected to.
+        var forGame = SkyLinkSettings.GameDocumentsFolder is string g ? Path.GetFileName(g.TrimEnd('\\')) : null;
+        return Task.FromResult<object>(new
+        {
+            saved = key,
+            file = SkyLinkSettings.FilePath,
+            forGame = forGame ?? "Skyrim Special Edition (default: no game connected yet)",
+            warning = forGame == null ? "No game has connected since the server started, so this went to the Steam game's settings. For the GOG game, start it first and set it again." : null,
+        });
     }
 
     private static bool IsPlainFileName(string filename) =>

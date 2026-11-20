@@ -246,8 +246,13 @@ public sealed class LootMasterlist
 
     // ---- the parts of LOOT's condition language that only ask what is installed ----
 
+    // "../X" names a file in the game folder (round A: VR-only requirements guarded by file("../SkyrimVR.exe") counted as missing on SE).
+    static string? GameFile(string name) =>
+        name.StartsWith("../") && SkyLinkSettings.SkyrimPath().Path is string game ? System.IO.Path.Combine(game, name[3..].Replace('/', '\\')) : null;
+
     static bool Present(string name, LoadOrderState lo) =>
-        lo.FileOf(name) != null || (SkyLinkSettings.DataPath() is string data && File.Exists(System.IO.Path.Combine(data, name)));
+        GameFile(name) is string g ? File.Exists(g)
+        : lo.FileOf(name) != null || (SkyLinkSettings.DataPath() is string data && File.Exists(System.IO.Path.Combine(data, name)));
 
     static bool Active(string name, LoadOrderState lo) => lo.IndexOf(name) != null;
 
@@ -332,7 +337,8 @@ public sealed class LootMasterlist
             return fn switch
             {
                 "active" => Matching(lo.Active).Any(),
-                "file" when a.StartsWith("../") => null,   // the game folder: not checked here
+                "file" or "readable" when a.StartsWith("../") => GameFile(a) is string g ? File.Exists(g) : null,
+                "product_version" when a.StartsWith("../") && args.Count >= 3 => ProductVersion(a, args[1], args[2]),
                 "file" => IsRegex(a) ? Matching(lo.Files.Keys).Any() : Present(a, lo),
                 "many_active" => Matching(lo.Active).Skip(1).Any(),
                 "many" => Matching(lo.Files.Keys).Skip(1).Any(),
@@ -340,6 +346,15 @@ public sealed class LootMasterlist
                 _ => null,   // version, checksum, readable, product_version, ...: not evaluated
             };
         }
+    }
+
+    static bool? ProductVersion(string file, string wanted, string op)
+    {
+        if (GameFile(file) is not string g || !File.Exists(g)) return false;
+        var have = System.Diagnostics.FileVersionInfo.GetVersionInfo(g).ProductVersion;
+        if (!Version.TryParse(have?.Split(' ')[0], out var h) || !Version.TryParse(wanted, out var w)) return null;
+        var c = h.CompareTo(w);
+        return op.Trim() switch { ">=" => c >= 0, ">" => c > 0, "<=" => c <= 0, "<" => c < 0, "==" => c == 0, "!=" => c != 0, _ => null };
     }
 
     // ---- CRC-32 (the zlib/ISO polynomial LOOT and xEdit report) ----

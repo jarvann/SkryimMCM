@@ -93,7 +93,7 @@ public class SessionTools : ToolBase
         {
             started = run?["error"] == null,
             cell = trimmed,
-            result = DeserializeResponse(run),
+            error = run?["error"]?.ToString(),   // the console text of a whole new game's load (169 KB in round A) isn't returned
             note = "The game loads into the cell; WaitForSkyrim then GetPlayerInfo confirms it. The main quest hasn't started: an alternate-start mod, or ReplayQuests from a blueprint, can set quests up.",
         };
     }
