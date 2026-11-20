@@ -362,6 +362,7 @@ namespace SkyrimMCP::QuestManager {
 
         std::vector<RE::TESQuest*> order;
         std::map<RE::TESQuest*, json> byQuest;
+        std::map<RE::TESQuest*, bool> visible;
         int total = 0, unresolvedTotal = 0, hidden = 0;
         for (auto* item : player->GetQuestLog()) {
             if (!item || !item->owner || !item->hasLogEntry) continue;
@@ -377,6 +378,7 @@ namespace SkyrimMCP::QuestManager {
             });
             const bool shown = quest->GetName() && quest->GetName()[0] && (quest->IsCompleted() || (quest->IsEnabled() && quest->IsRunning() && hasObjective));
             if (!shown && !includeHidden) { ++hidden; continue; }
+            visible[quest] = shown;
             if (!byQuest.contains(quest)) {
                 if (static_cast<int>(order.size()) >= maxQuests) continue;
                 order.push_back(quest);
@@ -404,6 +406,7 @@ namespace SkyrimMCP::QuestManager {
                               {"completed", quest->IsCompleted()},
                               {"running", quest->IsEnabled() && quest->IsRunning()},
                               {"currentStage", quest->GetCurrentStageID()},
+                              {"inJournal", visible[quest]},
                               {"entries", byQuest[quest]}});
         }
         json result = {{"quests", quests}, {"questCount", quests.size()}, {"entriesInJournal", total}};
