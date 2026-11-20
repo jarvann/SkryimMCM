@@ -1113,6 +1113,10 @@
             {
               "datetime": "2026-11-20T13:00",
               "note": "Round complete: apply kept on the Adventurer (Save4, level 4). Mouse look and activate dead after each apply: the vanilla Magic Student encounter (WIChangeLocation04) starts once she knows a ward and holds the controls; it isn't SkyLink. Apply now reports quests started during/after it and restores controls switched off meanwhile (EnablePlayerControls), saying which."
+            },
+            {
+              "datetime": "2026-11-20T14:00",
+              "note": "Shout round trip passes (Fus, Kest unlocked there -> unlocked here; Ro not taught). Follow-ups: GetKnownShouts adds per-word 'unlocked' (Papyrus IsWordUnlocked) and 'word' decoded from the dragon font (D4 -> Dah); UnlockShout given a word adds its shout if missing; the apply lists spells/shouts gained beyond the blueprint (a mod gave Burst Voice on FUS)."
             }
           ]
         },

@@ -163,7 +163,28 @@ public class PlayerTools : ToolBase
     public async Task<object> GetKnownShouts()
     {
         var data = await _pipe.SendRequestAsync("get_known_shouts");
+        // Per-word status, as the description promises (it was missing: 2026-11-20), and the word in plain letters.
+        if (data?["shouts"] is JsonArray shouts)
+            foreach (var w in shouts.OfType<JsonObject>().SelectMany(sh => (sh["words"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()))
+            {
+                if (w["name"]?.ToString() is string raw && raw.Any(char.IsDigit)) w["word"] = DragonWord(raw);
+                if (w["formId"]?.ToString() is not string wid) continue;
+                try
+                {
+                    var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject { ["className"] = "Game", ["functionName"] = "IsWordUnlocked", ["args"] = new JsonArray(wid) });
+                    if (r?["result"] is JsonValue v && v.TryGetValue<bool>(out var unlocked)) w["unlocked"] = unlocked;
+                }
+                catch (Exception) { }
+            }
         return DeserializeResponse(data);
+    }
+
+    // Word of power names are stored in the dragon font's spelling, digits for double letters (D4 = Dah, N4 = Nah).
+    internal static string DragonWord(string raw)
+    {
+        var map = new Dictionary<char, string> { ['2'] = "aa", ['3'] = "ei", ['4'] = "ah", ['6'] = "ii", ['7'] = "ir", ['8'] = "oo", ['9'] = "uu" };
+        var text = string.Concat(raw.Select(c => map.TryGetValue(c, out var d) ? d : c.ToString())).ToLowerInvariant();
+        return text.Length == 0 ? raw : char.ToUpperInvariant(text[0]) + text[1..];
     }
 
     [McpServerTool]
@@ -344,13 +365,33 @@ public class PlayerTools : ToolBase
             catch (Exception) { return []; }
         }
         var questsBefore = dryRun ? [] : await RunningQuests();
+        // Spells and shouts she has before, to list ones a mod granted on top of the apply (Burst Voice on learning FUS).
+        async Task<Dictionary<string, string>> KnownMagic()
+        {
+            var map = new Dictionary<string, string>();
+            try
+            {
+                foreach (var key in new[] { ("get_known_spells", "spells"), ("get_known_shouts", "shouts") })
+                    foreach (var x in ((await _pipe.SendRequestAsync(key.Item1))?[key.Item2] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                        if (x["formId"]?.ToString() is string id) map[id] = x["name"]?.ToString() ?? id;
+            }
+            catch (Exception) { }
+            return map;
+        }
+        var magicBefore = dryRun ? [] : await KnownMagic();
         var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
         if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
         object? controls = null;
         object? questsStarted = null;
+        object? alsoGained = null;
         if (!dryRun)
         {
             await Task.Delay(3000);
+            var fromBlueprint = new HashSet<string>(new[] { bp["spells"]?["spells"], bp["shouts"]?["shouts"] }.OfType<JsonArray>()
+                .SelectMany(a => a.OfType<JsonObject>()).Select(x => x["formId"]?.ToString() ?? ""));
+            var extra = (await KnownMagic()).Where(kv => !magicBefore.ContainsKey(kv.Key) && !fromBlueprint.Contains(kv.Key)).Select(kv => kv.Value).ToList();
+            if (extra.Count > 0)
+                alsoGained = new { spellsAndShouts = extra.Take(20), note = "Granted by another mod reacting to the apply (not in the blueprint)." };
             var startedNow = (await RunningQuests()).Where(kv => !questsBefore.ContainsKey(kv.Key)).Select(kv => kv.Value).ToList();
             if (startedNow.Count > 0)
                 questsStarted = new { quests = startedNow.Take(20),
@@ -418,6 +459,7 @@ public class PlayerTools : ToolBase
             shoutWords = words,
             controls,
             questsStarted,
+            alsoGained,
             quests = questReport,
         };
     }
