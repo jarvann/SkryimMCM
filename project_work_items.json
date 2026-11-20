@@ -1101,6 +1101,10 @@
             {
               "datetime": "2026-11-20T03:00",
               "note": "Built: ApplyBlueprint sections skills (SetBaseActorValue, raise only unless lowerSkills), level (actorData.level, raise only; perk points and level-up choices not given), perks (AddPerk), spells (AddSpell, before equipment so spells can be equipped), shouts (AddShout) and words (Game.TeachWord + UnlockWord through Papyrus for words the export marks unlocked; export now records unlocked per word via Game.IsWordUnlocked). All add-only, dry run by default, portable IDs."
+            },
+            {
+              "datetime": "2026-11-20T11:00",
+              "note": "Export on Arya: 1,421 spells (all kinds), 729 perks, 243 quests (238 with stagesDone). Spells now apply castable kinds only by default (spellKinds 'spell,power,lesserPower'): abilities (racial, vampirism, blessings), diseases and addictions are opt-in. Arya has no shouts, so words can't be checked on her."
             }
           ]
         },
@@ -2506,7 +2510,7 @@
         {
           "id": "BUG-025",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "get_enchantment_info reports magnitude 100 for console-made enchantments",
           "description": "On an item enchanted with the playerenchantobject console command, get_enchantment_info showed magnitude 100 on both effects while the game shows Turn Undead at level 0 (2026-11-16). Check which magnitude the tool reads (base effect vs the created enchantment's effect items) and the cost/level the game displays.",
           "history": [
@@ -2517,6 +2521,10 @@
             {
               "datetime": "2026-11-20T06:00",
               "note": "Diagnostic build: GetEnchantmentInfo now reports per effect noMagnitude/noDuration, archetype, cost and the description template (<mag>), with a note that the stored magnitude and the item card can differ for player and console enchantments. Needs the Turn Undead item in game to see which value the card uses."
+            },
+            {
+              "datetime": "2026-11-20T11:00",
+              "note": "Retest: a vanilla Blessed Steel Dagger reads magnitude 3, duration 30, archetype TurnUndead; the item card says 'Undead flee for 30 seconds. Chance to fail on targets above level 3.' The tool reads the right value: the 100 on 11-16 came from that console-made enchantment itself. Closed; noMagnitude/noDuration now always present."
             }
           ],
           "targetRelease": "1.4"
