@@ -204,8 +204,8 @@ public class WorldTools : ToolBase
     private async Task<object> ArrivalReply(string location, string? cellId, JsonNode? arrived, Dictionary<string, string> followersBefore)
     {
         if (arrived == null)
-            return new { success = true, arrived = false, location, cellId,
-                         note = "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
+            return new { success = PipeClient.GameDownNote() == null, arrived = false, location, cellId,
+                         note = PipeClient.GameDownNote() ?? "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
         // BUG-072: followers don't always come along, and once she is far away they aren't found at all: compare with the
         // followers she had before the move.
         await Task.Delay(1500);  // followers that do come along arrive just after her
