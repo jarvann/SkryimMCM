@@ -3532,6 +3532,10 @@
             {
               "datetime": "2026-11-20T07:00",
               "note": "Experiment build: Teleport(method) 'coc' (default, unchanged), 'center' (native PlayerCharacter::CenterOnCell, which coc calls, without the console) and 'loadingscreen' (UIMessageQueue shows the Loading Menu, then CenterOnCell a frame later; the server hides it after arrival if still open, new loading_menu action). One in-game round to compare: does 'loadingscreen' draw a real loading screen, does the game close it, any hang."
+            },
+            {
+              "datetime": "2026-11-20T08:00",
+              "note": "Round 1, step 1.1: coc out = frozen frame; Teleport('back') to the Solitude market = real loading screen, then an engine crash on the loading thread (EXCEPTION_ACCESS_VIOLATION SkyrimSE.exe+1563F2A, bad vtable; stack all SkyrimSE.exe; objects: a Grand Solitude tree, TESObjectTREE 0x180246CD / REFR 0x189CE5D9, ztree's dwarfjunip04.nif). Content issue exposed by the fast cell load, not SkyLink. Server fix: when Skyrim is gone or not responding, timeouts and the arrival wait now say so (PipeClient.GameDownNote) instead of timing out until the bridge's 80 s limit. Steps 1.2 onward still to do; test away from Solitude's walls."
             }
           ],
           "targetRelease": "1.4"

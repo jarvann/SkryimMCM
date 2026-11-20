@@ -182,7 +182,12 @@ public class WorldTools : ToolBase
                 var cell = now?["cellFormId"]?.ToString();
                 if (cell != null && cell != fromCell) return now;
             }
-            catch (Exception) { /* still loading */ }
+            catch (Exception)
+            {
+                // Still loading, unless the game has gone or stopped responding: then stop waiting (the call hit the
+                // bridge's 80-second limit after a crash, with no explanation).
+                if (PipeClient.GameDownNote() != null) return null;
+            }
         }
         return null;
     }
