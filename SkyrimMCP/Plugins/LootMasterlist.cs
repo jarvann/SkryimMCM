@@ -155,6 +155,8 @@ public sealed class LootMasterlist
             // Round A: Update.esm came back "known" with nothing about cleaning: say whether LOOT knows dirty versions at all.
             dirtyStatus = !checkDirty ? null
                 : dirty.Count > 0 ? "dirty (this exact file, by checksum)"
+                : crc is uint mine && SkyrimMCP.Tools.CleanTools.CleanedBySkyLink(plugin, mine) is { } cleaned
+                    ? $"cleaned by SkyLink on {cleaned["at"]} (backup: {cleaned["backup"]})"
                 : entries.Any(e => Children(e.Node, "dirty").Any()) ? $"LOOT lists dirty versions of this plugin, but not this file (checksum {crc:X8}): it may be a newer or older version than the masterlist knows, or already cleaned"
                 : entries.Any(e => Children(e.Node, "clean").Any()) ? "LOOT knows it as clean"
                 : "LOOT has no cleaning information for it",
