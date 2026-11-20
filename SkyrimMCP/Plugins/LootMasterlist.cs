@@ -25,13 +25,13 @@ public sealed class LootMasterlist
     /// <summary>The masterlist LOOT keeps for Skyrim SE (or its GOG/VR variants' folders when those exist).</summary>
     public static string? FindFile()
     {
+        // LOOT keeps one per game; Vortex keeps its own copy and updates it as it sorts (round B: LOOT's was 505 days old,
+        // Vortex's from that day). Read the newest.
         var root = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LOOT", "games");
-        foreach (var game in new[] { "Skyrim Special Edition", "Skyrim Special Edition (GOG)", "Skyrim Special Edition GOG" })
-        {
-            var f = System.IO.Path.Combine(root, game, "masterlist.yaml");
-            if (File.Exists(f)) return f;
-        }
-        return null;
+        var candidates = new[] { "Skyrim Special Edition", "Skyrim Special Edition (GOG)", "Skyrim Special Edition GOG" }
+            .Select(g => System.IO.Path.Combine(root, g, "masterlist.yaml"))
+            .Append(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Vortex", "skyrimse", "masterlist", "masterlist.yaml"));
+        return candidates.Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
     }
 
     public static LootMasterlist? Load()

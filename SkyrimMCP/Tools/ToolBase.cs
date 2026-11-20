@@ -217,11 +217,22 @@ public abstract class ToolBase
         // Summary only mode
         if (page == 0 || pageSize == 0)
         {
+            // Round B: the summary was only a count. Add what fits in a line: how many of each type, and totals where the items
+            // carry weight and value (inventories).
+            var objs = array.OfType<JsonObject>().ToList();
+            double Num(JsonObject o, string k) => o[k] is JsonValue v && v.TryGetValue<double>(out var d) ? d : 0;
+            var hasWeight = objs.Any(o => o.ContainsKey("weight"));
+            var hasValue = objs.Any(o => o.ContainsKey("value"));
             return new
             {
                 totalItems,
                 totalPages = pageSize > 0 ? totalPages : 0,
-                summaryOnly = true
+                summaryOnly = true,
+                byType = objs.Any(o => o.ContainsKey("type"))
+                    ? objs.GroupBy(o => o["type"]?.ToString() ?? "?").OrderByDescending(g => g.Count()).ToDictionary(g => g.Key, g => g.Count())
+                    : null,
+                totalWeight = hasWeight ? Math.Round(objs.Sum(o => Num(o, "weight") * Math.Max(1, Num(o, "count"))), 1) : (double?)null,
+                totalValue = hasValue ? Math.Round(objs.Sum(o => Num(o, "value") * Math.Max(1, Num(o, "count")))) : (double?)null,
             };
         }
 

@@ -321,7 +321,7 @@ public class PlayerTools : ToolBase
         "doesn't know are skipped, since spells aren't restored; worn items not in the blueprint stay on). Items are found by plugin name and local ID, so a different load order works; " +
         "items from plugins that aren't loaded, items created in game, and blueprints from before 1.3 whose form IDs now point at " +
         "a different item are listed as unresolved. Player-made enchantments are not restored (the plain item is added).")]
-    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false, bool lowerSkills = false, string spellKinds = "spell,power,lesserPower")
+    public async Task<object> ApplyBlueprint(string path, bool dryRun = true, string sections = "inventory,equipment,gold", bool exactGold = false, bool lowerSkills = false, string spellKinds = "spell,power,lesserPower", bool detail = false)
     {
         JsonNode? blueprint;
         try
@@ -479,10 +479,13 @@ public class PlayerTools : ToolBase
                     : null,
             };
         }
+        // Round B: a dry run listed all 248 items (~40 KB). Counts first; each list capped at 15 unless detail=true.
+        if (!detail && data is JsonObject dataObj) CapLists(dataObj, 15);
         var result = DeserializeResponse(data);
         return new
         {
             blueprint = path,
+            listsCapped = detail ? null : "Lists show their first 15 entries with a count of the rest; detail: true lists everything.",
             exportedBy = bp["exportSource"]?.GetValue<string>(),
             portableIds = bp["formatVersion"]?.GetValue<int>() >= 2,
             result,
@@ -492,6 +495,24 @@ public class PlayerTools : ToolBase
             alsoGained,
             quests = questReport,
         };
+    }
+
+    static void CapLists(JsonObject obj, int cap)
+    {
+        foreach (var key in obj.Select(kv => kv.Key).ToList())
+        {
+            switch (obj[key])
+            {
+                case JsonArray arr when arr.Count > cap:
+                    var kept = new JsonArray(arr.Take(cap).Select(n => n?.DeepClone()).ToArray());
+                    obj[key + "More"] = arr.Count - cap;
+                    obj[key] = kept;
+                    break;
+                case JsonObject child:
+                    CapLists(child, cap);
+                    break;
+            }
+        }
     }
 
     // Blueprint quests against this game's: what the blueprint's character had completed or running that this one hasn't.

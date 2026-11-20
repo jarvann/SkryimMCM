@@ -101,7 +101,12 @@ public class InstallTools : ToolBase
         var pluginsTxt = GamePluginsTxt();
         var targets = plugins.Select(p => Path.Combine(data, Path.GetFileName(p))).ToList();
         var clash = targets.Where(File.Exists).ToList();
-        if (dryRun) return (new { dryRun = true, manager = "none", copyTo = targets, pluginsTxt, wouldReplace = clash });
+        if (dryRun) return (new
+        {
+            dryRun = true, manager = "none", copyTo = targets, pluginsTxt,
+            // Round B: the dry run said it would replace a plugin the real run then refused to overwrite.
+            wouldRefuse = clash.Count > 0 ? $"A plugin with that name is already in Data ({string.Join(", ", clash.Select(Path.GetFileName))}): the real run stops; rename the build or remove the old one." : null,
+        });
         if (clash.Count > 0) return (new { error = $"A plugin with that name is already in Data: {string.Join(", ", clash.Select(Path.GetFileName))}. Rename the build or remove the old one first." });
         foreach (var (src, dest) in plugins.Zip(targets)) File.Copy(src, dest);
         var activatedNone = plugins.Select(p => Activate(pluginsTxt, Path.GetFileName(p), null)).ToList();

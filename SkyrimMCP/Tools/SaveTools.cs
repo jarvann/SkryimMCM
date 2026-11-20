@@ -82,7 +82,22 @@ public class SaveTools : ToolBase
                 if (File.Exists(file)) return (null, sheathed);
             }
         }
-        return ($"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}). Most likely a mod blocked it: survival or " +
+        // Round B: a refused save near a runaway pile-up. Say what the game was doing, not only what it could be.
+        var seen = new List<string>();
+        try
+        {
+            var safety = await pipe.SendRequestAsync("get_game_safety");
+            foreach (var b in (safety?["moveBlockers"] as JsonArray ?? new JsonArray()).Select(x => x?.ToString() ?? ""))
+                if (b.Contains("combat", StringComparison.OrdinalIgnoreCase) || b.Contains("loading", StringComparison.OrdinalIgnoreCase) || b.Contains("saving", StringComparison.OrdinalIgnoreCase)) seen.Add(b);
+            var stats = await pipe.SendRequestAsync("get_script_stats", new JsonObject { ["top"] = 1 });
+            if (stats?["overstressed"]?.GetValue<bool>() == true)
+                seen.Add($"the script engine is overstressed ({stats["runningStacks"]} stacks running): saves wait for scripts to pause, and a pile-up can stop that");
+            var s = await pipe.SendRequestAsync("sheathe");
+            if (s?["weaponState"]?.GetValue<int>() is int ws && ws != 0) seen.Add($"a weapon or spell is still out (weapon state {ws})");
+        }
+        catch (Exception) { }
+        var observed = seen.Count > 0 ? " Right now: " + string.Join("; ", seen) + "." : "";
+        return ($"the game didn't save '{name}' (no file after two requests, 12 seconds{(sheathed ? "; a drawn weapon was sheathed first" : "")}).{observed} Otherwise most likely a mod blocked it: survival or " +
                "save-limiting mods (Survival Mode, SaveReminder and the like) refuse saves under their own rules, console saves included; " +
                "the game also won't save in combat, during a load or while another save is being written. In some load orders a drawn " +
                "weapon or readied spell blocks it too: SkyLink sheathes before saving, so check it stayed sheathed. Nothing else was done.", sheathed);
