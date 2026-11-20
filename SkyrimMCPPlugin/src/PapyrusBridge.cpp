@@ -476,7 +476,13 @@ namespace SkyrimMCP::PapyrusBridge {
         // BUG-048: with a target (a form ID or editor ID of a form the script is attached to, such as a quest), call a
         // member function on that form's script instead of a global one.
         RE::TESForm* targetForm = nullptr;
-        if (!target.empty()) {
+        // FEAT-280: "handle:<hex>" names a script object by its VM handle (from find_stack_objects), which also reaches
+        // objects with no form of their own, such as reference aliases.
+        RE::VMHandle rawHandle = 0;
+        if (target.rfind("handle:", 0) == 0) {
+            try { rawHandle = std::stoull(target.substr(7), nullptr, 16); } catch (...) { rawHandle = 0; }
+            if (!rawHandle) return {{"error", "Bad handle: " + target}};
+        } else if (!target.empty()) {
             try { targetForm = RE::TESForm::LookupByID(Helpers::ParseFormId(target)); } catch (...) { targetForm = nullptr; }
             if (!targetForm) targetForm = RE::TESForm::LookupByEditorID(target);
             if (!targetForm) return {{"error", "Target not found: " + target + " (a form ID like 0001A2B3, or an editor ID)"}};
@@ -494,8 +500,9 @@ namespace SkyrimMCP::PapyrusBridge {
         }
 
         // 2. It must declare a global function with that name (or, with a target, a member function).
-        auto* func = targetForm ? FindMemberFunction(typeInfo.get(), functionName) : FindGlobalFunction(typeInfo.get(), functionName);
-        if (!func && targetForm) {
+        const bool member = targetForm || rawHandle;
+        auto* func = member ? FindMemberFunction(typeInfo.get(), functionName) : FindGlobalFunction(typeInfo.get(), functionName);
+        if (!func && member) {
             return {{"error", "Member function not found: " + className + "." + functionName + ". Use get_script_functions to list what it has."}};
         }
         if (!func) {
@@ -562,7 +569,9 @@ namespace SkyrimMCP::PapyrusBridge {
 
         // Dispatch the call (from the pipe thread; see Protocol.cpp for why not TaskQueue)
         bool dispatched = false;
-        if (targetForm) {
+        if (rawHandle) {
+            dispatched = impl->DispatchMethodCall2(rawHandle, RE::BSFixedString(className), RE::BSFixedString(functionName), dynArgs.get(), callback);
+        } else if (targetForm) {
             auto* policy = impl->GetObjectHandlePolicy1();
             const auto handle = policy ? policy->GetHandleForObject(targetForm->GetFormType(), targetForm) : 0;
             if (!handle || handle == (policy ? policy->EmptyHandle() : 0)) {
@@ -580,7 +589,7 @@ namespace SkyrimMCP::PapyrusBridge {
         if (!dispatched) {
             // A member call on a reference the script engine hasn't bound (no script attached, like most beds and clutter)
             // fails here, whatever the function would return (2026-11-20: GetActorOwner on a bed read as a return problem).
-            return {{"error", targetForm
+            return {{"error", member
                 ? "Failed to dispatch " + signature + ": the target isn't bound in the script engine (it has no script attached), so its member functions can't be called this way. Use a SkyLink tool or a global function instead."
                 : "Failed to dispatch Papyrus call: " + signature}};
         }
@@ -608,6 +617,7 @@ namespace SkyrimMCP::PapyrusBridge {
         result["functionName"] = functionName;
         result["signature"] = signature;
         if (targetForm) result["target"] = std::format("{:08X}", targetForm->GetFormID());
+        else if (rawHandle) result["target"] = target;
         if (!packed.empty()) result["packed"] = packed;
         return result;
     }

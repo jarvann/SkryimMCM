@@ -338,6 +338,13 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [top]() { return ScriptStats::GetScriptStats(top); });
         };
 
+        // FEAT-280: the objects behind a runaway handler, for StopRunaway
+        registry["find_stack_objects"] = [](const std::string& id, const json& params) {
+            std::string entry = params.value("entry", "");
+            int limit = params.value("limit", 100);
+            return GameThread(id, [entry, limit]() { return ScriptStats::FindStackObjects(entry, limit); });
+        };
+
         // FEAT-226: hair colour and skin tone with the game's own data (no RaceMenu needed)
         registry["get_colors"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");
