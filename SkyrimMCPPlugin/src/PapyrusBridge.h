@@ -21,7 +21,7 @@ namespace SkyrimMCP {
         json CallPapyrusFunction(const std::string& className,
                                   const std::string& functionName,
                                   const json& args,
-                                  const std::string& target = "");
+                                  const std::string& target = "", bool wait = true);
 
         // Get capabilities for a specific script class
         json GetScriptFunctions(const std::string& className);
