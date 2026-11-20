@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 298,
+    "totalItems": 299,
     "completed": 247,
     "completedPartial": 2,
-    "implementedUntested": 4,
+    "implementedUntested": 17,
     "inProgress": 0,
-    "planned": 45,
+    "planned": 33,
     "bugs": 93
   },
   "phases": [
@@ -283,7 +283,7 @@
         {
           "id": "FEAT-015",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Force new game via MCP",
           "description": "Trigger new game initialization directly, bypassing main menu. Reframed 2026-11-20: start a new game from the main menu (optionally straight into a cell, as coc does from the menu), for the automated restart cycle (FEAT-278) and for carrying a character to a fresh game with ApplyBlueprint. Must cope with alternate-start mods.",
           "targetRelease": "1.5",
@@ -292,6 +292,10 @@
             {
               "datetime": "2026-11-20T19:00",
               "note": "Unparked into 1.5 (Cory: parked items go to 1.5 if still relevant)."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): StartNewGame(cell): coc from the main menu; without a cell the player picks New. get_session_state."
             }
           ]
         },
@@ -1078,7 +1082,7 @@
         {
           "id": "FEAT-113",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "title": "Journal integration: read journal entries",
           "description": "Read what the player's journal shows: each quest's log entries for the stages done (the text, not just stage numbers) and the objectives as displayed, so the AI can answer 'what does my journal say' and spot a quest whose log stopped. Writing notes into the game's own journal needs a SkyLink plugin and moves to 2.0 with the on-screen quest tracker (FEAT-225); notes outside the game already exist (AddNote/GetNotes).",
           "targetRelease": "1.5",
@@ -1087,6 +1091,10 @@
             {
               "datetime": "2026-11-20T19:00",
               "note": "Unparked into 1.5 for the read half; the write half belongs with FEAT-225 in 2.0."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): get_journal walks PlayerCharacter::GetQuestLog (the entries the player received) per quest; GetJournal lists journal/diary/notebook mods so their API can be used, falling back to ours (Cory's suggestion)."
             }
           ]
         }
@@ -4714,7 +4722,7 @@
         {
           "id": "BUG-093",
           "type": "bug",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
           "title": "Quest objectives show unresolved alias tokens",
           "description": "Objective text read from a quest can still contain tokens like <Alias=Target> instead of the name the journal shows. Resolve them from the quest's filled aliases, as the journal does; leave the token with a note when the alias is empty. Split from BUG-085.",
@@ -4722,6 +4730,10 @@
             {
               "datetime": "2026-11-20T19:30",
               "note": "Split from BUG-085 when it was closed."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): ResolveTokens fills <Alias=...>, <Alias.X=...> (reference aliases) and <Global=...> in objectives and journal text."
             }
           ],
           "targetRelease": "1.5"
@@ -4738,7 +4750,7 @@
         {
           "id": "FEAT-270",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Patch a mod's script as an override mod",
           "description": "The workflow used for the wendigo runaway on 2026-11-20, made a tool chain: find the handler in StackReport, read the mod's .psc (loose or from its BSA), write the fix, compile it (FEAT-272), and package the .pex with its source as a small override mod (zip for Vortex or MO2, winning over the original). Then verify with StackReport after a restart. Never edits the original mod's files.",
@@ -4746,6 +4758,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Asked for by Cory ('write scripts in realtime... fix and save into the game'); the wendigo patch (WendigoUpdateFix.zip) was the manual run."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): PackageOverrideMod: Data-layout zip with readme; optional MO2 install at top priority (modlist.txt backed up)."
             }
           ],
           "targetRelease": "1.5"
@@ -4753,7 +4769,7 @@
         {
           "id": "FEAT-271",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Creation Kit detection and setup offer",
           "description": "Find an installed Creation Kit (SE, or the LE one as with Cory's C:\\Steam\\steamapps\\common\\skyrim) and its PapyrusCompiler.exe; check vanilla script sources exist and offer to unpack Data\\Scripts.rar (Windows tar reads RAR) when only the archive is there. When it is missing, the AI explains what installing it (free on Steam) would unlock and how, and never installs anything itself.",
@@ -4761,6 +4777,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: 'can we offer as an AI to have the user install it for more functionality?'"
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): GetCreationKit (Steam libraries, settings creationKitPath; LE kit accepted, same .pex), PrepareScriptSources (Windows tar into SkyLinkAI\\Build)."
             }
           ],
           "targetRelease": "1.5"
@@ -4768,7 +4788,7 @@
         {
           "id": "FEAT-272",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "CompileScript: compile Papyrus with imports resolved",
           "description": "Run the Creation Kit's compiler on a .psc with the import order worked out: the patch's own source folder, then Data\\Scripts\\Source (SE layout), then the unpacked vanilla sources, plus the sources of the mods it depends on (loose or from BSAs, MO2-aware through SkyLinkSettings). Return the compiler's errors with file and line, and the .pex path.",
@@ -4776,6 +4796,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "The wendigo compile failed until the vanilla sources were unpacked; this makes that automatic."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): CompileScript: imports = project, extra folders, MO2 mod sources it names (copied into deps), Data and base-game sources; errors with line numbers. GetScriptSource reads a .psc."
             }
           ],
           "targetRelease": "1.5"
@@ -4786,11 +4810,15 @@
           "status": "planned",
           "priority": "medium",
           "title": "Write small plugins (ESP / light ESPFE)",
-          "description": "Create a small plugin the AI can reason about: a few records (a quest with a script, a spell, a global, a leveled list edit) with correct masters, the light flag when eligible, and FormIDs inside the light range. Writer library to be chosen (Mutagen is the likely choice; it is MIT and handles SSE plugins).",
+          "description": "Create a small plugin the AI can reason about: a few records (a quest with a script, a spell, a global, a leveled list edit) with correct masters, the light flag when eligible, and FormIDs inside the light range. Our own reader and writer, written from the UESP format documentation and inspection of game files (clean room): Mutagen, xEdit and nifly are GPL-3.0 and can't go into the MIT server, so no code is read or copied from them.",
           "history": [
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: build ESP/ESPFE and add it to the load order."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Correction: Mutagen is GPL-3.0, not MIT. Built as original work (Cory: 'make sure it's all original work and not derivative')."
             }
           ],
           "targetRelease": "1.5"
@@ -4843,7 +4871,7 @@
         {
           "id": "FEAT-277",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Main-menu content reload (experiment)",
           "description": "Research spike: the AE engine has a content reload from the main menu (Main::reloadContent, used by Creations). Find out whether calling it lets a newly installed plugin load without restarting Skyrim, what breaks (scripts, SKSE plugins, the logic DLL's handles), and whether it is safe enough to offer. Outcome is a yes or no with evidence, not a feature.",
@@ -4851,6 +4879,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: 'with Anniversary Edition they added the ability to reload the engine from the main menu... Can we tap into that?'"
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): ReloadContent sets Main reloadContent at the main menu and reports whether a given plugin appeared. Test on the vanilla GOG/MO2 install first (Cory's large list has a return-to-main-menu issue; startup main menu is fine)."
             }
           ],
           "targetRelease": "1.5"
@@ -4858,7 +4890,7 @@
         {
           "id": "FEAT-278",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Automated restart cycle",
           "description": "When a change needs a game restart (a new plugin, a host DLL, a patched script): save, quit cleanly, relaunch through SKSE (skse64_loader or the mod manager), wait for the main menu (WaitForSkyrim), load the save and run a check (StackReport, or the tool that needed the restart). The player confirms the quit.",
@@ -4866,6 +4898,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Discussed with the build-and-install chain; the fallback when FEAT-277 says no."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): RestartGame: save, Main quitGame (as Quit to Desktop; never returns to the main menu), wait for exit, relaunch via skse64_loader or MO2's SKSE entry; then WaitForSkyrim + LoadSave."
             }
           ],
           "targetRelease": "1.5"
@@ -4873,7 +4909,7 @@
         {
           "id": "FEAT-279",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Crash-log patterns",
           "description": "A small catalogue of known crash signatures matched against Crash Logger reports: the faulting module and offset, the menu open at the time, the forms in the stack. Each match names the likely mod and the known fix (e.g. the Inner Warmth scroll in BarterMenu, crash-2026-11-14-10-10-42.log, fixed by the Reducks InnerWarmthScrollFix). Grows from crashes seen in testing.",
@@ -4881,6 +4917,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "From the 11/14 Inner Warmth crash and the crashes during 1.4 testing (Grand Solitude tree, Community Shaders with Better Dynamic Snow, OStim SceneMenu)."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): CrashPatterns in GetCrashLog's analysis: 4 signatures from crashes on Cory's setup (match by Address Library ID), plus general rules (faulting DLL, graphics driver, plugins and meshes named, start-up crash). Only specific signatures fire for those mods, so vanilla setups get the general rules."
             }
           ],
           "targetRelease": "1.5"
@@ -4888,7 +4928,7 @@
         {
           "id": "FEAT-280",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "StopRunaway: stop a runaway update loop live",
           "description": "For a StackReport handler flagged runaway: find the objects whose script keeps re-registering (OnUpdate / RegisterForSingleUpdate), call UnregisterForUpdate on them through the Papyrus bridge, and watch the count fall. Live and temporary (the loop can come back on the next load); points to a patch (FEAT-270) for a lasting fix. Asks first and names the mod.",
@@ -4896,6 +4936,25 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "From the wendigo runaway (mihail_wendigo_script2) during 1.4 testing."
+            },
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Built (1.5 batch A): find_stack_objects (running + queued stacks, shared pending-call walker), call_papyrus_function target 'handle:<hex>', StopRunaway unregisters and re-counts after 5 s."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-285",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Use an installed journal mod's API to write notes in game",
+          "description": "When GetJournal finds a journal/diary/notebook mod with a Papyrus API for its own entries, let the AI add notes through it (CallPapyrusFunction), so notes appear in the game without a SkyLink plugin. Falls back to AddNote (outside the game) when none is installed. Find candidate mods and their APIs first.",
+          "history": [
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Cory: look for journaling mods and use them if present, with our own utilities as the fallback."
             }
           ],
           "targetRelease": "1.5"
@@ -5187,7 +5246,7 @@
     {
       "id": "INFRA-005",
       "type": "infrastructure",
-      "status": "planned",
+      "status": "implemented-untested",
       "title": "VPrint hook",
       "description": "Full console output capture for multi-line command results. Still relevant 2026-11-20: Helpers::CaptureConsoleOutput is best effort (lastMessage only), so multi-line output such as sqv quest variables or help is lost. The hook lives in the host DLL (hooks can't go in the logic DLL), so it needs a game restart and a host release.",
       "targetRelease": "1.5",
@@ -5196,6 +5255,10 @@
         {
           "datetime": "2026-11-20T19:00",
           "note": "Unparked into 1.5."
+        },
+        {
+          "datetime": "2026-11-20T22:30",
+          "note": "Built (1.5 batch A): No hook needed: ConsoleLog keeps all printed text in its buffer; mark it before a command and take what was added (lastMessage fallback); multi-line output also as lines. Helpers.h, so host rebuild."
         }
       ]
     },
@@ -5216,7 +5279,7 @@
     {
       "id": "INFRA-007",
       "type": "infrastructure",
-      "status": "planned",
+      "status": "implemented-untested",
       "title": "Measure SkyLink's game-thread cost, then cache",
       "description": "Measure first: time spent on the game thread per SkyLink task (the host already counts tasks), per tool, during normal play and during polling, reported by a tool so players asking 'will this affect performance?' get numbers. Cache only what the numbers show is costly and safe to cache (form lookups, the load order, the Papyrus catalog). Fits 1.5's FPS and save-health theme.",
       "targetRelease": "1.5",
@@ -5225,6 +5288,10 @@
         {
           "datetime": "2026-11-20T19:00",
           "note": "Unparked into 1.5, reframed as measure-then-cache."
+        },
+        {
+          "datetime": "2026-11-20T22:30",
+          "note": "Built (1.5 batch A): Host times every game-thread task and charges it to the queuing request; get_skylink_cost on the pipe thread; GetSkyLinkCost tool. Caching deferred until numbers show a need."
         }
       ]
     },
@@ -5399,7 +5466,7 @@
     {
       "id": "INFRA-023",
       "type": "infrastructure",
-      "status": "planned",
+      "status": "implemented-untested",
       "priority": "low",
       "title": "Pipe serves more than one client",
       "description": "The plugin's pipe accepts one client at a time, so while Claude Desktop's server is connected the dev agent can't query the game (scripts/pipe-call.sh, added 2026-11-16). Serve each client on its own instance and check the pipe-thread paths (Papyrus catalog, DispatchStaticCall) are safe with two clients. Host change: needs a game restart.",
@@ -5411,6 +5478,10 @@
         {
           "datetime": "2026-11-20T19:00",
           "note": "Slipped from 1.4; moved to 1.5 (Cory)."
+        },
+        {
+          "datetime": "2026-11-20T22:30",
+          "note": "Built (1.5 batch A): Up to 4 clients, a thread each; requests reaching the logic DLL take turns (ping/poll_events don't). Host change."
         }
       ],
       "targetRelease": "1.5"
@@ -5953,7 +6024,8 @@
         "FEAT-280",
         "INFRA-005",
         "INFRA-007",
-        "INFRA-023"
+        "INFRA-023",
+        "FEAT-285"
       ],
       "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "testRemediation": [
