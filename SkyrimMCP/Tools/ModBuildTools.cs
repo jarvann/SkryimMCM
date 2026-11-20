@@ -230,10 +230,13 @@ public partial class ModBuildTools : ToolBase
         "(MO2 must be closed; modlist.txt is backed up first). Vortex: the player installs the zip (Install From File) and lets it " +
         "win over the original. dryRun (default true) lists what would be packed.")]
     public Task<object> PackageOverrideMod(string project, string? overrides = null, string? description = null, bool installToMo2 = false, bool dryRun = true)
+        => Task.FromResult(PackageOverrideModCore(project, overrides, description, installToMo2, dryRun));
+
+    internal static object PackageOverrideModCore(string project, string? overrides, string? description, bool installToMo2, bool dryRun = false)
     {
         var projectName = SafeName(project);
         var dir = Path.Combine(BuildRoot, projectName);
-        if (!Directory.Exists(dir)) return Task.FromResult<object>(new { error = $"No build project '{projectName}' in {BuildRoot}. CompileScript creates one." });
+        if (!Directory.Exists(dir)) return (new { error = $"No build project '{projectName}' in {BuildRoot}. CompileScript creates one." });
 
         // Data-relative path -> source file.
         var files = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -248,7 +251,7 @@ public partial class ModBuildTools : ToolBase
         foreach (var ext in new[] { "*.esp", "*.esl", "*.esm" })
             foreach (var f in Directory.EnumerateFiles(dir, ext)) files[Path.GetFileName(f)] = f;
         if (!files.Keys.Any(k => k.EndsWith(".pex", StringComparison.OrdinalIgnoreCase) || k.EndsWith(".esp") || k.EndsWith(".esl") || k.EndsWith(".esm")))
-            return Task.FromResult<object>(new { error = "Nothing to package: compile a script (CompileScript) or create a plugin first." });
+            return (new { error = "Nothing to package: compile a script (CompileScript) or create a plugin first." });
 
         var readmeName = projectName + " - README.txt";
         var readme = new StringBuilder()
@@ -267,7 +270,7 @@ public partial class ModBuildTools : ToolBase
         var zip = Path.Combine(dir, projectName + ".zip");
         var (mo2, profile) = SkyLinkSettings.Mo2Instance();
         if (dryRun)
-            return Task.FromResult<object>(new { dryRun = true, zip, files = files.Keys, readme = readmeName, installToMo2 = installToMo2 ? (mo2 != null ? Path.Combine(mo2, "mods", projectName) : "no MO2 instance found") : null });
+            return (new { dryRun = true, zip, files = files.Keys, readme = readmeName, installToMo2 = installToMo2 ? (mo2 != null ? Path.Combine(mo2, "mods", projectName) : "no MO2 instance found") : null });
 
         if (File.Exists(zip)) File.Delete(zip);
         using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
@@ -287,7 +290,7 @@ public partial class ModBuildTools : ToolBase
             else mo2Result = InstallToMo2(mo2, profile, projectName, files, readmeName, readme);
         }
 
-        return Task.FromResult<object>(new
+        return (new
         {
             zip,
             files = files.Keys,
