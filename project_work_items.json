@@ -1117,6 +1117,10 @@
             {
               "datetime": "2026-11-20T14:00",
               "note": "Shout round trip passes (Fus, Kest unlocked there -> unlocked here; Ro not taught). Follow-ups: GetKnownShouts adds per-word 'unlocked' (Papyrus IsWordUnlocked) and 'word' decoded from the dragon font (D4 -> Dah); UnlockShout given a word adds its shout if missing; the apply lists spells/shouts gained beyond the blueprint (a mod gave Burst Voice on FUS)."
+            },
+            {
+              "datetime": "2026-11-20T15:00",
+              "note": "Recheck: apply fields always present, words decoded (Fus, Wuld, Nah, Kest), alreadyUnlocked right. alsoGained missed Burst Voice: the blueprint (exported after the mod granted it) listed it under spells, and every blueprint entry was excluded even for sections not applied; now only applied sections count. GetKnownShouts: decoded spelling is 'name', raw kept as 'nameRaw'."
             }
           ]
         },

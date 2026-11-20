@@ -167,7 +167,8 @@ public class PlayerTools : ToolBase
         if (data?["shouts"] is JsonArray shouts)
             foreach (var w in shouts.OfType<JsonObject>().SelectMany(sh => (sh["words"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()))
             {
-                if (w["name"]?.ToString() is string raw && raw.Any(char.IsDigit)) w["word"] = DragonWord(raw);
+                // The readable spelling is the name; the record's dragon-font spelling stays as nameRaw.
+                if (w["name"]?.ToString() is string raw && raw.Any(char.IsDigit)) { w["nameRaw"] = raw; w["name"] = DragonWord(raw); }
                 if (w["formId"]?.ToString() is not string wid) continue;
                 try
                 {
@@ -388,8 +389,11 @@ public class PlayerTools : ToolBase
         if (!dryRun)
         {
             await Task.Delay(3000);
-            var fromBlueprint = new HashSet<string>(new[] { bp["spells"]?["spells"], bp["shouts"]?["shouts"] }.OfType<JsonArray>()
-                .SelectMany(a => a.OfType<JsonObject>()).Select(x => x["formId"]?.ToString() ?? ""));
+            // Only the sections applied count as "from the blueprint": Burst Voice sat in the blueprint's spells (exported after a
+            // mod granted it) and was taken for the apply's own work on a shouts-only apply (2026-11-20).
+            bool Applied(string section) => sections.Split(',', StringSplitOptions.TrimEntries).Contains(section, StringComparer.OrdinalIgnoreCase);
+            var fromBlueprint = new HashSet<string>(new[] { Applied("spells") ? bp["spells"]?["spells"] : null, Applied("shouts") ? bp["shouts"]?["shouts"] : null }
+                .OfType<JsonArray>().SelectMany(a => a.OfType<JsonObject>()).Select(x => x["formId"]?.ToString() ?? ""));
             var extra = (await KnownMagic()).Where(kv => !magicBefore.ContainsKey(kv.Key) && !fromBlueprint.Contains(kv.Key)).Select(kv => kv.Value).ToList();
             if (extra.Count > 0)
                 alsoGained = new { spellsAndShouts = extra.Take(20), note = "Granted by another mod reacting to the apply (not in the blueprint)." };
