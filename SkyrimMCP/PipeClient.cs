@@ -60,8 +60,8 @@ public class PipeClient : IPipeClient
             await _writer!.WriteLineAsync(request.ToJsonString());
             await _writer.FlushAsync();
             using var cts = new CancellationTokenSource(5000);
-            var line = await _reader!.ReadLineAsync(cts.Token);
-            var data = string.IsNullOrEmpty(line) ? null : JsonNode.Parse(line)?["data"];
+            var reply = await ReadReplyAsync(request["id"]!.ToString(), cts.Token);
+            var data = reply?["data"];
             var folder = data?["folder"]?.GetValue<string>();
             var game = data?["gameFolder"]?.GetValue<string>();
             SkyLinkSettings.GameDocumentsFolder = string.IsNullOrWhiteSpace(folder) ? null : folder;
@@ -116,18 +116,11 @@ public class PipeClient : IPipeClient
 
             // Read response with timeout
             using var cts = new CancellationTokenSource(ResponseTimeoutMs);
-            var responseLine = await _reader!.ReadLineAsync(cts.Token);
-
-            if (string.IsNullOrEmpty(responseLine))
+            var response = await ReadReplyAsync(request["id"]!.ToString(), cts.Token);
+            if (response == null)
             {
                 Disconnect();
                 throw new McpException("Empty response from SKSE plugin - connection may have been lost");
-            }
-
-            var response = JsonNode.Parse(responseLine);
-            if (response == null)
-            {
-                throw new McpException("Failed to parse response from SKSE plugin");
             }
 
             // Errors are thrown as McpException because the MCP SDK passes only that
@@ -137,7 +130,11 @@ public class PipeClient : IPipeClient
             if (!success)
             {
                 var error = response["error"]?.GetValue<string>() ?? "Unknown error from SKSE plugin";
-                if (error.Contains("timed out", StringComparison.OrdinalIgnoreCase) && GameDownNote() is string down) error = down + " (" + error + ")";
+                if (error.Contains("timed out", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (GameDownNote() is string down) error = down + " (" + error + ")";
+                    else if (FocusNote() is string focus) error = focus + " (" + error + ")";
+                }
                 throw new McpException(error);
             }
 
@@ -146,7 +143,7 @@ public class PipeClient : IPipeClient
         catch (OperationCanceledException)
         {
             Disconnect();
-            throw new McpException(GameDownNote() ?? "Timed out waiting for response from SKSE plugin - game may be loading or paused");
+            throw new McpException(GameDownNote() ?? FocusNote() ?? "Timed out waiting for response from SKSE plugin - game may be loading or paused");
         }
         catch (IOException)
         {
@@ -157,6 +154,29 @@ public class PipeClient : IPipeClient
         {
             _sendLock.Release();
         }
+    }
+
+    /// <summary>
+    /// The reply to one request. Replies carry the request's id: a reply with another id is a late answer to an earlier request
+    /// whose wait ran out (round A: after a relaunch the folder query timed out, its reply arrived later and every call after it
+    /// got the previous call's answer). Those are discarded. Null when the connection closed.
+    /// </summary>
+    private async Task<JsonNode?> ReadReplyAsync(string id, CancellationToken token)
+    {
+        for (var skipped = 0; skipped < 50; skipped++)
+        {
+            var line = await _reader!.ReadLineAsync(token);
+            if (line == null) return null;
+            if (line.Length == 0) continue;
+            JsonNode? reply;
+            try { reply = JsonNode.Parse(line); }
+            catch (System.Text.Json.JsonException) { continue; }
+            var replyId = reply?["id"]?.ToString();
+            // An empty id is a reply the plugin couldn't tie to a request (unparseable request): treat it as ours.
+            if (string.IsNullOrEmpty(replyId) || replyId == id) return reply;
+            Console.Error.WriteLine($"[SkyLink] Discarded a late reply ({replyId}) while waiting for {id}");
+        }
+        throw new McpException("Too many stray replies from the SKSE plugin; reconnecting on the next call.");
     }
 
     /// <summary>
@@ -188,6 +208,52 @@ public class PipeClient : IPipeClient
             }
         }
         catch (Exception) { }
+        return null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    /// <summary>
+    /// BUG-087 (round A): instead of listing possibilities, check them: is Skyrim's window in front, and does Skyrim.ini keep
+    /// the game running in the background (bAlwaysActive)? Null when the window isn't the reason.
+    /// </summary>
+    internal static string? FocusNote()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) return null;
+            var skyrim = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Select(p => (uint)p.Id).ToHashSet();
+            if (skyrim.Count == 0) return null;
+            GetWindowThreadProcessId(GetForegroundWindow(), out var front);
+            if (skyrim.Contains(front)) return null;
+            var alwaysActive = AlwaysActiveSetting();
+            if (alwaysActive == true) return null;
+            string other;
+            try { other = System.Diagnostics.Process.GetProcessById((int)front).ProcessName; } catch (Exception) { other = "another program"; }
+            return $"Skyrim's window is in the background ({other} has focus) and Skyrim.ini {(alwaysActive == false ? "sets bAlwaysActive=0" : "doesn't set bAlwaysActive")}, " +
+                   "so the game is paused and SkyLink's calls can't run. Click into the game, or set bAlwaysActive=1 under [General] in Skyrim.ini (takes effect at the next start).";
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>bAlwaysActive from the running game's Skyrim.ini ([General]); null when not set.</summary>
+    internal static bool? AlwaysActiveSetting()
+    {
+        var docs = SkyLinkSettings.GameDocumentsFolder
+                   ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition");
+        var ini = Path.Combine(docs, "Skyrim.ini");
+        if (!File.Exists(ini)) return null;
+        var section = "";
+        foreach (var raw in File.ReadLines(ini))
+        {
+            var line = raw.Trim();
+            if (line.StartsWith('[')) { section = line.Trim('[', ']'); continue; }
+            if (!section.Equals("General", StringComparison.OrdinalIgnoreCase)) continue;
+            var eq = line.IndexOf('=');
+            if (eq > 0 && line[..eq].Trim().Equals("bAlwaysActive", StringComparison.OrdinalIgnoreCase))
+                return line[(eq + 1)..].Trim() == "1";
+        }
         return null;
     }
 
