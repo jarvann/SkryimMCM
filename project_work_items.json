@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 305,
+    "totalItems": 306,
     "completed": 267,
     "completedPartial": 2,
-    "implementedUntested": 6,
+    "implementedUntested": 7,
     "inProgress": 0,
     "planned": 30,
-    "bugs": 95
+    "bugs": 96
   },
   "phases": [
     {
@@ -5177,6 +5177,21 @@
             {
               "datetime": "2026-11-20T18:30",
               "note": "Found by the Tester in round B (GOG direct launch); fixed the same evening."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "BUG-096",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "StopRunaway's session block froze the game",
+          "description": "Round B: the per-frame prune task re-queued itself from inside SKSE's task processing, which runs queued tasks until the queue is empty, so the frame never ended: Not Responding, every script count frozen, SkyLink's own tasks still running in the same loop, memory 13 -> 17.6 GB in ~10 minutes; StopRunaway(release: true) unfroze it within seconds (memory back to 11.5 GB). Fix: a host thread queues at most one pass every 100 ms while objects are blocked; the pass never re-queues itself.",
+          "history": [
+            {
+              "datetime": "2026-11-20T20:00",
+              "note": "Found in round B's StopRunaway fair test; fixed the same evening (host DLL, needs the game closed to deploy)."
             }
           ],
           "targetRelease": "1.5"
