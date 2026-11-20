@@ -75,6 +75,10 @@ public static class SkyLinkSettings
         if (Str(s, "skyrimPath") is string configured) return (configured, "settings.json skyrimPath");
         if (Environment.GetEnvironmentVariable("SKYRIM_PATH") is string env && env.Length > 0) return (env, "SKYRIM_PATH variable");
         if (GameInstallFolder is { Length: > 0 } running && Directory.Exists(running)) return (running, "the running game");
+        // Before the server has talked to the game (a freshly restarted server): the running game's own folder, from its process.
+        // Round B: RestartGame on a fresh server fell through to the server's install folder and relaunched the Steam game
+        // instead of the GOG game it had just quit.
+        if (RunningGameFolder() is string fromProcess) return (fromProcess, "the running game's process");
 
         foreach (var candidate in new[] { Environment.GetEnvironmentVariable("SKYLINK_SERVER_SOURCE"), typeof(SkyLinkSettings).Assembly.Location })
         {
@@ -116,6 +120,18 @@ public static class SkyLinkSettings
         return (null, null);
 
         static string Unwrap(string v) => v.StartsWith("@ByteArray(") && v.EndsWith(")") ? v[11..^1] : v;
+    }
+
+    /// <summary>The folder of the running SkyrimSE.exe (null when none is running, or more than one is).</summary>
+    internal static string? RunningGameFolder()
+    {
+        try
+        {
+            var procs = System.Diagnostics.Process.GetProcessesByName("SkyrimSE");
+            if (procs.Length != 1) return null;
+            return System.IO.Path.GetDirectoryName(procs[0].MainModule?.FileName);
+        }
+        catch (Exception) { return null; }
     }
 
     internal static bool RunningWithoutMo2()
