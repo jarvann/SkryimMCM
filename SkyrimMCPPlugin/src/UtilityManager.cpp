@@ -497,6 +497,36 @@ namespace SkyrimMCP::UtilityManager {
         return {{"loading", true}, {"saveName", saveName}};
     }
 
+    // FEAT-278 / FEAT-015 / FEAT-277: where the session is, so the restart cycle and new-game tools know what they may do.
+    json GetSessionState() {
+        auto* ui = RE::UI::GetSingleton();
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        const bool mainMenu = ui && ui->IsMenuOpen(RE::MainMenu::MENU_NAME);
+        const bool inGame = player && player->GetParentCell() != nullptr;
+        return {{"mainMenuOpen", mainMenu}, {"gameLoaded", inGame}, {"loadingMenuOpen", ui && ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)}};
+    }
+
+    // FEAT-278: quit the way Quit to Desktop does (the main loop sees the flag and shuts down cleanly), not qqq's hard exit.
+    json QuitGame() {
+        auto* main = RE::Main::GetSingleton();
+        if (!main) return {{"error", "Main not available"}};
+        main->GetRuntimeData().quitGame = true;
+        return {{"quitting", true}};
+    }
+
+    // FEAT-277 (experiment): the flag the main menu sets after the Creations menu installs content, which reloads the game's
+    // data without restarting. Only offered at the main menu with no game loaded; whether newly installed plugins appear
+    // afterwards is what the experiment finds out.
+    json ReloadContent() {
+        const auto state = GetSessionState();
+        if (!state.value("mainMenuOpen", false) || state.value("gameLoaded", false))
+            return {{"error", "Only at the main menu with no game loaded (quit to the main menu first)."}, {"state", state}};
+        auto* main = RE::Main::GetSingleton();
+        if (!main) return {{"error", "Main not available"}};
+        main->GetRuntimeData().reloadContent = true;
+        return {{"requested", true}};
+    }
+
     json LoadMostRecentSave() {
         auto* mgr = RE::BGSSaveLoadManager::GetSingleton();
         if (!mgr) return {{"error", "Save manager not available"}};

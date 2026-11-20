@@ -16,6 +16,9 @@ namespace SkyrimMCP {
         json GetModFormIdPrefix(const std::string& modName);
         json LoadSave(const std::string& saveName);
         json LoadMostRecentSave();
+        json GetSessionState();
+        json QuitGame();
+        json ReloadContent();
         // FEAT-131: an Audio menu category's volume (0-1); category "master" (default), a menu
         // category's name, or "list".
         json SetVolume(const std::string& category, float volume);

@@ -171,6 +171,9 @@ namespace SkyrimMCP::Protocol {
         noParam("get_combat_state", []() { return GameInterface::GetCombatState(); });
         noParam("get_menu_state", []() { return GameInterface::GetMenuState(); });
         noParam("get_game_safety", []() { return GameInterface::GetGameSafety(); });
+        noParam("get_session_state", []() { return UtilityManager::GetSessionState(); });
+        noParam("quit_game", []() { return UtilityManager::QuitGame(); });
+        noParam("reload_content", []() { return UtilityManager::ReloadContent(); });
         noParam("load_most_recent_save", []() { return GameInterface::LoadMostRecentSave(); });
 
         // Papyrus Bridge — these run on pipe thread (no game thread needed for catalog)
