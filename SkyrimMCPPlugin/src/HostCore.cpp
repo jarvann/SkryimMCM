@@ -25,6 +25,7 @@
 #include <format>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -80,6 +81,63 @@ namespace SkyrimMCP::HostCore {
             ++c.calls;
             c.wallMsTotal += wallMs;
             c.wallMsMax = std::max(c.wallMsMax, wallMs);
+        }
+
+        // FEAT-280 (round B): StopRunaway's one-off removal didn't stop a single-update loop: the ~200 copies still running each
+        // registered the next update as they finished (the wendigo script re-registers one second later), so the pile kept
+        // growing. While objects are blocked, a task queued every frame drops any update registration for them from the VM's
+        // table before it can fire; the running copies then finish without starting new ones. Host side: it outlives logic
+        // reloads, and the frame task is host code. Cleared when a save loads (handles mean other objects then).
+        std::mutex g_blockMutex;
+        std::set<std::uint64_t> g_blockedHandles;
+        std::atomic<bool> g_blockTaskQueued{ false };
+        std::atomic<std::uint64_t> g_blockRemoved{ 0 };
+
+        void PruneBlockedUpdates();
+
+        void QueuePrune() {
+            if (g_blockTaskQueued.exchange(true)) return;
+            if (auto* tasks = SKSE::GetTaskInterface()) tasks->AddTask([]() { PruneBlockedUpdates(); });
+            else g_blockTaskQueued = false;
+        }
+
+        void PruneBlockedUpdates() {
+            g_blockTaskQueued = false;
+            std::set<std::uint64_t> blocked;
+            {
+                std::scoped_lock lock(g_blockMutex);
+                blocked = g_blockedHandles;
+            }
+            if (blocked.empty()) return;
+            if (auto* vm = RE::SkyrimVM::GetSingleton()) {
+                auto& data = vm->GetVMRuntimeData();
+                RE::BSSpinLockGuard guard(data.queuedOnUpdateEventLock);
+                for (auto* regs : {&data.queuedOnUpdateEvents, &data.queuedOnUpdateGameEvents}) {
+                    if (regs->size() > 500000) break;   // layout doesn't match: leave it alone
+                    for (auto i = regs->size(); i-- > 0;) {
+                        const auto& r = (*regs)[i];
+                        if (r && blocked.contains(r->handle)) {
+                            regs->erase(regs->begin() + i);
+                            ++g_blockRemoved;
+                        }
+                    }
+                }
+            }
+            QueuePrune();   // next frame
+        }
+
+        json BlockUpdates(const json& params) {
+            std::size_t now = 0;
+            {
+                std::scoped_lock lock(g_blockMutex);
+                if (params.value("clear", false)) g_blockedHandles.clear();
+                for (const auto& h : params.value("handles", json::array())) {
+                    try { g_blockedHandles.insert(std::stoull(h.get<std::string>(), nullptr, 16)); } catch (...) {}
+                }
+                now = g_blockedHandles.size();
+            }
+            if (now > 0) QueuePrune();
+            return {{"blocked", now}, {"removedSoFar", g_blockRemoved.load()}};
         }
 
         // INFRA-023: more than one client can connect, but the logic DLL's handlers were written for one at a time.
@@ -400,6 +458,10 @@ namespace SkyrimMCP::HostCore {
             info["gameVersion"] = REL::Module::get().version().string(".");
             info["loadingScreen"] = LoadingScreenWatcher::Get().Active();
             info["gameLoads"] = g_gameLoads.load();  // FEAT-268: saves loaded or games started this session
+            {
+                std::scoped_lock lock(g_blockMutex);
+                if (!g_blockedHandles.empty()) info["updateBlock"] = {{"objects", g_blockedHandles.size()}, {"removed", g_blockRemoved.load()}};
+            }
             info["logic"] = LogicStatusJson();
             info["diagnostics"] = Diagnostics();
             return Respond(id, true, info);
@@ -521,6 +583,7 @@ namespace SkyrimMCP::HostCore {
                 if (action == "poll_events") return PollEvents(id, request.value("params", json::object()));
                 if (action == "reload_plugin") return Reload(id);
                 if (action == "get_skylink_cost") return Cost(id);
+                if (action == "block_updates") return Respond(id, true, BlockUpdates(request.value("params", json::object())));
                 if (action == "get_game_safety" && LoadingScreenWatcher::Get().Active()) return LoadingScreenSafety(id);
 
                 if (!g_loader) return Respond(id, false, {}, "Plugin not started yet");
@@ -594,7 +657,12 @@ namespace SkyrimMCP::HostCore {
         }
     }
 
-    void NoteGameLoaded() { ++g_gameLoads; }
+    void NoteGameLoaded() {
+        ++g_gameLoads;
+        // A loaded save gives handles to other objects: drop StopRunaway's block (FEAT-280).
+        std::scoped_lock lock(g_blockMutex);
+        g_blockedHandles.clear();
+    }
 
     bool LoadingScreenActive() { return LoadingScreenWatcher::Get().Active(); }
 
