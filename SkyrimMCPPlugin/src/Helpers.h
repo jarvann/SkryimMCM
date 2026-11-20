@@ -252,6 +252,18 @@ namespace SkyrimMCP::Helpers {
                     break;
                 }
             }
+            // OStim's scene menu draws without a cursor and OStim's API reported no scene while it ran (2026-11-20: StopIdle
+            // forced a pose under it and OStim.dll crashed in SceneMenu::BuildMenuData). Its menu being open is the signal.
+            for (auto& [name, entry] : ui->menuMap) {
+                const std::string_view n(name.c_str());
+                if (!entry.menu || !entry.menu->OnStack()) continue;
+                std::string lower(n);
+                std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (lower.find("ostim") != std::string::npos || lower == "scenemenu") {
+                    out.blockers.push_back(std::string("an OStim scene is running (its menu ") + std::string(n) + " is open): wait for it to end");
+                    break;
+                }
+            }
             for (auto& [name, entry] : ui->menuMap) {
                 const auto& menu = entry.menu;
                 if (!menu || !menu->OnStack() || menu->AlwaysOpen() || !menu->UsesCursor()) continue;
