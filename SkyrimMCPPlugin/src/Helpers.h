@@ -190,22 +190,50 @@ namespace SkyrimMCP::Helpers {
 
     // ==================== Console Output Capture ====================
     //
-    // Best-effort capture via lastMessage. Console output is not reliably
-    // captured — commands execute silently via CompileAndRun without writing
-    // to ConsoleLog. Use dedicated query tools instead of relying on console
-    // output (GetPlayerInfo, GetSkillLevels, GetQuestStages, etc.).
+    // INFRA-005: lastMessage holds only the last line a command printed, so multi-line output (sqv, help) was lost. The
+    // console log also keeps everything printed in `buffer`: mark it before a command and take what was added after. The
+    // buffer is trimmed when it grows long, so the mark keeps the tail of the old text and finds it again rather than
+    // trusting the old length. lastMessage stays the fallback when the buffer shows nothing new.
 
-    inline void ClearConsoleOutput() {
+    struct ConsoleMark {
+        std::string tail;
+        std::size_t size = 0;
+    };
+
+    inline std::string ConsoleBufferText() {
         auto* console = RE::ConsoleLog::GetSingleton();
-        if (console) {
-            std::memset(console->lastMessage, 0, sizeof(console->lastMessage));
-        }
+        const char* text = console ? console->buffer.c_str() : nullptr;
+        return text ? std::string(text) : std::string{};
     }
 
-    inline std::string CaptureConsoleOutput() {
+    inline ConsoleMark MarkConsole() {
         auto* console = RE::ConsoleLog::GetSingleton();
-        if (!console) return "";
-        return std::string(console->lastMessage);
+        if (console) std::memset(console->lastMessage, 0, sizeof(console->lastMessage));
+        const auto text = ConsoleBufferText();
+        ConsoleMark mark;
+        mark.size = text.size();
+        mark.tail = text.size() > 256 ? text.substr(text.size() - 256) : text;
+        return mark;
+    }
+
+    inline std::string ConsoleSince(const ConsoleMark& mark) {
+        const auto text = ConsoleBufferText();
+        std::string added;
+        if (mark.tail.empty()) {
+            added = text;
+        } else if (auto at = text.rfind(mark.tail); at != std::string::npos) {
+            added = text.substr(at + mark.tail.size());
+        } else if (text.size() > mark.size) {
+            added = text.substr(mark.size);
+        }
+        // Trim the newlines the console puts around each line.
+        while (!added.empty() && (added.front() == '\n' || added.front() == '\r')) added.erase(added.begin());
+        while (!added.empty() && (added.back() == '\n' || added.back() == '\r')) added.pop_back();
+        if (added.empty()) {
+            auto* console = RE::ConsoleLog::GetSingleton();
+            if (console) added = std::string(console->lastMessage);
+        }
+        return added;
     }
 
     // FEAT-259: is the player free to be moved (Teleport, studio trips)? Each reason that blocks it, plus warnings that don't.
@@ -454,12 +482,12 @@ namespace SkyrimMCP::Helpers {
         auto* script = factory->Create();
         if (!script) return {{"error", "Failed to create script"}};
 
-        ClearConsoleOutput();
+        const auto mark = MarkConsole();
 
         script->SetCommand(command);
         bool ok = RunScriptSEH(script, targetRef);
 
-        std::string output = CaptureConsoleOutput();
+        std::string output = ConsoleSince(mark);
 
         if (!ok) {
             SKSE::log::error("Command '{}' caused an access violation — caught by SEH", command);
@@ -474,7 +502,23 @@ namespace SkyrimMCP::Helpers {
         json result;
         result["executed"] = true;
         result["command"] = command;
-        if (!output.empty()) result["output"] = output;
+        if (!output.empty()) {
+            result["output"] = output;
+            // Multi-line output (sqv, help) also as lines, so long results read cleanly.
+            if (output.find('\n') != std::string::npos) {
+                json lines = json::array();
+                std::size_t start = 0;
+                while (start <= output.size() && lines.size() < 2000) {
+                    auto end = output.find('\n', start);
+                    auto line = output.substr(start, end == std::string::npos ? std::string::npos : end - start);
+                    if (!line.empty() && line.back() == '\r') line.pop_back();
+                    lines.push_back(line);
+                    if (end == std::string::npos) break;
+                    start = end + 1;
+                }
+                result["lines"] = lines;
+            }
+        }
         return result;
     }
 

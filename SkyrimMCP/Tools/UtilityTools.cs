@@ -110,7 +110,7 @@ public class UtilityTools : ToolBase
         "Commands run with the player selected, as if the player were clicked in the console, so 'tcl' here only " +
         "sets the player's reference flag and is NOT no-clip: use ToggleCollision for that. " +
         "CAUTION: Invalid FormIDs crash the game. Avoid during loading screens or scripted events. " +
-        "Console output may be captured if the command produces text output.")]
+        "Everything the command prints is returned in 'output', and multi-line output (sqv, help) also as 'lines'.")]
     public async Task<object> ExecuteConsoleCommand(string command)
     {
         // BUG-024: a console move (coc, cow, centeroncell, player.moveto) loads a cell inside the call and timed out though it
