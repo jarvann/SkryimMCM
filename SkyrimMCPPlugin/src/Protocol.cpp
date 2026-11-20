@@ -229,6 +229,11 @@ namespace SkyrimMCP::Protocol {
         };
 
         formIdParam("get_quest_stage", "formId", [](const std::string& f) { return GameInterface::GetQuestStage(f); });
+        registry["get_journal"] = [](const std::string& id, const json& params) {
+            std::string quest = params.value("quest", "");
+            int maxQuests = params.value("maxQuests", 60);
+            return GameThread(id, [quest, maxQuests]() { return QuestManager::GetJournal(quest, maxQuests); });
+        };
         formIdParam("get_quest_stages", "formId", [](const std::string& f) { return GameInterface::GetQuestStages(f); });
         formIdParam("get_quest_aliases", "formId", [](const std::string& f) { return GameInterface::GetQuestAliases(f); });
         formIdParam("complete_quest", "formId", [](const std::string& f) { return GameInterface::CompleteQuest(f); });
