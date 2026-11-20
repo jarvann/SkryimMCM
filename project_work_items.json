@@ -3536,6 +3536,10 @@
             {
               "datetime": "2026-11-20T08:00",
               "note": "Round 1, step 1.1: coc out = frozen frame; Teleport('back') to the Solitude market = real loading screen, then an engine crash on the loading thread (EXCEPTION_ACCESS_VIOLATION SkyrimSE.exe+1563F2A, bad vtable; stack all SkyrimSE.exe; objects: a Grand Solitude tree, TESObjectTREE 0x180246CD / REFR 0x189CE5D9, ztree's dwarfjunip04.nif). Content issue exposed by the fast cell load, not SkyLink. Server fix: when Skyrim is gone or not responding, timeouts and the arrival wait now say so (PipeClient.GameDownNote) instead of timing out until the bridge's 80 s limit. Steps 1.2 onward still to do; test away from Solitude's walls."
+            },
+            {
+              "datetime": "2026-11-20T10:00",
+              "note": "Recorded test: coc, center and loadingscreen all freeze outbound (the opened Loading Menu closed within 6-14 ms, before a frame); Teleport('back'), a native MoveTo to a marker reference, shows the real loading screen every time (loads on one steady thread vs a new thread per outbound load). Built: default method 'auto' moves to a reference in the target cell (map marker > XMarkerHeading > door > XMarker; interiors from the cell's references, exteriors from the worldspace's persistent cell filtered to the cell's grid), coc as fallback and as method 'coc'; reply says movedTo. center/loadingscreen and the loading_menu action retired. A long load no longer reads as 'not responding' failure: only a gone process ends the wait."
             }
           ],
           "targetRelease": "1.4"

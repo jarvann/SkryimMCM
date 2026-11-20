@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <format>
 #include <unordered_map>
 
@@ -47,16 +48,43 @@ namespace SkyrimMCP::WorldManager {
         }
     }
 
-    // FEAT-258 experiment: the loading screen shown on purpose around a native move. Shown by the server before the move and
-    // hidden after arrival if the game didn't close it itself.
-    json LoadingMenu(bool show) {
-        auto* queue = RE::UIMessageQueue::GetSingleton();
-        if (!queue) return {{"error", "UI message queue not available"}};
-        auto* ui = RE::UI::GetSingleton();
-        const bool open = ui && ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
-        if (show && !open) queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
-        if (!show && open) queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kHide, nullptr);
-        return {{"wasOpen", open}, {"requested", show ? "show" : "hide"}};
+    // FEAT-258: a reference in the target cell to MoveTo. Recorded in game (2026-11-20): Teleport("back"), a native MoveTo to a
+    // marker reference, draws the real loading screen every time, while coc and CenterOnCell only freeze the frame. Prefers a
+    // map marker, then a heading marker (COC markers are these), then a door, then a plain XMarker; persistent references
+    // are the ones in memory for a cell that isn't loaded (an exterior's live in its worldspace's persistent cell).
+    RE::TESObjectREFR* MoveTargetIn(RE::TESObjectCELL* cell, std::string& how) {
+        RE::TESObjectREFR* best = nullptr;
+        int bestScore = 0;
+        auto consider = [&](RE::TESObjectREFR* r) {
+            if (!r || r->IsDisabled() || r->IsDeleted()) return;
+            auto* base = r->GetBaseObject();
+            if (!base) return;
+            int score = 0;
+            if (r->extraList.HasType<RE::ExtraMapMarker>()) score = 5;
+            else if (base->GetFormID() == 0x00000034) score = 4;   // XMarkerHeading
+            else if (base->Is(RE::FormType::Door)) score = 3;
+            else if (base->GetFormID() == 0x0000003B) score = 2;   // XMarker
+            if (score > bestScore) { bestScore = score; best = r; }
+        };
+        if (cell->IsInteriorCell()) {
+            cell->ForEachReference([&](RE::TESObjectREFR* r) { consider(r); return RE::BSContainer::ForEachResult::kContinue; });
+        } else if (auto* coords = cell->GetCoordinates()) {
+            const int cx = coords->cellX, cy = coords->cellY;
+            auto inCell = [&](RE::TESObjectREFR* r) {
+                const auto pos = r->GetPosition();
+                return static_cast<int>(std::floor(pos.x / 4096.0f)) == cx && static_cast<int>(std::floor(pos.y / 4096.0f)) == cy;
+            };
+            cell->ForEachReference([&](RE::TESObjectREFR* r) { consider(r); return RE::BSContainer::ForEachResult::kContinue; });
+            if (auto* ws = cell->GetRuntimeData().worldSpace; ws && ws->persistentCell) {
+                ws->persistentCell->ForEachReference([&](RE::TESObjectREFR* r) {
+                    if (r && inCell(r)) consider(r);
+                    return RE::BSContainer::ForEachResult::kContinue;
+                });
+            }
+        }
+        static const char* kKinds[] = {"", "", "marker", "door", "heading marker", "map marker"};
+        if (best) how = std::format("{} {:08X}", kKinds[bestScore], best->GetFormID());
+        return best;
     }
 
     json Teleport(const std::string& cellId, const std::string& method) {
@@ -88,19 +116,29 @@ namespace SkyrimMCP::WorldManager {
         // FEAT-258: how to move. coc (default, as before): the console command, which freezes the frame during the load.
         // center: the native CenterOnCell coc itself calls, without the console. loadingscreen: show the Loading Menu, then
         // CenterOnCell on a later frame, so the game may draw its loading screen as fast travel does.
-        if (method == "center") {
-            TaskQueue::Post([cellId]() { if (auto* p = RE::PlayerCharacter::GetSingleton()) p->CenterOnCell(cellId.c_str()); });
-        } else if (method == "loadingscreen") {
-            TaskQueue::Post([cellId]() {
-                if (auto* queue = RE::UIMessageQueue::GetSingleton())
-                    queue->AddMessage(RE::LoadingMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
-                TaskQueue::Post([cellId]() { if (auto* p = RE::PlayerCharacter::GetSingleton()) p->CenterOnCell(cellId.c_str()); });
+        // FEAT-258: 'auto' (default) moves to a reference in the cell, as Teleport("back") does, which shows the loading
+        // screen; with none found, or method 'coc', the console move (frozen frame).
+        std::string used = "coc";
+        std::string how;
+        RE::TESObjectREFR* to = nullptr;
+        if (method != "coc") {
+            if (auto* cell = target->As<RE::TESObjectCELL>()) to = MoveTargetIn(cell, how);
+        }
+        if (to) {
+            used = "marker";
+            const RE::FormID toId = to->GetFormID();
+            TaskQueue::Post([toId]() {
+                auto* p = RE::PlayerCharacter::GetSingleton();
+                auto* ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(toId);
+                if (p && ref) p->MoveTo(ref);
             });
         } else {
             TaskQueue::Post([cellId]() { Helpers::ExecuteConsoleCommand("coc " + cellId); });
         }
         json result = {{"moving", true}, {"cell", cellId}, {"targetFormId", std::format("{:08X}", target->GetFormID())},
-                       {"markerId", markerId}, {"method", method}};
+                       {"markerId", markerId}, {"method", used}};
+        if (!how.empty()) result["movedTo"] = how;
+        else if (method != "coc") result["note"] = "No marker or door found in that cell: used the console move (a frozen frame instead of a loading screen).";
         if (const char* name = target->GetName(); name && name[0]) result["targetName"] = name;
         return result;
     }

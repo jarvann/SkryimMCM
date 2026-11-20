@@ -167,6 +167,13 @@ public class PipeClient : IPipeClient
     /// crash report). Null when Skyrim is running normally. After a crash the plugin's pipe can still answer for a while and
     /// report game-thread timeouts, which read like a slow load (seen 2026-11-19).
     /// </summary>
+    /// <summary>True when no Skyrim process exists (closed or crashed): the only state that ends a wait for certain.</summary>
+    internal static bool GameGone()
+    {
+        try { return System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Length == 0; }
+        catch (Exception) { return false; }
+    }
+
     internal static string? GameDownNote()
     {
         try

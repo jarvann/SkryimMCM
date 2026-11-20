@@ -105,18 +105,19 @@ public class WorldTools : ToolBase
     [McpServerTool]
     [Description("Teleport the player to a location (e.g. 'whiterun', 'riverwood', 'solitude') or a cell editor ID (SearchForms type " +
         "'cell' finds them); an unknown cell is refused. location 'back' returns her to where the last Teleport started, facing the " +
-        "same way. Tell the player first: the screen freezes for several seconds (the game may show as not responding), and " +
+        "same way. Tell the player first: the load takes several seconds (a loading screen, or a frozen frame with the console " +
+        "move, when the game may show as not responding), and " +
         "teleporting during combat, scenes or dialogue can crash the game. The reply waits up to 20 seconds for her to arrive, says " +
         "where she is, and lists followers left far away (MoveActorTo brings them). Refused, with the reason, while she isn't free " +
         "to move: a pausing menu, combat, dialogue, a scene or script-held controls (cutscenes, OStim), furniture, a mount, " +
         "ragdoll, falling, bleeding out or holding an object; GetGameSafety shows canMovePlayer beforehand. Player homes (breezehome, honeyside, proudspire manor, vlindrel hall, " +
-        "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names. method (experimental, FEAT-258): 'coc' " +
-        "(default, the console move), 'center' (the same move without the console) or 'loadingscreen' (opens the game's " +
-        "loading screen first, then moves; closed after arrival if still up). Report how each looked.")]
-    public async Task<object> Teleport(string location, string method = "coc")
+        "hjerim, lakeview manor, windstad manor, heljarchen hall) are known names. method: 'auto' (default) moves her to a map " +
+        "marker, heading marker or door in the target cell, which shows the game's loading screen; 'coc' (or a cell with none " +
+        "of those) uses the console move, which freezes the frame instead. movedTo in the reply says which.")]
+    public async Task<object> Teleport(string location, string method = "auto")
     {
         method = method.Trim().ToLowerInvariant();
-        if (method is not ("coc" or "center" or "loadingscreen")) return new { error = "method must be coc (default), center or loadingscreen" };
+        if (method is not ("auto" or "coc")) return new { error = "method must be auto (default) or coc" };
         if (await SafetyBlock("move", null) is string gateReason) return new { error = gateReason };  // FEAT-260
         var backFile = Path.Combine(SkyLinkSettings.Folder, "teleport_back.json");
         var before = await _pipe.SendRequestAsync("studio", new JsonObject { ["mode"] = "status" });
@@ -161,13 +162,9 @@ public class WorldTools : ToolBase
             await File.WriteAllTextAsync(backFile, new JsonObject { ["markerId"] = markerId, ["from"] = before?["cellName"]?.DeepClone() }.ToJsonString());
         }
         var arrived = await WaitForArrival(fromCell);
-        // FEAT-258 experiment: if the loading screen opened on purpose is still up after arrival, close it.
-        if (method == "loadingscreen")
-        {
-            await Task.Delay(1000);
-            try { await _pipe.SendRequestAsync("loading_menu", new JsonObject { ["show"] = false }); } catch (Exception) { }
-        }
-        return await ArrivalReply(location, cellId, arrived, followersBefore);
+        var reply = await ArrivalReply(location, cellId, arrived, followersBefore);
+        // FEAT-258: say how she was moved (a marker in the cell shows the loading screen; the console move freezes the frame).
+        return new { teleport = reply, movedTo = data?["movedTo"]?.ToString(), method = data?["method"]?.ToString(), note = data?["note"]?.ToString() };
     }
 
     // BUG-071: waits out the frozen screen (the game thread doesn't answer during it); the new cell, or null after 20 s.
@@ -184,9 +181,9 @@ public class WorldTools : ToolBase
             }
             catch (Exception)
             {
-                // Still loading, unless the game has gone or stopped responding: then stop waiting (the call hit the
-                // bridge's 80-second limit after a crash, with no explanation).
-                if (PipeClient.GameDownNote() != null) return null;
+                // Still loading, unless the game process is gone: then stop waiting (the call hit the bridge's 80-second
+                // limit after a crash). "Not responding" isn't enough: a long load freezes the window too (seen 2026-11-20).
+                if (PipeClient.GameGone()) return null;
             }
         }
         return null;
@@ -209,8 +206,9 @@ public class WorldTools : ToolBase
     private async Task<object> ArrivalReply(string location, string? cellId, JsonNode? arrived, Dictionary<string, string> followersBefore)
     {
         if (arrived == null)
-            return new { success = PipeClient.GameDownNote() == null, arrived = false, location, cellId,
-                         note = PipeClient.GameDownNote() ?? "The move started but she hadn't arrived after 20 seconds. Check with GetCellInfo shortly." };
+            return new { success = PipeClient.GameGone() ? false : (bool?)null, arrived = false, location, cellId,
+                         note = PipeClient.GameGone() ? PipeClient.GameDownNote()
+                             : "She hadn't arrived after 20 seconds: the load is still running (the window can show as not responding while it does), or the game froze. Check with GetCellInfo in a moment." };
         // BUG-072: followers don't always come along, and once she is far away they aren't found at all: compare with the
         // followers she had before the move.
         await Task.Delay(1500);  // followers that do come along arrive just after her
