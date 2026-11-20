@@ -381,9 +381,10 @@ public class PlayerTools : ToolBase
         var magicBefore = dryRun ? [] : await KnownMagic();
         var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
         if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
-        object? controls = null;
-        object? questsStarted = null;
-        object? alsoGained = null;
+        object? controls = dryRun ? null : "unchanged";
+        // On a real apply these are always present (an empty result read as "missing" in the round of 2026-11-20).
+        object? questsStarted = dryRun ? null : "none";
+        object? alsoGained = dryRun ? null : "none";
         if (!dryRun)
         {
             await Task.Delay(3000);
@@ -424,11 +425,20 @@ public class PlayerTools : ToolBase
         {
             var resolve = await PortableResolver();
             var taught = new List<string>();
+            var alreadyUnlocked = new List<string>();
             var skipped = 0;
             foreach (var w in shoutList.OfType<JsonObject>().SelectMany(sh => (sh["words"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()))
             {
                 if (w["unlocked"]?.GetValue<bool>() != true) { skipped++; continue; }
                 if (resolve(w) is not string id) continue;
+                var label = w["name"]?.ToString() is string n && n.Any(char.IsDigit) ? DragonWord(n) : w["name"]?.ToString() ?? id;
+                // Already unlocked here: list apart, don't "teach" again.
+                try
+                {
+                    var have = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject { ["className"] = "Game", ["functionName"] = "IsWordUnlocked", ["args"] = new JsonArray(id) });
+                    if (have?["result"] is JsonValue hv && hv.TryGetValue<bool>(out var already) && already) { alreadyUnlocked.Add(label); continue; }
+                }
+                catch (Exception) { }
                 if (!dryRun)
                 {
                     try
@@ -438,11 +448,12 @@ public class PlayerTools : ToolBase
                     }
                     catch (Exception) { continue; }
                 }
-                taught.Add(w["name"]?.ToString() ?? id);
+                taught.Add(label);
             }
             words = new
             {
                 taughtAndUnlocked = taught,
+                alreadyUnlocked,
                 notUnlockedThere = skipped,
                 note = skipped > 0 && taught.Count == 0 && shoutList.Count > 0 && !shoutList.OfType<JsonObject>().Any(sh => (sh["words"] as JsonArray)?.OfType<JsonObject>().Any(x => x["unlocked"] != null) == true)
                     ? "This blueprint doesn't record which words were unlocked (exported before 1.4): export it again to bring words across."
