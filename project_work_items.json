@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 303,
-    "completed": 266,
+    "totalItems": 304,
+    "completed": 267,
     "completedPartial": 2,
     "implementedUntested": 6,
     "inProgress": 0,
     "planned": 29,
-    "bugs": 94
+    "bugs": 95
   },
   "phases": [
     {
@@ -4933,6 +4933,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Steam builds the Vortex zip; GOG installs into MO2 and activates the plugin."
+            },
+            {
+              "datetime": "2026-11-20T18:30",
+              "note": "Round B: no-manager route verified on GOG started directly (copied into the real Data folder, activated in the game's own Plugins.txt, backup made) after the direct-launch fix."
             }
           ],
           "targetRelease": "1.5"
@@ -4963,7 +4967,7 @@
         {
           "id": "FEAT-277",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Main-menu content reload (experiment)",
           "description": "Research spike: the AE engine has a content reload from the main menu (Main::reloadContent, used by Creations). Find out whether calling it lets a newly installed plugin load without restarting Skyrim, what breaks (scripts, SKSE plugins, the logic DLL's handles), and whether it is safe enough to offer. Outcome is a yes or no with evidence, not a feature.",
@@ -4979,6 +4983,10 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "GOG: no crash, back at the main menu, save loads after. Inconclusive: on MO2 the plugin is loaded at launch anyway (virtual Data). Needs a no-mod-manager setup to answer."
+            },
+            {
+              "datetime": "2026-11-20T18:30",
+              "note": "Answered on GOG without a mod manager: no crash, back at the main menu, but the new plugin isn't loaded (80 before and after); after a restart it loads (FE041, getglobalvalue 1.00). The main-menu reload doesn't pick up new plugins: a restart is needed (RestartGame)."
             }
           ],
           "targetRelease": "1.5"
@@ -5154,6 +5162,21 @@
             {
               "datetime": "2026-11-20T17:30",
               "note": "Verified: correct replies after a timeout and with a StackReport overlapping three calls."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "BUG-095",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "RestartGame relaunched the other game (Steam instead of GOG)",
+          "description": "Round B: after a server restart (a deploy), RestartGame chose its launcher before its first call to the game, so the game folder fell through to the server's install location (the Steam game) and it relaunched Steam after quitting GOG. Fix: SkyrimPath uses the running SkyrimSE.exe's folder before the server's; RestartGame pins the quitting game's folder, refuses a direct launcher outside it, and shows gameFolder and launchExe in the dry run.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:30",
+              "note": "Found by the Tester in round B (GOG direct launch); fixed the same evening."
             }
           ],
           "targetRelease": "1.5"
