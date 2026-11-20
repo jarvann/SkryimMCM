@@ -578,7 +578,11 @@ namespace SkyrimMCP::PapyrusBridge {
         }
 
         if (!dispatched) {
-            return {{"error", "Failed to dispatch Papyrus call: " + signature}};
+            // A member call on a reference the script engine hasn't bound (no script attached, like most beds and clutter)
+            // fails here, whatever the function would return (2026-11-20: GetActorOwner on a bed read as a return problem).
+            return {{"error", targetForm
+                ? "Failed to dispatch " + signature + ": the target isn't bound in the script engine (it has no script attached), so its member functions can't be called this way. Use a SkyLink tool or a global function instead."
+                : "Failed to dispatch Papyrus call: " + signature}};
         }
 
         // A long latent function (MCM Recorder's PlayRecording runs the whole recording before it returns) timed out at 5 s

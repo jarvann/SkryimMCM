@@ -230,7 +230,8 @@ public class QuestTools : ToolBase
 
     [McpServerTool]
     [Description("Read quest variables and running status via native API. " +
-        "Returns current stage, running/active/completed status, and objectives. " +
+        "Returns current stage, running/active/completed status, and objectives. isRunning matches Papyrus Quest.IsRunning; " +
+        "isActive is the journal's active-quest flag (shown or tracked), which a stopped quest can keep. " +
         "This is a convenience wrapper around GetQuestStages for quick status checks.")]
     public async Task<object> ReadQuestVariables(string questFormId)
     {

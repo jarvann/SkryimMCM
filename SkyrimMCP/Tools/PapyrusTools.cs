@@ -208,14 +208,16 @@ public class PapyrusTools : ToolBase
                 : peaks >= 2 ? "periodic"
                 : max >= 20 ? "burst"
                 : null;
-            var runaway = kind != null;
+            // "flagged" = worth reporting (any kind); "runaway" only for that kind (a burst read runaway: true, 2026-11-20).
+            var flagged = kind != null;
+            var runaway = kind == "runaway";
             // Headline: every real plugin among the owners; "(created in game)" only when there is nothing else.
             var ownerList = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null) ?? new JsonArray();
             var named = ownerList.Select(x => x?["plugin"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
             var real = named.Where(n => !n.StartsWith("(")).ToList();
             var plugin = real.Count > 0 ? string.Join(", ", real) : named.FirstOrDefault();
-            return new { entry = kv.Key, last, max, first, growing, kind, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
-        }).OrderByDescending(r => r.runaway).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
+            return new { entry = kv.Key, last, max, first, growing, kind, flagged, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
+        }).OrderByDescending(r => r.flagged).ThenByDescending(r => r.max).Take(Math.Clamp(top, 1, 50)).ToList();
 
         // FEAT-268: a short history across calls (per game folder), so slow patterns show: a handler creeping up call after call
         // (a leak: mihail_wendigo 2 -> 10 -> 12 -> 14 -> 24 -> 31) or spiking again and again over minutes (Exalted Enemies
@@ -287,7 +289,7 @@ public class PapyrusTools : ToolBase
         }
         catch (Exception) { }
 
-        var runaways = rows.Where(r => r.runaway).ToList();
+        var runaways = rows.Where(r => r.flagged).ToList();
         static string Who(string? plugin) => plugin == null ? "" : plugin.StartsWith("(") ? " " + plugin : $" ({plugin})";
         // A handler appears twice when its copies are both waiting to start ("X (queued)") and running ("X"): one headline with
         // the total, or a reader takes the running 352 for the size of an 11,364-copy flood.

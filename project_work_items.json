@@ -1353,6 +1353,10 @@
             {
               "datetime": "2026-11-19T21:00",
               "note": "Retest #4 after a restart passes everything: the history resets on every save load (including clean -> flood, time moving forward), the combined headline ('about 11288 copies (10907 waiting to start, 381 running)'), all queued stacks named, totals add up. Closed for 1.4. Test save TEST_StackFlood_Aniya_DO_NOT_PLAY kept for the clean-and-reload tools (FEAT-267)."
+            },
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "A one-off burst (Exalted Enemies arriving in Riverwood, 69 -> 2) read kind: burst and runaway: true: the row field meant 'flagged'. Now flagged (any kind) and runaway (that kind only)."
             }
           ],
           "targetRelease": "1.4"

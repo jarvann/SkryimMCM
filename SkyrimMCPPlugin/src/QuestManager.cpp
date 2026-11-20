@@ -210,7 +210,7 @@ namespace SkyrimMCP::QuestManager {
             result["formId"] = formIdHex;
             result["name"] = quest->GetName();
             result["currentStage"] = quest->GetCurrentStageID();
-            result["isActive"] = quest->IsActive();
+            result["isActive"] = quest->IsActive();   // the journal's "active quest" flag (shown/tracked), not "running"
             result["isCompleted"] = quest->IsCompleted();
             // CommonLib's IsRunning only checks "not starting or stopping"; a stopped quest read as running while Papyrus's
             // Quest.IsRunning said false (2026-11-20). Running needs the enabled flag too, as Papyrus checks.
