@@ -348,4 +348,43 @@ namespace SkyrimMCP::ScriptStats {
         return {{"entry", entry}, {"objects", list}, {"objectCount", objects.size()}};
     }
 
+    // FEAT-280 fix: StopRunaway's UnregisterForUpdate calls went through the script engine and timed out at 5 s each in game:
+    // they queue behind the very pile-up they are meant to stop. The registrations are an array the VM keeps by object handle
+    // (what UnregisterForUpdate edits); removing them here, on the game thread under the VM's own lock, stops the next
+    // OnUpdate at once. Stacks already queued still run once.
+    json UnregisterUpdates(const std::vector<std::uint64_t>& handles, bool gameTime) {
+        auto* vm = RE::SkyrimVM::GetSingleton();
+        if (!vm) return {{"error", "The Papyrus VM is not available yet"}};
+        auto& data = vm->GetVMRuntimeData();
+        const std::set<RE::VMHandle> wanted(handles.begin(), handles.end());
+        auto prune = [&](RE::BSTArray<RE::BSTSmartPointer<RE::SkyrimVM::UpdateDataEvent>>& regs, int& removed) -> bool {
+            // A count this large means the layout doesn't match this game version: leave it alone.
+            if (regs.size() > 500000) return false;
+            for (auto i = regs.size(); i-- > 0;) {
+                const auto& r = regs[i];
+                if (r && wanted.contains(r->handle)) {
+                    regs.erase(regs.begin() + i);
+                    ++removed;
+                }
+            }
+            return true;
+        };
+        int removed = 0, removedGameTime = 0;
+        std::size_t before = 0, beforeGameTime = 0;
+        bool ok = true;
+        {
+            RE::BSSpinLockGuard guard(data.queuedOnUpdateEventLock);
+            before = data.queuedOnUpdateEvents.size();
+            ok = prune(data.queuedOnUpdateEvents, removed);
+            if (ok && gameTime) {
+                beforeGameTime = data.queuedOnUpdateGameEvents.size();
+                ok = prune(data.queuedOnUpdateGameEvents, removedGameTime);
+            }
+        }
+        if (!ok) return {{"error", "The VM's update registrations don't look valid for this game version; nothing was changed."}};
+        json result = {{"registrationsBefore", before}, {"removed", removed}};
+        if (gameTime) { result["gameTimeRegistrationsBefore"] = beforeGameTime; result["removedGameTime"] = removedGameTime; }
+        return result;
+    }
+
 }
