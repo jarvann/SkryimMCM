@@ -383,7 +383,9 @@ namespace SkyrimMCP::QuestManager {
             if (item->owningStage) e["stage"] = item->owningStage->data.index;
             // The same stage's entry can be in the log twice (round A: An Interesting Prospect, stage 1): keep one.
             bool repeat = false;
-            for (const auto& prev : byQuest[quest]) if (prev.value("text", "") == e["text"] && prev.value("stage", -1) == e.value("stage", -1)) repeat = true;
+            const auto text = e["text"].get<std::string>();
+            const int stage = e.value("stage", -1);
+            for (const auto& prev : byQuest[quest]) if (prev.value("text", std::string()) == text && prev.value("stage", -1) == stage) repeat = true;
             if (repeat) continue;
             if (unresolved) { e["unresolvedTokens"] = unresolved; unresolvedTotal += unresolved; }
             byQuest[quest].push_back(std::move(e));
