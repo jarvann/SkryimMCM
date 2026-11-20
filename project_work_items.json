@@ -3516,7 +3516,7 @@
         {
           "id": "FEAT-258",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
           "title": "Named teleports show the game's loading screen",
           "description": "Teleport to a named place runs the console coc on the next frame and shows a frozen or black frame for several seconds; Teleport(back) uses the native MoveTo to a marker and briefly showed the loading screen's level bar (in game, build 97). Studio trips (CenterOnCell, small interior) are near instant. Try a native move for named places: MoveTo the cell's COC heading marker or a door inside it, or CenterOnCell for interiors, and see whether the loading screen draws. Until then the description warns that the screen freezes.",
@@ -3528,6 +3528,10 @@
             {
               "datetime": "2026-11-19T16:45",
               "note": "Lead: a teleport issued with the map open showed a proper loading screen on the coc path (now refused, BUG-073). The game may draw its loading screen when the move starts from a paused-menu state, as map fast travel does."
+            },
+            {
+              "datetime": "2026-11-20T07:00",
+              "note": "Experiment build: Teleport(method) 'coc' (default, unchanged), 'center' (native PlayerCharacter::CenterOnCell, which coc calls, without the console) and 'loadingscreen' (UIMessageQueue shows the Loading Menu, then CenterOnCell a frame later; the server hides it after arrival if still open, new loading_menu action). One in-game round to compare: does 'loadingscreen' draw a real loading screen, does the game close it, any hang."
             }
           ],
           "targetRelease": "1.4"

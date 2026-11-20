@@ -8,7 +8,8 @@ namespace SkyrimMCP {
     using json = nlohmann::json;
 
     namespace WorldManager {
-        json Teleport(const std::string& cellId);
+        json Teleport(const std::string& cellId, const std::string& method = "coc");
+        json LoadingMenu(bool show);
         json GetWeather();
         json SetWeather(const std::string& weatherFormIdOrName);
         json ListWeathers();
