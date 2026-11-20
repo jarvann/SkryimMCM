@@ -857,8 +857,9 @@ namespace SkyrimMCP::PlayerQueries {
                     // BUG-025: a console-made enchantment read magnitude 100 while the item card showed Turn Undead at level 0.
                     // Report what decides the shown value: whether the effect has a magnitude at all, its archetype, cost.
                     const auto& flags = effect->baseEffect->data.flags;
-                    if (flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoMagnitude)) e["noMagnitude"] = true;
-                    if (flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoDuration)) e["noDuration"] = true;
+                    // Always present, so false reads as false rather than as a missing field (retest 2026-11-20).
+                    e["noMagnitude"] = flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoMagnitude);
+                    e["noDuration"] = flags.any(RE::EffectSetting::EffectSettingData::Flag::kNoDuration);
                     e["archetype"] = Helpers::Utf8(effect->baseEffect->GetArchetypeAsString().c_str());
                     e["cost"] = effect->cost;
                     if (const char* d = effect->baseEffect->magicItemDescription.c_str(); d && d[0]) e["descriptionTemplate"] = Helpers::Utf8(d);
