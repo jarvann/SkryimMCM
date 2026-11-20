@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 212,
-    "completed": 130,
+    "totalItems": 292,
+    "completed": 245,
     "completedPartial": 2,
-    "implementedUntested": 14,
+    "implementedUntested": 5,
     "inProgress": 0,
-    "planned": 35,
-    "bugs": 28
+    "planned": 39,
+    "bugs": 92
   },
   "phases": [
     {
@@ -4740,6 +4740,180 @@
           "targetRelease": "1.4"
         }
       ]
+    },
+    {
+      "phase": 17,
+      "name": "v1.5 \u2014 Build and install mods, crash and runaway care",
+      "priority": "medium",
+      "status": "planned",
+      "estimate": "40-70 human hours; Claude 4-7 h, 1.5-2.5M tokens (FEAT-277 is a spike and may cut FEAT-278 or make it unneeded)",
+      "items": [
+        {
+          "id": "FEAT-270",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Patch a mod's script as an override mod",
+          "description": "The workflow used for the wendigo runaway on 2026-11-20, made a tool chain: find the handler in StackReport, read the mod's .psc (loose or from its BSA), write the fix, compile it (FEAT-272), and package the .pex with its source as a small override mod (zip for Vortex or MO2, winning over the original). Then verify with StackReport after a restart. Never edits the original mod's files.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Asked for by Cory ('write scripts in realtime... fix and save into the game'); the wendigo patch (WendigoUpdateFix.zip) was the manual run."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-271",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Creation Kit detection and setup offer",
+          "description": "Find an installed Creation Kit (SE, or the LE one as with Cory's C:\\Steam\\steamapps\\common\\skyrim) and its PapyrusCompiler.exe; check vanilla script sources exist and offer to unpack Data\\Scripts.rar (Windows tar reads RAR) when only the archive is there. When it is missing, the AI explains what installing it (free on Steam) would unlock and how, and never installs anything itself.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: 'can we offer as an AI to have the user install it for more functionality?'"
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-272",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "CompileScript: compile Papyrus with imports resolved",
+          "description": "Run the Creation Kit's compiler on a .psc with the import order worked out: the patch's own source folder, then Data\\Scripts\\Source (SE layout), then the unpacked vanilla sources, plus the sources of the mods it depends on (loose or from BSAs, MO2-aware through SkyLinkSettings). Return the compiler's errors with file and line, and the .pex path.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "The wendigo compile failed until the vanilla sources were unpacked; this makes that automatic."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-273",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Write small plugins (ESP / light ESPFE)",
+          "description": "Create a small plugin the AI can reason about: a few records (a quest with a script, a spell, a global, a leveled list edit) with correct masters, the light flag when eligible, and FormIDs inside the light range. Writer library to be chosen (Mutagen is the likely choice; it is MIT and handles SSE plugins).",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: build ESP/ESPFE and add it to the load order."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-274",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Masters and dependency check before installing",
+          "description": "Before a new or patched mod is installed: every master present and enabled, loaded in front of the plugin, script imports and SKSE plugins it needs present, and the versions SkyLink can read. Reports what is missing in plain terms.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: 'obviously it would need to manage the dependencies'."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-275",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Install into the load order and sort with LOOT",
+          "description": "Add the new plugin to Vortex's or MO2's load order (plugins.txt / the MO2 profile's loadorder.txt, through SkyLinkSettings), then sort with LOOT's command line when LOOT is installed, and show the order before and after. Asks before changing anything.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: 'sort the load order (LOOT)'."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-276",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Plugin limits and light-flag eligibility",
+          "description": "Read the live load order and say how close it is to the limits (254 full plugins, 4096 light) and, for a given plugin, whether it can be light (record count and FormID range) and whether flagging it changes anything a save depends on (ties into CompareSaveToLoadOrder).",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: 'confirm that it's not going over any limits like full/lite mod counts'."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-277",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Main-menu content reload (experiment)",
+          "description": "Research spike: the AE engine has a content reload from the main menu (Main::reloadContent, used by Creations). Find out whether calling it lets a newly installed plugin load without restarting Skyrim, what breaks (scripts, SKSE plugins, the logic DLL's handles), and whether it is safe enough to offer. Outcome is a yes or no with evidence, not a feature.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Cory: 'with Anniversary Edition they added the ability to reload the engine from the main menu... Can we tap into that?'"
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-278",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Automated restart cycle",
+          "description": "When a change needs a game restart (a new plugin, a host DLL, a patched script): save, quit cleanly, relaunch through SKSE (skse64_loader or the mod manager), wait for the main menu (WaitForSkyrim), load the save and run a check (StackReport, or the tool that needed the restart). The player confirms the quit.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Discussed with the build-and-install chain; the fallback when FEAT-277 says no."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-279",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Crash-log patterns",
+          "description": "A small catalogue of known crash signatures matched against Crash Logger reports: the faulting module and offset, the menu open at the time, the forms in the stack. Each match names the likely mod and the known fix (e.g. the Inner Warmth scroll in BarterMenu, crash-2026-11-14-10-10-42.log, fixed by the Reducks InnerWarmthScrollFix). Grows from crashes seen in testing.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "From the 11/14 Inner Warmth crash and the crashes during 1.4 testing (Grand Solitude tree, Community Shaders with Better Dynamic Snow, OStim SceneMenu)."
+            }
+          ],
+          "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-280",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "StopRunaway: stop a runaway update loop live",
+          "description": "For a StackReport handler flagged runaway: find the objects whose script keeps re-registering (OnUpdate / RegisterForSingleUpdate), call UnregisterForUpdate on them through the Papyrus bridge, and watch the count fall. Live and temporary (the loop can come back on the next load); points to a patch (FEAT-270) for a lasting fix. Asks first and names the mod.",
+          "history": [
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "From the wendigo runaway (mihail_wendigo_script2) during 1.4 testing."
+            }
+          ],
+          "targetRelease": "1.5"
+        }
+      ]
     }
   ],
   "infrastructure": [
@@ -5494,6 +5668,13 @@
       "nexus": "mod 175682 file updated, version 1.3.0, sticky post edited",
       "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.3.0",
       "notes": "docs/release-notes-1.3.md"
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-11-20",
+      "nexus": "mod 175682 file updated over 1.3.0, version 1.4.0; summary, description and sticky updated; AI disclosure Mod Content + Media; 'done' replies to DutchiesCanadian, kilaya42, AlexiousITA, Bardicle, Maruzarix",
+      "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.4.0",
+      "notes": "docs/release-notes-1.4.md"
     }
   ],
   "releasePlan": {
@@ -5512,6 +5693,22 @@
       "openDecision": "KringleKiller's fork already has the in-game client, quest tracker, waypoints and notes: take their code, build our own, or build it with them"
     },
     "1.4": "Takes whatever slips out of 1.3",
-    "parked": "No release yet: FEAT-013, FEAT-015, FEAT-113, INFRA-005, INFRA-007"
+    "parked": "No release yet: FEAT-013, FEAT-015, FEAT-113, INFRA-005, INFRA-007",
+    "1.5": {
+      "theme": "Build and install mods; crash and runaway care",
+      "items": [
+        "FEAT-270",
+        "FEAT-271",
+        "FEAT-272",
+        "FEAT-273",
+        "FEAT-274",
+        "FEAT-275",
+        "FEAT-276",
+        "FEAT-277",
+        "FEAT-278",
+        "FEAT-279",
+        "FEAT-280"
+      ]
+    }
   }
 }
