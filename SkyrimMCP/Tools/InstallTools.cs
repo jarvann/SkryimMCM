@@ -21,7 +21,14 @@ public class InstallTools : ToolBase
 
     internal static Manager DetectManager()
     {
-        if (SkyLinkSettings.Mo2Instance().Folder != null) return Manager.Mo2;
+        // MO2 manages the game only when the game runs through it: a game started directly (skse64_loader, MO2 closed) reads
+        // the real Data folder and its own Plugins.txt even though an MO2 instance points at that folder.
+        if (SkyLinkSettings.Mo2Instance().Folder != null)
+        {
+            var gameRunning = Process.GetProcessesByName("SkyrimSE").Length > 0;
+            var mo2Running = Process.GetProcessesByName("ModOrganizer").Length > 0;
+            if (!(gameRunning && !mo2Running)) return Manager.Mo2;
+        }
         if (SkyLinkSettings.DataPath() is string data && File.Exists(Path.Combine(data, "vortex.deployment.json"))) return Manager.Vortex;
         return Manager.None;
     }
