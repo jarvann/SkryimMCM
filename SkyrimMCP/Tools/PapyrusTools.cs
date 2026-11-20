@@ -122,7 +122,9 @@ public class PapyrusTools : ToolBase
     public async Task<object> StackReport(int samples = 6, int intervalMs = 1000, int top = 12)
     {
         samples = Math.Clamp(samples, 2, 20);
+        var askedInterval = intervalMs;
         intervalMs = Math.Clamp(intervalMs, 200, 5000);
+        var intervalNote = askedInterval != intervalMs ? $"intervalMs {askedInterval} was set to {intervalMs} (allowed: 200-5000)." : null;
         var perEntry = new Dictionary<string, List<int>>();
         var owners = new Dictionary<string, JsonNode?>();
         var running = new List<int>();
@@ -233,7 +235,7 @@ public class PapyrusTools : ToolBase
         string? historyBreak = null;
         if (recent.Count > 0 && gameLoads.HasValue && recent.Last()["gameLoads"] is JsonValue lastLoads && lastLoads.GetValue<int>() != gameLoads.Value)
         {
-            historyBreak = "A save was loaded since the last call: the history starts over from here.";
+            historyBreak = "The game was restarted or a save was loaded since the last call: the history starts over from here.";
             recent.Clear();
         }
         if (recent.Count > 0 && gameDays.HasValue && recent.Last()["gameDays"] is JsonValue lastDays)
@@ -242,7 +244,7 @@ public class PapyrusTools : ToolBase
             // Back in time, or more than half a game day ahead in under 30 real minutes (a wait or a load): a different state.
             if (gameDays.Value < prevDays - 0.0001 || gameDays.Value - prevDays > 0.5)
             {
-                historyBreak = "A save was loaded (or time jumped) since the last call: the history starts over from here.";
+                historyBreak = "The game was restarted, a save was loaded, or time jumped since the last call: the history starts over from here.";
                 recent.Clear();
             }
         }
@@ -338,6 +340,7 @@ public class PapyrusTools : ToolBase
             acrossCalls = crossCall.Count > 0 ? crossCall : null,
             paused,
             historyBreak,
+            intervalNote,
             queuedStacks = queuedLast,
             queuedDiagnostics,
             historyCalls = recent.Count,
