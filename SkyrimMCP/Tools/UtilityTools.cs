@@ -723,7 +723,7 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set one SkyLink setting (see GetSkyLinkSettings for the list): skyrimPath, dataPath, mo2Path, mo2Profile, " +
-        "resaverPath, creationKitPath, or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
+        "resaverPath, creationKitPath, xeditPath, lootPath, or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
         "Use this for MO2 or Wabbajack setups where config files aren't in the game's own Data folder.")]
     public Task<object> SetSkyLinkSetting(string key, string? value = null)
     {

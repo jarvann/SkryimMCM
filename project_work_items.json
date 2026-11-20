@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 301,
+    "totalItems": 302,
     "completed": 247,
     "completedPartial": 2,
-    "implementedUntested": 17,
+    "implementedUntested": 24,
     "inProgress": 0,
-    "planned": 35,
+    "planned": 29,
     "bugs": 93
   },
   "phases": [
@@ -4807,7 +4807,7 @@
         {
           "id": "FEAT-273",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Write small plugins (ESP / light ESPFE)",
           "description": "Create a small plugin the AI can reason about: a few records (a quest with a script, a spell, a global, a leveled list edit) with correct masters, the light flag when eligible, and FormIDs inside the light range. Our own reader and writer, written from the UESP format documentation and inspection of game files (clean room): Mutagen, xEdit and nifly are GPL-3.0 and can't go into the MIT server, so no code is read or copied from them.",
@@ -4819,6 +4819,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Correction: Mutagen is GPL-3.0, not MIT. Built as original work (Cory: 'make sure it's all original work and not derivative')."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "Built by a background agent as original work (clean-room note in PluginFile.cs): reader, light eligibility, GLOB/QUST writer with VMAD; round trip checked; vanilla, empty/missing Plugins.txt and GOG paths tested."
             }
           ],
           "targetRelease": "1.5"
@@ -4826,7 +4830,7 @@
         {
           "id": "FEAT-274",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Masters and dependency check before installing",
           "description": "Before a new or patched mod is installed: every master present and enabled, loaded in front of the plugin, script imports and SKSE plugins it needs present, and the versions SkyLink can read. Reports what is missing in plain terms.",
@@ -4834,6 +4838,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: 'obviously it would need to manage the dependencies'."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "CheckPluginDependencies; InstallPlugin runs it first."
             }
           ],
           "targetRelease": "1.5"
@@ -4841,7 +4849,7 @@
         {
           "id": "FEAT-275",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Install into the load order and sort with LOOT",
           "description": "Add the new plugin to Vortex's or MO2's load order (plugins.txt / the MO2 profile's loadorder.txt, through SkyLinkSettings), then sort with LOOT's command line when LOOT is installed, and show the order before and after. Asks before changing anything.",
@@ -4849,6 +4857,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: 'sort the load order (LOOT)'."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "Built: InstallPlugin (MO2 / Vortex / none, masters checked first) and SortLoadOrder (LOOT --auto-sort, backup first)."
             }
           ],
           "targetRelease": "1.5"
@@ -4856,7 +4868,7 @@
         {
           "id": "FEAT-276",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Plugin limits and light-flag eligibility",
           "description": "Read the live load order and say how close it is to the limits (254 full plugins, 4096 light) and, for a given plugin, whether it can be light (record count and FormID range) and whether flagging it changes anything a save depends on (ties into CompareSaveToLoadOrder).",
@@ -4864,6 +4876,10 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Cory: 'confirm that it's not going over any limits like full/lite mod counts'."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "GetLoadOrderLimits: Cory's list at 251/254 full and 4,088/4,096 light; 135 full plugins could be light by compacting."
             }
           ],
           "targetRelease": "1.5"
@@ -4962,7 +4978,7 @@
         {
           "id": "FEAT-286",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "Read the player's LOOT masterlist in plugin checks",
           "description": "LOOT's masterlist (a YAML file per game under %LOCALAPPDATA%\\LOOT\\games\\<game>\\masterlist.yaml, kept up to date by LOOT) records, per plugin, dirty edits that need cleaning, incompatibilities, missing requirements, recommended patches and messages. Read the player's own copy at runtime (never bundled: its licence is CC BY-NC-SA, as far as known) in CheckPluginDependencies, InstallPlugin, GetLoadOrderLimits and crash troubleshooting, so the AI can say 'LOOT lists X as incompatible with Y' or 'this plugin has dirty edits'. Say how old the masterlist is (Cory's copy dates from July 2025) and suggest opening LOOT to update it. YAML parsing with an MIT library (YamlDotNet) or a small reader for the parts used. Works only when LOOT is installed; without it, say so and carry on.",
@@ -4970,6 +4986,10 @@
             {
               "datetime": "2026-11-20T23:30",
               "note": "Cory asked for it after the question about sites that track known issues. Masterlist found on Cory's machine (1.1 MB, 2025-07-03)."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "Built: GetLootNotes (per plugin, or a load-order scan), YamlDotNet 8.1.0 (MIT, from the local cache). On Cory's 4,339-plugin list: 540 known to LOOT, 7 missing a requirement, 50 dirty, 1 warning; 1.4 s with checksums. Masterlist 505 days old."
             }
           ],
           "targetRelease": "1.5",
@@ -4980,7 +5000,7 @@
         {
           "id": "FEAT-287",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
           "title": "Point to Phostwood's Crash Log Analyzer as a second opinion",
           "description": "Phostwood's Skyrim Crash Log Analyzer (phostwood.github.io/crash-analyzer) matches Crash Logger reports against a large set of known signatures. GetCrashLog suggests it as a second opinion with the report's path, so the player can paste the log there. SkyLink's own catalogue (CrashPatterns) stays original work: using the analyzer's rules would need its licence checked or Phostwood's permission (Phostwood has commented on SkyLink's Nexus page).",
@@ -4988,9 +5008,31 @@
             {
               "datetime": "2026-11-20T23:30",
               "note": "Cory asked for it after the question about sites that track known issues."
+            },
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "Built: GetCrashLog's secondOpinion names Phostwood's analyzer with the report's path."
             }
           ],
           "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-288",
+          "type": "feature",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "CleanPlugins: SSEEdit Quick Auto Clean on what LOOT lists as dirty",
+          "description": "Drive SSEEdit's command-line Quick Auto Clean (-qac -autoexit -autoload) on the plugins LOOT's masterlist lists as dirty for this exact file (CRC), one at a time with the game closed: back up, clean, re-checksum against LOOT's clean entries, report removed ITMs and undeleted references; deleted navmeshes reported as needing the author's fix. Base game and Creation Club files skipped unless asked. MO2 setups get instructions to run SSEEdit from MO2. SSEEdit runs as a separate program (no GPL code in SkyLink). Chosen over writing our own cleaner (60-100 h, risky).",
+          "history": [
+            {
+              "datetime": "2026-11-21T00:30",
+              "note": "Cory: 'can we build a tool that cleans like SSEdit? or maybe use SSEdit to fix plugins automatically in large load orders?' Built the same evening; SSEEdit isn't installed on Cory's machine yet."
+            }
+          ],
+          "targetRelease": "1.5",
+          "dependsOn": [
+            "FEAT-286"
+          ]
         }
       ]
     },
@@ -6060,7 +6102,8 @@
         "INFRA-023",
         "FEAT-285",
         "FEAT-286",
-        "FEAT-287"
+        "FEAT-287",
+        "FEAT-288"
       ],
       "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "testRemediation": [

@@ -155,6 +155,31 @@ public sealed class LootMasterlist
         };
     }
 
+    /// <summary>FEAT-288: what LOOT knows about cleaning this exact file (matched by CRC).</summary>
+    public sealed record Cleaning(uint Crc, bool Dirty, bool KnownClean, int? Itm, int? Udr, int? Nav, IReadOnlyList<uint> CleanCrcs);
+
+    public Cleaning CleaningFor(string plugin, string path, uint? crc = null)
+    {
+        var actual = crc ?? Crc32Of(path);
+        int? itm = null, udr = null, nav = null;
+        var dirty = false;
+        var cleanCrcs = new List<uint>();
+        foreach (var e in EntriesFor(plugin))
+        {
+            foreach (var d in Children(e.Node, "dirty").OfType<YamlMappingNode>().Select(Merged))
+            {
+                if (!TryHex(Scalar(d, "crc"), out var c) || c != actual) continue;
+                dirty = true;
+                itm = int.TryParse(Scalar(d, "itm"), out var i) ? i : null;
+                udr = int.TryParse(Scalar(d, "udr"), out var u) ? u : null;
+                nav = int.TryParse(Scalar(d, "nav"), out var n) ? n : null;
+            }
+            foreach (var c in Children(e.Node, "clean").OfType<YamlMappingNode>())
+                if (TryHex(Scalar(c, "crc"), out var cc)) cleanCrcs.Add(cc);
+        }
+        return new Cleaning(actual, dirty, cleanCrcs.Contains(actual), itm, udr, nav, cleanCrcs);
+    }
+
     // ---- small YAML helpers ----
 
     static string? Scalar(YamlMappingNode m, string key) =>
