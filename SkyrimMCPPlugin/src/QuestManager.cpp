@@ -370,7 +370,12 @@ namespace SkyrimMCP::QuestManager {
             if (!matches(quest)) continue;
             // The journal lists running and completed quests with a name. Setup quests (radiant boards, start-up quests) also
             // write log entries but stop without completing and never show (round A: five "... Board" quests listed).
-            const bool shown = quest->GetName() && quest->GetName()[0] && (quest->IsCompleted() || (quest->IsEnabled() && quest->IsRunning()));
+            // A running quest is listed once it has an objective on display (round A: Creation Club starters and other running
+            // quests with log entries but no objective yet were listed, and the journal doesn't show them).
+            const bool hasObjective = std::any_of(quest->objectives.begin(), quest->objectives.end(), [](const RE::BGSQuestObjective* o) {
+                return o && o->state.get() != RE::QUEST_OBJECTIVE_STATE::kDormant;
+            });
+            const bool shown = quest->GetName() && quest->GetName()[0] && (quest->IsCompleted() || (quest->IsEnabled() && quest->IsRunning() && hasObjective));
             if (!shown && !includeHidden) { ++hidden; continue; }
             if (!byQuest.contains(quest)) {
                 if (static_cast<int>(order.size()) >= maxQuests) continue;

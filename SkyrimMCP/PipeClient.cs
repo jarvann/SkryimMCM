@@ -100,6 +100,7 @@ public class PipeClient : IPipeClient
                         throw new McpException(DescribeConnectFailure());
                     }
                     await LearnGameFolderAsync();
+                    AlwaysActiveSetting();
                 }
 
                 try
@@ -133,7 +134,7 @@ public class PipeClient : IPipeClient
                 if (error.Contains("timed out", StringComparison.OrdinalIgnoreCase))
                 {
                     if (GameDownNote() is string down) error = down + " (" + error + ")";
-                    else if (FocusNote() is string focus) error = focus + " (" + error + ")";
+                    else if (FocusNote() is string focus) error = focus;
                 }
                 throw new McpException(error);
             }
@@ -237,8 +238,22 @@ public class PipeClient : IPipeClient
         catch (Exception) { return null; }
     }
 
-    /// <summary>bAlwaysActive from the running game's Skyrim.ini ([General]); null when not set.</summary>
+    static (int pid, bool? value)? _alwaysActiveAtStart;
+
+    /// <summary>
+    /// bAlwaysActive as the running game read it: Skyrim.ini is read once per game process (the game reads it at start; round A:
+    /// setting the file back to 1 mid-session made the check fall back to the generic message).
+    /// </summary>
     internal static bool? AlwaysActiveSetting()
+    {
+        var pid = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Select(p => p.Id).DefaultIfEmpty(0).First();
+        if (_alwaysActiveAtStart is { } cached && cached.pid == pid) return cached.value;
+        var value = ReadAlwaysActiveFromIni();
+        _alwaysActiveAtStart = (pid, value);
+        return value;
+    }
+
+    static bool? ReadAlwaysActiveFromIni()
     {
         var docs = SkyLinkSettings.GameDocumentsFolder
                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition");

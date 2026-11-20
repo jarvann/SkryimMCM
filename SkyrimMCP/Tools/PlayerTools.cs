@@ -74,6 +74,13 @@ public class PlayerTools : ToolBase
         {
             // Plugin 1.1.0+ reports its version and the game runtime; 1.2.0+ also its link time.
             var info = await _pipe.SendRequestAsync("ping");
+            // Round A: right after connecting the first game-thread task can still be queued, which read as "SKSE never runs
+            // SkyLink's tasks". Look again after a moment before saying so.
+            if (info?["diagnostics"]?["problem"]?.ToString() is string p0 && p0.Contains("none has ever run"))
+            {
+                await Task.Delay(2500);
+                info = await _pipe.SendRequestAsync("ping");
+            }
             // BUG-087: a stalled game thread (tasks ran, then stopped) usually means the window is unfocused. The plugin says so
             // itself from this build; older host DLLs don't, so work it out here too.
             string? stalled = null;

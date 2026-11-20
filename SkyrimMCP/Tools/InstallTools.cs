@@ -129,7 +129,7 @@ public class InstallTools : ToolBase
                 note = "LOOT has to run inside MO2 to see the mods' plugins. Ask the player to start LOOT from MO2's executables list and click Sort, then Apply.",
                 mo2,
                 lootPath = loot,
-                launchHint = launch.how,
+                mo2Running = Process.GetProcessesByName("ModOrganizer").Length > 0,
             };
         }
 
