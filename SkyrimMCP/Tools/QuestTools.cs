@@ -203,12 +203,14 @@ public class QuestTools : ToolBase
     [Description("Read the player's journal (FEAT-113): every quest log entry the player has received, in order, grouped by quest, " +
         "with the stage that wrote it and the text as the journal shows it (names filled in). Use it for 'what does my journal say', " +
         "to see where a quest stopped writing, or to compare with a walkthrough (UESP lists the stages). quest: a form ID, editor ID " +
-        "or part of the name; empty = every quest (maxQuests caps how many, default 60). Also lists installed journal mods: most " +
+        "or part of the name; empty = every quest (maxQuests caps how many, default 60). Only quests the journal shows (running or " +
+        "completed, with a name); includeHidden: true adds stopped setup quests that also wrote entries. Roles whose alias is empty " +
+        "show as [RoleName]. Also lists installed journal mods: most " +
         "re-skin the same journal, so these entries are what they show; one with its own notes can be scripted with " +
         "CallPapyrusFunction (GetScriptFunctions shows its API). Without one, AddNote keeps notes outside the game. Read-only.")]
-    public async Task<object> GetJournal(string? quest = null, int maxQuests = 60)
+    public async Task<object> GetJournal(string? quest = null, int maxQuests = 60, bool includeHidden = false)
     {
-        var data = await _pipe.SendRequestAsync("get_journal", new JsonObject { ["quest"] = quest ?? "", ["maxQuests"] = maxQuests });
+        var data = await _pipe.SendRequestAsync("get_journal", new JsonObject { ["quest"] = quest ?? "", ["maxQuests"] = maxQuests, ["includeHidden"] = includeHidden });
         if (data is JsonObject obj && obj["error"] == null) obj["journalMods"] = await FindJournalMods();
         return DeserializeResponse(data);
     }

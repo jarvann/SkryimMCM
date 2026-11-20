@@ -60,7 +60,7 @@ public partial class ModBuildTools : ToolBase
                     ? "This is the 2011 Skyrim Creation Kit. Its compiler produces the same .pex format Skyrim SE loads, so it works for script fixes."
                     : null,
                 sourceFolders = sources.Select(s => new { path = s.Path, what = s.What, scripts = CountPsc(s.Path) }),
-                vanillaSources = vanilla,
+                vanillaSources = new { vanilla.ready, vanilla.folder, vanilla.archive, scripts = vanilla.folder != null ? CountPsc(vanilla.folder) : 0 },
                 flagsFile = flags,
                 buildFolder = BuildRoot,
                 unlocks = Unlocks,
@@ -122,7 +122,7 @@ public partial class ModBuildTools : ToolBase
             {
                 script = name,
                 path,
-                from = DescribeFolder(folder),
+                from = VortexSource(path) is string mod ? $"Vortex mod {mod}" : DescribeFolder(folder),
                 lines = text.Count(c => c == '\n') + 1,
                 truncated = text.Length > maxChars,
                 source = text.Length > maxChars ? text[..maxChars] : text,
@@ -495,6 +495,34 @@ public partial class ModBuildTools : ToolBase
             if (folder.StartsWith(Path.Combine(mo2, "overwrite"), StringComparison.OrdinalIgnoreCase)) return "MO2 overwrite";
         }
         return folder;
+    }
+
+    /// <summary>
+    /// The Vortex mod a deployed file came from: Vortex hard-links files into Data and records each in vortex.deployment.json
+    /// (relPath + source). The manifest can be hundreds of MB, so it is streamed, not loaded.
+    /// </summary>
+    internal static string? VortexSource(string path)
+    {
+        var data = SkyLinkSettings.DataPath();
+        if (data == null || !path.StartsWith(data, StringComparison.OrdinalIgnoreCase)) return null;
+        var manifest = Path.Combine(data, "vortex.deployment.json");
+        if (!File.Exists(manifest)) return null;
+        var rel = path[data.Length..].TrimStart('\\', '/');
+        var want = "\"relPath\": " + System.Text.Json.JsonSerializer.Serialize(rel);
+        try
+        {
+            using var reader = new StreamReader(new FileStream(manifest, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16));
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (!line.TrimStart().StartsWith(want, StringComparison.OrdinalIgnoreCase)) continue;
+                var next = reader.ReadLine()?.Trim();
+                if (next != null && next.StartsWith("\"source\":"))
+                    return System.Text.Json.JsonDocument.Parse("{" + next.TrimEnd(',') + "}").RootElement.GetProperty("source").GetString();
+            }
+        }
+        catch (Exception) { }
+        return null;
     }
 
     static int CountPsc(string folder) { try { return Directory.EnumerateFiles(folder, "*.psc").Count(); } catch (IOException) { return 0; } }

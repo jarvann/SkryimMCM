@@ -341,7 +341,18 @@ namespace SkyrimMCP::ScriptStats {
                       {"running", f.running}, {"queued", f.queued}};
             if (auto* form = f.formId ? RE::TESForm::LookupByID(f.formId) : nullptr) {
                 o["formId"] = std::format("{:08X}", f.formId);
-                if (const char* n = form->GetName(); n && n[0]) o["name"] = n;
+                o["formType"] = RE::FormTypeToString(form->GetFormType());
+                const RE::TESForm* named = form;
+                if (auto* ref = form->As<RE::TESObjectREFR>()) {
+                    if (const char* n = ref->GetDisplayFullName(); n && n[0]) o["name"] = n;
+                    if (auto* base = ref->GetBaseObject()) {
+                        named = base;
+                        o["baseFormId"] = std::format("{:08X}", base->GetFormID());
+                        o["baseType"] = RE::FormTypeToString(base->GetFormType());
+                    }
+                }
+                if (!o.contains("name")) { if (const char* n = named->GetName(); n && n[0]) o["name"] = n; }
+                if (const char* e = named->GetFormEditorID(); e && e[0]) o["editorId"] = e;
             }
             list.push_back(std::move(o));
         }

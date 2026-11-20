@@ -68,8 +68,10 @@ public class InstallTools : ToolBase
             {
                 manager = "Vortex",
                 installed = false,
-                next = "Vortex manages this game: package the project (PackageOverrideMod with installToMo2=false) and ask the player to " +
-                       "install the zip in Vortex (Mods > Install From File), enable it and the plugin, then sort in Vortex (Plugins > Sort Now).",
+                // Round A: build the zip here rather than send the AI to another tool first.
+                package = dryRun ? null : ModBuildTools.PackageOverrideModCore(name, null, null, installToMo2: false),
+                next = (dryRun ? "With dryRun: false this packages a zip; then " : "") +
+                       "ask the player to install the zip in Vortex (Mods > Install From File), enable it and the plugin, then sort in Vortex (Plugins > Sort Now).",
                 plugins = plugins.Select(Path.GetFileName),
             });
 

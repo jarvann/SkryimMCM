@@ -115,6 +115,8 @@ public class CrashTools : ToolBase
             sectionsAvailable = parsed.Keys.ToArray(),
             // FEAT-279: known signatures and what the report names (plugins, meshes, the faulting DLL).
             analysis = CrashPatterns.Analyse(text),
+            // Round A: every report showed the same recorder sessions; name the one that ended when this report was written.
+            recorderSessionForThisReport = RecorderSessionNear(file.LastWriteTime),
             sections = output,
             recent,
             windowsDump,
@@ -158,6 +160,27 @@ public class CrashTools : ToolBase
             catch { /* unreadable folder: skip it */ }
         }
         return newest;
+    }
+
+    /// <summary>The recorder file whose last entry is closest to a crash report's time (within 10 minutes).</summary>
+    static object? RecorderSessionNear(DateTime when)
+    {
+        var names = new[] { "crash-recorder-previous.bin", "crash-recorder.bin" }.Concat(Enumerable.Range(2, 4).Select(n => $"crash-recorder-previous-{n}.bin"));
+        (string file, string? start, string? last, double gap)? best = null;
+        foreach (var name in names)
+        {
+            if (FindRecorderFile(name) is not FileInfo f) continue;
+            try
+            {
+                var d = JsonSerializer.SerializeToNode(DecodeRecorder(f, 3, out _));
+                if (!DateTime.TryParse(d?["lastEntry"]?.ToString(), out var lastAt)) continue;
+                var gap = Math.Abs((lastAt - when).TotalMinutes);
+                if (gap <= 10 && (best == null || gap < best.Value.gap)) best = (f.Name, d?["sessionStart"]?.ToString(), d?["lastEntry"]?.ToString(), gap);
+            }
+            catch (Exception) { }
+        }
+        return best is { } b ? new { file = b.file, sessionStart = b.start, lastEntry = b.last, note = "This recorder session ended when the report was written: its entries are the run-up to this crash." }
+            : new { note = "No recorder session ended within 10 minutes of this report (older than the five kept, or the plugin wasn't loaded)." };
     }
 
     internal static object ReadRecorder(int entries, bool includeCurrent)

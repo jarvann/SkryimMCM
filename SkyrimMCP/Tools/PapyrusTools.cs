@@ -213,7 +213,8 @@ public class PapyrusTools : ToolBase
             var runaway = kind == "runaway";
             // Headline: every real plugin among the owners; "(created in game)" only when there is nothing else.
             var ownerList = (owners.TryGetValue(kv.Key, out var ow) ? ow as JsonArray : null) ?? new JsonArray();
-            var named = ownerList.Select(x => x?["plugin"]?.ToString()).Where(n => !string.IsNullOrEmpty(n)).Cast<string>().ToList();
+            // "31 more plugins" is the owners list's remainder, not a plugin (round A: RaceMenuLoad's headline read it).
+            var named = ownerList.Select(x => x?["plugin"]?.ToString()).Where(n => !string.IsNullOrEmpty(n) && !System.Text.RegularExpressions.Regex.IsMatch(n!, @"^\d+ more plugins$")).Cast<string>().ToList();
             var real = named.Where(n => !n.StartsWith("(")).ToList();
             var plugin = real.Count > 0 ? string.Join(", ", real) : named.FirstOrDefault();
             return new { entry = kv.Key, last, max, first, growing, kind, flagged, runaway, plugin, owners = owners.TryGetValue(kv.Key, out var ow2) ? ow2 : null };
@@ -268,8 +269,12 @@ public class PapyrusTools : ToolBase
             var stepsUp = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).Count(x => x);
             var creeping = stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.Last() - lasts.First() >= 5;
             var stuckHigh = series.All(x => x.last >= 20);
+            // High but falling call after call (round A: 180 -> 170 -> 160 read "never draining"): it is draining, slowly.
+            var stepsDown = lasts.Zip(lasts.Skip(1), (a, b) => b < a).Count(x => x);
+            var draining = stuckHigh && stepsDown >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.First() - lasts.Last() >= 5;
             var spikes = series.Count(x => x.peak >= 20);
             string? pattern = creeping ? "creeping up across calls (a leak: it registers again without finishing)"
+                : draining ? $"high but draining slowly ({string.Join(" -> ", lasts)}): the loop has stopped growing; old stacks are finishing"
                 : stuckHigh ? $"stuck high ({lasts.Min()}+ in every one of the last {series.Count} calls, never draining)"
                 : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+, draining between)"
                 : null;
@@ -395,14 +400,16 @@ public class PapyrusTools : ToolBase
             objects = objects.Count,
             registrationsRemoved = removed,
             perPass = passes,
-            registrationsBefore = first?["registrationsBefore"],
+            // The VM's whole update table, not these objects' share (round A: 176 next to 2 objects looked wrong).
+            vmUpdateRegistrationsTotal = first?["registrationsBefore"],
             reading = removed == 0
                 ? "None of these objects had an update registration: the loop isn't an OnUpdate re-registering itself (it may be events or a Wait loop), so this can't stop it. The lasting fix is the mod or a script patch."
                 : stillComing > 0
                     ? $"Removed {removed} registration(s), but queued OnUpdates were still re-registering in the last passes: run StopRunaway again in a minute, once more of the queue has drained."
                     : $"Removed {removed} update registration(s) and none came back: those objects get no more OnUpdate calls.",
-            note = "Queued stacks still run once; check again with StackReport in a minute. If the count climbs back, the mod re-registers " +
-                   "from another event: the lasting fix is the mod itself or a script patch.",
+            note = "This stops new OnUpdate calls; it doesn't end stacks already running. Those finish at their own pace (often minutes for " +
+                   "a long loop), so stacksAfter5s barely moves: judge it with StackReport over the next minutes (falling = stopped). " +
+                   "If the count climbs back, the mod re-registers from another event: the lasting fix is the mod itself or a script patch.",
         };
     }
     [McpServerTool]

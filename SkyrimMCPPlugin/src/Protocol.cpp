@@ -235,7 +235,8 @@ namespace SkyrimMCP::Protocol {
         registry["get_journal"] = [](const std::string& id, const json& params) {
             std::string quest = params.value("quest", "");
             int maxQuests = params.value("maxQuests", 60);
-            return GameThread(id, [quest, maxQuests]() { return QuestManager::GetJournal(quest, maxQuests); });
+            bool includeHidden = params.value("includeHidden", false);
+            return GameThread(id, [quest, maxQuests, includeHidden]() { return QuestManager::GetJournal(quest, maxQuests, includeHidden); });
         };
         formIdParam("get_quest_stages", "formId", [](const std::string& f) { return GameInterface::GetQuestStages(f); });
         formIdParam("get_quest_aliases", "formId", [](const std::string& f) { return GameInterface::GetQuestAliases(f); });

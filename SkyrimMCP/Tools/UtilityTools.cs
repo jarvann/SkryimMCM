@@ -110,8 +110,8 @@ public class UtilityTools : ToolBase
         "Commands run with the player selected, as if the player were clicked in the console, so 'tcl' here only " +
         "sets the player's reference flag and is NOT no-clip: use ToggleCollision for that. " +
         "CAUTION: Invalid FormIDs crash the game. Avoid during loading screens or scripted events. " +
-        "Everything the command prints is returned in 'output', and multi-line output (sqv, help) also as 'lines'.")]
-    public async Task<object> ExecuteConsoleCommand(string command)
+        "What the command prints comes back in 'output', or for multi-line output (sqv, help) as 'lines' (maxLines, default 300).")]
+    public async Task<object> ExecuteConsoleCommand(string command, int maxLines = 300)
     {
         // BUG-024: a console move (coc, cow, centeroncell, player.moveto) loads a cell inside the call and timed out though it
         // worked. Start it, then wait for the cell to change, as Teleport does.
@@ -145,6 +145,20 @@ public class UtilityTools : ToolBase
         {
             ["command"] = command
         });
+        // Round A: long output came back twice (output and lines), 72-85 KB a reply. Lines only, capped.
+        if (data is JsonObject o && o["lines"] is JsonArray lines)
+        {
+            o.Remove("output");
+            var cap = Math.Clamp(maxLines, 10, 5000);
+            if (lines.Count > cap)
+            {
+                var total = lines.Count;
+                var kept = new JsonArray(lines.Take(cap).Select(l => l?.DeepClone()).ToArray());
+                o["lines"] = kept;
+                o["truncated"] = $"{total - cap} more lines (raise maxLines, up to 5000)";
+            }
+            o["lineCount"] = lines.Count;
+        }
         return DeserializeResponse(data);
     }
 

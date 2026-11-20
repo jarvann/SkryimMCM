@@ -127,15 +127,16 @@ public sealed class LootMasterlist
                 else if (u is YamlMappingNode um && Scalar(um, "link") is string link) urls.Add(link);
             }
             var dirtyEntries = Children(e.Node, "dirty").OfType<YamlMappingNode>().Select(Merged).ToList();
-            if (checkDirty && dirtyEntries.Count > 0 && lo.FileOf(plugin) is string path)
+            if (checkDirty && (dirtyEntries.Count > 0 || Children(e.Node, "clean").Any()) && lo.FileOf(plugin) is string path)
             {
                 crc ??= Crc32Of(path);
                 foreach (var d in dirtyEntries)
                 {
                     if (!TryHex(Scalar(d, "crc"), out var want) || want != crc) continue;
+                    static int? Num(string? s) => int.TryParse(s, out var n) ? n : null;
                     dirty.Add(new
                     {
-                        itm = Scalar(d, "itm"), deletedReferences = Scalar(d, "udr"), deletedNavmeshes = Scalar(d, "nav"),
+                        itm = Num(Scalar(d, "itm")), deletedReferences = Num(Scalar(d, "udr")), deletedNavmeshes = Num(Scalar(d, "nav")),
                         cleanWith = Scalar(d, "util"), note = MessageText(d),
                     });
                 }
@@ -151,6 +152,12 @@ public sealed class LootMasterlist
             activeIncompatibilities = incompatible.Count(r => r.GetType().GetProperty("active")!.GetValue(r) is true),
             messages = messages.Count > 0 ? messages.Select(m => new { type = m.Kind, text = m.Text, condition = m.Condition, applies = m.Applies }) : null,
             dirty = dirty.Count > 0 ? dirty : null,
+            // Round A: Update.esm came back "known" with nothing about cleaning: say whether LOOT knows dirty versions at all.
+            dirtyStatus = !checkDirty ? null
+                : dirty.Count > 0 ? "dirty (this exact file, by checksum)"
+                : entries.Any(e => Children(e.Node, "dirty").Any()) ? $"LOOT lists dirty versions of this plugin, but not this file (checksum {crc:X8}): it may be a newer or older version than the masterlist knows, or already cleaned"
+                : entries.Any(e => Children(e.Node, "clean").Any()) ? "LOOT knows it as clean"
+                : "LOOT has no cleaning information for it",
             links = urls.Count > 0 ? urls.Distinct().Take(4) : null,
         };
     }

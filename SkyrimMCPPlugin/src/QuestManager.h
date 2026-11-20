@@ -18,7 +18,7 @@ namespace SkyrimMCP {
         json GetQuestAliases(const std::string& formIdHex);
         json GetQuestItems();
         // FEAT-113: the journal's log entries per quest (questFilter: form ID, editor ID or part of the name; empty = all).
-        json GetJournal(const std::string& questFilter, int maxQuests);
+        json GetJournal(const std::string& questFilter, int maxQuests, bool includeHidden);
     }
 
 }
