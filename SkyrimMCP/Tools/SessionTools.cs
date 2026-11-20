@@ -24,6 +24,9 @@ public class SessionTools : ToolBase
     public async Task<object> RestartGame(bool confirm = false, bool saveFirst = true)
     {
         var running = Process.GetProcessesByName("SkyrimSE").Length > 0;
+        // Relaunch the game that is running, wherever it is (Steam or GOG): pin its folder before anything else decides.
+        var quitting = SkyLinkSettings.RunningGameFolder();
+        if (quitting != null) SkyLinkSettings.GameInstallFolder = quitting;
         var launch = FindLauncher();
         // At the main menu there is no game to save (round B planned a save there).
         if (running && saveFirst)
@@ -41,6 +44,9 @@ public class SessionTools : ToolBase
                 dryRun = true,
                 gameRunning = running,
                 steps = new[] { saveFirst && running ? "save as SkyLink_restart_<time>" : null, running ? "quit to desktop" : null, launch.how, "then WaitForSkyrim and LoadSave" }.Where(s => s != null),
+                gameFolder = quitting ?? SkyLinkSettings.SkyrimPath().Path,
+                launchExe = launch.exe,
+                launchArgs = string.IsNullOrEmpty(launch.args) ? null : launch.args,
                 canLaunch = launch.exe != null,
                 note = launch.exe == null ? launch.how : null,
             };
@@ -68,6 +74,11 @@ public class SessionTools : ToolBase
         }
 
         if (launch.exe == null) return new { launched = false, savedAs, reason = launch.how };
+        // A launcher outside the game that quit would start another game (an MO2 launch runs through MO2's own exe, so only
+        // check direct launches).
+        if (quitting != null && launch.exe.EndsWith("skse64_loader.exe", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(Path.GetDirectoryName(launch.exe), quitting, StringComparison.OrdinalIgnoreCase))
+            return new { launched = false, savedAs, reason = $"Would have launched {launch.exe}, not the game that quit ({quitting}): not launched. Start it by hand." };
         try
         {
             Process.Start(new ProcessStartInfo(launch.exe, launch.args) { WorkingDirectory = launch.dir, UseShellExecute = true });
@@ -77,6 +88,7 @@ public class SessionTools : ToolBase
         {
             launched = true,
             how = launch.how,
+            launchExe = launch.exe,
             savedAs,
             next = savedAs != null
                 ? $"Call WaitForSkyrim (timeoutSeconds 600 for a large load order), then LoadSave \"{savedAs}\"."
