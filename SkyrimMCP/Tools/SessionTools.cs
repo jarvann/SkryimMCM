@@ -25,6 +25,16 @@ public class SessionTools : ToolBase
     {
         var running = Process.GetProcessesByName("SkyrimSE").Length > 0;
         var launch = FindLauncher();
+        // At the main menu there is no game to save (round B planned a save there).
+        if (running && saveFirst)
+        {
+            try
+            {
+                var state = await _pipe.SendRequestAsync("get_session_state");
+                if (state?["gameLoaded"]?.GetValue<bool>() != true) saveFirst = false;
+            }
+            catch (Exception) { }
+        }
         if (!confirm)
             return new
             {
