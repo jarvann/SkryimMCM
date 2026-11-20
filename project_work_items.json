@@ -129,13 +129,13 @@
     ]
   },
   "summary": {
-    "totalItems": 302,
-    "completed": 247,
+    "totalItems": 303,
+    "completed": 257,
     "completedPartial": 2,
-    "implementedUntested": 24,
+    "implementedUntested": 15,
     "inProgress": 0,
     "planned": 29,
-    "bugs": 93
+    "bugs": 94
   },
   "phases": [
     {
@@ -1095,6 +1095,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): get_journal walks PlayerCharacter::GetQuestLog (the entries the player received) per quest; GetJournal lists journal/diary/notebook mods so their API can be used, falling back to ours (Cory's suggestion)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: matches the in-game journal word for word; hidden setup quests filtered and repeats dropped after fix."
             }
           ]
         }
@@ -4251,6 +4255,10 @@
             {
               "datetime": "2026-11-20T19:45",
               "note": "Not proven fixed in game; rolled from 1.3 to 1.5 for test remediation (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: failed under OBody NG's window (SKSE Menu Framework/ImGui, not a game menu). Fixed: IsAnyBlockingWindowOpened export checked (host). Retest."
             }
           ],
           "targetRelease": "1.5"
@@ -4274,6 +4282,10 @@
             {
               "datetime": "2026-11-20T19:45",
               "note": "Not proven fixed in game; rolled from 1.3 to 1.5 for test remediation (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: 4 items equipped; she had every item, so 'added' was untested: now always reported. Retest with a missing item and an unknown spell."
             }
           ],
           "targetRelease": "1.5"
@@ -4397,6 +4409,10 @@
             {
               "datetime": "2026-11-20T19:45",
               "note": "Not proven fixed in game; rolled from 1.4 to 1.5 for test remediation (Cory)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: partial; generic text and CheckConnection blamed SKSE. Fixed: checks the foreground window and Skyrim.ini bAlwaysActive and says so. Retest."
             }
           ],
           "targetRelease": "1.5"
@@ -4722,7 +4738,7 @@
         {
           "id": "BUG-093",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Quest objectives show unresolved alias tokens",
           "description": "Objective text read from a quest can still contain tokens like <Alias=Target> instead of the name the journal shows. Resolve them from the quest's filled aliases, as the journal does; leave the token with a note when the alias is empty. Split from BUG-085.",
@@ -4734,6 +4750,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): ResolveTokens fills <Alias=...>, <Alias.X=...> (reference aliases) and <Global=...> in objectives and journal text."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: names filled; empty aliases now [Role]."
             }
           ],
           "targetRelease": "1.5"
@@ -4762,6 +4782,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): PackageOverrideMod: Data-layout zip with readme; optional MO2 install at top priority (modlist.txt backed up)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: zip matches the hand-made patch (source identical) plus a README. MO2 install still to test on GOG."
             }
           ],
           "targetRelease": "1.5"
@@ -4769,7 +4793,7 @@
         {
           "id": "FEAT-271",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Creation Kit detection and setup offer",
           "description": "Find an installed Creation Kit (SE, or the LE one as with Cory's C:\\Steam\\steamapps\\common\\skyrim) and its PapyrusCompiler.exe; check vanilla script sources exist and offer to unpack Data\\Scripts.rar (Windows tar reads RAR) when only the archive is there. When it is missing, the AI explains what installing it (free on Steam) would unlock and how, and never installs anything itself.",
@@ -4781,6 +4805,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): GetCreationKit (Steam libraries, settings creationKitPath; LE kit accepted, same .pex), PrepareScriptSources (Windows tar into SkyLinkAI\\Build)."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A (Steam): passed; vanillaSources field fixed."
             }
           ],
           "targetRelease": "1.5"
@@ -4788,7 +4816,7 @@
         {
           "id": "FEAT-272",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "CompileScript: compile Papyrus with imports resolved",
           "description": "Run the Creation Kit's compiler on a .psc with the import order worked out: the patch's own source folder, then Data\\Scripts\\Source (SE layout), then the unpacked vanilla sources, plus the sources of the mods it depends on (loose or from BSAs, MO2-aware through SkyLinkSettings). Return the compiler's errors with file and line, and the .pex path.",
@@ -4800,6 +4828,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): CompileScript: imports = project, extra folders, MO2 mod sources it names (copied into deps), Data and base-game sources; errors with line numbers. GetScriptSource reads a .psc."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: compile and broken-source errors (line/column) passed; GetScriptSource now names the Vortex mod."
             }
           ],
           "targetRelease": "1.5"
@@ -4823,6 +4855,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "Built by a background agent as original work (clean-room note in PluginFile.cs): reader, light eligibility, GLOB/QUST writer with VMAD; round trip checked; vanilla, empty/missing Plugins.txt and GOG paths tested."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: CreatePlugin round trip ok (light .esp, GLOB at 0x800). QUST/VMAD still to load in game (GOG reload test)."
             }
           ],
           "targetRelease": "1.5"
@@ -4830,7 +4866,7 @@
         {
           "id": "FEAT-274",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Masters and dependency check before installing",
           "description": "Before a new or patched mod is installed: every master present and enabled, loaded in front of the plugin, script imports and SKSE plugins it needs present, and the versions SkyLink can read. Reports what is missing in plain terms.",
@@ -4842,6 +4878,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "CheckPluginDependencies; InstallPlugin runs it first."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: passed."
             }
           ],
           "targetRelease": "1.5"
@@ -4868,7 +4908,7 @@
         {
           "id": "FEAT-276",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Plugin limits and light-flag eligibility",
           "description": "Read the live load order and say how close it is to the limits (254 full plugins, 4096 light) and, for a given plugin, whether it can be light (record count and FormID range) and whether flagging it changes anything a save depends on (ties into CompareSaveToLoadOrder).",
@@ -4880,6 +4920,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "GetLoadOrderLimits: Cory's list at 251/254 full and 4,088/4,096 light; 135 full plugins could be light by compacting."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: 251/254 full, 4,088/4,096 light, 129 candidates."
             }
           ],
           "targetRelease": "1.5"
@@ -4918,6 +4962,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): RestartGame: save, Main quitGame (as Quit to Desktop; never returns to the main menu), wait for exit, relaunch via skse64_loader or MO2's SKSE entry; then WaitForSkyrim + LoadSave."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A (Steam): RestartGame saved, quit, relaunched, reconnected, loaded. MO2 path on GOG still to test."
             }
           ],
           "targetRelease": "1.5"
@@ -4925,7 +4973,7 @@
         {
           "id": "FEAT-279",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Crash-log patterns",
           "description": "A small catalogue of known crash signatures matched against Crash Logger reports: the faulting module and offset, the menu open at the time, the forms in the stack. Each match names the likely mod and the known fix (e.g. the Inner Warmth scroll in BarterMenu, crash-2026-11-14-10-10-42.log, fixed by the Reducks InnerWarmthScrollFix). Grows from crashes seen in testing.",
@@ -4937,6 +4985,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): CrashPatterns in GetCrashLog's analysis: 4 signatures from crashes on Cory's setup (match by Address Library ID), plus general rules (faulting DLL, graphics driver, plugins and meshes named, start-up crash). Only specific signatures fire for those mods, so vanilla setups get the general rules."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: all signatures matched their reports; mesh fragments and per-report recorder session fixed. Community reports added RaceMenu async morph and Souls RE terrain signatures, catch-all plugins and memory notes."
             }
           ],
           "targetRelease": "1.5"
@@ -4956,6 +5008,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): find_stack_objects (running + queued stacks, shared pending-call walker), call_papyrus_function target 'handle:<hex>', StopRunaway unregisters and re-counts after 5 s."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: Papyrus unregister timed out (queued behind the pile); fixed with native removal from SkyrimVM's update table, repeated while queued updates re-register (passes [2,0,0,0,2...], then 'none came back'). A fair test needs an unpatched runaway."
             }
           ],
           "targetRelease": "1.5"
@@ -4990,6 +5046,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "Built: GetLootNotes (per plugin, or a load-order scan), YamlDotNet 8.1.0 (MIT, from the local cache). On Cory's 4,339-plugin list: 540 known to LOOT, 7 missing a requirement, 50 dirty, 1 warning; 1.4 s with checksums. Masterlist 505 days old."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: summary right; ordering, numbers and dirtyStatus fixed."
             }
           ],
           "targetRelease": "1.5",
@@ -5000,7 +5060,7 @@
         {
           "id": "FEAT-287",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Point to Phostwood's Crash Log Analyzer as a second opinion",
           "description": "Phostwood's Skyrim Crash Log Analyzer (phostwood.github.io/crash-analyzer) matches Crash Logger reports against a large set of known signatures. GetCrashLog suggests it as a second opinion with the report's path, so the player can paste the log there. SkyLink's own catalogue (CrashPatterns) stays original work: using the analyzer's rules would need its licence checked or Phostwood's permission (Phostwood has commented on SkyLink's Nexus page).",
@@ -5012,6 +5072,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "Built: GetCrashLog's secondOpinion names Phostwood's analyzer with the report's path."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: secondOpinion shown."
             }
           ],
           "targetRelease": "1.5"
@@ -5027,12 +5091,31 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "Cory: 'can we build a tool that cleans like SSEdit? or maybe use SSEdit to fix plugins automatically in large load orders?' Built the same evening; SSEEdit isn't installed on Cory's machine yet."
+            },
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Round A: dry run right (10 mod plugins; skips counted after fix). SSEEdit not installed: real clean untested."
             }
           ],
           "targetRelease": "1.5",
           "dependsOn": [
             "FEAT-286"
           ]
+        },
+        {
+          "id": "BUG-094",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Pipe replies matched to the wrong request after a timeout",
+          "description": "Round A: after RestartGame's relaunch, the server's get_game_folder query (sent on connect) timed out with the game thread stalled; the error was swallowed but the connection kept, so its late reply was read as the next request's answer and every call got the previous call's reply until Claude Desktop restarted. Fix: replies are matched by request id and stray late replies discarded (PipeClient.ReadReplyAsync).",
+          "history": [
+            {
+              "datetime": "2026-11-20T16:30",
+              "note": "Found by the in-game agent in round A; fixed and deployed the same afternoon."
+            }
+          ],
+          "targetRelease": "1.5"
         }
       ]
     },
@@ -5321,7 +5404,7 @@
     {
       "id": "INFRA-005",
       "type": "infrastructure",
-      "status": "implemented-untested",
+      "status": "complete",
       "title": "VPrint hook",
       "description": "Full console output capture for multi-line command results. Still relevant 2026-11-20: Helpers::CaptureConsoleOutput is best effort (lastMessage only), so multi-line output such as sqv quest variables or help is lost. The hook lives in the host DLL (hooks can't go in the logic DLL), so it needs a game restart and a host release.",
       "targetRelease": "1.5",
@@ -5334,6 +5417,10 @@
         {
           "datetime": "2026-11-20T22:30",
           "note": "Built (1.5 batch A): No hook needed: ConsoleLog keeps all printed text in its buffer; mark it before a command and take what was added (lastMessage fallback); multi-line output also as lines. Helpers.h, so host rebuild."
+        },
+        {
+          "datetime": "2026-11-20T16:30",
+          "note": "Round A: sqv MQ101 631 lines, help 449 lines, single line unchanged; output once with maxLines after fix."
         }
       ]
     },
@@ -5354,7 +5441,7 @@
     {
       "id": "INFRA-007",
       "type": "infrastructure",
-      "status": "implemented-untested",
+      "status": "complete",
       "title": "Measure SkyLink's game-thread cost, then cache",
       "description": "Measure first: time spent on the game thread per SkyLink task (the host already counts tasks), per tool, during normal play and during polling, reported by a tool so players asking 'will this affect performance?' get numbers. Cache only what the numbers show is costly and safe to cache (form lookups, the load order, the Papyrus catalog). Fits 1.5's FPS and save-health theme.",
       "targetRelease": "1.5",
@@ -5367,6 +5454,10 @@
         {
           "datetime": "2026-11-20T22:30",
           "note": "Built (1.5 batch A): Host times every game-thread task and charges it to the queuing request; get_skylink_cost on the pipe thread; GetSkyLinkCost tool. Caching deferred until numbers show a need."
+        },
+        {
+          "datetime": "2026-11-20T16:30",
+          "note": "Round A: 0.26% of game time; longest task help riverwood 4 (1.5 s, expected). Face refresh retries during loading screens now skipped (host)."
         }
       ]
     },
@@ -5541,7 +5632,7 @@
     {
       "id": "INFRA-023",
       "type": "infrastructure",
-      "status": "implemented-untested",
+      "status": "complete",
       "priority": "low",
       "title": "Pipe serves more than one client",
       "description": "The plugin's pipe accepts one client at a time, so while Claude Desktop's server is connected the dev agent can't query the game (scripts/pipe-call.sh, added 2026-11-16). Serve each client on its own instance and check the pipe-thread paths (Papyrus catalog, DispatchStaticCall) are safe with two clients. Host change: needs a game restart.",
@@ -5557,6 +5648,10 @@
         {
           "datetime": "2026-11-20T22:30",
           "note": "Built (1.5 batch A): Up to 4 clients, a thread each; requests reaching the logic DLL take turns (ping/poll_events don't). Host change."
+        },
+        {
+          "datetime": "2026-11-20T16:30",
+          "note": "Round A: pipe-call.sh answered with Claude Desktop connected."
         }
       ],
       "targetRelease": "1.5"
