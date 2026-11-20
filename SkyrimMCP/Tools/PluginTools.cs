@@ -119,6 +119,7 @@ public class PluginTools : ToolBase
                 incCount += inc > 0 ? 1 : 0; reqCount += req > 0 ? 1 : 0; dirtyCount += dirty ? 1 : 0; warnCount += serious.Count > 0 ? 1 : 0;
                 problems.Add(new
                 {
+                    rank = inc > 0 ? 0 : req > 0 ? 1 : serious.Count > 0 ? 2 : 3,
                     plugin = p,
                     incompatibleWith = (n["incompatibilities"] as System.Text.Json.Nodes.JsonArray)?.Where(x => x?["active"]?.GetValue<bool>() == true).Select(x => x?["name"]?.ToString()),
                     missing = (n["requirements"] as System.Text.Json.Nodes.JsonArray)?.Where(x => x?["present"]?.GetValue<bool>() == false).Select(x => x?["name"]?.ToString()),
@@ -135,7 +136,8 @@ public class PluginTools : ToolBase
                 knownToLoot = known,
                 summary = $"{incCount} plugins with an active incompatibility, {reqCount} missing a requirement, {dirtyCount} dirty, {warnCount} with a LOOT warning or error.",
                 page, pages = (problems.Count + pageSize - 1) / pageSize,
-                problems = problems.Skip((page - 1) * pageSize).Take(pageSize),
+                // Round A: page 1 was all Creation Club dirty notes. Incompatibilities, missing requirements and warnings first.
+                problems = problems.OrderBy(x => (int)x.GetType().GetProperty("rank")!.GetValue(x)!).Skip((page - 1) * pageSize).Take(pageSize),
                 note = "LOOT's notes are community knowledge, not checks of the files' contents (except dirty edits, matched by checksum).",
             };
         });

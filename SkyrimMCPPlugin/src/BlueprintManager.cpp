@@ -314,7 +314,7 @@ namespace SkyrimMCP::BlueprintManager {
                 else if (slot == "leftHand") item["hand"] = "left";
                 auto p = Label(entry);
                 if (item.contains("hand")) p["hand"] = item["hand"];
-                if (adding) p["added"] = true;
+                p["added"] = adding;   // always present, so a reply shows items she already had too
                 planned.push_back(p);
                 toEquip.push_back(item);
             }

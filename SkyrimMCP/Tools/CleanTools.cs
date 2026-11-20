@@ -72,7 +72,10 @@ public class CleanTools : ToolBase
                 masterlist = ml.Age(),
                 toClean = plan,
                 more = Math.Max(0, candidates.Count - plan.Count),
+                skippedCount = skipped.Count,
+                skippedOfficial = skipped.Count(x => x.GetType().GetProperty("reason")!.GetValue(x)!.ToString()!.StartsWith("base game")),
                 skipped = skipped.Take(30),
+                accounting = $"{plan.Count + Math.Max(0, candidates.Count - plan.Count)} to clean + {skipped.Count} skipped",
                 xedit = xedit ?? "not found",
                 manager = manager.ToString(),
                 next = xedit == null ? "SSEEdit isn't installed (free on Nexus: mod 164). Install it, or set its folder with SetSkyLinkSetting xeditPath."

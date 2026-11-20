@@ -49,7 +49,9 @@ namespace SkyrimMCP::QuestManager {
                     }
                 }
                 if (value.empty()) {
-                    out.append(text, open, close - open + 1);
+                    // An empty alias: show its name as a placeholder, as readable text rather than the raw tag.
+                    const auto eqPos = token.find('=');
+                    out += eqPos != std::string::npos && token.compare(0, 5, "Alias") == 0 ? "[" + token.substr(eqPos + 1) + "]" : "<" + token + ">";
                     if (unresolved) ++*unresolved;
                 } else {
                     out += value;
@@ -343,7 +345,7 @@ namespace SkyrimMCP::QuestManager {
     // FEAT-113: the player's journal as the game keeps it: every log entry they have received, in order, per quest, with
     // the stage it came from and its text (tokens filled in). Only entries the player actually got are here, so this is
     // also a record of the stages that wrote to the journal.
-    json GetJournal(const std::string& questFilter, int maxQuests) {
+    json GetJournal(const std::string& questFilter, int maxQuests, bool includeHidden) {
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (!player) return {{"error", "Player not available"}};
         maxQuests = std::clamp(maxQuests, 1, 500);
@@ -360,12 +362,16 @@ namespace SkyrimMCP::QuestManager {
 
         std::vector<RE::TESQuest*> order;
         std::map<RE::TESQuest*, json> byQuest;
-        int total = 0, unresolvedTotal = 0;
+        int total = 0, unresolvedTotal = 0, hidden = 0;
         for (auto* item : player->GetQuestLog()) {
             if (!item || !item->owner || !item->hasLogEntry) continue;
             auto* quest = item->owner;
             ++total;
             if (!matches(quest)) continue;
+            // The journal lists running and completed quests with a name. Setup quests (radiant boards, start-up quests) also
+            // write log entries but stop without completing and never show (round A: five "... Board" quests listed).
+            const bool shown = quest->GetName() && quest->GetName()[0] && (quest->IsCompleted() || (quest->IsEnabled() && quest->IsRunning()));
+            if (!shown && !includeHidden) { ++hidden; continue; }
             if (!byQuest.contains(quest)) {
                 if (static_cast<int>(order.size()) >= maxQuests) continue;
                 order.push_back(quest);
@@ -375,6 +381,10 @@ namespace SkyrimMCP::QuestManager {
             int unresolved = 0;
             json e = {{"text", ResolveTokens(quest, raw ? raw : "", &unresolved)}};
             if (item->owningStage) e["stage"] = item->owningStage->data.index;
+            // The same stage's entry can be in the log twice (round A: An Interesting Prospect, stage 1): keep one.
+            bool repeat = false;
+            for (const auto& prev : byQuest[quest]) if (prev.value("text", "") == e["text"] && prev.value("stage", -1) == e.value("stage", -1)) repeat = true;
+            if (repeat) continue;
             if (unresolved) { e["unresolvedTokens"] = unresolved; unresolvedTotal += unresolved; }
             byQuest[quest].push_back(std::move(e));
         }
@@ -390,7 +400,8 @@ namespace SkyrimMCP::QuestManager {
                               {"entries", byQuest[quest]}});
         }
         json result = {{"quests", quests}, {"questCount", quests.size()}, {"entriesInJournal", total}};
-        if (unresolvedTotal) result["note"] = "Some entries keep a <...> token: the alias it names is empty now or isn't a reference.";
+        if (hidden) result["hiddenEntries"] = std::format("{} entries from quests the journal doesn't show (stopped setup quests); includeHidden: true lists them", hidden);
+        if (unresolvedTotal) result["note"] = "Names in [brackets] are roles whose alias is empty now (or isn't a person or object): the journal would show nothing there.";
         return result;
     }
 

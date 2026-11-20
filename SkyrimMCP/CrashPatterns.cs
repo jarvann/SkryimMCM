@@ -74,8 +74,12 @@ public static class CrashPatterns
         var plugins = Regex.Matches(objects, @"""(?<p>[^""\\/]+\.(esp|esm|esl))""", RegexOptions.IgnoreCase)
             .Select(m => m.Groups["p"].Value).GroupBy(p => p, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => new { plugin = g.Key, mentions = g.Count() }).Take(8).ToList();
-        var meshes = Regex.Matches(objects, @"""(?<m>[^""]+\.nif)""", RegexOptions.IgnoreCase)
-            .Select(m => m.Groups["m"].Value).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
+        // Crash Logger cuts long strings, which left fragments ("ock\\warlockrobes_0.nif", "_0.nif"): keep full paths (with a
+        // folder), and drop any that is the tail of another.
+        var meshList = Regex.Matches(objects, @"""(?<m>[^""]+\.nif)""", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups["m"].Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var meshes = meshList.Where(m => m.Contains('\\') && m.Length > 12 && !meshList.Any(o => o.Length > m.Length && o.EndsWith(m, StringComparison.OrdinalIgnoreCase)))
+            .Take(8).ToList();
         if (plugins.Count > 0)
         {
             // Crash Logger names the last plugin that changed an object. Patchers and occlusion plugins edit every cell or the whole

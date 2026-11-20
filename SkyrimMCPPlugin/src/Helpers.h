@@ -236,6 +236,16 @@ namespace SkyrimMCP::Helpers {
         return added;
     }
 
+    // BUG-081: windows drawn through SKSE Menu Framework (ImGui: OBody's preset window and others) never appear in the game's
+    // menu list, so a face edit read as allowed under OBody's window. The framework exports IsAnyBlockingWindowOpened.
+    inline bool MenuFrameworkWindowOpen() {
+        auto module = REX::W32::GetModuleHandleW(L"SKSEMenuFramework.dll");
+        if (!module) return false;
+        using Fn = bool (*)();
+        auto fn = reinterpret_cast<Fn>(REX::W32::GetProcAddress(module, "IsAnyBlockingWindowOpened"));
+        return fn && fn();
+    }
+
     // FEAT-259: is the player free to be moved (Teleport, studio trips)? Each reason that blocks it, plus warnings that don't.
     // The engine states that leave something broken if she is moved out of them: menus, combat, dialogue, kill moves, scenes,
     // controls taken by a script (cutscenes, OStim and other animation frameworks), furniture, mounts, ragdoll, falling,
@@ -273,6 +283,10 @@ namespace SkyrimMCP::Helpers {
                     named = true;
                     break;
                 }
+            }
+            if (!named && MenuFrameworkWindowOpen()) {
+                out.blockers.push_back("a mod's menu is open (a SKSE Menu Framework window, such as OBody's): close it");
+                named = true;
             }
             for (const auto& [name, friendly] : kWorldMenus) {
                 if (ui->IsMenuOpen(name)) {
