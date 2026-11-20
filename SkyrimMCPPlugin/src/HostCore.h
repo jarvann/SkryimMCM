@@ -24,4 +24,7 @@ namespace SkyrimMCP::HostCore {
     // FEAT-268: counts save loads and new games, so the server can tell one game state from the next.
     void NoteGameLoaded();
 
+    // Whether a loading screen is up (the game thread is busy loading, so game-thread requests can't run).
+    bool LoadingScreenActive();
+
 }

@@ -596,6 +596,8 @@ namespace SkyrimMCP::HostCore {
 
     void NoteGameLoaded() { ++g_gameLoads; }
 
+    bool LoadingScreenActive() { return LoadingScreenWatcher::Get().Active(); }
+
     std::string HandleRequest(const std::string& requestLine) {
         json request;
         try {

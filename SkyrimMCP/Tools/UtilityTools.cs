@@ -257,7 +257,8 @@ public class UtilityTools : ToolBase
     [Description("What SkyLink has cost the game this session (INFRA-007), for 'does this mod hurt my FPS?': game-thread time " +
         "(the part a player can feel: it comes out of frames) in total and per tool action, the longest single task (one long " +
         "task is a hitch), and how long the AI waited. shareOfGameTime is game-thread time divided by time since the game started " +
-        "(0.001 = 0.1%). Read-only, answered without touching the game thread.")]
+        "(0.001 = 0.1%). reapply_face_state is SkyLink's own face refresh after loads and cell changes, not an AI call. Read-only, " +
+        "answered without touching the game thread.")]
     public async Task<object> GetSkyLinkCost()
     {
         var data = await _pipe.SendRequestAsync("get_skylink_cost");
