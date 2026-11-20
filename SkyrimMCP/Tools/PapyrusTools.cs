@@ -117,8 +117,8 @@ public class PapyrusTools : ToolBase
         "(a leak) or spiking again and again: call it a few times over several minutes to catch those. Samples during a loading screen are skipped, not fatal. Overstress and waiting function " +
         "messages are shown beside them. Plugins read 'defined in X, last changed by Y' " +
         "when another mod overrides the object (the overriding mod is often the cause). Read-only: nothing in the game changes. " +
-        "Clearing stacks needs a save edit and reload (planned: CleanAndReload); until then the fix is the mod itself " +
-        "(update, configure, or stop the feature that loops).")]
+        "For a runaway, StopRunaway stops the loop for this session; CleanAndReload clears stacks stored in the save; the " +
+        "lasting fix is the mod itself (update, configure, or a script patch with CompileScript and PackageOverrideMod).")]
     public async Task<object> StackReport(int samples = 6, int intervalMs = 1000, int top = 12)
     {
         samples = Math.Clamp(samples, 2, 20);
@@ -344,6 +344,68 @@ public class PapyrusTools : ToolBase
         };
     }
 
+    [McpServerTool]
+    [Description("Stop a runaway script loop for this session (FEAT-280). For an entry point StackReport flags (\"Script.Function\", " +
+        "or \"Script\" for all its handlers), finds the objects whose scripts keep piling up and calls UnregisterForUpdate on each " +
+        "(gameTime: true also UnregisterForUpdateGameTime), so a handler that re-registers itself stops being called again. " +
+        "Stacks already queued still run once, so the count falls over a minute or two rather than at once. Temporary: the loop " +
+        "can come back on the next load if the mod registers again; the lasting fix is the mod (update or configure it) or a " +
+        "script patch (CompileScript, PackageOverrideMod). Can stop a mod feature that relied on that update, so ask the player " +
+        "first and name the mod. dryRun (default true) lists the objects only.")]
+    public async Task<object> StopRunaway(string entry, bool dryRun = true, bool gameTime = false, int limit = 50)
+    {
+        if (string.IsNullOrWhiteSpace(entry)) return new { error = "entry is empty: pass a handler from StackReport, e.g. MyScript.OnUpdate" };
+        var found = await _pipe.SendRequestAsync("find_stack_objects", new JsonObject { ["entry"] = entry.Trim(), ["limit"] = Math.Clamp(limit, 1, 200) });
+        if (found?["error"] != null) return DeserializeResponse(found);
+        var objects = (found?["objects"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().ToList();
+        int Total(IEnumerable<JsonObject> list) => list.Sum(o => (o["running"]?.GetValue<int>() ?? 0) + (o["queued"]?.GetValue<int>() ?? 0));
+        if (objects.Count == 0)
+            return new { entry, objects = 0, note = "No stacks from that handler right now. Run StackReport and pass an entry exactly as it shows it." };
+        if (dryRun)
+            return new { dryRun = true, entry, stacks = Total(objects), objectCount = found?["objectCount"], objects };
+
+        var functions = gameTime ? new[] { "UnregisterForUpdate", "UnregisterForUpdateGameTime" } : ["UnregisterForUpdate"];
+        var results = new List<object>();
+        foreach (var o in objects)
+        {
+            var script = o["script"]?.ToString();
+            if (string.IsNullOrEmpty(script)) { results.Add(new { handle = o["handle"]?.ToString(), error = "unknown script type" }); continue; }
+            foreach (var fn in functions)
+            {
+                try
+                {
+                    var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = script, ["functionName"] = fn, ["args"] = new JsonArray(), ["target"] = "handle:" + o["handle"],
+                    });
+                    results.Add(new { handle = o["handle"]?.ToString(), name = o["name"]?.ToString(), script, function = fn, done = r?["error"] == null, error = r?["error"]?.ToString() });
+                }
+                catch (Exception ex) { results.Add(new { handle = o["handle"]?.ToString(), script, function = fn, done = false, error = ex.Message }); }
+            }
+        }
+
+        // Re-count after a few seconds so the reply shows whether the loop is draining.
+        await Task.Delay(5000);
+        int? after = null;
+        try
+        {
+            var again = await _pipe.SendRequestAsync("find_stack_objects", new JsonObject { ["entry"] = entry.Trim(), ["limit"] = 200 });
+            after = Total((again?["objects"] as JsonArray ?? new JsonArray()).OfType<JsonObject>());
+        }
+        catch (Exception) { }
+        var ok = results.Count(r => r.GetType().GetProperty("done")?.GetValue(r) is true);
+        return new
+        {
+            entry,
+            stacksBefore = Total(objects),
+            stacksAfter5s = after,
+            unregistered = ok,
+            failed = results.Count - ok,
+            results = results.Take(40),
+            note = "Queued stacks still run once; check again with StackReport in a minute. If the count climbs back, the mod re-registers " +
+                   "from another event: the lasting fix is the mod itself or a script patch.",
+        };
+    }
     [McpServerTool]
     [Description("Papyrus script engine diagnostics, to find the mod behind script lag or a save that bloats. " +
         "Reports runningStacks (scripts active right now), how many wait on latent functions, waitingFunctionMessages, " +

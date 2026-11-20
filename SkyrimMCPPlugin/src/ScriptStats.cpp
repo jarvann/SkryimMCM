@@ -4,6 +4,7 @@
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <set>
 #include <string>
@@ -106,6 +107,43 @@ namespace SkyrimMCP::ScriptStats {
             return {std::string(t && t[0] ? t : "?") + "." + (fn.c_str() && fn.c_str()[0] ? fn.c_str() : "?") + " (queued)", OwnerOf(self)};
         }
 
+        // Every call waiting to start: the function message queue (and its overflow) and both suspend queues (and theirs).
+        // A queued stack has no frames, so the call is the only place its function and object are known (FEAT-268).
+        template <class F>
+        std::pair<std::size_t, std::size_t> ForEachPendingCall(RE::BSScript::Internal::VirtualMachine* impl, F&& visit) {
+            std::size_t messages = 0, suspended = 0;
+            for (auto* elem = impl->funcMsgQueue.head; elem && messages < 200000; elem = elem->next, ++messages) {
+                auto* msg = reinterpret_cast<RE::BSScript::Internal::FunctionMessage*>(elem->elem);
+                if (msg && msg->stack) visit(msg->stack.get(), msg->funcQuery.get());
+            }
+            for (auto& msg : impl->overflowFuncMsgs) {
+                if (++messages > 200000) break;
+                if (msg.stack) visit(msg.stack.get(), msg.funcQuery.get());
+            }
+            // The retest found none of the ~11,000 queued stacks in the function message queue: stacks waiting to start (or
+            // to resume) sit in the suspend queues instead, each with its call. Walk both ring buffers and their overflow arrays.
+            RE::BSSpinLockGuard suspendGuard(impl->suspendQueueLock);
+            auto walkRing = [&](const auto& queue) {
+                constexpr std::uint32_t kSize = 128;
+                const auto* entries = reinterpret_cast<const RE::BSScript::Internal::SuspendedStack*>(queue.queueBuffer);
+                const auto count = std::min<std::uint32_t>(queue.numEntries, kSize);
+                for (std::uint32_t i = 0; i < count; ++i) {
+                    const auto& e = entries[(queue.popIdx + i) % kSize];
+                    ++suspended;
+                    if (e.stack) visit(e.stack.get(), e.funcCallQuery.get());
+                }
+            };
+            walkRing(impl->suspendQueue1);
+            walkRing(impl->suspendQueue2);
+            for (const auto* arr : {&impl->overflowSuspendArray1, &impl->overflowSuspendArray2}) {
+                for (const auto& e : *arr) {
+                    if (++suspended > 200000) break;
+                    if (e.stack) visit(e.stack.get(), e.funcCallQuery.get());
+                }
+            }
+            return {messages, suspended};
+        }
+
         json TopN(const std::map<std::string, int>& counts, int top) {
             std::vector<std::pair<std::string, int>> sorted(counts.begin(), counts.end());
             std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
@@ -147,41 +185,9 @@ namespace SkyrimMCP::ScriptStats {
         // FEAT-268: pending function messages (the VM's queue and its overflow) hold the stack each call will run on and the
         // call itself; a queued stack has no frames, so this is where its name comes from (the Aniya flood: ~11,000 queued).
         std::unordered_map<const RE::BSScript::Stack*, std::pair<std::string, std::string>> queuedCalls;
-        std::size_t pendingMessages = 0;
-        {
-            for (auto* elem = impl->funcMsgQueue.head; elem && pendingMessages < 200000; elem = elem->next, ++pendingMessages) {
-                auto* msg = reinterpret_cast<RE::BSScript::Internal::FunctionMessage*>(elem->elem);
-                if (msg && msg->stack) queuedCalls[msg->stack.get()] = DescribeQuery(msg->funcQuery.get());
-            }
-            for (auto& msg : impl->overflowFuncMsgs) {
-                if (++pendingMessages > 200000) break;
-                if (msg.stack) queuedCalls[msg.stack.get()] = DescribeQuery(msg.funcQuery.get());
-            }
-        }
-        // The retest found none of the ~11,000 queued stacks in the function message queue: stacks waiting to start (or to
-        // resume) sit in the suspend queues instead, each with its call. Walk both ring buffers and their overflow arrays.
-        std::size_t suspendedWalked = 0;
-        {
-            RE::BSSpinLockGuard suspendGuard(impl->suspendQueueLock);
-            auto walkRing = [&](const auto& queue) {
-                constexpr std::uint32_t kSize = 128;
-                const auto* entries = reinterpret_cast<const RE::BSScript::Internal::SuspendedStack*>(queue.queueBuffer);
-                const auto count = std::min<std::uint32_t>(queue.numEntries, kSize);
-                for (std::uint32_t i = 0; i < count; ++i) {
-                    const auto& e = entries[(queue.popIdx + i) % kSize];
-                    ++suspendedWalked;
-                    if (e.stack) queuedCalls[e.stack.get()] = DescribeQuery(e.funcCallQuery.get());
-                }
-            };
-            walkRing(impl->suspendQueue1);
-            walkRing(impl->suspendQueue2);
-            for (const auto* arr : {&impl->overflowSuspendArray1, &impl->overflowSuspendArray2}) {
-                for (const auto& e : *arr) {
-                    if (++suspendedWalked > 200000) break;
-                    if (e.stack) queuedCalls[e.stack.get()] = DescribeQuery(e.funcCallQuery.get());
-                }
-            }
-        }
+        const auto [pendingMessages, suspendedWalked] = ForEachPendingCall(impl, [&](const RE::BSScript::Stack* stack, RE::BSScript::Internal::IFuncCallQuery* query) {
+            queuedCalls[stack] = DescribeQuery(query);
+        });
         std::size_t queuedNamed = 0;
         {
             RE::BSSpinLockGuard guard(impl->runningStacksLock);
@@ -269,6 +275,77 @@ namespace SkyrimMCP::ScriptStats {
             "hundreds of stacks from one script, a high waitingFunctionMessages count or overstressed=true point to that mod as the cause of script lag. "
             "topEntryPoints is where each call started (usually the mod's own event handler).";
         return result;
+    }
+
+    json FindStackObjects(const std::string& entry, int limit) {
+        limit = std::clamp(limit, 1, 500);
+        auto* vm = RE::SkyrimVM::GetSingleton();
+        auto* impl = vm ? static_cast<RE::BSScript::Internal::VirtualMachine*>(vm->GetVMRuntimeData().impl.get()) : nullptr;
+        if (!impl) return {{"error", "The Papyrus VM is not available yet"}};
+
+        // "Script.Function" matches that handler (queued or running); "Script" alone matches every handler of the script.
+        auto lower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return s; };
+        std::string want = lower(entry);
+        if (auto cut = want.find(" (queued)"); cut != std::string::npos) want.erase(cut);
+        const bool scriptOnly = want.find('.') == std::string::npos;
+        auto matches = [&](const std::string& name) {
+            auto n = lower(name);
+            if (auto cut = n.find(" (queued)"); cut != std::string::npos) n.erase(cut);
+            return scriptOnly ? n.rfind(want + ".", 0) == 0 : n == want;
+        };
+
+        struct Found { std::string type; std::string owner; RE::FormID formId = 0; int running = 0; int queued = 0; };
+        std::map<RE::VMHandle, Found> objects;
+        auto note = [&](const RE::BSScript::Variable& self, bool queued) {
+            auto obj = self.GetObject();
+            if (!obj) return;
+            auto& f = objects[obj->GetHandle()];
+            if (f.type.empty()) {
+                const auto* t = obj->GetTypeInfo();
+                f.type = t && t->GetName() ? t->GetName() : "";
+                f.owner = OwnerOf(self);
+                f.formId = static_cast<RE::FormID>(obj->GetHandle() & 0xFFFFFFFF);
+            }
+            ++(queued ? f.queued : f.running);
+        };
+
+        ForEachPendingCall(impl, [&](const RE::BSScript::Stack*, RE::BSScript::Internal::IFuncCallQuery* query) {
+            if (!query) return;
+            RE::BSScript::Internal::IFuncCallQuery::CallType callType{};
+            RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> type;
+            RE::BSFixedString fn;
+            RE::BSScript::Variable self;
+            RE::BSScrapArray<RE::BSScript::Variable> args;
+            if (!query->GetFunctionCallInfo(callType, type, fn, self, args)) return;
+            const char* t = type ? type->GetName() : nullptr;
+            if (matches(std::string(t ? t : "") + "." + (fn.c_str() ? fn.c_str() : ""))) note(self, true);
+        });
+        {
+            RE::BSSpinLockGuard guard(impl->runningStacksLock);
+            if (impl->allRunningStacks.size() > 200000) return {{"error", "Papyrus VM data doesn't look valid for this game version"}};
+            for (const auto& item : impl->allRunningStacks) {
+                const auto* stack = item.second.get();
+                const auto* bottom = stack ? stack->top : nullptr;
+                if (!bottom) continue;   // queued: counted from its call above
+                for (int depth = 0; bottom->previousFrame && depth < 256; ++depth) bottom = bottom->previousFrame;
+                if (matches(FrameName(bottom))) note(bottom->self, false);
+            }
+        }
+
+        std::vector<std::pair<RE::VMHandle, Found>> sorted(objects.begin(), objects.end());
+        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second.running + a.second.queued > b.second.running + b.second.queued; });
+        json list = json::array();
+        for (const auto& [handle, f] : sorted) {
+            if (static_cast<int>(list.size()) >= limit) break;
+            json o = {{"handle", std::format("{:016X}", handle)}, {"script", f.type}, {"owner", f.owner},
+                      {"running", f.running}, {"queued", f.queued}};
+            if (auto* form = f.formId ? RE::TESForm::LookupByID(f.formId) : nullptr) {
+                o["formId"] = std::format("{:08X}", f.formId);
+                if (const char* n = form->GetName(); n && n[0]) o["name"] = n;
+            }
+            list.push_back(std::move(o));
+        }
+        return {{"entry", entry}, {"objects", list}, {"objectCount", objects.size()}};
     }
 
 }
