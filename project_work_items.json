@@ -5061,21 +5061,6 @@
           "targetRelease": "1.5"
         },
         {
-          "id": "FEAT-285",
-          "type": "feature",
-          "status": "planned",
-          "priority": "low",
-          "title": "Use an installed journal mod's API to write notes in game",
-          "description": "When GetJournal finds a journal/diary/notebook mod with a Papyrus API for its own entries, let the AI add notes through it (CallPapyrusFunction), so notes appear in the game without a SkyLink plugin. Falls back to AddNote (outside the game) when none is installed. Find candidate mods and their APIs first.",
-          "history": [
-            {
-              "datetime": "2026-11-20T22:30",
-              "note": "Cory: look for journaling mods and use them if present, with our own utilities as the fallback."
-            }
-          ],
-          "targetRelease": "1.5"
-        },
-        {
           "id": "FEAT-286",
           "type": "feature",
           "status": "implemented-untested",
@@ -5403,6 +5388,25 @@
             "FEAT-282",
             "FEAT-283"
           ]
+        },
+        {
+          "id": "FEAT-285",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Use an installed journal mod's API to write notes in game",
+          "description": "When GetJournal finds a journal/diary/notebook mod with a Papyrus API for its own entries, let the AI add notes through it (CallPapyrusFunction), so notes appear in the game without a SkyLink plugin. Falls back to AddNote (outside the game) when none is installed. Find candidate mods and their APIs first.",
+          "history": [
+            {
+              "datetime": "2026-11-20T22:30",
+              "note": "Cory: look for journaling mods and use them if present, with our own utilities as the fallback."
+            },
+            {
+              "datetime": "2026-11-20T18:00",
+              "note": "Moved to 1.6 (Cory and the Tester): Journal Redesigned, the only journal mod on the test setups, re-skins the journal with no notes of its own, so nothing could test it before 1.5's release."
+            }
+          ],
+          "targetRelease": "1.6"
         }
       ]
     }
@@ -6251,7 +6255,6 @@
         "INFRA-005",
         "INFRA-007",
         "INFRA-023",
-        "FEAT-285",
         "FEAT-286",
         "FEAT-287",
         "FEAT-288"
@@ -6278,7 +6281,8 @@
         "INFRA-024",
         "FEAT-282",
         "FEAT-283",
-        "FEAT-284"
+        "FEAT-284",
+        "FEAT-285"
       ],
       "estimate": "70-110 human hours; Claude 7-10 h, 3-4M tokens. The FaceGen writer (FEAT-281) is the main unknown: spike it first.",
       "broughtForward": "FEAT-122 and INFRA-024 from 2.0 (dependencies of the character loop)",
