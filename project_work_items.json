@@ -1089,7 +1089,7 @@
         {
           "id": "FEAT-121",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Apply character blueprint",
           "description": "Import blueprint JSON selectively \u2014 AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API \u2014 bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first \u2014 only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower).",
           "targetRelease": "1.4",
@@ -1121,6 +1121,10 @@
             {
               "datetime": "2026-11-20T15:00",
               "note": "Recheck: apply fields always present, words decoded (Fus, Wuld, Nah, Kest), alreadyUnlocked right. alsoGained missed Burst Voice: the blueprint (exported after the mod granted it) listed it under spells, and every blueprint entry was excluded even for sections not applied; now only applied sections count. GetKnownShouts: decoded spelling is 'name', raw kept as 'nameRaw'."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ]
         },
@@ -1174,7 +1178,7 @@
         {
           "id": "FEAT-263",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Quest replay from a blueprint (dry run first)",
           "description": "Apply part of FEAT-262. Needs a reliable record of stages done first (executedStages read only zeros): the stage list from the plugin's QUST records plus Quest.GetStageDone, or the runtime stage flags. Then: start the quest so its aliases fill, replay the recorded stages in order with SetQuestStage (which verifies each), dry run per quest with warnings, main and faction lines flagged, a save first. Thane of Falkreath SetStage(200) on an unstarted quest was refused by the game.",
@@ -1194,6 +1198,10 @@
             {
               "datetime": "2026-11-20T13:00",
               "note": "Round: Kolskeggr Mine replayed 10 -> 100 cleanly; Favor154 (Jarl bounty) refused, empty aliases. Replay now checks required aliases after starting a quest and stops/skips it when they stay empty. GetQuestStages' executed/waiting lists labelled as not a done record (Kolskeggr at 100 still listed 15, 20, 100 as waiting)."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -1224,7 +1232,7 @@
         {
           "id": "FEAT-265",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Save health: native save scan (C#)",
           "description": "Read a save natively: header, plugins, LZ4, the Papyrus section; report undefined scripts, unattached instances, undefined elements and threads, size and health, grouped by plugin. Verified against the ReSaver-based scripts/save-scan on ten or more saves (Steam and GOG). Plan: docs/save-health-plan.md.",
@@ -1244,6 +1252,10 @@
             {
               "datetime": "2026-11-19T23:00",
               "note": "Pilot on 20 more saves (Papyrus Data Transfer backups, Saves\\\\_Backup restored from OneDrive, a GOG save; 2.8-23.7 MB, 2020-2026): every count and finding matches ReSaver (26 saves in all). Real pile-ups found: 94,814 queued stacks (defaultsetstagealiasscript.OnMagicEffectApply 86,668 on the player, Ordinator ORD_* ~7,200), 26,358, 11,200 from SimpleItemSpawner.esp over 17 chest handlers, DynDOLOD OnCellAttach pending calls 18,291 and 10,149. Added: totals per mod, pending-call floods reported as not cleanable, stacks can name a whole mod, wording for scripts on the player/base-game objects. Cleaner tested offline on the SimpleItemSpawner save: 11,199 threads and stacks removed, re-reads in both."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -1251,7 +1263,7 @@
         {
           "id": "FEAT-266",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Save health: ListSaves and CheckSave (in-game check)",
           "description": "ListSaves for the running game's save folder; CheckSave makes a fresh save of the current game, waits for the file to be complete, scans it and explains the findings. Plan: docs/save-health-plan.md.",
@@ -1267,6 +1279,10 @@
             {
               "datetime": "2026-11-20T00:30",
               "note": "CheckSave() timed out at the bridge's 80 s while waiting for its save: waits now stop at 55 s with a retry hint; liveOwner added for named saves too; ListSaves topMod counts threads and queued calls per mod (the wendigo's 280 threads in Game.FindRandomActorFromRef); SaveGame waits for the file and reports a save that never appeared."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -1274,7 +1290,7 @@
         {
           "id": "FEAT-267",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Save health: CleanSave and CleanAndReload",
           "description": "CleanSave writes a cleaned copy (never overwrites), dry run first, defaulting to ReSaver's safe removals; first through the installed ReSaver, later a native writer once it round-trips saves byte for byte. CleanAndReload: check, clean to a copy, load it (move safety rules), check again. Needs the player's confirmation. Credit ReSaver/FallrimTools (Apache-2.0). Plan: docs/save-health-plan.md.",
@@ -1298,6 +1314,10 @@
             {
               "datetime": "2026-11-19T23:59",
               "note": "Retest: preview warning, regrowth (247 -> 1,374, 'coming back'), totals all pass; StopQuest then drained it fully. Fixed: stillActive leads the preview; liveOwner was always missing (duplicate X / 'X (queued)' keys threw); one way-back save per cleanup (previewSave); ListSaves scan:true and madeBySkyLink; new ArchiveSaves (moves to Saves\\\\SkyLink_Archive, never deletes)."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -1434,7 +1454,7 @@
         {
           "id": "FEAT-269",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Save against the current load order (collection updates)",
           "description": "For Nexus collection updates: compare a save's plugin list with the current load order and say per plugin what changes and how much of the save it owns, so a player knows before loading whether an old save survives the update.",
@@ -1454,6 +1474,10 @@
             {
               "datetime": "2026-11-20T13:00",
               "note": "Round: numbers match on the current and a July save; the reply was 311 KB. Now summary and verdict first, one legend, one-line footprints, capped lists (30 high, 20 medium, 15 examples)."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -2502,7 +2526,7 @@
         {
           "id": "BUG-023",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Unknown tool parameter returns an error with no message",
           "description": "Calling a tool with a parameter it doesn't have returns an error without any text (seen 2026-11-16 by the in-game agent). Should name the unknown parameter and list the valid ones.",
           "history": [
@@ -2513,6 +2537,10 @@
             {
               "datetime": "2026-11-20T05:30",
               "note": "Built: a tool-call filter (SDK AddCallToolFilter) checks argument names against each tool's parameters (snake_case tool names, as the SDK publishes them) and returns 'list_saves has no parameter 'Limit' (did you mean 'limit'?), 'folderz'. Its parameters: filter, limit, scan.'; an exception with an empty message gets one. Verified over stdio against the built server."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -3556,7 +3584,7 @@
         {
           "id": "FEAT-258",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "Named teleports show the game's loading screen",
           "description": "Teleport to a named place runs the console coc on the next frame and shows a frozen or black frame for several seconds; Teleport(back) uses the native MoveTo to a marker and briefly showed the loading screen's level bar (in game, build 97). Studio trips (CenterOnCell, small interior) are near instant. Try a native move for named places: MoveTo the cell's COC heading marker or a door inside it, or CenterOnCell for interiors, and see whether the loading screen draws. Until then the description warns that the screen freezes.",
@@ -3580,6 +3608,10 @@
             {
               "datetime": "2026-11-20T10:00",
               "note": "Recorded test: coc, center and loadingscreen all freeze outbound (the opened Loading Menu closed within 6-14 ms, before a frame); Teleport('back'), a native MoveTo to a marker reference, shows the real loading screen every time (loads on one steady thread vs a new thread per outbound load). Built: default method 'auto' moves to a reference in the target cell (map marker > XMarkerHeading > door > XMarker; interiors from the cell's references, exteriors from the worldspace's persistent cell filtered to the cell's grid), coc as fallback and as method 'coc'; reply says movedTo. center/loadingscreen and the loading_menu action retired. A long load no longer reads as 'not responding' failure: only a gone process ends the wait."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -4289,7 +4321,7 @@
         {
           "id": "BUG-086",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "No lighting warning on a very dark capture; camera refusal names the pause, not the message box",
           "description": "Release check (1.3.0): a night capture outside Helgen read skin lightness 5.6 (reference 59); the comparison flagged it but the measurement's own lighting.warnings was empty: warn below about 15, since colour numbers mean nothing there. With the grass cache prompt up, the camera refusal said 'a menu is open (the game is paused)' while moveBlockers named the message box: the camera kind should use the named message box line.",
@@ -4317,6 +4349,10 @@
             {
               "datetime": "2026-11-19T23:59",
               "note": "CaptureFace had no lighting check (capture in the Winking Skeever, face brightness 11/100, warning null): added 'lighting' with the same thresholds."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
@@ -4687,7 +4723,7 @@
         {
           "id": "BUG-092",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "StopIdle under a running OStim scene crashed OStim",
           "description": "An OStim scene ran on the Adventurer while OStim's API reported none (OActor.GetSceneID -1, OThread.GetThreadCount 0, isInOStimScene false); StopIdle forced the default pose and OStim.dll crashed in SceneMenu::BuildMenuData (null scene data).",
@@ -4695,6 +4731,10 @@
             {
               "datetime": "2026-11-20T12:00",
               "note": "Built: an open menu named like OStim's (contains 'ostim', or SceneMenu) is a blocker for moves, captures and face edits, and for actor actions; StopIdle now applies the actor rule."
+            },
+            {
+              "datetime": "2026-11-20T14:10",
+              "note": "Tested in game in the 1.4 round; released in 1.4.0."
             }
           ],
           "targetRelease": "1.4"
