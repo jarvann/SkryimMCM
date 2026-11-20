@@ -786,7 +786,8 @@ public class UtilityTools : ToolBase
         var forGame = SkyLinkSettings.GameDocumentsFolder is string g ? Path.GetFileName(g.TrimEnd('\\')) : null;
         return Task.FromResult<object>(new
         {
-            saved = key,
+            saved = string.IsNullOrWhiteSpace(value) ? null : key,
+            removed = string.IsNullOrWhiteSpace(value) ? key : null,
             file = SkyLinkSettings.FilePath,
             forGame = forGame ?? "Skyrim Special Edition (default: no game connected yet)",
             warning = forGame == null ? "No game has connected since the server started, so this went to the Steam game's settings. For the GOG game, start it first and set it again." : null,
