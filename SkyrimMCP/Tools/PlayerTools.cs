@@ -107,6 +107,8 @@ public class PlayerTools : ToolBase
                 pluginBuilt = info?["pluginBuilt"]?.GetValue<string>(),
                 gameVersion = info?["gameVersion"]?.GetValue<string>(),
                 loadingScreen = info?["loadingScreen"]?.GetValue<bool>(),  // 1.2.1+
+                // FEAT-280: StopRunaway's session block, while it is on (objects blocked, registrations removed so far).
+                updateBlock = info?["updateBlock"] is JsonNode block ? DeserializeResponse(block) : null,
                 logic = info?["logic"] is JsonNode logicNode ? DeserializeResponse(logicNode) : null,
                 // 1.3+: store, Address Library file, and whether game-thread calls run at all (BUG-012)
                 diagnostics = info?["diagnostics"] is JsonNode diag ? DeserializeResponse(diag) : null,

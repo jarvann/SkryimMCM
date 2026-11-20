@@ -271,15 +271,25 @@ public class PapyrusTools : ToolBase
             var stepsUp = lasts.Zip(lasts.Skip(1), (a, b) => b >= a).Count(x => x);
             // Rising overall with the odd dip (182 -> 180 -> 184 -> 196 read "stuck high" in round B): half the steps up is enough
             // when the rise is clear.
-            var creeping = (stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.Last() - lasts.First() >= 5)
-                        || (stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.5) && lasts.Last() - lasts.First() >= 10);
+            var rise = lasts.Last() - lasts.First();
+            // One jump isn't a leak (round B: critterspawn 2 -> 1 -> 3 -> 46 -> 47 read "creeping"): no single step may carry most
+            // of the rise.
+            var biggestStep = lasts.Zip(lasts.Skip(1), (a, b) => b - a).DefaultIfEmpty(0).Max();
+            // ...unless that step is small next to the count itself (182 -> 180 -> 184 -> 196 is a climb, not a jump).
+            var steady = rise > 0 && (biggestStep < 0.6 * rise || biggestStep < 0.15 * lasts.Average());
+            // The last three calls going down by 10+ is draining now, whatever came before (round B: 238 -> 213 -> 194 after
+            // StopRunaway read "stuck high, never draining" because the older calls had risen).
+            var fallingNow = lasts.Count >= 3 && lasts[^3] > lasts[^2] && lasts[^2] > lasts[^1] && lasts[^3] - lasts[^1] >= 10;
+            var creeping = !fallingNow && steady &&
+                           ((stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.75) && rise >= 5) ||
+                            (stepsUp >= Math.Ceiling((lasts.Count - 1) * 0.5) && rise >= 10));
             var stuckHigh = series.All(x => x.last >= 20);
             // High but falling call after call (round A: 180 -> 170 -> 160 read "never draining"): it is draining, slowly.
             var stepsDown = lasts.Zip(lasts.Skip(1), (a, b) => b < a).Count(x => x);
-            var draining = stuckHigh && stepsDown >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.First() - lasts.Last() >= 5;
+            var draining = stuckHigh && (fallingNow || (stepsDown >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.First() - lasts.Last() >= 5));
             var spikes = series.Count(x => x.peak >= 20);
             string? pattern = creeping ? "creeping up across calls (a leak: it registers again without finishing)"
-                : draining ? $"high but draining slowly ({string.Join(" -> ", lasts)}): the loop has stopped growing; old stacks are finishing"
+                : draining ? $"high but falling ({string.Join(" -> ", lasts)}): the loop has stopped growing; old stacks are finishing"
                 : stuckHigh ? $"stuck high ({lasts.Min()}+ in every one of the last {series.Count} calls, never draining)"
                 : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+, draining between)"
                 : null;
