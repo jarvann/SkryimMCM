@@ -29,7 +29,8 @@ public class CrashTools : ToolBase
         "Other sections: PROCESS INFO, SYSTEM SPECS, REGISTERS, MODULES, SKSE PLUGINS, PLUGINS. " +
         "maxCharsPerSection (default 6000) trims long sections. Also lists the most recent reports with their times. " +
         "skyrimPath (optional) is the game folder, used to find NetScriptFramework reports under Data. " +
-        "Look for mod names (.esp/.esm/.esl) and DLL names in the call stack and relevant objects. " +
+        "Look for mod names (.esp/.esm/.esl) and DLL names in the call stack and relevant objects; 'analysis' lists known " +
+        "crash signatures that match (with their fix and how sure the match is) and the plugins, meshes and DLL the report names. " +
         "skylinkRecorder: SkyLink's own crash recorder (Documents\\My Games\\<game>\\SkyLinkAI\\crash-recorder*.bin), " +
         "the last things SkyLink and the game did before the session ended: AI tool calls ('>' when a request started, " +
         "'<' with ok/error and time when it returned; a '>' with no '<' after it was still running when the game died), " +
@@ -99,6 +100,8 @@ public class CrashTools : ToolBase
             written = file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
             format = file.Name.StartsWith("crash-", StringComparison.OrdinalIgnoreCase) ? "Crash Logger SSE" : "NetScriptFramework or other",
             sectionsAvailable = parsed.Keys.ToArray(),
+            // FEAT-279: known signatures and what the report names (plugins, meshes, the faulting DLL).
+            analysis = CrashPatterns.Analyse(text),
             sections = output,
             recent,
             skylinkRecorder = recorder,
