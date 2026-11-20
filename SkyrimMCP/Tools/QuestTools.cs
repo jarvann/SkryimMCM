@@ -200,6 +200,41 @@ public class QuestTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("Read the player's journal (FEAT-113): every quest log entry the player has received, in order, grouped by quest, " +
+        "with the stage that wrote it and the text as the journal shows it (names filled in). Use it for 'what does my journal say', " +
+        "to see where a quest stopped writing, or to compare with a walkthrough (UESP lists the stages). quest: a form ID, editor ID " +
+        "or part of the name; empty = every quest (maxQuests caps how many, default 60). Also lists installed journal mods: most " +
+        "re-skin the same journal, so these entries are what they show; one with its own notes can be scripted with " +
+        "CallPapyrusFunction (GetScriptFunctions shows its API). Without one, AddNote keeps notes outside the game. Read-only.")]
+    public async Task<object> GetJournal(string? quest = null, int maxQuests = 60)
+    {
+        var data = await _pipe.SendRequestAsync("get_journal", new JsonObject { ["quest"] = quest ?? "", ["maxQuests"] = maxQuests });
+        if (data is JsonObject obj && obj["error"] == null) obj["journalMods"] = await FindJournalMods();
+        return DeserializeResponse(data);
+    }
+
+    // Journal, diary and notebook mods by plugin or SKSE DLL name: use theirs when present, ours otherwise.
+    async Task<JsonArray> FindJournalMods()
+    {
+        var found = new JsonArray();
+        static bool Journalish(string n) => n.Contains("journal", StringComparison.OrdinalIgnoreCase) || n.Contains("diary", StringComparison.OrdinalIgnoreCase) || n.Contains("notebook", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var lo = await _pipe.SendRequestAsync("get_load_order");
+            foreach (var m in lo?["mods"]?.AsArray() ?? new JsonArray())
+                if (m?["name"]?.ToString() is string n && Journalish(n)) found.Add(new JsonObject { ["plugin"] = n });
+            var skse = await _pipe.SendRequestAsync("get_loaded_skse_plugins");
+            foreach (var p in (skse?["plugins"] as JsonArray) ?? new JsonArray())
+            {
+                var n = p?["name"]?.ToString() ?? p?["file"]?.ToString() ?? p?.ToString() ?? "";
+                if (Journalish(n)) found.Add(new JsonObject { ["sksePlugin"] = n });
+            }
+        }
+        catch (Exception) { /* detection is a hint only */ }
+        return found;
+    }
+
+    [McpServerTool]
     [Description("List all stages of a specific quest — executed stages, waiting stages, and objectives with their state. " +
         "Use this to see quest progression history and what stages have been completed. " +
         "Get the quest FormID from SearchForms or GetQuestInfo first.")]
