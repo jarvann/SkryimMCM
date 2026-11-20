@@ -81,6 +81,10 @@ namespace SkyrimMCP::QuestManager {
                 }
             }
             result["waitingStages"] = waiting;
+            // FEAT-263: these in-memory lists don't say which stages are done (a replayed quest at 100 still listed 15, 20 and
+            // 100 as waiting; executedStages read only zeros). The save's quest data is the record: ReplayQuests and the
+            // blueprint export read it from there.
+            result["note"] = "executedStages and waitingStages aren't a record of stages done; stages done come from a save (GetCharacterBlueprint, ReplayQuests).";
 
             // Objectives
             json objectives = json::array();
@@ -119,6 +123,9 @@ namespace SkyrimMCP::QuestManager {
                     a["isQuestObject"] = alias->IsQuestObject();
                     a["isEssential"] = alias->IsEssential();
                     a["isProtected"] = alias->IsProtected();
+                    // FEAT-263: ReplayQuests stops a started quest whose required aliases stayed empty (a story-manager quest
+                    // such as a Jarl's bounty, started cold, fills none, and its stages then do nothing).
+                    a["optional"] = alias->flags.any(RE::BGSBaseAlias::FLAGS::kOptional);
 
                     // Resolve alias to a reference
                     // Use VMTypeID check instead of dynamic_cast (RTTI can fail in SKSE plugins)
@@ -126,6 +133,7 @@ namespace SkyrimMCP::QuestManager {
                         auto* refAlias = static_cast<RE::BGSRefAlias*>(alias);
                         a["type"] = "reference";
                         auto* ref = refAlias->GetReference();
+                        a["filled"] = ref != nullptr;
                         if (ref) {
                             a["refId"] = std::format("{:08X}", ref->GetFormID());
                             a["refName"] = ref->GetName() ? ref->GetName() : "";

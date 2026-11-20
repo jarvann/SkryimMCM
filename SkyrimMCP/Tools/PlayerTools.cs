@@ -324,8 +324,42 @@ public class PlayerTools : ToolBase
         if ((bp["skills"]?["playerLevel"] ?? bp["character"]?["level"]) is JsonNode lvl) parms["level"] = lvl.DeepClone();
         if (bp["gold"]?["gold"] is JsonNode gold) parms["gold"] = gold.DeepClone();
 
+        // A script reacting to the new perks, spells or level can switch off player controls and not give them back (mouse look
+        // dead in game after every apply, 2026-11-20). Note what was on before, restore what the apply's aftermath turned off.
+        async Task<HashSet<string>> DisabledControls()
+        {
+            try { return ((await _pipe.SendRequestAsync("get_controls"))?["disabled"] as JsonArray ?? new JsonArray()).Select(n => n?.ToString() ?? "").ToHashSet(); }
+            catch (Exception) { return []; }
+        }
+        var controlsBefore = dryRun ? [] : await DisabledControls();
         var data = await _pipe.SendRequestAsync("apply_blueprint_items", parms);
         if (!dryRun && data?["error"] == null) await NotifyInGame("Blueprint applied");
+        object? controls = null;
+        if (!dryRun)
+        {
+            await Task.Delay(3000);
+            var turnedOff = (await DisabledControls()).Except(controlsBefore).ToList();
+            if (turnedOff.Count > 0)
+            {
+                try
+                {
+                    await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "Game", ["functionName"] = "EnablePlayerControls",
+                        ["args"] = new JsonArray(true, true, true, true, true, true, true, true, 0),
+                    });
+                }
+                catch (Exception) { }
+                var still = (await DisabledControls()).Except(controlsBefore).ToList();
+                controls = new
+                {
+                    turnedOffDuringApply = turnedOff,
+                    restored = still.Count == 0,
+                    stillOff = still.Count > 0 ? still : null,
+                    note = "A script reacting to the new perks, spells or level switched these controls off (a mod's or a radiant quest's scene); SkyLink switched them back on. If a quest scene was meant to hold them, it may need finishing.",
+                };
+            }
+        }
         // FEAT-121: shout words the other character had unlocked are taught and unlocked through Papyrus (no native call).
         object? words = null;
         if (sections.Contains("shouts", StringComparison.OrdinalIgnoreCase) && bp["shouts"]?["shouts"] is JsonArray shoutList)
@@ -365,6 +399,7 @@ public class PlayerTools : ToolBase
             portableIds = bp["formatVersion"]?.GetValue<int>() >= 2,
             result,
             shoutWords = words,
+            controls,
             quests = questReport,
         };
     }
