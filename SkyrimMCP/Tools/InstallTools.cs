@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using ModelContextProtocol.Server;
+using SkyrimMCP.Plugins;
 
 namespace SkyrimMCP.Tools;
 
@@ -29,20 +30,41 @@ public class InstallTools : ToolBase
     [Description("Install a plugin SkyLink built (CreatePlugin, in a build project) into the load order (FEAT-275). MO2: copied into " +
         "the mods folder, the mod enabled and the plugin activated in the profile (MO2 must be closed). Vortex: Vortex owns the load " +
         "order and redeploys over hand edits, so this packages a zip for the player to install in Vortex. No mod manager: copied into " +
-        "Data and activated in Plugins.txt. Checks the plugin's masters first (CheckPluginDependencies). Changes apply the next time " +
-        "the game starts (RestartGame). dryRun (default true) says what would change.")]
-    public Task<object> InstallPlugin(string project, bool dryRun = true)
+        "Data and activated in Plugins.txt. Checks the plugin's masters first (CheckPluginDependencies) and stops when one is " +
+        "missing, disabled or loads too late (ignoreMasterProblems: true installs anyway). Changes apply the next time the game " +
+        "starts (RestartGame). dryRun (default true) says what would change.")]
+    public async Task<object> InstallPlugin(string project, bool dryRun = true, bool ignoreMasterProblems = false)
+    {
+        var result = await InstallPluginCore(project, dryRun, ignoreMasterProblems);
+        return result;
+    }
+
+    async Task<object> InstallPluginCore(string project, bool dryRun, bool ignoreMasterProblems)
     {
         var name = string.Concat(project.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         var dir = Path.Combine(ModBuildTools.BuildRoot, name);
         var plugins = Directory.Exists(dir)
             ? Directory.EnumerateFiles(dir).Where(f => f.EndsWith(".esp", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".esl", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".esm", StringComparison.OrdinalIgnoreCase)).ToList()
             : [];
-        if (plugins.Count == 0) return Task.FromResult<object>(new { error = $"No plugin in build project '{name}' ({dir}). CreatePlugin writes one." });
+        if (plugins.Count == 0) return (new { error = $"No plugin in build project '{name}' ({dir}). CreatePlugin writes one." });
         var manager = DetectManager();
 
+        // FEAT-274: a plugin whose masters are missing or load after it crashes the game at start.
+        var checks = new List<object>();
+        var blocking = new List<string>();
+        var deps = new PluginTools(_pipe);
+        foreach (var p in plugins)
+        {
+            var check = await deps.CheckPluginDependencies(p);
+            checks.Add(check);
+            var node = System.Text.Json.JsonSerializer.SerializeToNode(check);
+            if (node?["ok"]?.GetValue<bool>() == false) blocking.Add(node["verdict"]?.ToString() ?? Path.GetFileName(p));
+        }
+        if (blocking.Count > 0 && !ignoreMasterProblems)
+            return new { installed = false, error = "Masters problem: " + string.Join(" ", blocking), masters = checks, next = "Fix the masters (install or enable them), or pass ignoreMasterProblems: true if you know better." };
+
         if (manager == Manager.Vortex)
-            return Task.FromResult<object>(new
+            return (new
             {
                 manager = "Vortex",
                 installed = false,
@@ -56,25 +78,25 @@ public class InstallTools : ToolBase
             var (mo2, profile) = SkyLinkSettings.Mo2Instance();
             profile ??= DefaultProfile(mo2!);
             var profileDir = Path.Combine(mo2!, "profiles", profile);
-            if (dryRun) return Task.FromResult<object>(new { dryRun = true, manager = "MO2", modFolder = Path.Combine(mo2!, "mods", name), profile, activate = plugins.Select(Path.GetFileName) });
+            if (dryRun) return (new { dryRun = true, manager = "MO2", modFolder = Path.Combine(mo2!, "mods", name), profile, activate = plugins.Select(Path.GetFileName) });
             if (Process.GetProcessesByName("ModOrganizer").Length > 0)
-                return Task.FromResult<object>(new { error = "MO2 is running: it rewrites its profile files when it closes. Close MO2 and run this again." });
+                return (new { error = "MO2 is running: it rewrites its profile files when it closes. Close MO2 and run this again." });
             var pack = ModBuildTools.PackageOverrideModCore(name, null, null, installToMo2: true);
             var activated = plugins.Select(p => Activate(Path.Combine(profileDir, "plugins.txt"), Path.GetFileName(p), Path.Combine(profileDir, "loadorder.txt"))).ToList();
-            return Task.FromResult<object>(new { manager = "MO2", package = pack, activated, next = "Sort with LOOT run from MO2 (SortLoadOrder says how), then RestartGame." });
+            return (new { manager = "MO2", package = pack, activated, next = "Sort with LOOT run from MO2 (SortLoadOrder says how), then RestartGame." });
         }
 
         // No mod manager: the Data folder and the game's Plugins.txt.
         var data = SkyLinkSettings.DataPath();
-        if (data == null) return Task.FromResult<object>(new { error = "The game's Data folder wasn't found (SetSkyLinkSetting skyrimPath)." });
+        if (data == null) return (new { error = "The game's Data folder wasn't found (SetSkyLinkSetting skyrimPath)." });
         var pluginsTxt = GamePluginsTxt();
         var targets = plugins.Select(p => Path.Combine(data, Path.GetFileName(p))).ToList();
         var clash = targets.Where(File.Exists).ToList();
-        if (dryRun) return Task.FromResult<object>(new { dryRun = true, manager = "none", copyTo = targets, pluginsTxt, wouldReplace = clash });
-        if (clash.Count > 0) return Task.FromResult<object>(new { error = $"A plugin with that name is already in Data: {string.Join(", ", clash.Select(Path.GetFileName))}. Rename the build or remove the old one first." });
+        if (dryRun) return (new { dryRun = true, manager = "none", copyTo = targets, pluginsTxt, wouldReplace = clash });
+        if (clash.Count > 0) return (new { error = $"A plugin with that name is already in Data: {string.Join(", ", clash.Select(Path.GetFileName))}. Rename the build or remove the old one first." });
         foreach (var (src, dest) in plugins.Zip(targets)) File.Copy(src, dest);
         var activatedNone = plugins.Select(p => Activate(pluginsTxt, Path.GetFileName(p), null)).ToList();
-        return Task.FromResult<object>(new { manager = "none", copied = targets, activated = activatedNone, next = "Sort with SortLoadOrder (LOOT), then RestartGame." });
+        return (new { manager = "none", copied = targets, activated = activatedNone, next = "Sort with SortLoadOrder (LOOT), then RestartGame." });
     }
 
     [McpServerTool]
@@ -134,16 +156,8 @@ public class InstallTools : ToolBase
 
     // ---- files ----
 
-    /// <summary>The game's Plugins.txt: AppData\Local\Skyrim Special Edition (or the GOG game's folder).</summary>
-    internal static string GamePluginsTxt()
-    {
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var docsName = SkyLinkSettings.GameDocumentsFolder is string d ? Path.GetFileName(d.TrimEnd('\\')) : null;
-        var game = SkyLinkSettings.SkyrimPath().Path;
-        var gog = game != null && Directory.EnumerateFiles(game, "goggame-*.info").Any();
-        var folder = docsName ?? (gog ? "Skyrim Special Edition GOG" : "Skyrim Special Edition");
-        return Path.Combine(local, folder, "Plugins.txt");
-    }
+    /// <summary>The game's Plugins.txt (Steam or GOG folder; MO2's profile when MO2 manages the game).</summary>
+    internal static string GamePluginsTxt() => LoadOrder.PluginsTxtPath().Path;
 
     static string DefaultProfile(string mo2)
     {

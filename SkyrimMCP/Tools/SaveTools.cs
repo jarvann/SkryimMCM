@@ -717,11 +717,9 @@ public class SaveTools : ToolBase
         if (current == null)
         {
             // MO2 keeps the load order in its profile; Vortex and the game in LocalAppData.
-            var (mo2, profile) = SkyLinkSettings.Mo2Instance();
-            var mo2Txt = mo2 == null ? null : Path.Combine(mo2, "profiles", profile ?? "Default", "plugins.txt");
-            var txt = mo2Txt != null && File.Exists(mo2Txt) ? mo2Txt
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Skyrim Special Edition", "Plugins.txt");
-            if (!File.Exists(txt)) return new { error = "The game isn't running and Plugins.txt wasn't found: start the game, or run this from the main menu." };
+            // MO2's profile, or the Steam or GOG game's Plugins.txt (the GOG one was missed before).
+            var (txt, exists, _) = SkyrimMCP.Plugins.LoadOrder.PluginsTxtPath();
+            if (!exists) return new { error = "The game isn't running and Plugins.txt wasn't found: start the game, or run this from the main menu." };
             current = MigrationReport.FromPluginsTxt(txt, SkyLinkSettings.SkyrimPath().Path);
             source = txt + " (game closed: full or light not known, so type changes aren't checked)";
         }
