@@ -353,6 +353,15 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [entry, limit]() { return ScriptStats::FindStackObjects(entry, limit); });
         };
 
+        registry["unregister_updates"] = [](const std::string& id, const json& params) {
+            std::vector<std::uint64_t> handles;
+            for (const auto& h : params.value("handles", json::array())) {
+                try { handles.push_back(std::stoull(h.get<std::string>(), nullptr, 16)); } catch (...) {}
+            }
+            bool gameTime = params.value("gameTime", false);
+            return GameThread(id, [handles, gameTime]() { return ScriptStats::UnregisterUpdates(handles, gameTime); });
+        };
+
         // FEAT-226: hair colour and skin tone with the game's own data (no RaceMenu needed)
         registry["get_colors"] = [](const std::string& id, const json& params) {
             std::string refId = params.value("refId", "");

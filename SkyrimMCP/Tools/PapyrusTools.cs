@@ -346,8 +346,9 @@ public class PapyrusTools : ToolBase
 
     [McpServerTool]
     [Description("Stop a runaway script loop for this session (FEAT-280). For an entry point StackReport flags (\"Script.Function\", " +
-        "or \"Script\" for all its handlers), finds the objects whose scripts keep piling up and calls UnregisterForUpdate on each " +
-        "(gameTime: true also UnregisterForUpdateGameTime), so a handler that re-registers itself stops being called again. " +
+        "or \"Script\" for all its handlers), finds the objects whose scripts keep piling up and removes their OnUpdate registrations " +
+        "straight from the script engine's table, as UnregisterForUpdate does but without queueing behind the pile-up (gameTime: true " +
+        "also the game-time ones), repeating for about 10 seconds while queued updates re-register. " +
         "Stacks already queued still run once, so the count falls over a minute or two rather than at once. Temporary: the loop " +
         "can come back on the next load if the mod registers again; the lasting fix is the mod (update or configure it) or a " +
         "script patch (CompileScript, PackageOverrideMod). Can stop a mod feature that relied on that update, so ask the player " +
@@ -364,28 +365,21 @@ public class PapyrusTools : ToolBase
         if (dryRun)
             return new { dryRun = true, entry, stacks = Total(objects), objectCount = found?["objectCount"], objects };
 
-        var functions = gameTime ? new[] { "UnregisterForUpdate", "UnregisterForUpdateGameTime" } : ["UnregisterForUpdate"];
-        var results = new List<object>();
-        foreach (var o in objects)
+        // Straight from the VM's registration table (a Papyrus UnregisterForUpdate call queued behind the pile-up and timed out).
+        var handles = new JsonArray(objects.Select(o => (JsonNode)(o["handle"]?.ToString() ?? "")).ToArray());
+        // A single-update loop re-registers from every queued OnUpdate that still runs, so repeat the removal while they drain.
+        var passes = new List<int>();
+        JsonNode? first = null;
+        for (var pass = 0; pass < 8; pass++)
         {
-            var script = o["script"]?.ToString();
-            if (string.IsNullOrEmpty(script)) { results.Add(new { handle = o["handle"]?.ToString(), error = "unknown script type" }); continue; }
-            foreach (var fn in functions)
-            {
-                try
-                {
-                    var r = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
-                    {
-                        ["className"] = script, ["functionName"] = fn, ["args"] = new JsonArray(), ["target"] = "handle:" + o["handle"],
-                    });
-                    results.Add(new { handle = o["handle"]?.ToString(), name = o["name"]?.ToString(), script, function = fn, done = r?["error"] == null, error = r?["error"]?.ToString() });
-                }
-                catch (Exception ex) { results.Add(new { handle = o["handle"]?.ToString(), script, function = fn, done = false, error = ex.Message }); }
-            }
+            if (pass > 0) await Task.Delay(1250);
+            var unreg = await _pipe.SendRequestAsync("unregister_updates", new JsonObject { ["handles"] = handles.DeepClone(), ["gameTime"] = gameTime });
+            if (unreg?["error"] != null) return DeserializeResponse(unreg);
+            first ??= unreg;
+            passes.Add((unreg?["removed"]?.GetValue<int>() ?? 0) + (unreg?["removedGameTime"]?.GetValue<int>() ?? 0));
         }
-
-        // Re-count after a few seconds so the reply shows whether the loop is draining.
-        await Task.Delay(5000);
+        var removed = passes.Sum();
+        var stillComing = passes.Skip(4).Sum();
         int? after = null;
         try
         {
@@ -393,15 +387,20 @@ public class PapyrusTools : ToolBase
             after = Total((again?["objects"] as JsonArray ?? new JsonArray()).OfType<JsonObject>());
         }
         catch (Exception) { }
-        var ok = results.Count(r => r.GetType().GetProperty("done")?.GetValue(r) is true);
         return new
         {
             entry,
             stacksBefore = Total(objects),
             stacksAfter5s = after,
-            unregistered = ok,
-            failed = results.Count - ok,
-            results = results.Take(40),
+            objects = objects.Count,
+            registrationsRemoved = removed,
+            perPass = passes,
+            registrationsBefore = first?["registrationsBefore"],
+            reading = removed == 0
+                ? "None of these objects had an update registration: the loop isn't an OnUpdate re-registering itself (it may be events or a Wait loop), so this can't stop it. The lasting fix is the mod or a script patch."
+                : stillComing > 0
+                    ? $"Removed {removed} registration(s), but queued OnUpdates were still re-registering in the last passes: run StopRunaway again in a minute, once more of the queue has drained."
+                    : $"Removed {removed} update registration(s) and none came back: those objects get no more OnUpdate calls.",
             note = "Queued stacks still run once; check again with StackReport in a minute. If the count climbs back, the mod re-registers " +
                    "from another event: the lasting fix is the mod itself or a script patch.",
         };
