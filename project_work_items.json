@@ -130,9 +130,9 @@
   },
   "summary": {
     "totalItems": 303,
-    "completed": 257,
+    "completed": 266,
     "completedPartial": 2,
-    "implementedUntested": 15,
+    "implementedUntested": 6,
     "inProgress": 0,
     "planned": 29,
     "bugs": 94
@@ -283,7 +283,7 @@
         {
           "id": "FEAT-015",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "title": "Force new game via MCP",
           "description": "Trigger new game initialization directly, bypassing main menu. Reframed 2026-11-20: start a new game from the main menu (optionally straight into a cell, as coc does from the menu), for the automated restart cycle (FEAT-278) and for carrying a character to a fresh game with ApplyBlueprint. Must cope with alternate-start mods.",
           "targetRelease": "1.5",
@@ -296,6 +296,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): StartNewGame(cell): coc from the main menu; without a cell the player picks New. get_session_state."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "GOG: new game in the Sleeping Giant Inn; console flood no longer returned."
             }
           ]
         },
@@ -1099,6 +1103,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: matches the in-game journal word for word; hidden setup quests filtered and repeats dropped after fix."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Recheck: setup quests hidden; still ~10 running quests without objectives shown: now filtered by displayed objectives. Both views (Cory): journal view by default, includeHidden lists all with inJournal true/false."
             }
           ]
         }
@@ -4239,7 +4247,7 @@
         {
           "id": "BUG-081",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "GetMenuState leaves out mods' menus; face edits allowed under a modal mod menu",
           "description": "In game (build 114): with Skyrim Unbound / MCM Recorder's CustomMenu open on its own, the move check refused ('a mod's menu is open (CustomMenu)': pass), but GetMenuState listed openMenus [] and menuCount 0, and face edits were allowed under the modal menu and its message box. openMenus now includes any open menu that takes the cursor and isn't a permanent overlay; face edits refuse while a mod's menu or a message box is open. Not done: detecting MCM Recorder between its steps, when no menu is open (FEAT backlog).",
@@ -4259,6 +4267,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: failed under OBody NG's window (SKSE Menu Framework/ImGui, not a game menu). Fixed: IsAnyBlockingWindowOpened export checked (host). Retest."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Round A recheck: the real SetFaceSliders was refused under OBody's window. Dry runs now refuse too."
             }
           ],
           "targetRelease": "1.5"
@@ -4266,7 +4278,7 @@
         {
           "id": "BUG-082",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "ApplyBlueprint equipment: items not added before equipping; unlearned spells equipped",
           "description": "In game (new character from Arya's blueprint): ApplyBlueprint(sections: equipment) failed 15 of 17 with 'Not in the inventory', and the dry run listed all 17 as fine; the two that worked were Lightning Storm in both hands, a spell she doesn't know (spells aren't restored), which no tool can unequip. The agent worked around it with BulkAddItems and EquipItems. Now the equipment section adds one of any item it will equip that she lacks (the dry run marks it added), and skips spells she doesn't know (spellsNotKnown). Not done: an option to unequip slots the blueprint leaves empty (her starting robes stayed on), and a tool to unequip a spell.",
@@ -4286,6 +4298,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: 4 items equipped; she had every item, so 'added' was untested: now always reported. Retest with a missing item and an unknown spell."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Round A recheck: added true for the missing item, false otherwise; unknown spell in spellsNotKnown, not equipped."
             }
           ],
           "targetRelease": "1.5"
@@ -4393,7 +4409,7 @@
         {
           "id": "BUG-087",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "An unfocused game stalls every call with only a generic timeout",
           "description": "GOG test (2026-11-19, vanilla GOG 1.6.1179 + SKSE 2.2.6 GOG): the connection, store detection and Address Library worked, but every game call timed out: three tasks ran at start, then none while the window was unfocused (a fresh install has no bAlwaysActive). The timeout error now names the background window and bAlwaysActive; CheckConnection reports stalled with that advice when tasks ran and then stopped; the host diagnosis says the same (host DLL, next restart). Also checked: the GOG install's 1.3.0 build times differ from the Steam deploy but the code is identical (only build_release.ps1 and the tracker changed between them).",
@@ -4413,6 +4429,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: partial; generic text and CheckConnection blamed SKSE. Fixed: checks the foreground window and Skyrim.ini bAlwaysActive and says so. Retest."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Round A recheck: names the focused program and bAlwaysActive=0. Follow-ups fixed: generic hint dropped, INI read once per game process, CheckConnection looks again before 'never ran'."
             }
           ],
           "targetRelease": "1.5"
@@ -4770,7 +4790,7 @@
         {
           "id": "FEAT-270",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Patch a mod's script as an override mod",
           "description": "The workflow used for the wendigo runaway on 2026-11-20, made a tool chain: find the handler in StackReport, read the mod's .psc (loose or from its BSA), write the fix, compile it (FEAT-272), and package the .pex with its source as a small override mod (zip for Vortex or MO2, winning over the original). Then verify with StackReport after a restart. Never edits the original mod's files.",
@@ -4786,6 +4806,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: zip matches the hand-made patch (source identical) plus a README. MO2 install still to test on GOG."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "GOG: MO2 install at top priority with modlist.txt backup."
             }
           ],
           "targetRelease": "1.5"
@@ -4839,7 +4863,7 @@
         {
           "id": "FEAT-273",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Write small plugins (ESP / light ESPFE)",
           "description": "Create a small plugin the AI can reason about: a few records (a quest with a script, a spell, a global, a leveled list edit) with correct masters, the light flag when eligible, and FormIDs inside the light range. Our own reader and writer, written from the UESP format documentation and inspection of game files (clean room): Mutagen, xEdit and nifly are GPL-3.0 and can't go into the MIT server, so no code is read or copied from them.",
@@ -4859,6 +4883,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: CreatePlugin round trip ok (light .esp, GLOB at 0x800). QUST/VMAD still to load in game (GOG reload test)."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "GOG: the CreatePlugin global loads in game (getglobalvalue SkyLinkTestGlobal = 1.00). QUST/VMAD not yet loaded in game."
             }
           ],
           "targetRelease": "1.5"
@@ -4889,7 +4917,7 @@
         {
           "id": "FEAT-275",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Install into the load order and sort with LOOT",
           "description": "Add the new plugin to Vortex's or MO2's load order (plugins.txt / the MO2 profile's loadorder.txt, through SkyLinkSettings), then sort with LOOT's command line when LOOT is installed, and show the order before and after. Asks before changing anything.",
@@ -4901,6 +4929,10 @@
             {
               "datetime": "2026-11-21T00:30",
               "note": "Built: InstallPlugin (MO2 / Vortex / none, masters checked first) and SortLoadOrder (LOOT --auto-sort, backup first)."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Steam builds the Vortex zip; GOG installs into MO2 and activates the plugin."
             }
           ],
           "targetRelease": "1.5"
@@ -4943,6 +4975,10 @@
             {
               "datetime": "2026-11-20T22:30",
               "note": "Built (1.5 batch A): ReloadContent sets Main reloadContent at the main menu and reports whether a given plugin appeared. Test on the vanilla GOG/MO2 install first (Cory's large list has a return-to-main-menu issue; startup main menu is fine)."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "GOG: no crash, back at the main menu, save loads after. Inconclusive: on MO2 the plugin is loaded at launch anyway (virtual Data). Needs a no-mod-manager setup to answer."
             }
           ],
           "targetRelease": "1.5"
@@ -4950,7 +4986,7 @@
         {
           "id": "FEAT-278",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Automated restart cycle",
           "description": "When a change needs a game restart (a new plugin, a host DLL, a patched script): save, quit cleanly, relaunch through SKSE (skse64_loader or the mod manager), wait for the main menu (WaitForSkyrim), load the save and run a check (StackReport, or the tool that needed the restart). The player confirms the quit.",
@@ -4966,6 +5002,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A (Steam): RestartGame saved, quit, relaunched, reconnected, loaded. MO2 path on GOG still to test."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Steam (skse64_loader, twice) and GOG (through MO2, ~16 s) both relaunched and loaded."
             }
           ],
           "targetRelease": "1.5"
@@ -5012,6 +5052,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: Papyrus unregister timed out (queued behind the pile); fixed with native removal from SkyrimVM's update table, repeated while queued updates re-register (passes [2,0,0,0,2...], then 'none came back'). A fair test needs an unpatched runaway."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Mechanics verified (removed, 'none came back'); a fair test needs an unpatched runaway (WendigoUpdateFix off)."
             }
           ],
           "targetRelease": "1.5"
@@ -5050,6 +5094,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: summary right; ordering, numbers and dirtyStatus fixed."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Round A recheck passed; VR-only requirements (file('../SkyrimVR.exe')) fixed."
             }
           ],
           "targetRelease": "1.5",
@@ -5095,6 +5143,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Round A: dry run right (10 mod plugins; skips counted after fix). SSEEdit not installed: real clean untested."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Dry run accounts for all 50. Real clean untested (SSEEdit not installed)."
             }
           ],
           "targetRelease": "1.5",
@@ -5105,7 +5157,7 @@
         {
           "id": "BUG-094",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Pipe replies matched to the wrong request after a timeout",
           "description": "Round A: after RestartGame's relaunch, the server's get_game_folder query (sent on connect) timed out with the game thread stalled; the error was swallowed but the connection kept, so its late reply was read as the next request's answer and every call got the previous call's reply until Claude Desktop restarted. Fix: replies are matched by request id and stray late replies discarded (PipeClient.ReadReplyAsync).",
@@ -5113,6 +5165,10 @@
             {
               "datetime": "2026-11-20T16:30",
               "note": "Found by the in-game agent in round A; fixed and deployed the same afternoon."
+            },
+            {
+              "datetime": "2026-11-20T17:30",
+              "note": "Verified: correct replies after a timeout and with a StackReport overlapping three calls."
             }
           ],
           "targetRelease": "1.5"
