@@ -177,8 +177,13 @@ public class SaveTools : ToolBase
         pick = pick.Where(f => f.FullName != newest).ToList();
         var archive = Path.Combine(folder, "SkyLink_Archive");
         if (dryRun || pick.Count == 0)
-            return Task.FromResult<object>(new { dryRun = true, wouldMove = pick.Select(f => Path.GetFileNameWithoutExtension(f.Name)), to = archive,
-                                                  note = "Nothing moved. The newest save is never moved (Continue loads it)." });
+            return Task.FromResult<object>(new
+            {
+                dryRun,   // as asked: a real run with nothing to move isn't a dry run (2026-11-20)
+                wouldMove = pick.Select(f => Path.GetFileNameWithoutExtension(f.Name)), to = archive,
+                note = pick.Count == 0 ? "Nothing to move: no save qualifies (the newest save is never moved, since Continue loads it)."
+                                       : "Nothing moved (dry run). The newest save is never moved (Continue loads it).",
+            });
         Directory.CreateDirectory(archive);
         var moved = new List<string>();
         foreach (var f in pick)
