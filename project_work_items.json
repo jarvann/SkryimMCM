@@ -129,12 +129,12 @@
     ]
   },
   "summary": {
-    "totalItems": 299,
+    "totalItems": 301,
     "completed": 247,
     "completedPartial": 2,
     "implementedUntested": 17,
     "inProgress": 0,
-    "planned": 33,
+    "planned": 35,
     "bugs": 93
   },
   "phases": [
@@ -4958,6 +4958,39 @@
             }
           ],
           "targetRelease": "1.5"
+        },
+        {
+          "id": "FEAT-286",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Read the player's LOOT masterlist in plugin checks",
+          "description": "LOOT's masterlist (a YAML file per game under %LOCALAPPDATA%\\LOOT\\games\\<game>\\masterlist.yaml, kept up to date by LOOT) records, per plugin, dirty edits that need cleaning, incompatibilities, missing requirements, recommended patches and messages. Read the player's own copy at runtime (never bundled: its licence is CC BY-NC-SA, as far as known) in CheckPluginDependencies, InstallPlugin, GetLoadOrderLimits and crash troubleshooting, so the AI can say 'LOOT lists X as incompatible with Y' or 'this plugin has dirty edits'. Say how old the masterlist is (Cory's copy dates from July 2025) and suggest opening LOOT to update it. YAML parsing with an MIT library (YamlDotNet) or a small reader for the parts used. Works only when LOOT is installed; without it, say so and carry on.",
+          "history": [
+            {
+              "datetime": "2026-11-20T23:30",
+              "note": "Cory asked for it after the question about sites that track known issues. Masterlist found on Cory's machine (1.1 MB, 2025-07-03)."
+            }
+          ],
+          "targetRelease": "1.5",
+          "dependsOn": [
+            "FEAT-274"
+          ]
+        },
+        {
+          "id": "FEAT-287",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Point to Phostwood's Crash Log Analyzer as a second opinion",
+          "description": "Phostwood's Skyrim Crash Log Analyzer (phostwood.github.io/crash-analyzer) matches Crash Logger reports against a large set of known signatures. GetCrashLog suggests it as a second opinion with the report's path, so the player can paste the log there. SkyLink's own catalogue (CrashPatterns) stays original work: using the analyzer's rules would need its licence checked or Phostwood's permission (Phostwood has commented on SkyLink's Nexus page).",
+          "history": [
+            {
+              "datetime": "2026-11-20T23:30",
+              "note": "Cory asked for it after the question about sites that track known issues."
+            }
+          ],
+          "targetRelease": "1.5"
         }
       ]
     },
@@ -6025,7 +6058,9 @@
         "INFRA-005",
         "INFRA-007",
         "INFRA-023",
-        "FEAT-285"
+        "FEAT-285",
+        "FEAT-286",
+        "FEAT-287"
       ],
       "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "testRemediation": [
