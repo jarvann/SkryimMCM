@@ -83,6 +83,14 @@ public class PlayerTools : ToolBase
                 (gt["lastTaskRanSecondsAgo"] as JsonValue)?.GetValue<double>() > 5)
                 stalled = "The game has stopped running SkyLink's tasks. Usually its window is in the background and the game " +
                           "pauses when unfocused: click into the game, or set bAlwaysActive=1 under [General] in Skyrim.ini.";
+            // Round A: with the window unfocused from the start (no task ever ran), the plugin blamed an SKSE version mismatch.
+            // Check focus first: when it's the reason, it replaces both readings.
+            if (PipeClient.FocusNote() is string focus &&
+                ((gt?["pending"]?.GetValue<int>() ?? 0) > 0 || stalled != null || info?["diagnostics"]?["problem"] != null))
+            {
+                stalled = focus;
+                if (info?["diagnostics"] is JsonObject d) d["problem"] = focus;
+            }
             return new
             {
                 connected = true,
