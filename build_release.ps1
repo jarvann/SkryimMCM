@@ -134,6 +134,7 @@ and earlier.
 - Face and pose models: Google MediaPipe (Apache-2.0), see SkyLinkAI_Server\Models\NOTICE.txt
 - ONNX Runtime by Microsoft (MIT)
 - Guidebook answers from UESP (CC BY-SA 2.5), fetched on demand
+- YamlDotNet by Antoine Aubry and contributors (MIT), reads the player's LOOT masterlist
 - Save reading follows ReSaver (FallrimTools by Mark Fairchild, Apache-2.0); cleaning
   runs an installed ReSaver's own library. See SkyLinkAI_Server\NOTICE-ReSaver.txt
 
