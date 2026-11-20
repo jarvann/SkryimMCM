@@ -38,13 +38,25 @@ public class CrashTools : ToolBase
         "Each session shows its start time, its last entry and whether it exited cleanly: match it to the crash report by time. " +
         "previousCrash is the last session that did not exit cleanly (kept when the next session started); lastSession is " +
         "the newest session, included when the game is not running or recorderCurrent is true. " +
-        "recorderEntries (default 60, 0 = header only) is how many of the newest entries to show per session.")]
+        "recorderEntries (default 60, 0 = header only) is how many of the newest entries to show per session. " +
+        "windowsDump: when Windows wrote a crash dump (LocalDumps) newer than the newest report, as for crashes while quitting or " +
+        "returning to the main menu that Crash Logger misses, its exception, faulting module and a stack scan.")]
     public Task<object> GetCrashLog(int index = 0, string? sections = null, int maxCharsPerSection = 6000, string? skyrimPath = null,
         int recorderEntries = 60, bool recorderCurrent = false)
     {
         var recorder = ReadRecorder(recorderEntries, recorderCurrent);
         var logs = FindCrashLogs(skyrimPath);
         var recent = logs.Take(10).Select(f => new { file = f.FullName, written = f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss") }).ToArray();
+        // FEAT-279: a crash during shutdown or a return to the main menu leaves no Crash Logger report, only the dump Windows
+        // writes when LocalDumps is set up. Summarise the newest dump when it is newer than the newest report.
+        object? windowsDump = null;
+        try
+        {
+            var dumps = Minidump.FindDumps();
+            if (dumps.Count > 0 && (logs.Count == 0 || dumps[0].LastWriteTime > logs[0].LastWriteTime.AddMinutes(1)))
+                windowsDump = Minidump.Summarise(dumps[0].FullName);
+        }
+        catch (Exception ex) { windowsDump = new { error = "Couldn't read the Windows crash dump: " + ex.Message }; }
         if (logs.Count == 0)
         {
             // BUG-071: say whether a crash reporter is installed, since "no reports" only means something when one is.
@@ -57,6 +69,7 @@ public class CrashTools : ToolBase
                     ? "No crash reports: Crash Logger is installed and hasn't written one, so the game hasn't crashed since its reports were last cleared."
                     : "No crash reports, and no crash reporter is installed: install Crash Logger SSE so crashes leave a report. Searched: " +
                       string.Join("; ", SearchFolders(skyrimPath)),
+                windowsDump,
                 skylinkRecorder = recorder,
             });
         }
@@ -104,6 +117,7 @@ public class CrashTools : ToolBase
             analysis = CrashPatterns.Analyse(text),
             sections = output,
             recent,
+            windowsDump,
             skylinkRecorder = recorder,
         });
     }
