@@ -1,6 +1,6 @@
 # SkyLink AI
 
-A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. About 150 tools for reading and changing game state in real time: player stats, inventory, quests, NPCs, world, combat, and (new in 1.3, experimental) building and matching a character's face.
+A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. About 160 tools for reading and changing game state in real time: player stats, inventory, quests, NPCs, world, combat, building and matching a character's face (experimental), and (new in 1.4) save health: finding what slows a game down, cleaning saves, and checking old saves against a changed load order.
 
 ## Architecture
 
@@ -16,16 +16,17 @@ Claude Desktop <--stdio--> SkyLinkLauncher <--stdio/MCP--> C# MCP Server <--name
 
 | Category | Tools |
 |----------|-------|
-| **Player** | Info, skills, perks, spells, shouts, appearance, factions, resistances, powers, diseases, level, blueprint export (now with quest progress) and apply (inventory, equipment, gold) |
+| **Player** | Info, skills, perks, spells, shouts (per-word status), appearance, factions, resistances, powers, diseases, level, blueprint export (with quest stages done) and apply (inventory, equipment, gold, skills, level, perks, spells, shouts) |
 | **Inventory** | Full inventory (paged), equipped items, add/remove, bulk add, equip/unequip, enchantment details, loot by category |
-| **Quests** | Active quests, stages, aliases (resolved to NPCs), quest items, verified set stage, start/stop/complete |
+| **Quests** | Active quests, stages, aliases (resolved to NPCs), quest items, verified set stage, start/stop/complete, quest replay from a blueprint |
 | **NPCs** | Nearby NPCs, detailed info, NPC inventory and appearance, followers, detection, crosshair targeting, move to the player |
-| **World** | Weather, cell info, nearby objects, containers, doors, map markers, teleport (with a way back) |
+| **World** | Weather, cell info, nearby objects, containers, doors, map markers, teleport with the game's loading screen (and a way back) |
 | **Combat** | Combat state, damage stats, threat assessment |
 | **Face builder** *(experimental, needs RaceMenu)* | Repeatable face captures, measurement against a photo, sliders, makeup tints, brow and hair colour, head parts, sculpt brush, slider probing, a lit studio room, side-by-side sheets |
 | **Hair and body** *(experimental)* | Hair picker by shape (contact sheets, no in-game cycling), body proportions, RaceMenu body morphs and overlays (OBody-aware) |
 | **Utility** | Console commands with output, form search, load order, volume (with snapshot and restore), screenshots, crash log and SkyLink's crash recorder, Skyrim guidebook (UESP), notes and goals |
-| **Papyrus** | Function catalog, function lookup, VM call bridge |
+| **Save health** *(new in 1.4)* | StackReport (live script pile-ups by mod), CheckSave and ListSaves (SkyLink's own save reader), CleanSave and CleanAndReload (through ReSaver), CompareSaveToLoadOrder (removed, renamed and changed mods, changed scripts), ArchiveSaves, RepairCharacterId |
+| **Papyrus** | Function catalog, function lookup, VM call bridge, MCM Recorder playback |
 
 ### Safety
 
@@ -33,7 +34,9 @@ Each kind of action has its own rule, applied by the tool itself, and `GetGameSa
 
 - **Moving the player** (teleport, studio trips) is refused during menus (including ones a mod keeps from pausing), combat, dialogue, scenes, OStim scenes, script-held controls, furniture, mounts, ragdoll, falling, bleeding out or carrying an object.
 - **Captures and measurements** are refused in scenes, menus, combat or furniture (a capture's pose reset would stand her up); `TakeScreenshot` always works.
-- **Face edits** wait for scenes, a mod's menu or a message box, and beast form.
+- **Face edits** wait for scenes, an open menu (the Journal or MCM included), a message box, and beast form.
+- An OStim scene (seen through its menu) and MCM Recorder playing or recording block all of these.
+- Saves sheathe a drawn weapon or spell first, and a save a mod refused is reported as not saved.
 - Reads (inventory, quests, morphs...) are never blocked. Every game-thread task runs inside a fault guard.
 
 ### Other
@@ -123,7 +126,7 @@ dotnet build SkyrimMCP
 dotnet build SkyLinkLauncher
 
 # Or build release package
-.\build_release.ps1 -Version "1.3.0"
+.\build_release.ps1 -Version "1.4.0"
 ```
 
 ## Project Structure

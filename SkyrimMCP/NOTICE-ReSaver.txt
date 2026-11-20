@@ -1,0 +1,7 @@
+SkyLink AI's save reader (SkyrimMCP/Saves: EssScanner, PapyrusReader) follows the read path of ReSaver, part of
+FallrimTools by Mark Fairchild, licensed under the Apache License, Version 2.0:
+    http://www.apache.org/licenses/LICENSE-2.0
+It is a port for Skyrim SE/AE, not a copy of ReSaver's code. Save cleaning (SaveClean) does not include ReSaver: it runs
+the library of a ReSaver the player has installed.
+
+FallrimTools: https://www.nexusmods.com/skyrimspecialedition/mods/5031
