@@ -260,10 +260,12 @@ public class PapyrusTools : ToolBase
         var crossSummary = new List<string>();
         foreach (var name in perEntry.Keys)
         {
-            var series = recent.Select(h => h["entries"]?[name]).Where(e => e != null)
-                .Select(e => (peak: e!["peak"]!.GetValue<int>(), last: e["last"]!.GetValue<int>())).ToList();
+            var withTimes = recent.Where(h => h["entries"]?[name] != null)
+                .Select(h => (at: DateTime.TryParse(h["at"]?.ToString(), out var t) ? t : DateTime.Now, e: h["entries"]![name]!)).ToList();
+            var series = withTimes.Select(x => (peak: x.e["peak"]!.GetValue<int>(), last: x.e["last"]!.GetValue<int>())).ToList();
             var cur = (peak: perEntry[name].Max(), last: perEntry[name].Last());
             series.Add(cur);
+            var firstAt = withTimes.Count > 0 ? withTimes[0].at : DateTime.Now;
             if (series.Count < 3) continue;
             var lasts = series.Select(x => x.last).ToList();
             // Creeping wins over spiking when the counts rise most of the time (68 -> 71 -> 75 with the odd dip); stuck high
@@ -288,7 +290,19 @@ public class PapyrusTools : ToolBase
             var stepsDown = lasts.Zip(lasts.Skip(1), (a, b) => b < a).Count(x => x);
             var draining = stuckHigh && (fallingNow || (stepsDown >= Math.Ceiling((lasts.Count - 1) * 0.75) && lasts.First() - lasts.Last() >= 5));
             var spikes = series.Count(x => x.peak >= 20);
-            string? pattern = creeping ? "creeping up across calls (a leak: it registers again without finishing)"
+            // Round C: Aniya's flood (+1,700-2,000 a call, ~60 a second) read "creeping", and "registers again" is only true of
+            // an update loop: an event handler is being triggered faster than its copies finish.
+            var minutes = Math.Max((DateTime.Now - firstAt).TotalMinutes, 0.1);
+            var perMinute = (int)Math.Round(rise / minutes);
+            var bare = name.EndsWith(" (queued)") ? name[..^9] : name;
+            var function = bare.Contains('.') ? bare[(bare.LastIndexOf('.') + 1)..] : "";
+            var why = function.StartsWith("OnUpdate", StringComparison.OrdinalIgnoreCase)
+                ? "a leak: it registers for another update without finishing"
+                : function.StartsWith("On", StringComparison.Ordinal)
+                    ? "the event keeps firing faster than its copies finish"
+                    : "copies start faster than they finish";
+            string? pattern = creeping && perMinute >= 100 ? $"climbing fast across calls (about {perMinute:N0} more a minute; {why})"
+                : creeping ? $"creeping up across calls ({why})"
                 : draining ? $"high but falling ({string.Join(" -> ", lasts)}): the loop has stopped growing; old stacks are finishing"
                 : stuckHigh ? $"stuck high ({lasts.Min()}+ in every one of the last {series.Count} calls, never draining)"
                 : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+, draining between)"
@@ -340,6 +354,8 @@ public class PapyrusTools : ToolBase
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
             })));
         if (crossSummary.Count > 0) summary += " Across recent calls: " + string.Join(" ", crossSummary);
+        // Round C: the first trend label appeared on the third call with nothing saying one was coming.
+        else if (recent.Count < 3) summary += $" Trends across calls (creeping, climbing, falling) need 3 calls in a row; this is call {recent.Count} since the last load.";
         if (paused != null) summary = paused + " " + summary;
         // Stacks the listed handlers don't account for (before queued stacks were named, ~14,000 of 14,500 were missing).
         var listedTotal = perEntry.Values.Sum(v => v.Last());
@@ -388,8 +404,19 @@ public class PapyrusTools : ToolBase
         int Total(IEnumerable<JsonObject> list) => list.Sum(o => (o["running"]?.GetValue<int>() ?? 0) + (o["queued"]?.GetValue<int>() ?? 0));
         if (objects.Count == 0)
             return new { entry, objects = 0, note = "No stacks from that handler right now. Run StackReport and pass an entry exactly as it shows it." };
+        // Round C: the entry name already says whether this is an update loop (OnUpdate...) or an event handler (On...).
+        var fn = entry.Trim();
+        fn = fn.Contains('.') ? fn[(fn.LastIndexOf('.') + 1)..] : "";
+        var eventHandler = fn.StartsWith("On", StringComparison.Ordinal) && !fn.StartsWith("OnUpdate", StringComparison.OrdinalIgnoreCase);
         if (dryRun)
-            return new { dryRun = true, entry, stacks = Total(objects), objectCount = found?["objectCount"], objects };
+            return new
+            {
+                dryRun = true, entry, stacks = Total(objects), objectCount = found?["objectCount"], objects,
+                warning = eventHandler
+                    ? $"{fn} is an event handler, not an update loop: StopRunaway removes update registrations, so it most likely can't stop this. " +
+                      "The fix is in the mod (its settings, an update, or a script patch)."
+                    : null,
+            };
 
         // Straight from the VM's registration table (a Papyrus UnregisterForUpdate call queued behind the pile-up and timed out).
         var handles = new JsonArray(objects.Select(o => (JsonNode)(o["handle"]?.ToString() ?? "")).ToArray());
@@ -446,9 +473,11 @@ public class PapyrusTools : ToolBase
                       "handler being triggered over and over (OnMagicEffectApply, OnHit...) or a Wait loop, which StopRunaway can't stop. Nothing was " +
                       "blocked. The fix is in the mod: its settings (MCM), an update, or a script patch (CompileScript, PackageOverrideMod)."
                     : $"Removed {removed} registration(s) in 10 s ({(stillComing > 0 ? "some were still coming back" : "none came back in that time")}), but copies still running re-register as they finish: without the block (newer plugin DLL) this can't hold. Check with StackReport.",
-            note = "This stops new OnUpdate calls; it doesn't end stacks already running. Those finish at their own pace (often minutes for " +
-                   "a long loop), so stacksAfter5s barely moves: judge it with StackReport over the next minutes (falling = stopped). " +
-                   "If the count climbs back, the mod re-registers from another event: the lasting fix is the mod itself or a script patch.",
+            // Round C: with nothing removed, this note contradicted the reading.
+            note = removed == 0 ? null
+                : "This stops new OnUpdate calls; it doesn't end stacks already running. Those finish at their own pace (often minutes for " +
+                  "a long loop), so stacksAfter5s barely moves: judge it with StackReport over the next minutes (falling = stopped). " +
+                  "If the count climbs back, the mod re-registers from another event: the lasting fix is the mod itself or a script patch.",
         };
     }
     [McpServerTool]
