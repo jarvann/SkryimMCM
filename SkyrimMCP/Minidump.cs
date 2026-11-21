@@ -47,6 +47,38 @@ public static class Minidump
     public static List<FileInfo> FindDumps() =>
         DumpFolders().SelectMany(f => new DirectoryInfo(f).EnumerateFiles("SkyrimSE.exe*.dmp")).OrderByDescending(f => f.LastWriteTime).ToList();
 
+    /// <summary>The folder of the game exe the dump was written for (Steam or GOG), from its module list; null if unreadable.</summary>
+    public static string? GameFolder(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var r = new BinaryReader(fs);
+            if (r.ReadUInt32() != 0x504D444D) return null;
+            r.ReadUInt32();
+            var count = r.ReadUInt32();
+            var dirRva = r.ReadUInt32();
+            for (var i = 0; i < count; i++)
+            {
+                fs.Seek(dirRva + i * 12, SeekOrigin.Begin);
+                var type = r.ReadUInt32(); r.ReadUInt32(); var rva = r.ReadUInt32();
+                if (type != ModuleList) continue;
+                fs.Seek(rva, SeekOrigin.Begin);
+                var n = r.ReadUInt32();
+                for (var m = 0; m < n; m++)
+                {
+                    fs.Seek(rva + 4 + m * 108 + 20, SeekOrigin.Begin);
+                    var nameRva = r.ReadUInt32();
+                    fs.Seek(nameRva, SeekOrigin.Begin);
+                    var name = System.Text.Encoding.Unicode.GetString(r.ReadBytes((int)r.ReadUInt32()));
+                    if (Path.GetFileName(name).Equals("SkyrimSE.exe", StringComparison.OrdinalIgnoreCase)) return Path.GetDirectoryName(name);
+                }
+            }
+        }
+        catch (Exception) { }
+        return null;
+    }
+
     public static object Summarise(string path, int stackEntries = 30)
     {
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
