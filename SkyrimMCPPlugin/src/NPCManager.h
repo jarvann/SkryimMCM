@@ -22,6 +22,10 @@ namespace SkyrimMCP {
         json PlayIdle(const std::string& idleFormIdHex, const std::string& refId = "");
         json GetCurrentIdle(const std::string& refId = "");
         json StopIdle(const std::string& refId = "");
+        // FEAT-122 / INFRA-024: a new NPC base copied from a template of the race and sex, placed at the player. Runtime forms
+        // aren't kept by saves: without SkyLink's NPC slot plugin the spawn is a preview for this session.
+        json SpawnNpc(const json& params);
+        json RemoveSpawnedNpc(const std::string& refId);
     }
 
 }
