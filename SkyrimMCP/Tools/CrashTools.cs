@@ -41,8 +41,19 @@ public class CrashTools : ToolBase
         "recorderEntries (default 60, 0 = header only) is how many of the newest entries to show per session. " +
         "windowsDump: when Windows wrote a crash dump (LocalDumps) newer than the newest report, as for crashes while quitting or " +
         "returning to the main menu that Crash Logger misses, its exception, faulting module and a stack scan.")]
-    public Task<object> GetCrashLog(int index = 0, string? sections = null, int maxCharsPerSection = 6000, string? skyrimPath = null,
+    public async Task<object> GetCrashLog(int index = 0, string? sections = null, int maxCharsPerSection = 6000, string? skyrimPath = null,
         int recorderEntries = 60, bool recorderCurrent = false)
+    {
+        // A freshly (re)started server hasn't asked the game which one it is (Steam or GOG): connecting does. Brief, since the
+        // game may be hung; without an answer every game's folders are searched.
+        if (SkyLinkSettings.GameDocumentsFolder == null && System.Diagnostics.Process.GetProcessesByName("SkyrimSE").Length > 0)
+        {
+            try { await Task.WhenAny(_pipe.SendRequestAsync("ping"), Task.Delay(3000)); } catch (Exception) { }
+        }
+        return Report(index, sections, maxCharsPerSection, skyrimPath, recorderEntries, recorderCurrent);
+    }
+
+    private object Report(int index, string? sections, int maxCharsPerSection, string? skyrimPath, int recorderEntries, bool recorderCurrent)
     {
         var recorder = ReadRecorder(recorderEntries, recorderCurrent);
         var logs = FindCrashLogs(skyrimPath);
@@ -65,7 +76,7 @@ public class CrashTools : ToolBase
         {
             // BUG-071: say whether a crash reporter is installed, since "no reports" only means something when one is.
             var installed = CrashReporterInstalled();
-            return Task.FromResult<object>(new
+            return new
             {
                 crashReports = "none",
                 crashReporterInstalled = installed,
@@ -75,10 +86,10 @@ public class CrashTools : ToolBase
                       string.Join("; ", SearchFolders(skyrimPath)),
                 windowsDump,
                 skylinkRecorder = recorder,
-            });
+            };
         }
         if (index < 0 || index >= logs.Count)
-            return Task.FromResult<object>(new { error = $"index must be 0 to {logs.Count - 1}", recent, skylinkRecorder = recorder });
+            return new { error = $"index must be 0 to {logs.Count - 1}", recent, skylinkRecorder = recorder };
 
         var file = logs[index];
         string text;
@@ -90,7 +101,7 @@ public class CrashTools : ToolBase
         }
         catch (Exception ex)
         {
-            return Task.FromResult<object>(new { error = $"Could not read {file.FullName}: {ex.Message}", recent, skylinkRecorder = recorder });
+            return new { error = $"Could not read {file.FullName}: {ex.Message}", recent, skylinkRecorder = recorder };
         }
 
         var parsed = SplitSections(text);
@@ -111,7 +122,7 @@ public class CrashTools : ToolBase
             output[key] = body;
         }
 
-        return Task.FromResult<object>(new
+        return new
         {
             file = file.FullName,
             written = file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -129,7 +140,7 @@ public class CrashTools : ToolBase
                 ? $"For a second opinion, the player can paste this report into Phostwood's Crash Log Analyzer (https://phostwood.github.io/crash-analyzer/), which knows many more crash signatures: {file.FullName}"
                 : null,
             skylinkRecorder = recorder,
-        });
+        };
     }
 
     // ---- SkyLink crash recorder (FEAT-219) ----
