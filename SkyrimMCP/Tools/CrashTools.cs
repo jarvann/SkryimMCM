@@ -168,6 +168,15 @@ public class CrashTools : ToolBase
             yield break;
         }
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);  // follows OneDrive redirection
+        // Not connected yet (still loading, or hung) but running: tell Steam from GOG by the running exe's folder (GOG installs
+        // carry goggame-*.info files), rather than mixing both games' files (round C: GOG's session shown while Steam loaded).
+        if (SkyLinkSettings.RunningGameFolder() is string running)
+        {
+            bool gog;
+            try { gog = Directory.EnumerateFiles(running, "goggame-*.info").Any(); } catch (Exception) { gog = false; }
+            yield return Path.Combine(docs, "My Games", gog ? "Skyrim Special Edition GOG" : "Skyrim Special Edition");
+            yield break;
+        }
         foreach (var game in new[] { "Skyrim Special Edition", "Skyrim Special Edition GOG", "Skyrim VR" })
             yield return Path.Combine(docs, "My Games", game);
     }
@@ -248,7 +257,9 @@ public class CrashTools : ToolBase
                 lastSessionNote = "The game is running, so lastSession is this session; pass recorderCurrent=true to see it.";
         }
 
-        var searched = SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } g ? Path.GetFileName(g.TrimEnd('\\')) + " (the connected game)" : "every game's folder (no game connected since the server started)";
+        var searched = SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } g ? Path.GetFileName(g.TrimEnd('\\')) + " (the connected game)"
+            : SkyLinkSettings.RunningGameFolder() != null ? Path.GetFileName(GameDocumentFolders().First()) + " (the running game, not connected yet)"
+            : "every game's folder (no game running or connected)";
         return new { searched, previousCrash, previousNote, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
     }
 
