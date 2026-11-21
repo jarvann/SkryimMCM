@@ -253,6 +253,10 @@ namespace SkyrimMCP::Protocol {
         formIdParam("unlock_shout", "formId", [](const std::string& f) { return GameInterface::UnlockShout(f); });
         formIdParam("unlock_door", "refId", [](const std::string& r) { return GameInterface::UnlockDoor(r); });
         formIdParam("kill_actor", "refId", [](const std::string& r) { return GameInterface::KillActor(r); });
+        registry["spawn_npc"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return NPCManager::SpawnNpc(params); });
+        };
+        formIdParam("remove_spawned_npc", "refId", [](const std::string& r) { return NPCManager::RemoveSpawnedNpc(r); });
         registry["play_idle"] = [](const std::string& id, const json& params) {
             std::string idleFormId = params.value("idleFormId", "");
             std::string refId = params.value("refId", "");

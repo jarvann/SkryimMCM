@@ -564,4 +564,98 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+
+    namespace {
+        RE::TESRace* ResolveRace(const std::string& text) {
+            if (text.empty()) return nullptr;
+            RE::TESForm* form = nullptr;
+            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(text)); } catch (...) {}
+            if (!form) form = RE::TESForm::LookupByEditorID(text);
+            return form ? form->As<RE::TESRace>() : nullptr;
+        }
+
+        // A plain NPC of this race and sex to copy: not the player, not built from a template (its look and stats would come
+        // from somewhere else), preferring one that isn't unique.
+        RE::TESNPC* FindTemplate(RE::TESRace* race, bool female) {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data || !race) return nullptr;
+            RE::TESNPC* fallback = nullptr;
+            for (auto* npc : data->GetFormArray<RE::TESNPC>()) {
+                if (!npc || npc->GetFormID() == 0x7 || npc->race != race) continue;
+                if ((npc->GetSex() == RE::SEX::kFemale) != female) continue;
+                if (npc->baseTemplateForm || npc->IsDeleted()) continue;
+                if (!npc->IsUnique()) return npc;
+                if (!fallback) fallback = npc;
+            }
+            return fallback;
+        }
+    }
+
+    json SpawnNpc(const json& params) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* playerBase = player ? player->GetActorBase() : nullptr;
+        if (!player || !playerBase) return {{"error", "No player (load a game first)"}};
+
+        auto* race = ResolveRace(params.value("race", std::string()));
+        if (!race) race = playerBase->race;
+        const bool female = params.contains("female") && params["female"].is_boolean()
+            ? params["female"].get<bool>() : playerBase->GetSex() == RE::SEX::kFemale;
+
+        RE::TESNPC* tmpl = nullptr;
+        if (auto t = params.value("template", std::string()); !t.empty()) {
+            RE::TESForm* form = nullptr;
+            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(t)); } catch (...) {}
+            if (!form) form = RE::TESForm::LookupByEditorID(t);
+            tmpl = form ? form->As<RE::TESNPC>() : nullptr;
+            if (!tmpl) return {{"error", "Template isn't an NPC base: " + t}};
+        } else {
+            tmpl = FindTemplate(race, female);
+            if (!tmpl) return {{"error", std::format("No NPC of race {:08X} ({}) to copy from", race->GetFormID(), female ? "female" : "male")}};
+        }
+
+        auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
+        auto* npc = factory ? factory->Create() : nullptr;
+        if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
+        npc->Copy(tmpl);
+        npc->race = race;
+
+        const auto name = params.value("name", std::string());
+        if (!name.empty()) npc->SetFullName(name.c_str());
+        // A copy of a unique NPC would share its "only one of me" rule; a spawned character is its own person.
+        npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        if (params.value("essential", false)) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kEssential);
+
+        // The face: the template's own FaceGen (it has a file), or none, for RaceMenu's CharGen to build one.
+        const auto face = params.value("face", std::string("template"));
+        npc->faceNPC = face == "template" ? (tmpl->faceNPC ? tmpl->faceNPC : tmpl) : nullptr;
+
+        auto ref = player->PlaceObjectAtMe(npc, false);
+        if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+
+        return {
+            {"refId", std::format("{:08X}", ref->GetFormID())},
+            {"baseId", std::format("{:08X}", npc->GetFormID())},
+            {"name", npc->GetName()},
+            {"race", std::format("{:08X}", race->GetFormID())},
+            {"raceName", race->GetName()},
+            {"female", female},
+            {"template", std::format("{:08X}", tmpl->GetFormID())},
+            {"templateName", tmpl->GetName()},
+            {"face", face},
+            {"runtimeForm", (npc->GetFormID() >> 24) == 0xFF},
+        };
+    }
+
+    json RemoveSpawnedNpc(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+        if (!ref) return {{"error", "Reference not found: " + refId}};
+        auto* base = ref->GetBaseObject();
+        // Only what SkyLink made: a runtime base (FF...) placed at runtime.
+        if (!base || (base->GetFormID() >> 24) != 0xFF) return {{"error", "Not a spawned NPC (its base isn't a runtime form): " + refId}};
+        ref->Disable();
+        ref->SetDelete(true);
+        return {{"removed", true}, {"refId", refId}};
+    }
 }
