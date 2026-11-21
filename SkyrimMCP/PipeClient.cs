@@ -232,8 +232,15 @@ public class PipeClient : IPipeClient
             if (alwaysActive == true) return null;
             string other;
             try { other = System.Diagnostics.Process.GetProcessById((int)front).ProcessName; } catch (Exception) { other = "another program"; }
-            return $"Skyrim's window is in the background ({other} has focus) and Skyrim.ini {(alwaysActive == false ? "sets bAlwaysActive=0" : "doesn't set bAlwaysActive")}, " +
-                   "so the game is paused and SkyLink's calls can't run. Click into the game, or set bAlwaysActive=1 under [General] in Skyrim.ini (takes effect at the next start).";
+            // The game read the INI at start; the file may say something else now (round B: set back to 1 mid-session).
+            var fileNow = ReadAlwaysActiveFromIni();
+            var setting = fileNow == true
+                ? "this launch started with bAlwaysActive " + (alwaysActive == false ? "=0" : "unset") + " (Skyrim.ini now says 1: it takes effect at the next start)"
+                : "Skyrim.ini " + (fileNow == false ? "sets bAlwaysActive=0" : "doesn't set bAlwaysActive");
+            var fix = fileNow == true
+                ? "Click into the game, or restart it to pick up bAlwaysActive=1."
+                : "Click into the game, or set bAlwaysActive=1 under [General] in Skyrim.ini (takes effect at the next start).";
+            return $"Skyrim's window is in the background ({other} has focus) and {setting}, so the game is paused and SkyLink's calls can't run. {fix}";
         }
         catch (Exception) { return null; }
     }
