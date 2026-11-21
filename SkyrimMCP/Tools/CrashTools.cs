@@ -52,7 +52,11 @@ public class CrashTools : ToolBase
         object? windowsDump = null;
         try
         {
+            // Round B: Windows keeps every game's dumps in one folder; with GOG connected, Steam's dump was shown.
             var dumps = Minidump.FindDumps();
+            if (SkyLinkSettings.GameInstallFolder is { Length: > 0 } game)
+                dumps = dumps.Where(d => Minidump.GameFolder(d.FullName) is not string f ||
+                    string.Equals(f.TrimEnd('\\'), game.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)).ToList();
             if (dumps.Count > 0 && (logs.Count == 0 || dumps[0].LastWriteTime > logs[0].LastWriteTime.AddMinutes(1)))
                 windowsDump = Minidump.Summarise(dumps[0].FullName);
         }
