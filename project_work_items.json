@@ -4800,7 +4800,7 @@
       "phase": 17,
       "name": "v1.5 — Build and install mods, crash and runaway care",
       "priority": "medium",
-      "status": "planned",
+      "status": "complete",
       "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
       "items": [
         {
@@ -6387,6 +6387,11 @@
       "nexus": "mod 175682 file updated over 1.3.0, version 1.4.0; summary, description and sticky updated; AI disclosure Mod Content + Media; 'done' replies to DutchiesCanadian, kilaya42, AlexiousITA, Bardicle, Maruzarix",
       "github": "https://github.com/jarvann/SkryimMCM/releases/tag/v1.4.0",
       "notes": "docs/release-notes-1.4.md"
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-11-21",
+      "notes": "Mod building (Creation Kit compile, override mods, small plugins, masters check, install with LOOT sort, plugin limits), crash care (crash patterns, Windows dumps, LOOT notes, SSEEdit cleaning), StopRunaway, restart cycle and new games, GetJournal, BSA meshes. Tested on Steam 1.7.104 and GOG 1.6.1179 (MO2). GitHub v1.5.0 (SkyLinkAI-v1.5.0.zip, sha256 8b2d9a2f...19ded); Nexus file updated to 1.5.0, summary, description and sticky updated."
     }
   ],
   "releasePlan": {
