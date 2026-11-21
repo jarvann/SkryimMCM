@@ -5246,6 +5246,21 @@
             }
           ],
           "targetRelease": "1.5"
+        },
+        {
+          "id": "BUG-099",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "Round C (Aniya flood, Steam): LoadSave, trend labels and StopRunaway wording",
+          "description": "LoadSave answered loading:true for a save that doesn't exist (now refused, with close matches scored on shared words; MO2 profile saves accepted). StackReport called a ~60/s event flood 'creeping' and said it 're-registers' (now 'climbing fast (about N a minute)' past 100/min, with the cause matched to update loop, event or neither; says trends need 3 calls). StopRunaway's dry run now warns for event handlers; real runs on an event flood set no block and drop the contradicting OnUpdate note.",
+          "history": [
+            {
+              "datetime": "2026-11-21T14:25",
+              "note": "Found by the Tester on Steam with TEST_StackFlood_Aniya_DO_NOT_PLAY; StopRunaway's event-flood reading, the hand-set updateBlock in CheckConnection and the qqq 'quit by SkyLink' label passed. Fixes deployed; retest pending."
+            }
+          ],
+          "targetRelease": "1.5"
         }
       ]
     },
@@ -5523,6 +5538,22 @@
             {
               "datetime": "2026-11-21T12:50",
               "note": "Caused by the dev session launching GOG without checking it was running. Host DLL change: needs a game restart to test."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-290",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "LoadSave warns when the save is a different character",
+          "description": "Loading another character's save over a running game can crash some mods (Wheeler CTD on 2026-11-21, loading the Aniya test save over Adventurer). LoadSave compares the save header's character with the loaded one and suggests loading from the main menu instead.",
+          "history": [
+            {
+              "datetime": "2026-11-21T14:25",
+              "note": "The Tester's idea after the Wheeler crash."
             }
           ],
           "targetRelease": "1.6",
