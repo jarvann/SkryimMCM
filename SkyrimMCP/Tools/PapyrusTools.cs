@@ -257,6 +257,7 @@ public class PapyrusTools : ToolBase
                     ["plugin"] = rows.FirstOrDefault(x => x.entry == r.Key)?.plugin,
                 };
         var crossCall = new List<object>();
+        var drainingEntries = new HashSet<string>();
         var crossSummary = new List<string>();
         foreach (var name in perEntry.Keys)
         {
@@ -278,7 +279,10 @@ public class PapyrusTools : ToolBase
             // of the rise.
             var biggestStep = lasts.Zip(lasts.Skip(1), (a, b) => b - a).DefaultIfEmpty(0).Max();
             // ...unless that step is small next to the count itself (182 -> 180 -> 184 -> 196 is a climb, not a jump).
-            var steady = rise > 0 && (biggestStep < 0.6 * rise || biggestStep < 0.15 * lasts.Average());
+            // ...or every step is up (round C: running copies 340 -> 495 -> 583 read "stuck high" because one step was the
+            // bigger of two).
+            var allUp = stepsUp == lasts.Count - 1 && lasts.Zip(lasts.Skip(1), (a, b) => b > a).All(x => x) && rise >= 10;
+            var steady = rise > 0 && (allUp || biggestStep < 0.6 * rise || biggestStep < 0.15 * lasts.Average());
             // The last three calls going down by 10+ is draining now, whatever came before (round B: 238 -> 213 -> 194 after
             // StopRunaway read "stuck high, never draining" because the older calls had risen).
             var fallingNow = lasts.Count >= 3 && lasts[^3] > lasts[^2] && lasts[^2] > lasts[^1] && lasts[^3] - lasts[^1] >= 10;
@@ -308,6 +312,7 @@ public class PapyrusTools : ToolBase
                 : spikes >= 3 ? $"spiking again and again ({spikes} of the last {series.Count} calls reached 20+, draining between)"
                 : null;
             if (pattern == null) continue;
+            if (draining && !creeping) drainingEntries.Add(name);
             var plugin = rows.FirstOrDefault(r => r.entry == name)?.plugin
                 ?? recent.Select(h => h["entries"]?[name]?["plugin"]?.ToString()).LastOrDefault(p => !string.IsNullOrEmpty(p));
             crossCall.Add(new { entry = name, plugin, pattern, lastCounts = lasts, peaks = series.Select(x => x.peak).ToList() });
@@ -340,8 +345,12 @@ public class PapyrusTools : ToolBase
             var firstTotal = (queuedRow?.first ?? 0) + (startedRow?.first ?? 0);
             var plugin = queuedRow?.plugin ?? startedRow?.plugin;
             var grew = (queuedRow?.growing ?? false) || (startedRow?.growing ?? false);
-            combined.Add($"{g.Key}{Who(plugin)} is a runaway: about {q + st} copies ({q} waiting to start, {st} running)" +
-                         (grew && q + st > firstTotal ? $", up from {firstTotal}." : "."));
+            // Round C: a pile already draining (the across-calls trend says falling) isn't called a runaway any more.
+            var drainingNow = drainingEntries.Contains(g.Key) || drainingEntries.Contains(g.Key + QueuedTag);
+            combined.Add(drainingNow
+                ? $"{g.Key}{Who(plugin)} is draining: about {q + st} copies left ({q} waiting to start, {st} running), no longer growing."
+                : $"{g.Key}{Who(plugin)} is a runaway: about {q + st} copies ({q} waiting to start, {st} running)" +
+                  (grew && q + st > firstTotal ? $", up from {firstTotal}." : "."));
             combinedBases.Add(g.Key);
         }
         var singles = runaways.Where(r => !combinedBases.Contains(Base(r.entry))).ToList();
@@ -349,6 +358,7 @@ public class PapyrusTools : ToolBase
             ? "No pile-ups: no handler reached 20 copies or kept growing."
             : string.Join(" ", combined.Concat(singles.OrderBy(r => r.kind == "runaway" ? 0 : r.kind == "periodic" ? 1 : 2).Select(r => r.kind switch
             {
+                "runaway" when drainingEntries.Contains(r.entry) => $"{r.entry}{Who(r.plugin)} is draining: {r.last} copies running now, no longer growing (peak {r.max}).",
                 "runaway" => $"{r.entry}{Who(r.plugin)} is a runaway: {r.last} copies running now{(r.growing ? $", up from {r.first}" : "")} (peak {r.max}).",
                 "periodic" => $"{r.entry}{Who(r.plugin)} rises to {r.max} copies repeatedly and drains in between (periodic: a sweep over nearby objects?).",
                 _ => $"{r.entry}{Who(r.plugin)} peaked at {r.max} copies and drained back to {r.last} (a one-time burst).",
@@ -411,7 +421,10 @@ public class PapyrusTools : ToolBase
         if (dryRun)
             return new
             {
-                dryRun = true, entry, stacks = Total(objects), objectCount = found?["objectCount"], objects,
+                // Round C: "stacks" covered only the listed objects (limit) next to a larger objectCount.
+                dryRun = true, entry, stacksListed = Total(objects), objectsListed = objects.Count, objectCount = found?["objectCount"], objects,
+                limitNote = found?["objectCount"] is JsonValue oc && oc.TryGetValue<int>(out var all) && all > objects.Count
+                    ? $"Only the first {objects.Count} of {all} objects are listed and counted (limit); StackReport has the full total." : null,
                 warning = eventHandler
                     ? $"{fn} is an event handler, not an update loop: StopRunaway removes update registrations, so it most likely can't stop this. " +
                       "The fix is in the mod (its settings, an update, or a script patch)."
