@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-20",
+  "lastUpdated": "2026-11-21",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -14,7 +14,7 @@
         "n": 1,
         "tool": "get_papyrus_catalog",
         "prompt": "What Papyrus functions are available?",
-        "notes": "Scans 7400 .psc files \u2014 expect slow, summarize only"
+        "notes": "Scans 7400 .psc files — expect slow, summarize only"
       },
       {
         "n": 2,
@@ -247,7 +247,7 @@
           "type": "bug",
           "status": "complete",
           "title": "Save game timeout",
-          "description": "Fixed via async save \u2014 responds immediately, save completes in background."
+          "description": "Fixed via async save — responds immediately, save completes in background."
         },
         {
           "id": "FEAT-013",
@@ -320,7 +320,7 @@
             },
             {
               "datetime": "2026-03-21T17:30",
-              "note": "Closed as external \u2014 not our bug. Recommendation: disable po3_SaveUnbaker when switching saves."
+              "note": "Closed as external — not our bug. Recommendation: disable po3_SaveUnbaker when switching saves."
             }
           ]
         },
@@ -341,7 +341,7 @@
             },
             {
               "datetime": "2026-03-23T11:37",
-              "note": "Crash log analysis: SkyrimMCPPlugin.dll in call stack. RAX=0 null deref at offset 0x80. R14/R15 = BSScript::Internal::VirtualMachine. The tim command touches the Papyrus VM and crashes when VM has active scripts. Passed earlier test in clean interior (Crafting Hall) but crashed after combat/spawns/loot scan. Fix: replace tim with setessential toggle on player base ID \u2014 simpler command, less VM interaction."
+              "note": "Crash log analysis: SkyrimMCPPlugin.dll in call stack. RAX=0 null deref at offset 0x80. R14/R15 = BSScript::Internal::VirtualMachine. The tim command touches the Papyrus VM and crashes when VM has active scripts. Passed earlier test in clean interior (Crafting Hall) but crashed after combat/spawns/loot scan. Fix: replace tim with setessential toggle on player base ID — simpler command, less VM interaction."
             },
             {
               "datetime": "2026-03-23T18:24",
@@ -425,49 +425,49 @@
           "type": "feature",
           "status": "complete",
           "title": "Skill levels query",
-          "description": "GetSkillLevels \u2014 all 18 skills with current and base values. Tested 2026-03-21."
+          "description": "GetSkillLevels — all 18 skills with current and base values. Tested 2026-03-21."
         },
         {
           "id": "FEAT-030",
           "type": "feature",
           "status": "complete",
           "title": "Perks query",
-          "description": "GetPerks \u2014 708 perks returned (was 12 in old build). Now shows runtime vs base source. Tested 2026-03-21."
+          "description": "GetPerks — 708 perks returned (was 12 in old build). Now shows runtime vs base source. Tested 2026-03-21."
         },
         {
           "id": "FEAT-031",
           "type": "feature",
           "status": "complete",
           "title": "Known spells query",
-          "description": "GetKnownSpells \u2014 1,394 spells (807 spells, 476 abilities, 102 lesser powers, 5 powers, 6 schools). Tested 2026-03-21."
+          "description": "GetKnownSpells — 1,394 spells (807 spells, 476 abilities, 102 lesser powers, 5 powers, 6 schools). Tested 2026-03-21."
         },
         {
           "id": "FEAT-032",
           "type": "feature",
           "status": "complete",
           "title": "Known shouts query",
-          "description": "GetKnownShouts \u2014 52 shouts with full per-word detail. Tested 2026-03-21."
+          "description": "GetKnownShouts — 52 shouts with full per-word detail. Tested 2026-03-21."
         },
         {
           "id": "FEAT-033",
           "type": "feature",
           "status": "complete",
           "title": "Equipped items query",
-          "description": "GetEquippedItems \u2014 8 equipped slots returned correctly. Tested 2026-03-21."
+          "description": "GetEquippedItems — 8 equipped slots returned correctly. Tested 2026-03-21."
         },
         {
           "id": "FEAT-034",
           "type": "feature",
           "status": "complete",
           "title": "Unlock shouts",
-          "description": "UnlockShout \u2014 teachword + unlockword. Tested 2026-03-21: Disarm shout unlocked, count 52\u219255."
+          "description": "UnlockShout — teachword + unlockword. Tested 2026-03-21: Disarm shout unlocked, count 52→55."
         },
         {
           "id": "FEAT-035",
           "type": "feature",
           "status": "complete",
           "title": "Character blueprint export",
-          "description": "GetCharacterBlueprint \u2014 627KB file, 1395 spells, 708 perks, 52 shouts, 256 items, 946 effects. OutputPath writes to disk. Tested 2026-03-21."
+          "description": "GetCharacterBlueprint — 627KB file, 1395 spells, 708 perks, 52 shouts, 256 items, 946 effects. OutputPath writes to disk. Tested 2026-03-21."
         },
         {
           "id": "FEAT-036",
@@ -487,7 +487,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Appearance query",
-          "description": "GetAppearance \u2014 race, sex, height, weight, 19 face morphs, 29 head parts, carry weight. Tested 2026-03-21."
+          "description": "GetAppearance — race, sex, height, weight, 19 face morphs, 29 head parts, carry weight. Tested 2026-03-21."
         },
         {
           "id": "FEAT-038",
@@ -501,7 +501,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Favorites query",
-          "description": "GetFavorites \u2014 12 favorites (3 shouts, 9 spells). Tested 2026-03-21."
+          "description": "GetFavorites — 12 favorites (3 shouts, 9 spells). Tested 2026-03-21."
         },
         {
           "id": "FEAT-045",
@@ -512,7 +512,7 @@
           "history": [
             {
               "datetime": "2026-03-22T19:28",
-              "note": "Confirmed working via paged inventory test \u2014 displayName and enchantment fields present."
+              "note": "Confirmed working via paged inventory test — displayName and enchantment fields present."
             }
           ]
         },
@@ -520,7 +520,7 @@
           "id": "BUG-004",
           "type": "bug",
           "status": "complete",
-          "title": "NPC FormID confusion \u2014 refId vs baseId",
+          "title": "NPC FormID confusion — refId vs baseId",
           "description": "get_nearby_npcs now returns both refId and baseId."
         },
         {
@@ -542,7 +542,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Bulk add items",
-          "description": "BulkAddItems \u2014 JSON array of {formId, count}. Tested: 36 items, 0 failures."
+          "description": "BulkAddItems — JSON array of {formId, count}. Tested: 36 items, 0 failures."
         }
       ]
     },
@@ -557,14 +557,14 @@
           "type": "feature",
           "status": "complete",
           "title": "Weather control",
-          "description": "Weather control \u2014 GetWeather, SetWeather (by FormID or keyword: snow/rain/clear/cloudy), ListWeathers (339 forms with categories). All confirmed working 2026-03-22."
+          "description": "Weather control — GetWeather, SetWeather (by FormID or keyword: snow/rain/clear/cloudy), ListWeathers (339 forms with categories). All confirmed working 2026-03-22."
         },
         {
           "id": "FEAT-041",
           "type": "feature",
           "status": "complete",
           "title": "Cell info query",
-          "description": "GetCellInfo \u2014 cell name, interior/exterior, worldspace, position, facing angle. Tested 2026-03-21."
+          "description": "GetCellInfo — cell name, interior/exterior, worldspace, position, facing angle. Tested 2026-03-21."
         },
         {
           "id": "FEAT-042A",
@@ -585,7 +585,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Read container contents",
-          "description": "GetContainerInventory \u2014 Fish Barrel, 3 items. Tested 2026-03-21."
+          "description": "GetContainerInventory — Fish Barrel, 3 items. Tested 2026-03-21."
         },
         {
           "id": "FEAT-043",
@@ -599,13 +599,13 @@
           "type": "feature",
           "status": "complete",
           "title": "Nearby objects query",
-          "description": "GetNearbyObjects \u2014 573 objects in Riften exterior. Tested 2026-03-21."
+          "description": "GetNearbyObjects — 573 objects in Riften exterior. Tested 2026-03-21."
         },
         {
           "id": "BUG-009",
           "type": "bug",
           "status": "complete",
-          "title": "SetWeather name search fails \u2014 no editor IDs at runtime",
+          "title": "SetWeather name search fails — no editor IDs at runtime",
           "description": "GetFormEditorID() returns null for weather forms at runtime. ListWeathers returned 339 forms but with no names, editor IDs, or meaningful categories. SetWeather name search had nothing to match against.",
           "history": [
             {
@@ -643,14 +643,14 @@
           "type": "feature",
           "status": "complete",
           "title": "Active quests query",
-          "description": "GetQuestInfo \u2014 all active quests with stages and objectives."
+          "description": "GetQuestInfo — all active quests with stages and objectives."
         },
         {
           "id": "FEAT-051",
           "type": "feature",
           "status": "complete",
           "title": "Quest stage query",
-          "description": "GetQuestStage \u2014 specific quest by FormID with objectives."
+          "description": "GetQuestStage — specific quest by FormID with objectives."
         },
         {
           "id": "FEAT-052",
@@ -678,28 +678,28 @@
           "type": "feature",
           "status": "complete",
           "title": "Quest stage browser",
-          "description": "GetQuestStages \u2014 executed and waiting stages. Confirmed working 2026-03-22."
+          "description": "GetQuestStages — executed and waiting stages. Confirmed working 2026-03-22."
         },
         {
           "id": "FEAT-056",
           "type": "feature",
           "status": "complete",
           "title": "Quest variable read",
-          "description": "Quest variable read \u2014 native API via get_quest_stage. Tested 2026-03-24."
+          "description": "Quest variable read — native API via get_quest_stage. Tested 2026-03-24."
         },
         {
           "id": "FEAT-057",
           "type": "feature",
           "status": "complete",
           "title": "Quest item tracking",
-          "description": "GetQuestItems \u2014 quest-flagged items in inventory. Confirmed working 2026-03-22."
+          "description": "GetQuestItems — quest-flagged items in inventory. Confirmed working 2026-03-22."
         },
         {
           "id": "FEAT-058",
           "type": "feature",
           "status": "complete",
           "title": "Quest alias resolution",
-          "description": "GetQuestAliases \u2014 resolves to NPCs/objects with refIds. Confirmed working 2026-03-22."
+          "description": "GetQuestAliases — resolves to NPCs/objects with refIds. Confirmed working 2026-03-22."
         }
       ]
     },
@@ -742,49 +742,49 @@
           "type": "feature",
           "status": "complete",
           "title": "Kill actor",
-          "description": "KillActor \u2014 removes essential flag, KillImmediate(). Tested 2026-03-21: hostile rabbit killed, wasEssential/wasProtected flags returned."
+          "description": "KillActor — removes essential flag, KillImmediate(). Tested 2026-03-21: hostile rabbit killed, wasEssential/wasProtected flags returned."
         },
         {
           "id": "FEAT-065",
           "type": "feature",
           "status": "complete",
           "title": "Crosshair targeting",
-          "description": "GetCrosshairRef \u2014 Tested 2026-03-21: Paddles-Innocently (Argonian, essential, level 6). Returns name, race, level, essential, dead status."
+          "description": "GetCrosshairRef — Tested 2026-03-21: Paddles-Innocently (Argonian, essential, level 6). Returns name, race, level, essential, dead status."
         },
         {
           "id": "FEAT-066",
           "type": "feature",
           "status": "complete",
           "title": "Faction membership",
-          "description": "GetPlayerFactions \u2014 53 factions with ranks. Iterates base + ExtraFactionChanges + VisitFactions. Tested 2026-03-22."
+          "description": "GetPlayerFactions — 53 factions with ranks. Iterates base + ExtraFactionChanges + VisitFactions. Tested 2026-03-22."
         },
         {
           "id": "FEAT-067",
           "type": "feature",
           "status": "complete",
           "title": "NPC detailed info",
-          "description": "GetNPCDetailedInfo \u2014 class, combat style, outfit, factions, stats, state flags. Tested 2026-03-22: Inigo full detail."
+          "description": "GetNPCDetailedInfo — class, combat style, outfit, factions, stats, state flags. Tested 2026-03-22: Inigo full detail."
         },
         {
           "id": "FEAT-068",
           "type": "feature",
           "status": "complete",
           "title": "NPC inventory",
-          "description": "GetNPCInventory \u2014 27 items on Inigo. Tested 2026-03-22."
+          "description": "GetNPCInventory — 27 items on Inigo. Tested 2026-03-22."
         },
         {
           "id": "FEAT-069",
           "type": "feature",
           "status": "complete",
           "title": "Follower management",
-          "description": "GetFollowers \u2014 8 followers with class, health, distance, combat state. Tested 2026-03-22."
+          "description": "GetFollowers — 8 followers with class, health, distance, combat state. Tested 2026-03-22."
         },
         {
           "id": "FEAT-070",
           "type": "feature",
           "status": "complete",
           "title": "Detection state",
-          "description": "GetDetectionLevel \u2014 guard undetected at -3. Tested 2026-03-22."
+          "description": "GetDetectionLevel — guard undetected at -3. Tested 2026-03-22."
         },
         {
           "id": "BUG-008",
@@ -828,7 +828,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Disease/cure management",
-          "description": "GetDiseaseStatus \u2014 vampire/werewolf detection via race+perk actor values, active disease scan.",
+          "description": "GetDiseaseStatus — vampire/werewolf detection via race+perk actor values, active disease scan.",
           "history": [
             {
               "datetime": "2026-03-22T10:02",
@@ -845,7 +845,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Enchantment info",
-          "description": "GetEnchantmentInfo \u2014 enchantment name, charge, effects for any inventory item by FormID.",
+          "description": "GetEnchantmentInfo — enchantment name, charge, effects for any inventory item by FormID.",
           "history": [
             {
               "datetime": "2026-03-22T10:02",
@@ -862,7 +862,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Magic resistance",
-          "description": "GetMagicResistances \u2014 magic, fire, frost, shock, poison, disease resistance values.",
+          "description": "GetMagicResistances — magic, fire, frost, shock, poison, disease resistance values.",
           "history": [
             {
               "datetime": "2026-03-22T10:02",
@@ -879,7 +879,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Spell details",
-          "description": "GetSpellDetails \u2014 cost, school, casting type, delivery, casting perk, full effect list for any spell by FormID.",
+          "description": "GetSpellDetails — cost, school, casting type, delivery, casting perk, full effect list for any spell by FormID.",
           "history": [
             {
               "datetime": "2026-03-22T10:02",
@@ -896,7 +896,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Power management",
-          "description": "GetPowers \u2014 daily powers, lesser powers, abilities listed separately with school and primary effect.",
+          "description": "GetPowers — daily powers, lesser powers, abilities listed separately with school and primary effect.",
           "history": [
             {
               "datetime": "2026-03-22T10:02",
@@ -921,7 +921,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Merchant detection",
-          "description": "GetNearbyMerchants \u2014 find vendors via IsVendor() faction check within radius.",
+          "description": "GetNearbyMerchants — find vendors via IsVendor() faction check within radius.",
           "history": [
             {
               "datetime": "2026-03-22T10:19",
@@ -938,7 +938,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Merchant inventory",
-          "description": "GetMerchantInventory \u2014 read merchant items for sale by refId.",
+          "description": "GetMerchantInventory — read merchant items for sale by refId.",
           "history": [
             {
               "datetime": "2026-03-22T10:19",
@@ -955,7 +955,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Bounty management",
-          "description": "GetBounties \u2014 all active bounties via GetCrimeGoldValue across all factions.",
+          "description": "GetBounties — all active bounties via GetCrimeGoldValue across all factions.",
           "history": [
             {
               "datetime": "2026-03-22T10:19",
@@ -972,11 +972,11 @@
           "type": "feature",
           "status": "complete",
           "title": "Property ownership",
-          "description": "ClearBounty \u2014 zero bounty via SetCrimeGoldValue. Property ownership deferred.",
+          "description": "ClearBounty — zero bounty via SetCrimeGoldValue. Property ownership deferred.",
           "history": [
             {
               "datetime": "2026-03-22T10:19",
-              "note": "ClearBounty implemented. Property ownership removed \u2014 complex and low priority."
+              "note": "ClearBounty implemented. Property ownership removed — complex and low priority."
             },
             {
               "datetime": "2026-03-22T16:31",
@@ -1063,7 +1063,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Menu state query",
-          "description": "GetMenuState \u2014 checks 19 common menus, reports which are open + pause state. UIManager module.",
+          "description": "GetMenuState — checks 19 common menus, reports which are open + pause state. UIManager module.",
           "history": [
             {
               "datetime": "2026-03-22T17:09",
@@ -1135,7 +1135,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Apply character blueprint",
-          "description": "Import blueprint JSON selectively \u2014 AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API \u2014 bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first \u2014 only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower).",
+          "description": "Import blueprint JSON selectively — AI presents available sections, user picks what to apply. Sections: race/gender, appearance (vanilla FaceGen + RaceMenu overlays/sculpts via .jslot), height/weight, skills/levels (native SetActorValue), perks (native AddPerk), spells/shouts (native AddSpell/UnlockWord), inventory/equipment (native Add/EquipItem), factions, body morphs (NiOverride Papyrus API — bypasses OBody). Smart approximation: if target game lacks an asset (hair, tattoo, color), AI uses SearchForms for fuzzy match and reports substitutions. RaceMenu integration: read .jslot from SKSE/Plugins/CharGen/, apply via CharGen.LoadCharacter() Papyrus call. Native API first — only console commands as last resort. Same blueprint JSON extends to FEAT-122 (spawn NPC) and FEAT-123 (create follower).",
           "targetRelease": "1.4",
           "history": [
             {
@@ -1422,7 +1422,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Loot scanner",
-          "description": "ScanLoot \u2014 C# orchestration: finds nearby containers, reads inventories, filters by value, sorts. No new C++ needed.",
+          "description": "ScanLoot — C# orchestration: finds nearby containers, reads inventories, filters by value, sorts. No new C++ needed.",
           "history": [
             {
               "datetime": "2026-03-22T17:09",
@@ -1439,7 +1439,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Game state snapshot",
-          "description": "TakeSnapshot \u2014 exports blueprint to file + saves game with matching timestamped names. Blueprint now includes resistances, disease status, powers.",
+          "description": "TakeSnapshot — exports blueprint to file + saves game with matching timestamped names. Blueprint now includes resistances, disease status, powers.",
           "history": [
             {
               "datetime": "2026-03-22T17:09",
@@ -1482,7 +1482,7 @@
           "history": [
             {
               "datetime": "2026-03-22T18:04",
-              "note": "Natural extension of spell creator \u2014 same form creation pattern."
+              "note": "Natural extension of spell creator — same form creation pattern."
             }
           ],
           "targetRelease": "2.0"
@@ -1531,7 +1531,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Music control",
-          "description": "PlayMusic/StopMusic \u2014 native BGSMusicType::DoPlay()/DoFinish(). Tested 2026-03-24."
+          "description": "PlayMusic/StopMusic — native BGSMusicType::DoPlay()/DoFinish(). Tested 2026-03-24."
         },
         {
           "id": "FEAT-131",
@@ -1564,7 +1564,7 @@
           "type": "feature",
           "status": "complete",
           "title": "Play idle animations",
-          "description": "PlayIdle \u2014 native AIProcess::PlayIdle(), works with ESL-prefix NPCs. Tested 2026-03-24.",
+          "description": "PlayIdle — native AIProcess::PlayIdle(), works with ESL-prefix NPCs. Tested 2026-03-24.",
           "history": [
             {
               "datetime": "2026-03-24T18:05",
@@ -1598,14 +1598,14 @@
           "id": "FEAT-134",
           "type": "feature",
           "status": "complete",
-          "title": "GetCurrentIdle \u2014 read current idle animation",
+          "title": "GetCurrentIdle — read current idle animation",
           "description": "Native HighProcessData::currentProcessIdle. Returns null for most idles (field clears after handoff to behavior graph). Tested 2026-03-24."
         },
         {
           "id": "FEAT-135",
           "type": "feature",
           "status": "complete",
-          "title": "StopIdle \u2014 stop current idle animation",
+          "title": "StopIdle — stop current idle animation",
           "description": "Native AIProcess::StopCurrentIdle(). Tested 2026-03-24."
         }
       ]
@@ -1690,7 +1690,7 @@
     },
     {
       "phase": 13,
-      "name": "v1.2 \u2014 Field Feedback from 1.1.0",
+      "name": "v1.2 — Field Feedback from 1.1.0",
       "priority": "high",
       "status": "planned",
       "items": [
@@ -2113,7 +2113,7 @@
     },
     {
       "phase": 14,
-      "name": "Backlog \u2014 community requests and in-game AI",
+      "name": "Backlog — community requests and in-game AI",
       "priority": "medium",
       "status": "planned",
       "items": [
@@ -2426,7 +2426,7 @@
           "history": [
             {
               "datetime": "2026-11-15T12:30",
-              "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Estimate: about 3\u20134 human hours; for Claude about 15\u201320 minutes and 60\u201380k tokens."
+              "note": "Requested by DutchiesCanadian on the Nexus posts tab (13 Nov 2026): they tried to change their character's skin and hair colour and couldn't, and suggested RaceMenu support so players can create characters from a description. Estimate: about 3–4 human hours; for Claude about 15–20 minutes and 60–80k tokens."
             },
             {
               "datetime": "2026-11-15T14:30",
@@ -2451,7 +2451,7 @@
     },
     {
       "phase": 15,
-      "name": "v1.2.1 \u2014 Hot reload",
+      "name": "v1.2.1 — Hot reload",
       "priority": "high",
       "status": "complete",
       "items": [
@@ -3514,6 +3514,10 @@
             {
               "datetime": "2026-11-20T19:45",
               "note": "Not proven fixed in game; rolled from 1.3 to 1.5 for test remediation (Cory)."
+            },
+            {
+              "datetime": "2026-11-21T12:30",
+              "note": "Tested on GOG (vanilla hairs from Skyrim - Meshes0.bsa): archives read (all 29 'source: bsa') but every hair sat about 120 units low (lengthRatio ~6, nothing drawn). Cause: vanilla hair keeps vertices relative to the head bone; mod wigs use character space. Fixed: skinned vertices placed via the dominant bone's skin transform and node chain (checked offline: vanilla z 110-133, KS wigs unchanged). Needs a GOG retest; sculpt eye pieces need RaceMenu with archived eyes (not testable on vanilla GOG)."
             }
           ],
           "targetRelease": "1.5"
@@ -4324,7 +4328,7 @@
             },
             {
               "datetime": "2026-11-19T23:59",
-              "note": "In game (build 118): Arya's export written (3.56 MB); the bad string was the quest L'etreinte, now exported as \u00e9."
+              "note": "In game (build 118): Arya's export written (3.56 MB); the bad string was the quest L'etreinte, now exported as é."
             }
           ],
           "targetRelease": "1.3"
@@ -4786,7 +4790,7 @@
     },
     {
       "phase": 17,
-      "name": "v1.5 \u2014 Build and install mods, crash and runaway care",
+      "name": "v1.5 — Build and install mods, crash and runaway care",
       "priority": "medium",
       "status": "planned",
       "estimate": "50-80 human hours; Claude 5-7 h, 2-3M tokens, including 4 test-remediation items. FEAT-277 may make FEAT-278 unneeded.",
@@ -5219,12 +5223,27 @@
             }
           ],
           "targetRelease": "1.5"
+        },
+        {
+          "id": "BUG-097",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "GetCrashLog showed the Steam game's reports while the GOG game was connected",
+          "description": "Crash reports and recorder sessions were searched across every game's documents folder and the newest won, so with GOG connected GetCrashLog returned Steam's logs (1.7.104 sessions). Now only the connected game's folder is searched (the server keeps it after a crash); every folder before any game has connected, with 'searched' saying which. Also: a quit sent as the console's qqq/QuitGame through ExecuteConsoleCommand counts as quit by SkyLink, like RestartGame's.",
+          "history": [
+            {
+              "datetime": "2026-11-21T12:30",
+              "note": "Found by the Tester on GOG in round B; fixed and deployed to the server the same day."
+            }
+          ],
+          "targetRelease": "1.5"
         }
       ]
     },
     {
       "phase": 18,
-      "name": "v1.6 \u2014 Characters: face builder, NPCs and followers from blueprints",
+      "name": "v1.6 — Characters: face builder, NPCs and followers from blueprints",
       "priority": "high",
       "status": "planned",
       "estimate": "70-110 human hours; Claude 7-10 h, 3-4M tokens. The FaceGen writer (FEAT-281) is the main unknown: spike it first.",
@@ -5234,7 +5253,7 @@
           "type": "feature",
           "status": "planned",
           "title": "Spawn NPC from blueprint",
-          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face \u2014 RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy. 1.6 scope: spawn the NPC in the running game as a preview (runtime base from INFRA-024, recreated on load until it is exported by FEAT-283), with the face from the blueprint written by FEAT-281 so it never shows the grey or dark face.",
+          "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face — RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy. 1.6 scope: spawn the NPC in the running game as a preview (runtime base from INFRA-024, recreated on load until it is exported by FEAT-283), with the face from the blueprint written by FEAT-281 so it never shows the grey or dark face.",
           "targetRelease": "1.6",
           "history": [
             {
@@ -5508,7 +5527,7 @@
       "type": "infrastructure",
       "status": "complete",
       "title": "Form search engine",
-      "description": "SearchForms \u2014 direct form database search."
+      "description": "SearchForms — direct form database search."
     },
     {
       "id": "INFRA-004",
@@ -5522,7 +5541,7 @@
       "type": "infrastructure",
       "status": "complete",
       "title": "Paged output for large responses",
-      "description": "Add page/pageSize params to all large-output actions: GetInventory, GetKnownSpells, GetPerks, GetKnownShouts, GetNearbyObjects, PollEvents, GetNPCInventory, GetLoadOrder, ListWeathers, GetPlayerFactions, GetFollowers. Response includes totalItems, page, totalPages, hasMore. AI receives first page + metadata, decides whether to fetch additional pages based on task needs. Avoids loading 1394 spells or 708 perks into context when only a summary or specific item is needed. Default pageSize TBD \u2014 suggest 50 for spells/perks, 100 for inventory/objects. C# Protocol layer handles slicing; C++ plugin always returns full data.",
+      "description": "Add page/pageSize params to all large-output actions: GetInventory, GetKnownSpells, GetPerks, GetKnownShouts, GetNearbyObjects, PollEvents, GetNPCInventory, GetLoadOrder, ListWeathers, GetPlayerFactions, GetFollowers. Response includes totalItems, page, totalPages, hasMore. AI receives first page + metadata, decides whether to fetch additional pages based on task needs. Avoids loading 1394 spells or 708 perks into context when only a summary or specific item is needed. Default pageSize TBD — suggest 50 for spells/perks, 100 for inventory/objects. C# Protocol layer handles slicing; C++ plugin always returns full data.",
       "history": [
         {
           "datetime": "2026-03-22T22:45",
@@ -5603,7 +5622,7 @@
       "type": "infrastructure",
       "status": "planned",
       "title": "Push events via pipe",
-      "description": "Pipe Protocol v2 \u2014 unsolicited event messages from plugin to client.",
+      "description": "Pipe Protocol v2 — unsolicited event messages from plugin to client.",
       "targetRelease": "2.0"
     },
     {
@@ -5639,7 +5658,7 @@
         },
         {
           "datetime": "2026-03-22T12:00",
-          "note": "Attempt 1: VPrint hook via write_branch<6> at SKSEPlugin_Load. CTD during script init \u2014 trampoline produced invalid jump target."
+          "note": "Attempt 1: VPrint hook via write_branch<6> at SKSEPlugin_Load. CTD during script init — trampoline produced invalid jump target."
         },
         {
           "datetime": "2026-03-22T13:00",
@@ -5647,11 +5666,11 @@
         },
         {
           "datetime": "2026-03-22T13:25",
-          "note": "Attempt 2 failed: write_branch<5> installed but original pointer (7FF657E5D6AE) is invalid \u2014 ~400MB offset from target. Prologue has relative instructions that cant be relocated. CTD on first console print. Hook disabled. Need different approach: vtable swap, IAT hook, or Papyrus bridge."
+          "note": "Attempt 2 failed: write_branch<5> installed but original pointer (7FF657E5D6AE) is invalid — ~400MB offset from target. Prologue has relative instructions that cant be relocated. CTD on first console print. Hook disabled. Need different approach: vtable swap, IAT hook, or Papyrus bridge."
         },
         {
           "datetime": "2026-03-22T10:13",
-          "note": "ROOT CAUSE FOUND: C# ExecuteConsoleCommand was returning hardcoded message, discarding plugin response data. Plugin was capturing output correctly the entire time (confirmed in logs). One-line fix: return DeserializeResponse(data). All VPrint hook attempts were unnecessary \u2014 lastMessage capture works fine."
+          "note": "ROOT CAUSE FOUND: C# ExecuteConsoleCommand was returning hardcoded message, discarding plugin response data. Plugin was capturing output correctly the entire time (confirmed in logs). One-line fix: return DeserializeResponse(data). All VPrint hook attempts were unnecessary — lastMessage capture works fine."
         },
         {
           "datetime": "2026-03-22T10:13",
@@ -5663,7 +5682,7 @@
       "id": "FEAT-150",
       "type": "feature",
       "status": "complete",
-      "title": "GetScriptStats \u2014 Papyrus VM diagnostics",
+      "title": "GetScriptStats — Papyrus VM diagnostics",
       "description": "Access RE::BSScript::Internal::VirtualMachine to return active thread count, suspended stack count, running script names. Useful for debugging script lag and identifying heavy mods.",
       "targetRelease": "1.3",
       "history": [
@@ -5681,12 +5700,12 @@
       "id": "BUG-011",
       "type": "bug",
       "status": "complete",
-      "title": "CallPapyrusFunction \u2014 DispatchStaticCall freezes or errors",
+      "title": "CallPapyrusFunction — DispatchStaticCall freezes or errors",
       "description": "ConsoleUtil.ReadMessage freezes (blocks on console input). StorageUtil.SetIntValue errors instantly. Catalog and function lookup work, but actual VM dispatch is broken.",
       "history": [
         {
           "datetime": "2026-03-23T12:00",
-          "note": "Reported: call_papyrus_function fails immediately on StorageUtil.debug_GetIntObjectCount (no args, int return). ConsoleUtil.ReadMessage froze game \u2014 that function blocks on console input, not a VM issue. GetPapyrusCatalog (166 scripts) and GetScriptFunctions both work. DispatchStaticCall or C# return value marshaling is broken."
+          "note": "Reported: call_papyrus_function fails immediately on StorageUtil.debug_GetIntObjectCount (no args, int return). ConsoleUtil.ReadMessage froze game — that function blocks on console input, not a VM issue. GetPapyrusCatalog (166 scripts) and GetScriptFunctions both work. DispatchStaticCall or C# return value marshaling is broken."
         },
         {
           "datetime": "2026-11-12T22:00",
@@ -5715,7 +5734,7 @@
       "type": "infrastructure",
       "status": "complete",
       "title": "OOP refactor: unify player/NPC operations with polymorphic actor targeting",
-      "description": "Consolidate duplicate player/NPC functions into single polymorphic versions with optional refId param. ResolveActor(refId) helper returns player if empty, specific actor if provided. Merge: GetPlayerFactions+NPC factions\u2192GetFactions(refId?), GetInventory+GetNPCInventory\u2192GetInventory(refId?), SetActorValue+SetActorValueOn\u2192SetActorValue(attr,val,refId?), GetPlayerInfo+GetActorInfo+GetNPCDetailedInfo\u2192GetActorInfo(refId?). Move ToggleGodMode/ToggleImmortalMode to PlayerQueries. Update Protocol, facade, and C# tools.",
+      "description": "Consolidate duplicate player/NPC functions into single polymorphic versions with optional refId param. ResolveActor(refId) helper returns player if empty, specific actor if provided. Merge: GetPlayerFactions+NPC factions→GetFactions(refId?), GetInventory+GetNPCInventory→GetInventory(refId?), SetActorValue+SetActorValueOn→SetActorValue(attr,val,refId?), GetPlayerInfo+GetActorInfo+GetNPCDetailedInfo→GetActorInfo(refId?). Move ToggleGodMode/ToggleImmortalMode to PlayerQueries. Update Protocol, facade, and C# tools.",
       "history": [
         {
           "datetime": "2026-03-23T18:47",
@@ -5732,7 +5751,7 @@
       "type": "infrastructure",
       "status": "complete",
       "title": "Plugin config file read/write/list",
-      "description": "ReadPluginConfig, WritePluginConfig, ListPluginConfigs \u2014 file-based integration with pure C++ SKSE plugins. Works for SmoothCam, po3_Tweaks, ENB, any JSON/INI/TXT config.",
+      "description": "ReadPluginConfig, WritePluginConfig, ListPluginConfigs — file-based integration with pure C++ SKSE plugins. Works for SmoothCam, po3_Tweaks, ENB, any JSON/INI/TXT config.",
       "history": [
         {
           "datetime": "2026-03-23T20:01",
@@ -5868,22 +5887,22 @@
     "get_nearby_npcs returns reference IDs. setessential needs base FormID, kill/prid need ref ID.",
     "CompileAndRun needs RELOCATION_ID 441582 for Skyrim >= 1.6.1130 (ConsoleUtilSSE approach).",
     "Event system captures everything but framework quests (NFF etc.) spam start/stop events.",
-    "Save game with 4000+ plugins takes 10+ seconds \u2014 async fire-and-forget is required.",
-    "Static linking (x64-windows-static) required \u2014 dynamic linking causes SKSE load failure.",
-    "Blueprint outputPath is essential \u2014 full blueprint JSON for modded characters is 130KB-627KB, overflows MCP context window without it.",
+    "Save game with 4000+ plugins takes 10+ seconds — async fire-and-forget is required.",
+    "Static linking (x64-windows-static) required — dynamic linking causes SKSE load failure.",
+    "Blueprint outputPath is essential — full blueprint JSON for modded characters is 130KB-627KB, overflows MCP context window without it.",
     "Bulk add items (36 items, 0 failures) works reliably for character replication.",
-    "GetPerks new build returns 708 perks (was 12) \u2014 old build only iterated base perks.",
-    "GetKnownSpells new build returns 1,394 spells (was 1) \u2014 old build had broken spell iteration.",
+    "GetPerks new build returns 708 perks (was 12) — old build only iterated base perks.",
+    "GetKnownSpells new build returns 1,394 spells (was 1) — old build had broken spell iteration.",
     "GetAppearance returns full face morphs (19 values), head parts (29 entries including HDT hair), and carry weight.",
-    "SetWeather name search fails but direct FormID works \u2014 Sky::ForceWeather() API is fine, name resolution needs fix.",
-    "UnlockDoor/LockDoor tool wrappers return 'script command not found' but raw console commands work \u2014 formatting issue.",
-    "BUG-007 CTD was po3_SaveUnbaker.dll, not our plugin \u2014 closed as external.",
-    "UnlockShout confirmed working \u2014 Disarm shout taught, count 52\u219255.",
-    "KillActor confirmed working \u2014 hostile rabbit killed, returns wasEssential/wasProtected flags.",
-    "GetCrosshairRef confirmed \u2014 returns actor details including race, level, essential, dead status.",
-    "DiscoverAllMapMarkers confirmed \u2014 tmm 0 then discover restored all markers.",
-    "BUG-006 was a one-line C# bug \u2014 ExecuteConsoleCommand returned hardcoded message instead of plugin response data. Plugin captured output correctly the entire time via lastMessage. All VPrint hook/trampoline/open-console attempts were chasing the wrong problem.",
-    "Pure C++ SKSE plugins (SmoothCam, ENB) can be integrated via config file R/W \u2014 no API needed. ReadPluginConfig/WritePluginConfig pattern works for any JSON/INI config.",
+    "SetWeather name search fails but direct FormID works — Sky::ForceWeather() API is fine, name resolution needs fix.",
+    "UnlockDoor/LockDoor tool wrappers return 'script command not found' but raw console commands work — formatting issue.",
+    "BUG-007 CTD was po3_SaveUnbaker.dll, not our plugin — closed as external.",
+    "UnlockShout confirmed working — Disarm shout taught, count 52→55.",
+    "KillActor confirmed working — hostile rabbit killed, returns wasEssential/wasProtected flags.",
+    "GetCrosshairRef confirmed — returns actor details including race, level, essential, dead status.",
+    "DiscoverAllMapMarkers confirmed — tmm 0 then discover restored all markers.",
+    "BUG-006 was a one-line C# bug — ExecuteConsoleCommand returned hardcoded message instead of plugin response data. Plugin captured output correctly the entire time via lastMessage. All VPrint hook/trampoline/open-console attempts were chasing the wrong problem.",
+    "Pure C++ SKSE plugins (SmoothCam, ENB) can be integrated via config file R/W — no API needed. ReadPluginConfig/WritePluginConfig pattern works for any JSON/INI config.",
     "Papyrus VM DispatchStaticCall must NOT be called from game thread (deadlock). Call from pipe thread, callback fires on game thread asynchronously."
   ],
   "pluginIntegrations": [
@@ -5935,7 +5954,7 @@
       "plugin": "skee64.dll",
       "category": "appearance",
       "tier": "high",
-      "description": "RaceMenu/SKEE \u2014 full character appearance customization. Face morphs, overlays, body morphs, sculpt data.",
+      "description": "RaceMenu/SKEE — full character appearance customization. Face morphs, overlays, body morphs, sculpt data.",
       "repo": "https://github.com/expired6978/SKSE64Plugins",
       "status": "needs-research",
       "capabilities": [
@@ -5965,7 +5984,7 @@
       "plugin": "OStim.dll",
       "category": "gameplay",
       "tier": "medium",
-      "description": "OStim framework \u2014 scene management, animation control.",
+      "description": "OStim framework — scene management, animation control.",
       "repo": "https://github.com/VersuchDrei/OStimNG",
       "status": "needs-research",
       "capabilities": [
@@ -6033,7 +6052,7 @@
       "plugin": "Precision.dll",
       "category": "combat",
       "tier": "medium",
-      "description": "Precision \u2014 accurate melee collision, hit detection.",
+      "description": "Precision — accurate melee collision, hit detection.",
       "repo": "https://github.com/ersh1/PrecisionSE",
       "status": "needs-research",
       "capabilities": [
@@ -6046,7 +6065,7 @@
       "plugin": "po3_Tweaks.dll",
       "category": "engine",
       "tier": "medium",
-      "description": "Powerofthree's Tweaks \u2014 engine extensions, editor ID caching, condition fixes.",
+      "description": "Powerofthree's Tweaks — engine extensions, editor ID caching, condition fixes.",
       "repo": "https://github.com/powerof3/po3-Tweaks",
       "status": "needs-research",
       "capabilities": [
@@ -6060,7 +6079,7 @@
       "plugin": "po3_PapyrusExtender.dll",
       "category": "scripting",
       "tier": "high",
-      "description": "Papyrus Extender \u2014 massive Papyrus function library. Actor, form, string, array, JSON, file operations.",
+      "description": "Papyrus Extender — massive Papyrus function library. Actor, form, string, array, JSON, file operations.",
       "repo": "https://github.com/powerof3/PapyrusExtenderSSE",
       "status": "needs-research",
       "capabilities": [
@@ -6078,7 +6097,7 @@
       "plugin": "po3_SpellPerkItemDistributor.dll",
       "category": "distribution",
       "tier": "low",
-      "description": "SPID \u2014 distributes spells/perks/items to NPCs. Read-only interest \u2014 query what was distributed.",
+      "description": "SPID — distributes spells/perks/items to NPCs. Read-only interest — query what was distributed.",
       "repo": "https://github.com/powerof3/Spell-Perk-Item-Distributor",
       "status": "needs-research",
       "capabilities": [
@@ -6090,7 +6109,7 @@
       "plugin": "Experience.dll",
       "category": "gameplay",
       "tier": "medium",
-      "description": "Experience mod \u2014 XP-based leveling instead of skill-based.",
+      "description": "Experience mod — XP-based leveling instead of skill-based.",
       "repo": "https://github.com/Jeamena/SkyrimExperience",
       "status": "needs-research",
       "capabilities": [
@@ -6104,7 +6123,7 @@
       "plugin": "po3_SeasonsOfSkyrim.dll",
       "category": "world",
       "tier": "medium",
-      "description": "Seasons of Skyrim \u2014 seasonal world changes.",
+      "description": "Seasons of Skyrim — seasonal world changes.",
       "repo": "https://github.com/powerof3/SeasonsOfSkyrim",
       "status": "needs-research",
       "capabilities": [
@@ -6132,7 +6151,7 @@
       "plugin": "wheeler.dll",
       "category": "ui",
       "tier": "medium",
-      "description": "Wheeler \u2014 action wheel UI. Per-save wheel configuration.",
+      "description": "Wheeler — action wheel UI. Per-save wheel configuration.",
       "repo": "https://github.com/D7ry/wheeler",
       "status": "needs-research",
       "capabilities": [
@@ -6146,7 +6165,7 @@
       "plugin": "OpenAnimationReplacer.dll",
       "category": "animation",
       "tier": "medium",
-      "description": "OAR \u2014 conditional animation replacement.",
+      "description": "OAR — conditional animation replacement.",
       "repo": "https://github.com/ersh1/OpenAnimationReplacer",
       "status": "needs-research",
       "capabilities": [
@@ -6159,7 +6178,7 @@
       "plugin": "DbSkseFunctions.dll",
       "category": "scripting",
       "tier": "medium",
-      "description": "Database-style SKSE functions \u2014 extended Papyrus operations.",
+      "description": "Database-style SKSE functions — extended Papyrus operations.",
       "repo": null,
       "status": "needs-research",
       "capabilities": [
@@ -6198,7 +6217,7 @@
       "plugin": "QuickLootIE.dll",
       "category": "ui",
       "tier": "low",
-      "description": "Quick loot menu \u2014 Fallout 4 style loot popup.",
+      "description": "Quick loot menu — Fallout 4 style loot popup.",
       "repo": null,
       "status": "needs-research",
       "capabilities": [
@@ -6211,7 +6230,7 @@
       "plugin": "po3_PhotoMode.dll",
       "category": "utility",
       "tier": "medium",
-      "description": "Photo mode \u2014 freeze game, control camera, take screenshots.",
+      "description": "Photo mode — freeze game, control camera, take screenshots.",
       "repo": "https://github.com/powerof3/PhotoMode",
       "status": "needs-research",
       "capabilities": [
@@ -6239,7 +6258,7 @@
       "plugin": "OBody.dll",
       "category": "appearance",
       "tier": "medium",
-      "description": "OBody \u2014 per-NPC body morph management.",
+      "description": "OBody — per-NPC body morph management.",
       "repo": null,
       "status": "needs-research",
       "capabilities": [
@@ -6252,7 +6271,7 @@
       "plugin": "MoreInformativeConsole.dll",
       "category": "console",
       "tier": "low",
-      "description": "Enhanced console \u2014 shows more info when clicking objects in console.",
+      "description": "Enhanced console — shows more info when clicking objects in console.",
       "repo": "https://github.com/Jeamena/MoreInformativeConsole",
       "status": "needs-research",
       "capabilities": [
