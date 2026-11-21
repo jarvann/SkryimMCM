@@ -198,6 +198,9 @@ public class CrashTools : ToolBase
         }
 
         object? previousCrash = previous != null ? DecodeRecorder(previous, entries, out _) : null;
+        // The plugin keeps every session without a normal exit; one SkyLink quit itself (RestartGame) isn't a crash.
+        string? previousNote = previousCrash != null && JsonSerializer.SerializeToNode(previousCrash)?["notACrash"]?.GetValue<bool>() == true
+            ? "previousCrash is the session RestartGame quit: kept because it had no normal exit, but it wasn't a crash." : null;
         // FEAT-264: older unclean sessions kept by the plugin (previous-2 ... previous-5), summarised.
         var older = new List<object>();
         for (var n = 2; n <= 5; n++)
@@ -217,7 +220,7 @@ public class CrashTools : ToolBase
                 lastSessionNote = "The game is running, so lastSession is this session; pass recorderCurrent=true to see it.";
         }
 
-        return new { previousCrash, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
+        return new { previousCrash, previousNote, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
     }
 
     private static object DecodeRecorder(FileInfo file, int maxEntries, out bool running)
@@ -278,8 +281,11 @@ public class CrashTools : ToolBase
 
         // BUG-063: on 1.7.104 a Quit to Desktop ends the process without any of the signals the recorder watches, so an
         // unmarked session is judged by whether a crash report was written when it ended.
+        // A quit SkyLink asked for (RestartGame's quit_game) sets the game's quit flag, so the session is marked "quitting" and
+        // then ends without a normal exit like any quit on this game version: not a crash unless a report was written.
+        var quitBySkyLink = !running && list.Any(x => x.text.StartsWith("> quit_game"));
         string? crashReport = null;
-        if (exitState == 0 && !running && list.Count > 0)
+        if ((exitState == 0 || (exitState == 2 && quitBySkyLink)) && !running && list.Count > 0)
         {
             var end = LocalTime(list[^1].ms);
             var report = FindCrashLogs(null).FirstOrDefault(f => f.LastWriteTime >= end.AddSeconds(-5) && f.LastWriteTime <= end.AddMinutes(5));
@@ -288,6 +294,8 @@ public class CrashTools : ToolBase
         string exit = exitState switch
         {
             1 => "exited cleanly",
+            0 or 2 when quitBySkyLink && crashReport != null => $"crashed while quitting: SkyLink asked the game to quit (RestartGame) and a crash report was written ({crashReport})",
+            0 or 2 when quitBySkyLink => "quit by SkyLink (RestartGame asked the game to quit): a normal quit, not a crash",
             0 when !running && crashReport != null => $"crashed: a crash report was written when it ended ({crashReport})",
             0 when !running && list.Count > 0 && !CrashReporterInstalled() => "ended without an exit mark, and no crash reporter " +
                 "(Crash Logger SSE) is installed, so a crash can't be told from a normal quit (this game version ends the process " +
@@ -307,6 +315,7 @@ public class CrashTools : ToolBase
             lastEntry = list.Count > 0 ? LocalTime(list[^1].ms).ToString("yyyy-MM-dd HH:mm:ss.fff") : null,
             exit,
             exitTime = exitMs != 0 ? LocalTime(exitMs).ToString("yyyy-MM-dd HH:mm:ss") : null,
+            notACrash = quitBySkyLink && crashReport == null ? true : (bool?)null,
             pluginVersion,
             gameVersion,
             totalEntriesWritten = writeIndex,
