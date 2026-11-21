@@ -3522,6 +3522,10 @@
             {
               "datetime": "2026-11-21T12:50",
               "note": "Second cause: the vanilla head carries the head bone's offset in its own shape transform too, so it was counted twice. Skinned shapes are now placed by their bones only. Tested in game on GOG through scripts/mcp-call.py: all 29 vanilla hairs from the BSA measure short/bob/shoulder (lengthRatio 0.64-1.33) and the contact sheet draws them on the head. Eye pieces read through the same path (eyesmale.nif checked offline: at the eyes, z 124); SculptFace itself needs RaceMenu, so not run on vanilla GOG."
+            },
+            {
+              "datetime": "2026-11-21T15:05",
+              "note": "Eye pieces from the BSA tested on Steam (RaceMenu): with the loose EyesFemaleChargen.tri renamed aside, a SculptFace dry run read the archive copy (53 verts moved, sized to the capture's eye width), no error; file restored. FEAT-254 fully tested."
             }
           ],
           "targetRelease": "1.5"
@@ -5250,7 +5254,7 @@
         {
           "id": "BUG-099",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Round C (Aniya flood, Steam): LoadSave, trend labels and StopRunaway wording",
           "description": "LoadSave answered loading:true for a save that doesn't exist (now refused, with close matches scored on shared words; MO2 profile saves accepted). StackReport called a ~60/s event flood 'creeping' and said it 're-registers' (now 'climbing fast (about N a minute)' past 100/min, with the cause matched to update loop, event or neither; says trends need 3 calls). StopRunaway's dry run now warns for event handlers; real runs on an event flood set no block and drop the contradicting OnUpdate note.",
@@ -5258,6 +5262,10 @@
             {
               "datetime": "2026-11-21T14:25",
               "note": "Found by the Tester on Steam with TEST_StackFlood_Aniya_DO_NOT_PLAY; StopRunaway's event-flood reading, the hand-set updateBlock in CheckConnection and the qqq 'quit by SkyLink' label passed. Fixes deployed; retest pending."
+            },
+            {
+              "datetime": "2026-11-21T15:05",
+              "note": "Retest passed: missing-save refusal, 3-call note, 'climbing fast (about 2,965 more a minute; the event keeps firing...)', StopRunaway dry-run warning; 'high but falling (127 -> 114 -> 102)' seen on Save122. Last tweaks deployed after the retest (rising-every-call beats stuck high, 'draining' headline, stacksListed): logic small, not seen in game (the pile drained before it could be)."
             }
           ],
           "targetRelease": "1.5"
@@ -5554,6 +5562,22 @@
             {
               "datetime": "2026-11-21T14:25",
               "note": "The Tester's idea after the Wheeler crash."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-291",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Small diagnostics polish from round C",
+          "description": "StackReport says once when a handler flagged in earlier calls has cleared ('X: cleared, 0 left'). SculptFace's moved entries name each host's source (loose or bsa), as FindHairstyles does. A notifications setting (off / normal / verbose) if Cory wants it.",
+          "history": [
+            {
+              "datetime": "2026-11-21T15:05",
+              "note": "The Tester's suggestions after the 1.5 retest; Cory's notification question."
             }
           ],
           "targetRelease": "1.6",
