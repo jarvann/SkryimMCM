@@ -88,7 +88,7 @@ cd W:\home\cory\personal\skyrim_mcp
 #   scripts/deploy-from-wsl.sh [-r ref] [-p plugin only | -s server only] [-c configure] [log-name]
 
 # Release build for Nexus
-.\build_release.ps1 -Version "1.4.0"
+.\build_release.ps1 -Version "1.5.0"
 ```
 
 **Requires:** Visual Studio 2022 (or Build Tools) C++ workload, CMake 3.21+, vcpkg at `C:\vcpkg`, .NET 10 SDK

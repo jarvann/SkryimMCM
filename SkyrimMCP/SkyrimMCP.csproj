@@ -10,7 +10,7 @@
     <AssemblyTitle>SkyLink AI</AssemblyTitle>
     <Product>SkyLink AI</Product>
     <Description>MCP server connecting AI assistants to Skyrim SE/AE — 89 tools for real-time game interaction</Description>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <!-- Run as "dotnet SkyrimMCP.dll"; no SkyrimMCP.exe apphost (SmartScreen and antivirus flag unsigned .exe files). -->
     <UseAppHost>false</UseAppHost>
     <!-- Windows x64 only: keeps the ONNX Runtime native DLL for win-x64 and drops the other platforms'. -->
