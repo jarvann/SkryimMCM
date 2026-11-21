@@ -595,7 +595,10 @@ public class UtilityTools : ToolBase
         if (Directory.Exists(folder) && !File.Exists(Path.Combine(folder, bare + ".ess")) &&
             !(profileSaves != null && File.Exists(Path.Combine(profileSaves, bare + ".ess"))))
         {
-            var words = bare.Split(new[] { '_', ' ', '-' }, StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length >= 4).ToArray();
+            // Words only (round C: "2026" and "11" matched every dated save and recency filled the list), with camel case split
+            // so StackTest finds StackFlood through "Stack".
+            var words = System.Text.RegularExpressions.Regex.Matches(bare, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])")
+                .Select(m => m.Value).Where(w => w.Length >= 4).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var close = new DirectoryInfo(folder).EnumerateFiles("*.ess")
                 .Select(f => (name: Path.GetFileNameWithoutExtension(f.Name), hits: words.Count(w => f.Name.Contains(w, StringComparison.OrdinalIgnoreCase)), f.LastWriteTimeUtc))
                 .Where(x => x.hits > 0).OrderByDescending(x => x.hits).ThenByDescending(x => x.LastWriteTimeUtc).Take(5).Select(x => x.name).ToArray();
