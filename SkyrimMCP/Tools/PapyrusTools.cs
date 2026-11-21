@@ -409,10 +409,15 @@ public class PapyrusTools : ToolBase
 
         // Round B: copies still running re-register as they finish (the wendigo loop one second later), long after any short
         // watch. Block these objects' update registrations for the rest of the session (until a save loads or release=true).
+        // No registration at all in 10 s: not an update loop (an event handler such as OnMagicEffectApply, or a Wait loop).
+        // Blocking updates wouldn't touch it, so don't, and say so.
         JsonNode? block = null;
         string? blockError = null;
-        try { block = await _pipe.SendRequestAsync("block_updates", new JsonObject { ["handles"] = handles.DeepClone() }); }
-        catch (ModelContextProtocol.McpException ex) { blockError = ex.Message; }
+        if (removed > 0)
+        {
+            try { block = await _pipe.SendRequestAsync("block_updates", new JsonObject { ["handles"] = handles.DeepClone() }); }
+            catch (ModelContextProtocol.McpException ex) { blockError = ex.Message; }
+        }
         int? after = null;
         try
         {
@@ -437,7 +442,9 @@ public class PapyrusTools : ToolBase
                   "(StopRunaway with release: true lifts it sooner). Copies still running finish without starting new ones, so the count should stop " +
                   "rising and fall over the next minutes: check with StackReport. The mod's feature on these objects is off meanwhile."
                 : removed == 0
-                    ? "None of these objects had an update registration in the last 10 s: the loop may not be an OnUpdate re-registering itself (events or a Wait loop), and the block isn't available on this plugin build."
+                    ? "None of these objects had an update registration in the 10 s watched, so this isn't an OnUpdate loop: it is an event " +
+                      "handler being triggered over and over (OnMagicEffectApply, OnHit...) or a Wait loop, which StopRunaway can't stop. Nothing was " +
+                      "blocked. The fix is in the mod: its settings (MCM), an update, or a script patch (CompileScript, PackageOverrideMod)."
                     : $"Removed {removed} registration(s) in 10 s ({(stillComing > 0 ? "some were still coming back" : "none came back in that time")}), but copies still running re-register as they finish: without the block (newer plugin DLL) this can't hold. Check with StackReport.",
             note = "This stops new OnUpdate calls; it doesn't end stacks already running. Those finish at their own pace (often minutes for " +
                    "a long loop), so stacksAfter5s barely moves: judge it with StackReport over the next minutes (falling = stopped). " +
