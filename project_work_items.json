@@ -5582,6 +5582,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-292",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Clean saves with ReSaver Plus Plus (no Java) as well as ReSaver",
+          "description": "ReSaver Plus Plus (Nexus 196293, github.com/Tonycubed2/ResaverPP, Apache-2.0, a C++ port of ReSaver by tonycubed2) ships resaverpp-cli.exe with --remove-unattached, --remove-undefined, --purge-script <Script> [--keep-instances], --remove-not-installed, --remove-mod, --dry-run and -o <new save>. CleanSave and CleanAndReload find either cleaner (settings path, Nexus/MO2/Vortex install folders) and use the CLI when present, ReSaver's Java library otherwise; the reply names which one ran. When only ReSaver++ is found and the CLI can't do a requested clean, say so plainly. Run as a separate program (nothing shipped); pin the options to the version tested, since it updates often.",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:00",
+              "note": "DutchiesCanadian on Nexus: 'Why you no use ReSaver Plus Plus? I had a moment with figuring out I was using the wrong one'. Cory: add it. Estimate 4-8 human hours; Claude ~1-1.5 h, 0.4-0.6M tokens."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     }
