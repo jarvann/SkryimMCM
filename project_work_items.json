@@ -5622,6 +5622,65 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-293",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Voice lines for a follower, auditioned live (ElevenLabs)",
+          "stretch": true,
+          "description": "A small SkyLink carrier plugin (shipped once, one restart to install) holds a few general topics with fixed voice-file paths. Loop: the player says what the follower should say; ElevenLabs makes the audio with the player's own API key (never shipped); it plays on the PC first; SkyLink converts it to the game's format (xWMA via the Creation Kit's xWMAEncode, lip file via the Creation Kit's LipGen, packed as .fuz) and writes it to a carrier line's path; the NPC says it in game, lip-synced (voice files are read from disk each time a line is spoken). Keep or redo in seconds. Subtitles show as a notification while auditioning. Stock or designed voices only: no cloning of real voice actors.",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:05",
+              "note": "Cory: voice gen packaged with the follower, 'what do you want them to say', play it, link it to the dialogue. Agreed as a 1.6 stretch, voice first. Estimate 15-25 human hours; Claude 2-3 h, 0.8-1.2M tokens."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-122"
+          ]
+        },
+        {
+          "id": "FEAT-294",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Custom follower dialogue: auditioned live, written into the exported mod",
+          "stretch": true,
+          "description": "Lines tried through the carrier topics (FEAT-293) become real dialogue records (quest, topics, responses with conditions) with their voice files in the follower's own plugin at export (FEAT-283); one restart, then SkyLink checks the lines in game. Plugin records written by SkyLink's own writer (FEAT-273).",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:05",
+              "note": "Cory: 'develop' dialogue beyond the out-of-the-box lines, not a full mod. Estimate 10-15 human hours; Claude 1.5-2 h, 0.6-0.8M tokens."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-293",
+            "FEAT-283"
+          ]
+        },
+        {
+          "id": "FEAT-295",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "Live AI behaviour beyond the defaults (package overrides and carrier packages)",
+          "stretch": true,
+          "description": "Live: apply existing packages to an NPC at runtime (PapyrusUtil package overrides when installed) and carrier packages in SkyLink's plugin whose place and target are filled while the game runs (sandbox here, patrol between points, guard a spot). New package logic (schedules, new procedure combinations) is written into the exported mod and needs one restart. Fully authored packages stay 2.1.",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:05",
+              "note": "Cory: AI packages beyond the out-of-the-box ones, if we can swing it. Estimate 8-12 human hours; Claude 1-1.5 h, 0.4-0.6M tokens."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-122",
+            "FEAT-293"
+          ]
         }
       ]
     }
