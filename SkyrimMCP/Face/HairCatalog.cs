@@ -49,9 +49,9 @@ public static class HairCatalog
         if (path != null)
         {
             var info = new FileInfo(path);
-            stamp = $"v2:{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
+            stamp = $"v3:{info.Length}:{info.LastWriteTimeUtc.Ticks}:{head.Top:0.0}:{head.Bottom:0.0}";
         }
-        else if (MeshFiles.Source(model) == "bsa") stamp = $"v2:bsa:{head.Top:0.0}:{head.Bottom:0.0}";
+        else if (MeshFiles.Source(model) == "bsa") stamp = $"v3:bsa:{head.Top:0.0}:{head.Bottom:0.0}";
         else return null;
         lock (CacheLock)
         {
