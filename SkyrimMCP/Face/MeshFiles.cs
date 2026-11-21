@@ -27,6 +27,18 @@ public static class MeshFiles
         return Archives().Any(b => b.Contains(inArchive)) ? "bsa" : null;
     }
 
+    /// <summary>
+    /// Any file inside the archives SkyLink reads (mesh and script archives, not textures or sounds), by its path relative to
+    /// Data (BUG-100: GetScriptSource missed RaceMenu's CharGen.psc, packed in RaceMenu.bsa). Returns the bytes and the archive.
+    /// </summary>
+    public static (byte[] Bytes, string Archive)? ReadFromArchives(string dataRelativePath)
+    {
+        var p = dataRelativePath.Replace('/', '\\').TrimStart('\\');
+        foreach (var bsa in Archives())
+            if (bsa.Contains(p) && bsa.Read(p) is byte[] bytes) return (bytes, bsa.Path);
+        return null;
+    }
+
     // BUG-065: a path given relative to Data (meshes\actors\...) was looked up under meshes\meshes, so a follower's loose face
     // file read as missing.
     private static string Relative(string meshPath)
