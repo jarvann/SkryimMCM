@@ -3494,7 +3494,7 @@
         {
           "id": "FEAT-254",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "Meshes read from BSA archives (hair picker, sculpt eye pieces)",
           "description": "Some hair packs ship their meshes in BSA archives (KS Hairdos - Wigs SE by Xtudo.bsa here: 108 wig meshes). BsaArchive reads SE archives (version 105): folder and file records, the name tables, embedded names, per-file compression toggles, LZ4 frame decoding written in (no new package). MeshFiles.Read returns a mesh from a loose file first (MO2 overwrite and mods, Data), else from any mesh archive (texture and sound archives skipped). FindHairstyles, its contact sheet and the sculpt brush's TRI pieces use it. Also fixed in NifShape: Skyrim SE always stores full-precision positions (a wig's vertex flags lacked VF_FULLPREC and read as garbage half floats).",
@@ -3518,6 +3518,10 @@
             {
               "datetime": "2026-11-21T12:30",
               "note": "Tested on GOG (vanilla hairs from Skyrim - Meshes0.bsa): archives read (all 29 'source: bsa') but every hair sat about 120 units low (lengthRatio ~6, nothing drawn). Cause: vanilla hair keeps vertices relative to the head bone; mod wigs use character space. Fixed: skinned vertices placed via the dominant bone's skin transform and node chain (checked offline: vanilla z 110-133, KS wigs unchanged). Needs a GOG retest; sculpt eye pieces need RaceMenu with archived eyes (not testable on vanilla GOG)."
+            },
+            {
+              "datetime": "2026-11-21T12:50",
+              "note": "Second cause: the vanilla head carries the head bone's offset in its own shape transform too, so it was counted twice. Skinned shapes are now placed by their bones only. Tested in game on GOG through scripts/mcp-call.py: all 29 vanilla hairs from the BSA measure short/bob/shoulder (lengthRatio 0.64-1.33) and the contact sheet draws them on the head. Eye pieces read through the same path (eyesmale.nif checked offline: at the eyes, z 124); SculptFace itself needs RaceMenu, so not run on vanilla GOG."
             }
           ],
           "targetRelease": "1.5"
@@ -5227,7 +5231,7 @@
         {
           "id": "BUG-097",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "GetCrashLog showed the Steam game's reports while the GOG game was connected",
           "description": "Crash reports and recorder sessions were searched across every game's documents folder and the newest won, so with GOG connected GetCrashLog returned Steam's logs (1.7.104 sessions). Now only the connected game's folder is searched (the server keeps it after a crash); every folder before any game has connected, with 'searched' saying which. Also: a quit sent as the console's qqq/QuitGame through ExecuteConsoleCommand counts as quit by SkyLink, like RestartGame's.",
@@ -5235,6 +5239,10 @@
             {
               "datetime": "2026-11-21T12:30",
               "note": "Found by the Tester on GOG in round B; fixed and deployed to the server the same day."
+            },
+            {
+              "datetime": "2026-11-21T12:50",
+              "note": "Tested on GOG: reports, recorder and Windows dumps now only from the connected game (Steam's dump was also shown before; dumps are filtered by the exe folder in their module list). GetCrashLog also asks a running game which one it is first, so a freshly restarted server doesn't fall back to every game's folders."
             }
           ],
           "targetRelease": "1.5"
@@ -5503,6 +5511,22 @@
             }
           ],
           "targetRelease": "1.6"
+        },
+        {
+          "id": "BUG-098",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "A second game launch rotates the running game's recorder and log files",
+          "description": "Launching the game while it already runs starts a second SkyrimSE that loads SKSE and the host before exiting: it renames the running game's crash-recorder.bin to previous and truncates SkyrimMCPPlugin.log. Seen 2026-11-21 on GOG (a launch through MO2 while the game ran). Fix: at start, if the current recorder file's process is a live SkyrimSE other than this one, leave the files alone (no recorder, append-only log).",
+          "history": [
+            {
+              "datetime": "2026-11-21T12:50",
+              "note": "Caused by the dev session launching GOG without checking it was running. Host DLL change: needs a game restart to test."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     }
