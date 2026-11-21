@@ -5290,6 +5290,10 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Moved from 2.0 to 1.6, the Characters release (Cory)."
+            },
+            {
+              "datetime": "2026-11-21T15:45",
+              "note": "Appearance via CharGen.LoadCharacter(npc, race, preset) through the Papyrus bridge when RaceMenu is installed. Open question: does the preset mapping survive a reload when SkyLink recreates the runtime base (new form ID)?"
             }
           ],
           "priority": "high",
@@ -5418,6 +5422,10 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "The shared core of the Characters release: once it exists, most of FEAT-122 and FEAT-256 is done."
+            },
+            {
+              "datetime": "2026-11-21T15:45",
+              "note": "RaceMenu's CharGen has ExportHead (the player's head NIF and tint DDS), LoadCharacter (a preset onto any actor), SaveExternalCharacter/LoadExternalCharacter and DeleteFaceGenData. Plan: with RaceMenu, FaceGen files come from ExportHead after putting the face on the player; SkyLink's own NIF writer becomes the no-RaceMenu fallback (batch E). See docs/1.6-plan.md."
             }
           ],
           "targetRelease": "1.6",
@@ -5594,6 +5602,22 @@
             {
               "datetime": "2026-11-21T16:00",
               "note": "DutchiesCanadian on Nexus: 'Why you no use ReSaver Plus Plus? I had a moment with figuring out I was using the wrong one'. Cory: add it. Estimate 4-8 human hours; Claude ~1-1.5 h, 0.4-0.6M tokens."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-100",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "GetScriptSource and CompileScript didn't read sources packed in BSA archives",
+          "description": "GetScriptSource searched loose files only, so RaceMenu's CharGen.psc (in RaceMenu.bsa, scripts\\source\\) read as missing; FEAT-270/272 promised BSA sources. GetScriptSource now falls back to every mesh/script archive (scripts\\source and source\\scripts layouts) and names the archive. Still to do: CompileScript stages archive sources of the mods a patch imports.",
+          "history": [
+            {
+              "datetime": "2026-11-21T15:45",
+              "note": "Found while planning 1.6 (looking for RaceMenu's CharGen API). GetScriptSource part fixed and checked from WSL: CharGen.psc read from RaceMenu.bsa in 1.4 s. CompileScript part open."
             }
           ],
           "targetRelease": "1.6",
