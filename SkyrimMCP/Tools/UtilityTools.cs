@@ -586,6 +586,21 @@ public class UtilityTools : ToolBase
         "CAUTION: Any unsaved progress will be lost. Use SaveGame first if needed.")]
     public async Task<object> LoadSave(string saveName)
     {
+        // Round C: a name that doesn't exist answered {"loading":true} and the game stayed where it was.
+        var folder = SaveTools.SaveFolder();
+        var bare = saveName.EndsWith(".ess", StringComparison.OrdinalIgnoreCase) ? saveName[..^4] : saveName;
+        // MO2 profiles with local saves keep them in the profile's own saves folder.
+        var (mo2, profile) = SkyLinkSettings.Mo2Instance();
+        var profileSaves = mo2 != null ? Path.Combine(mo2, "profiles", profile ?? "Default", "saves") : null;
+        if (Directory.Exists(folder) && !File.Exists(Path.Combine(folder, bare + ".ess")) &&
+            !(profileSaves != null && File.Exists(Path.Combine(profileSaves, bare + ".ess"))))
+        {
+            var words = bare.Split(new[] { '_', ' ', '-' }, StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length >= 4).ToArray();
+            var close = new DirectoryInfo(folder).EnumerateFiles("*.ess")
+                .Select(f => (name: Path.GetFileNameWithoutExtension(f.Name), hits: words.Count(w => f.Name.Contains(w, StringComparison.OrdinalIgnoreCase)), f.LastWriteTimeUtc))
+                .Where(x => x.hits > 0).OrderByDescending(x => x.hits).ThenByDescending(x => x.LastWriteTimeUtc).Take(5).Select(x => x.name).ToArray();
+            return new { error = $"No save named \"{bare}\" in {folder}. Nothing was loaded.", closeMatches = close.Length > 0 ? close : null, hint = "ListSaves(filter) finds saves by name, character or location." };
+        }
         var data = await _pipe.SendRequestAsync("load_save", new JsonObject { ["saveName"] = saveName });
         return DeserializeResponse(data);
     }
