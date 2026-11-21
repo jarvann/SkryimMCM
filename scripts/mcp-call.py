@@ -5,6 +5,7 @@ Starts the deployed server (SkyrimMCP.dll, with Windows' dotnet), runs the MCP h
 order and prints each result. The server is a second pipe client next to Claude Desktop's (the plugin serves up to 4).
 
     scripts/mcp-call.py --list                                   # tool names
+    scripts/mcp-call.py --manifest > tools.json                  # names, descriptions and input schemas
     scripts/mcp-call.py check_connection
     scripts/mcp-call.py find_hairstyles '{"sheet":true}' get_crash_log '{"index":0}'
 
@@ -68,6 +69,11 @@ def main(argv):
             if name == "--list":
                 tools = request("tools/list", {}).get("result", {}).get("tools", [])
                 print("\n".join(sorted(t["name"] for t in tools)))
+                continue
+            if name == "--manifest":
+                # Every tool's name, description and input schema as JSON (for review in another AI client).
+                tools = request("tools/list", {}).get("result", {}).get("tools", [])
+                print(json.dumps(sorted(tools, key=lambda t: t["name"]), indent=1, ensure_ascii=False))
                 continue
             reply = request("tools/call", {"name": name, "arguments": args})
             print(f"=== {name} {json.dumps(args) if args else ''}")
