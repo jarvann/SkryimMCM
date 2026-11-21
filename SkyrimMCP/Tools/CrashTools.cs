@@ -137,14 +137,27 @@ public class CrashTools : ToolBase
     private const int RecorderEntrySize = 256;
     private const int RecorderTextOffset = 24;
 
+    private static readonly System.Text.RegularExpressions.Regex QuitCommand =
+        new(@"""command""\s*:\s*""\s*(qqq|quitgame)\s*""", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
     private static readonly string[] RecorderKinds = { "?", "request", "event", "cell", "papyrus", "note" };
 
-    internal static IEnumerable<string> RecorderFolders()
+    // Round B (GOG): with the GOG game connected, GetCrashLog showed the Steam game's reports and recorder sessions (newest
+    // across all games). Once the server knows which game it talks to (it keeps that after a crash), only that game's
+    // documents folder is searched; before then, every game's.
+    internal static IEnumerable<string> GameDocumentFolders()
     {
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } connected)
+        {
+            yield return connected;
+            yield break;
+        }
+        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);  // follows OneDrive redirection
         foreach (var game in new[] { "Skyrim Special Edition", "Skyrim Special Edition GOG", "Skyrim VR" })
-            yield return Path.Combine(docs, "My Games", game, "SkyLinkAI");
+            yield return Path.Combine(docs, "My Games", game);
     }
+
+    internal static IEnumerable<string> RecorderFolders() => GameDocumentFolders().Select(d => Path.Combine(d, "SkyLinkAI"));
 
     // The newest copy of a recorder file across the game folders (Steam, GOG, VR).
     private static FileInfo? FindRecorderFile(string name)
@@ -220,7 +233,8 @@ public class CrashTools : ToolBase
                 lastSessionNote = "The game is running, so lastSession is this session; pass recorderCurrent=true to see it.";
         }
 
-        return new { previousCrash, previousNote, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
+        var searched = SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } g ? Path.GetFileName(g.TrimEnd('\\')) + " (the connected game)" : "every game's folder (no game connected since the server started)";
+        return new { searched, previousCrash, previousNote, olderUncleanSessions = older.Count > 0 ? older : null, lastSession, lastSessionNote };
     }
 
     private static object DecodeRecorder(FileInfo file, int maxEntries, out bool running)
@@ -283,7 +297,10 @@ public class CrashTools : ToolBase
         // unmarked session is judged by whether a crash report was written when it ended.
         // A quit SkyLink asked for (RestartGame's quit_game) sets the game's quit flag, so the session is marked "quitting" and
         // then ends without a normal exit like any quit on this game version: not a crash unless a report was written.
-        var quitBySkyLink = !running && list.Any(x => x.text.StartsWith("> quit_game"));
+        // Also the console's quit commands sent through ExecuteConsoleCommand (round B: a qqq session read as "most likely a
+        // normal quit or a forced close").
+        var quitBySkyLink = !running && list.Any(x => x.text.StartsWith("> quit_game") ||
+            (x.text.StartsWith("> execute_command") && QuitCommand.IsMatch(x.text)));
         string? crashReport = null;
         if ((exitState == 0 || (exitState == 2 && quitBySkyLink)) && !running && list.Count > 0)
         {
@@ -294,8 +311,8 @@ public class CrashTools : ToolBase
         string exit = exitState switch
         {
             1 => "exited cleanly",
-            0 or 2 when quitBySkyLink && crashReport != null => $"crashed while quitting: SkyLink asked the game to quit (RestartGame) and a crash report was written ({crashReport})",
-            0 or 2 when quitBySkyLink => "quit by SkyLink (RestartGame asked the game to quit): a normal quit, not a crash",
+            0 or 2 when quitBySkyLink && crashReport != null => $"crashed while quitting: SkyLink asked the game to quit (RestartGame or a console quit) and a crash report was written ({crashReport})",
+            0 or 2 when quitBySkyLink => "quit by SkyLink (RestartGame or a console quit asked the game to quit): a normal quit, not a crash",
             0 when !running && crashReport != null => $"crashed: a crash report was written when it ended ({crashReport})",
             0 when !running && list.Count > 0 && !CrashReporterInstalled() => "ended without an exit mark, and no crash reporter " +
                 "(Crash Logger SSE) is installed, so a crash can't be told from a normal quit (this game version ends the process " +
@@ -351,9 +368,8 @@ public class CrashTools : ToolBase
 
     internal static IEnumerable<string> SearchFolders(string? skyrimPath)
     {
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);  // follows OneDrive redirection
-        foreach (var game in new[] { "Skyrim Special Edition", "Skyrim Special Edition GOG", "Skyrim VR" })
-            yield return Path.Combine(docs, "My Games", game, "SKSE");
+        foreach (var docs in GameDocumentFolders())
+            yield return Path.Combine(docs, "SKSE");
         if (!string.IsNullOrEmpty(skyrimPath))
             yield return Path.Combine(skyrimPath, "Data", "NetScriptFramework", "Crash");
     }
