@@ -107,7 +107,7 @@ public partial class ModBuildTools : ToolBase
 
     [McpServerTool]
     [Description("Read a script's Papyrus source (.psc) by name, from loose files in the Data folder, MO2 mods (highest priority " +
-        "first) and the unpacked base-game sources. Says which folder (mod) it came from, and whether only the compiled .pex exists " +
+        "first), the unpacked base-game sources, then mods' BSA archives. Says which folder, mod or archive it came from, and whether only the compiled .pex exists " +
         "(many mods ship no source; SkyLink has no decompiler). Read-only. maxChars caps the text returned.")]
     public Task<object> GetScriptSource(string scriptName, int maxChars = 20000)
     {
@@ -123,6 +123,21 @@ public partial class ModBuildTools : ToolBase
                 script = name,
                 path,
                 from = VortexSource(path) is string mod ? $"Vortex mod {mod}" : DescribeFolder(folder),
+                lines = text.Count(c => c == '\n') + 1,
+                truncated = text.Length > maxChars,
+                source = text.Length > maxChars ? text[..maxChars] : text,
+            });
+        }
+        // BUG-100: many mods pack their sources in their BSA (RaceMenu's CharGen.psc), under either layout.
+        foreach (var inArchive in new[] { $"scripts\\source\\{name}.psc", $"source\\scripts\\{name}.psc" })
+        {
+            if (Face.MeshFiles.ReadFromArchives(inArchive) is not { } found) continue;
+            var text = System.Text.Encoding.UTF8.GetString(found.Bytes);
+            return Task.FromResult<object>(new
+            {
+                script = name,
+                path = inArchive,
+                from = $"archive {Path.GetFileName(found.Archive)}",
                 lines = text.Count(c => c == '\n') + 1,
                 truncated = text.Length > maxChars,
                 source = text.Length > maxChars ? text[..maxChars] : text,
