@@ -5444,6 +5444,10 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Brought forward from 2.0: FEAT-122 needs it (Cory: bring 2.0 items forward when 1.6 depends on them)."
+            },
+            {
+              "datetime": "2026-11-21T16:30",
+              "note": "Decided (Cory): SkyLinkAI.esl with NPC slots (and FEAT-293's carrier topics) ships as an optional FOMOD file, on by default. Without it, SpawnNpc makes a session-only preview from a runtime form. The lasting result is always the player's own ESP/ESL (FEAT-283), curated as their own mod. Built: spawn_npc / SpawnNpc (runtime copy of a plain NPC of the race and sex, face from the template or the player's via CharGen.SaveCharacter + LoadCharacter) and RemoveSpawnedNpc. Untested."
             }
           ],
           "targetRelease": "1.6",
@@ -5478,6 +5482,10 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Cory: 'I would love to see that loop closed completely.'"
+            },
+            {
+              "datetime": "2026-11-21T16:30",
+              "note": "Cory: the goal is that the player exports into their own ESP/ESL to curate as a dedicated mod. Requirements come from FEAT-296."
             }
           ],
           "targetRelease": "1.6",
@@ -5681,6 +5689,40 @@
             "FEAT-122",
             "FEAT-293"
           ]
+        },
+        {
+          "id": "FEAT-296",
+          "type": "feature",
+          "status": "planned",
+          "priority": "high",
+          "title": "Track a character's mod dependencies while it's built, for the export's requirements list",
+          "description": "Every form a character uses is recorded with the plugin it comes from as the character is built: race, head parts (hair, eyes, brows, scars), face sliders and overlays from RaceMenu extensions (ECE and others), skin and body (CBBE, 3BA...), outfit and weapons, voice type, spells and perks, packages, and the template NPC. At export (FEAT-283) this becomes a requirements list: each plugin mapped to its Nexus mod (name, mod ID, page link) from MO2's meta.ini or Vortex's mod records, with 'required' or 'optional' and why, ready to pick on Nexus's Requirements page, plus a README section. Flags anything from paid Creations or mods that don't allow dependents, and suggests swapping a form for a vanilla one when a dependency is heavy for one item.",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:30",
+              "note": "Cory: NPC development tracks the plugins and mods tied to the NPC, so when the player exports and hosts it on Nexus they know which dependencies to select."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-122"
+          ]
+        },
+        {
+          "id": "INFRA-025",
+          "type": "infrastructure",
+          "status": "planned",
+          "priority": "medium",
+          "title": "FOMOD installer for the release zip",
+          "description": "The release becomes a FOMOD (fomod\\ModuleConfig.xml and info.xml): SkyLink core (required) and SkyLinkAI.esl, NPC slots and voice carrier topics (optional, selected by default). build_release.ps1 builds the folders and checks the XML; manual install notes for players without a mod manager.",
+          "history": [
+            {
+              "datetime": "2026-11-21T16:30",
+              "note": "Cory: make it a FOMOD installer now; the NPC slot plugin is optional and defaults to on."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     }
