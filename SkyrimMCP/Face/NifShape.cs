@@ -76,7 +76,8 @@ public static class NifShape
                     var part = BitConverter.ToInt32(b, starts[shape.Skin] + 4);
                     if (TypeOf(part) == "NiSkinPartition" && bsVersion == 100) { points = ReadPartition(b, starts[part], bsVersion); into = partition; }
                 }
-                into.AddRange(ToCharacterSpace(b, starts, TypeOf, parent, shape.Skin, points));
+                // A skinned shape is placed by its bones (the game ignores its own transform); anything else by its own transform.
+                into.AddRange(ToCharacterSpace(b, starts, TypeOf, parent, shape.Skin, points) ?? points.Select(shape.Own.Apply).ToList());
             }
             catch (Exception) { /* an odd block: skip it */ }
         }
@@ -85,16 +86,18 @@ public static class NifShape
 
     // FEAT-254 (round B, GOG): vanilla hair keeps its vertices relative to the head bone (that bone's skin transform is the
     // identity), while mod wigs keep them in character space; read as they are, vanilla hair sat about 120 units low, at the
-    // character's feet. A skinned vertex lands at bone node (bone skin transform (v)): use the bone most vertices follow,
-    // which for hair is the head. For character-space meshes the two transforms cancel out.
-    private static List<(float, float, float)> ToCharacterSpace(byte[] b, int[] starts, Func<int, string> typeOf,
+    // character's feet. A skinned vertex lands at bone node (bone skin transform (v)), whatever the shape's own transform
+    // says (the vanilla head carries the head bone's offset there too, and counting it twice put the head 120 units high).
+    // Uses the bone most vertices follow, which for hair is the head. For character-space meshes the two transforms cancel
+    // out. Null when the shape isn't skinned or its skin can't be read.
+    private static List<(float, float, float)>? ToCharacterSpace(byte[] b, int[] starts, Func<int, string> typeOf,
         Dictionary<int, int> parent, int skin, List<(float, float, float)> points)
     {
-        if (points.Count == 0 || typeOf(skin) is not ("NiSkinInstance" or "BSDismemberSkinInstance")) return points;
+        if (points.Count == 0 || typeOf(skin) is not ("NiSkinInstance" or "BSDismemberSkinInstance")) return null;
         var q = starts[skin];
         var data = BitConverter.ToInt32(b, q);
         var boneCount = BitConverter.ToInt32(b, q + 12);
-        if (typeOf(data) != "NiSkinData" || boneCount <= 0) return points;
+        if (typeOf(data) != "NiSkinData" || boneCount <= 0) return null;
         var bones = new int[boneCount];
         for (var k = 0; k < boneCount; k++) bones[k] = BitConverter.ToInt32(b, q + 16 + 4 * k);
 
@@ -102,7 +105,7 @@ public static class NifShape
         var count = BitConverter.ToInt32(b, d);
         var weights = b[d + 4] != 0;
         d += 5;
-        if (count != boneCount) return points;
+        if (count != boneCount) return null;
         Xf? skinXf = null;
         var best = -1;
         var bestBone = -1;
@@ -112,7 +115,7 @@ public static class NifShape
             if (vertices > best) { best = vertices; skinXf = ReadSkinTransform(b, d); bestBone = bones[k]; }
             d += 70 + (weights ? vertices * 6 : 0);
         }
-        if (skinXf is not { } sx || typeOf(bestBone) is not ("NiNode" or "BSFadeNode")) return points;
+        if (skinXf is not { } sx || typeOf(bestBone) is not ("NiNode" or "BSFadeNode")) return null;
 
         // The bone's place in the character: its node transform and those of its parents, up to the root.
         var chain = new List<Xf>();
@@ -159,7 +162,8 @@ public static class NifShape
         return p + 52;
     }
 
-    private sealed record Shape(List<(float, float, float)> Points, bool FromDynamic, int Skin);
+    // Points in the shape's own space; Own is its transform.
+    private sealed record Shape(List<(float, float, float)> Points, bool FromDynamic, int Skin, Xf Own);
 
     private static Shape ReadTriShape(byte[] b, int p, bool isDynamic, uint bsVersion)
     {
@@ -184,8 +188,8 @@ public static class NifShape
             {
                 var q = p + v * vertexSize;
                 local.Add(fullPrecision
-                    ? own.Apply((BitConverter.ToSingle(b, q), BitConverter.ToSingle(b, q + 4), BitConverter.ToSingle(b, q + 8)))
-                    : own.Apply(((float)BitConverter.ToHalf(b, q), (float)BitConverter.ToHalf(b, q + 2), (float)BitConverter.ToHalf(b, q + 4))));
+                    ? (BitConverter.ToSingle(b, q), BitConverter.ToSingle(b, q + 4), BitConverter.ToSingle(b, q + 8))
+                    : ((float)BitConverter.ToHalf(b, q), (float)BitConverter.ToHalf(b, q + 2), (float)BitConverter.ToHalf(b, q + 4)));
             }
             p += (int)dataSize;
             p += triangles * 6;
@@ -205,12 +209,12 @@ public static class NifShape
                 for (var v = 0; v < n; v++)
                 {
                     var q = p + v * 16;
-                    dyn.Add(own.Apply((BitConverter.ToSingle(b, q), BitConverter.ToSingle(b, q + 4), BitConverter.ToSingle(b, q + 8))));
+                    dyn.Add((BitConverter.ToSingle(b, q), BitConverter.ToSingle(b, q + 4), BitConverter.ToSingle(b, q + 8)));
                 }
-                return new Shape(dyn, true, skin);
+                return new Shape(dyn, true, skin, own);
             }
         }
-        return new Shape(local, false, skin);
+        return new Shape(local, false, skin, own);
     }
 
     private static List<(float, float, float)> ReadPartition(byte[] b, int p, uint bsVersion)
