@@ -7,7 +7,7 @@
 # SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
-    [string]$Version = "1.4.0",
+    [string]$Version = "1.5.0",
     [string]$OutputDir = "release",
     [string]$VcpkgRoot = "C:\vcpkg"
 )
@@ -68,7 +68,7 @@ An MCP server that lets AI assistants (Claude, etc.) interact directly
 with Skyrim SE/AE's runtime engine via an SKSE plugin.
 
 ## Requirements
-- Skyrim SE or AE: Steam 1.7.104, 1.6.1130-1.6.1170, or SE 1.5.97
+- Skyrim SE or AE: Steam 1.7.104, 1.6.1130-1.6.1170, GOG 1.6.1179, or SE 1.5.97
 - SKSE64 matching your game version (2.3.1 for 1.7.104) (https://skse.silverlock.org/)
 - Address Library for SKSE, current All-in-One for your game version (https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - .NET 10 Runtime (https://dotnet.microsoft.com/download/dotnet/10.0)
@@ -111,7 +111,7 @@ and earlier.
 3. Ask Claude to interact with your game!
 
 ## Features
-- About 160 MCP tools for reading and changing game state
+- About 180 MCP tools for reading and changing game state
 - Player stats, inventory, spells, perks, shouts, appearance
 - Quests, NPCs, followers, weather, world objects, containers, teleport
 - Combat analysis, event system, crash log
@@ -120,8 +120,15 @@ and earlier.
 - Hair picker and body measurement (experimental)
 - Character blueprint export (with quest stages done) and apply (items, gear,
   gold, skills, level, perks, spells, shouts); quest replay
-- Save health (new in 1.4): live script pile-ups by mod, save check and clean
+- Save health: live script pile-ups by mod, save check and clean
   (cleaning needs ReSaver), old saves against a changed load order
+- Mod building (new in 1.5): patch a mod's script as a small override mod
+  (needs the free Creation Kit's compiler), write small plugins, check masters,
+  install into Vortex or MO2 and sort with LOOT, plugin limits
+- Crash and runaway care (new in 1.5): known crash patterns, Windows crash
+  dumps, LOOT's notes on your plugins, cleaning with SSEEdit, stopping a
+  runaway script loop for the session, restart cycle and new games
+- Journal: what the quest log says, objectives as shown
 - Teleports show the game's loading screen
 - Safety rules: moves, captures and face edits refuse in menus, scenes,
   combat, furniture and similar states, with the reason
@@ -135,6 +142,9 @@ and earlier.
 - ONNX Runtime by Microsoft (MIT)
 - Guidebook answers from UESP (CC BY-SA 2.5), fetched on demand
 - YamlDotNet by Antoine Aubry and contributors (MIT), reads the player's LOOT masterlist
+  (LOOT's masterlist is read from your own LOOT install, never shipped)
+- Plugin cleaning runs your installed SSEEdit (xEdit team) as a separate program;
+  script compiling runs your Creation Kit's Papyrus compiler
 - Save reading follows ReSaver (FallrimTools by Mark Fairchild, Apache-2.0); cleaning
   runs an installed ReSaver's own library. See SkyLinkAI_Server\NOTICE-ReSaver.txt
 
