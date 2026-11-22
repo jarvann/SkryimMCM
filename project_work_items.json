@@ -5932,6 +5932,10 @@
             {
               "datetime": "2026-11-22T14:50",
               "note": "Cory: any race, not only human, and the faction's ranks are Father, Mother, Brother, Sister, with dialogue packages for each."
+            },
+            {
+              "datetime": "2026-11-22T15:00",
+              "note": "Cory: family members are not marryable; every other spawned character is (PotentialMarriageFaction; never a child race). Ranks for any family structure: Father, Mother, Brother, Sister, Son, Daughter, Uncle, Aunt, Niece, Nephew, Grandfather, Grandmother, plus placeholders (cousin, step and in-law, adopted, other)."
             }
           ],
           "targetRelease": "",
