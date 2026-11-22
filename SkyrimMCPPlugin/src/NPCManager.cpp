@@ -948,6 +948,38 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    json CopyOutfit(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* equip = RE::ActorEquipManager::GetSingleton();
+        if (!player || !equip) return {{"error", "Player not available"}};
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+
+        std::vector<RE::TESObjectARMO*> worn;
+        for (auto& [item, entry] : player->GetInventory([](RE::TESBoundObject& o) { return o.Is(RE::FormType::Armor); })) {
+            if (entry.second && entry.second->IsWorn()) if (auto* armor = item->As<RE::TESObjectARMO>()) worn.push_back(armor);
+        }
+        for (auto* outfit : { npc->defaultOutfit, npc->sleepOutfit }) if (outfit) actor->RemoveOutfitItems(outfit);
+        npc->defaultOutfit = nullptr;
+        npc->sleepOutfit = nullptr;
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kDefaultOutfit | RE::TESNPC::ChangeFlags::kSleepOutfit);
+
+        // What it has on already (a distributor such as SPID may have dressed it) comes off; it keeps those items.
+        for (auto& [item, entry] : actor->GetInventory([](RE::TESBoundObject& o) { return o.Is(RE::FormType::Armor); })) {
+            if (entry.second && entry.second->IsWorn()) equip->UnequipObject(actor, item, nullptr, 1, nullptr, true, true, false);
+        }
+        json items = json::array();
+        for (auto* armor : worn) {
+            actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);  // forced: its AI doesn't swap it for "better" armour
+            items.push_back(armor->GetName() ? armor->GetName() : "");
+        }
+        return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
+    }
+
     json SpawnNpc(const json& params) {
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* playerBase = player ? player->GetActorBase() : nullptr;
@@ -994,6 +1026,13 @@ namespace SkyrimMCP::NPCManager {
         npc->race = race;
         npc->originalRace = race;  // its face file is used only while the two match
         if (!params.value("keepSchedule", false)) MakeStayPut(npc);
+        // Marryable unless asked otherwise (family members aren't); never a child. The game's marriage talk also needs a voice that has it.
+        bool marryable = params.value("marryable", true) && race && !race->IsChildRace();
+        if (auto* faction = marryable ? RE::TESForm::LookupByID<RE::TESFaction>(0x00019809) : nullptr) {  // PotentialMarriageFaction
+            npc->factions.push_back(RE::FACTION_RANK{ faction, 0 });
+        } else {
+            marryable = false;
+        }
 
         const auto name = params.value("name", std::string());
         if (!name.empty()) npc->SetFullName(name.c_str());
@@ -1044,6 +1083,7 @@ namespace SkyrimMCP::NPCManager {
             {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
             {"faceSource", FaceSource(tmpl)},
             {"distance", placedAt},
+            {"marryable", marryable},
             {"faceData", FaceDataOf(npc)},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };

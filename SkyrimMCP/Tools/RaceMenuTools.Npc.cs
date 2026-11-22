@@ -70,17 +70,20 @@ public partial class RaceMenuTools
         "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
         "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
-        "preset. With SkyLinkAI.esl (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
+        "asked to marry, adults only. With SkyLinkAI.esl (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
         if (string.IsNullOrWhiteSpace(name)) return new { error = "name is required" };
         if (await SafetyBlock("move") is string blocked) return new { error = "Not now: " + blocked };
         if (face == "player" && await RaceMenuOpenError() is string open) return new { error = open };
+        var dress = string.IsNullOrWhiteSpace(outfit) ? face : outfit.Trim().ToLowerInvariant();
+        if (dress is not ("template" or "player")) return new { error = "outfit must be 'template' or 'player'" };
 
         if (dryRun)
             return new
@@ -104,7 +107,7 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
@@ -153,6 +156,13 @@ public partial class RaceMenuTools
                 faceResult = new { bodyPreset = string.IsNullOrEmpty(body) ? "none (OBody isn't installed, or gave none)" : body, preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
             }
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
+        }
+
+        object? outfitResult = null;
+        if (dress == "player" && refId != null)
+        {
+            try { outfitResult = DeserializeResponse(await _pipe.SendRequestAsync("copy_outfit", new JsonObject { ["refId"] = refId })); }
+            catch (McpException ex) { outfitResult = new { error = ex.Message, note = "Spawned in the template's outfit." }; }
         }
 
         var inSlot = spawned?["slot"] is JsonValue;
@@ -204,6 +214,7 @@ public partial class RaceMenuTools
             spawned = DeserializeResponse(spawned),
             face = faceResult,
             voice = voiceResult,
+            outfit = outfitResult,
             slotFace,
             lasting = inSlot,
             note = inSlot

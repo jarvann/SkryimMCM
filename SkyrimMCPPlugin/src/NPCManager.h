@@ -37,6 +37,9 @@ namespace SkyrimMCP {
         json ReapplySlots();
         // Voice type (form ID or editor ID) of a spawned NPC.
         json SetNpcVoice(const std::string& refId, const std::string& voice);
+        // A spawned NPC takes what the player wears: its own outfit removed (and its default outfit, or it comes back on load), copies
+        // of the worn armour added and put on. Player-made enchantments and tempering aren't copied.
+        json CopyOutfit(const std::string& refId);
         json SetSpawnedNpcEnabled(const std::string& refId, bool enable);
     }
 
