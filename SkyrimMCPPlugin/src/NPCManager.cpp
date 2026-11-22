@@ -806,10 +806,6 @@ namespace SkyrimMCP::NPCManager {
         auto* npc = actor ? actor->GetActorBase() : nullptr;
         if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
         ApplyFaceData(npc, params);
-        // Finding out why the game builds a head instead of using its face file (2026-11-22).
-        if (params.value("clearMorphs", false)) npc->faceData = nullptr;
-        if (params.value("clearTintLayers", false)) npc->tintLayers = nullptr;
-        if (params.value("removeFaceChange", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
         return FaceDataOf(npc);
     }
 
