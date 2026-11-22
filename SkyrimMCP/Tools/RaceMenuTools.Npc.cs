@@ -14,8 +14,20 @@ namespace SkyrimMCP.Tools;
 /// </summary>
 public partial class RaceMenuTools
 {
-    // refId -> preset, so removing a spawned NPC removes the face files made for it.
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> SpawnPresets = new(StringComparer.OrdinalIgnoreCase);
+    // refId -> preset, so removing a spawned NPC removes the face files made for it. Kept in a file: the spike's server restarted
+    // between calls and left the files behind.
+    private static string SpawnFile => Path.Combine(SkyLinkSettings.Folder, "spawned_npcs.json");
+
+    private static JsonObject LoadSpawns()
+    {
+        try { return File.Exists(SpawnFile) ? JsonNode.Parse(File.ReadAllText(SpawnFile)) as JsonObject ?? new JsonObject() : new JsonObject(); }
+        catch (Exception) { return new JsonObject(); }
+    }
+
+    private static void SaveSpawns(JsonObject spawns)
+    {
+        try { Directory.CreateDirectory(SkyLinkSettings.Folder); File.WriteAllText(SpawnFile, spawns.ToJsonString()); } catch (Exception) { }
+    }
 
     /// <summary>
     /// Exports the player's head (CharGen.ExportHead writes CharGen\<name>.dds and .nif) and puts the tint where LoadCharacter
@@ -107,7 +119,9 @@ public partial class RaceMenuTools
                 await _pipe.SendRequestAsync("set_spawned_npc_enabled", new JsonObject { ["refId"] = refId, ["enable"] = false });
                 await Task.Delay(1500);
                 await _pipe.SendRequestAsync("set_spawned_npc_enabled", new JsonObject { ["refId"] = refId, ["enable"] = true });
-                SpawnPresets[refId] = presetName;
+                var spawns = LoadSpawns();
+                spawns[refId] = presetName;
+                SaveSpawns(spawns);
                 faceResult = new { preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
             }
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
@@ -130,8 +144,11 @@ public partial class RaceMenuTools
     {
         var id = refId.Trim();
         var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
-        if (r?["error"] == null && SpawnPresets.TryRemove(id, out var preset) && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
+        var spawns = LoadSpawns();
+        if (r?["error"] == null && spawns[id]?.ToString() is string preset && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
         {
+            spawns.Remove(id);
+            SaveSpawns(spawns);
             // Only the files SpawnNpc made for this NPC (named SkyLink_...).
             foreach (var plugins in SkyLinkSettings.ConfigFolders())
             {
