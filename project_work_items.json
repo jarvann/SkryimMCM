@@ -5310,6 +5310,10 @@
             {
               "datetime": "2026-11-22T13:40",
               "note": "Spawns 160 units in front of the player, facing them, not through walls. Voice can be set (set_npc_voice). Photos: studio lights follow the photographed actor; the idle camera is left first."
+            },
+            {
+              "datetime": "2026-11-22T15:20",
+              "note": "Clone wears the player's 15 worn pieces (copy_outfit; the base's default and sleep outfits removed, so the template's tunic doesn't come back), is peaceful and marryable (PotentialMarriageFaction): all kept through a save and an in-session load on Steam. Not checked: a full restart with the copied outfit; hair physics moving; marriage dialogue."
             }
           ],
           "priority": "high",
@@ -5881,7 +5885,7 @@
           "id": "BUG-102",
           "title": "RaceMenu exported heads name face textures on other shapes",
           "description": "ExportHead gave KSSMP_Desirae (hair) and one scar shape the head's texture set (Desirae.nif and FemaleMaskLeftSide.nif name their own). Take each shape's textures from its head part's own mesh or texture set. HDT bones are renamed hdtSSEPhysics_AutoRename_Head_… and the physics reference is missing.",
-          "status": "not-started",
+          "status": "implemented-untested",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
@@ -5916,6 +5920,10 @@
             {
               "datetime": "2026-11-22T15:10",
               "note": "Profiler (scripts/startup-profile.ps1) on Steam. First ~30 s: one GetFileAttributes per loose file (1.03 million) because bInvalidateOlderFiles=1; setting it to 0 removed the wait but loose files stopped loading and the game crashed at the menu (never change it). 134-190 s: SkyrimSE+293060 scans a table of form ID lists to remove one ID, per placed reference (layout fits the large-reference lists; a hook with a reverse map could make it constant). 90-134 s: SkyrimSE+1E29E6 searches a list of pointer arrays one by one. XEMIUtil off: 233 s with the profiler, not the cause."
+            },
+            {
+              "datetime": "2026-11-22T15:20",
+              "note": "Normal launch after the tests: 213 s to data loaded. Comment on the Seasons issue offers a pull request."
             }
           ],
           "targetRelease": "",
