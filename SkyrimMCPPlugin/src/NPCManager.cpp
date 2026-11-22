@@ -615,18 +615,36 @@ namespace SkyrimMCP::NPCManager {
 
         // A plain NPC of this race and sex to copy: not the player, not built from a template (its look and stats would come
         // from somewhere else), preferring one that isn't unique.
+        // (2026-11-22: the first version took the first match in the form list, which for a Nord man was the Headless Horseman.)
         RE::TESNPC* FindTemplate(RE::TESRace* race, bool female) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data || !race) return nullptr;
-            RE::TESNPC* fallback = nullptr;
+            constexpr RE::FormID kCitizenClass = 0x0001326B;
+            using Flag = RE::ACTOR_BASE_DATA::Flag;
+            RE::TESNPC* best = nullptr;
+            int bestScore = -1;
             for (auto* npc : data->GetFormArray<RE::TESNPC>()) {
                 if (!npc || npc->GetFormID() == 0x7 || npc->race != race) continue;
                 if ((npc->GetSex() == RE::SEX::kFemale) != female) continue;
-                if (npc->baseTemplateForm || npc->IsDeleted()) continue;
-                if (!npc->IsUnique()) return npc;
-                if (!fallback) fallback = npc;
+                if (npc->baseTemplateForm || npc->IsDeleted() || SlotIndex(npc) >= 0) continue;
+                const auto& flags = npc->actorData.actorBaseFlags;
+                if (flags.any(Flag::kIsGhost, Flag::kSummonable, Flag::kInvulnerable, Flag::kSimpleActor, Flag::kDoesntBleed,
+                              Flag::kIsChargenFacePreset, Flag::kUsesTemplate)) continue;
+                // No head of its own, no name, or a plugin's script on it: not an ordinary person to copy.
+                if (npc->numHeadParts < 3 || !npc->GetName() || !*npc->GetName()) continue;
+                const auto id = npc->GetFormID();
+                int score = 0;
+                if ((id >> 24) == 0x00) score += 2;                            // the base game
+                if (npc->npcClass && npc->npcClass->GetFormID() == kCitizenClass) score += 3;
+                if (!npc->IsUnique()) score += 2;
+                if (npc->defaultOutfit) score += 1;
+                if (!flags.any(Flag::kEssential, Flag::kProtected)) score += 1;
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = npc;
+                }
             }
-            return fallback;
+            return best;
         }
     }
 
