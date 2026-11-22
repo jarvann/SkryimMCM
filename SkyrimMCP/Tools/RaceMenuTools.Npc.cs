@@ -71,7 +71,7 @@ public partial class RaceMenuTools
         "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
         "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
-        "asked to marry, adults only. With SkyLinkAI.esl (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "asked to marry, adults only. With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
@@ -218,9 +218,9 @@ public partial class RaceMenuTools
             slotFace,
             lasting = inSlot,
             note = inSlot
-                ? "Uses one of SkyLinkAI.esl's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
+                ? "Uses one of SkyLinkAI.esp's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
                 : "A preview for this session: it won't survive a save and load" +
-                  (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esl is in use)." : " (SkyLinkAI.esl, the optional plugin with NPC slots, isn't in the load order).") +
+                  (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esp is in use)." : " (SkyLinkAI.esp, the optional plugin with NPC slots, isn't in the load order).") +
                   " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
         };
     }
@@ -246,7 +246,7 @@ public partial class RaceMenuTools
     }
 
     [McpServerTool]
-    [Description("The characters kept in SkyLinkAI.esl's NPC slots (INFRA-024): slot, name, how the face was made, which character " +
+    [Description("The characters kept in SkyLinkAI.esp's NPC slots (INFRA-024): slot, name, how the face was made, which character " +
         "(save) made it, and whether its face files are in place. Slots are shared by all saves of the game, so a slot stays taken " +
         "until RemoveSpawnedNpc (or freeSlot: the number of a slot whose character is gone from every save).")]
     public async Task<object> ListNpcSlots(int? freeSlot = null)

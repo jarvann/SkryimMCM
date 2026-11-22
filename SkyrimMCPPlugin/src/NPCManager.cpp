@@ -581,9 +581,9 @@ namespace SkyrimMCP::NPCManager {
             return form ? form->As<RE::TESRace>() : nullptr;
         }
 
-        // INFRA-024: SkyLinkAI.esl (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
+        // INFRA-024: SkyLinkAI.esp (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
         // Their base forms belong to a plugin, so the game can keep changes to them and references to them in saves.
-        constexpr std::string_view kSlotPlugin = "SkyLinkAI.esl";
+        constexpr std::string_view kSlotPlugin = "SkyLinkAI.esp";
         constexpr RE::FormID kFirstSlot = 0x800;
         // Slots by race (the game uses a face file only while an NPC's race is the one its record was made with), then sex, then
         // number. The same order as scripts/build-slot-plugin.py; it must never change once released.

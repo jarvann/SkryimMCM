@@ -9,7 +9,7 @@
 			<optionalFileGroups order="Explicit">
 				<group name="Characters" type="SelectAny">
 					<plugins order="Explicit">
-						<plugin name="NPC slots (SkyLinkAI.esl)">
+						<plugin name="NPC slots (SkyLinkAI.esp)">
 							<description>A tiny light plugin with blank character slots. Characters the AI creates for you use them, so they are kept in your saves. It doesn't count toward the 254 plugin limit. Without it, created characters last for one session.</description>
 							<files>
 								<folder source="10 NPC slots" destination="" priority="0" />

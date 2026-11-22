@@ -4,7 +4,7 @@ using SkyrimMCP.Face;
 namespace SkyrimMCP;
 
 /// <summary>
-/// INFRA-024: SkyLinkAI.esl's NPC slots are shared by every save of a game, because a slot's face files sit in the game's folders.
+/// INFRA-024: SkyLinkAI.esp's NPC slots are shared by every save of a game, because a slot's face files sit in the game's folders.
 /// The registry (slots.json in the running game's SkyLink folder) keeps a slot reserved for its character until it is removed,
 /// whatever save is loaded. Faces: the mesh and the tint both, or neither; only the mesh crashed the game as soon as the camera
 /// framed the character (GOG, 2026-11-22).
@@ -51,7 +51,7 @@ public static class SlotRegistry
         if (all[slot.ToString()] is JsonObject entry)
         {
             foreach (var f in entry["files"] as JsonArray ?? [])
-                if (f?.ToString() is string path && path.Contains("SkyLinkAI.esl", StringComparison.OrdinalIgnoreCase))
+                if (f?.ToString() is string path && path.Contains("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase))
                     try { if (File.Exists(path)) { File.Delete(path); deleted++; } } catch (Exception) { }
             all.Remove(slot.ToString());
             Save(all);
@@ -67,8 +67,8 @@ public static class SlotRegistry
     public static (string mesh, string tint)? FaceFiles(string slotObjectId)
     {
         if (SkyLinkSettings.WritableDataFolder() is not string root) return null;
-        return (Path.Combine(root, "meshes", "actors", "character", "facegendata", "facegeom", "SkyLinkAI.esl", slotObjectId + ".nif"),
-                Path.Combine(root, "textures", "actors", "character", "facegendata", "facetint", "SkyLinkAI.esl", slotObjectId + ".dds"));
+        return (Path.Combine(root, "meshes", "actors", "character", "facegendata", "facegeom", "SkyLinkAI.esp", slotObjectId + ".nif"),
+                Path.Combine(root, "textures", "actors", "character", "facegendata", "facetint", "SkyLinkAI.esp", slotObjectId + ".dds"));
     }
 
     /// <summary>Writes both files for a slot, or neither. Null when done, else why not.</summary>
@@ -81,7 +81,7 @@ public static class SlotRegistry
         // The mesh names its skin texture by path: an exported head's temporary one, or the template's. Make it this slot's.
         try
         {
-            mesh = NifTextures.Replace(mesh, path => IsFaceTint(path) ? $@"data\textures\actors\character\facegendata\facetint\SkyLinkAI.esl\{slotObjectId}.dds" : null).Bytes;
+            mesh = NifTextures.Replace(mesh, path => IsFaceTint(path) ? $@"data\textures\actors\character\facegendata\facetint\SkyLinkAI.esp\{slotObjectId}.dds" : null).Bytes;
         }
         catch (Exception ex) { return $"the face mesh couldn't be read ({ex.Message})"; }
         try

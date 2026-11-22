@@ -3,7 +3,7 @@
 # Produces the release folder and SkyLinkAI-v<Version>.zip
 #
 # The zip is a FOMOD (INFRA-025): fomod\ (the installer), "00 Core" (required; what goes inside Data) and
-# "10 NPC slots" (SkyLinkAI.esl, optional and selected by default). MO2 and Vortex run it. Docs go in
+# "10 NPC slots" (SkyLinkAI.esp, optional and selected by default). MO2 and Vortex run it. Docs go in
 # SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
@@ -50,7 +50,7 @@ Copy-Item "SkyrimMCPPlugin\output\SkyLinkAI\SkyLinkLogic.dll" "$Plugins\SkyLinkA
 New-Item -ItemType Directory -Path "$OutputDir\fomod", $Slots -Force | Out-Null
 Copy-Item "fomod\ModuleConfig.xml" "$OutputDir\fomod\" -Force
 (Get-Content "fomod\info.xml" -Raw).Replace("@VERSION@", $Version) | Set-Content "$OutputDir\fomod\info.xml" -Encoding UTF8
-Copy-Item "plugin\SkyLinkAI.esl" "$Slots\" -Force
+Copy-Item "plugin\SkyLinkAI.esp" "$Slots\" -Force
 
 # No .exe in the package: the server and launcher are run with "dotnet <dll>", and
 # SmartScreen and antivirus tools treat unsigned .exe files with more suspicion.
@@ -88,7 +88,7 @@ with Skyrim SE/AE's runtime engine via an SKSE plugin.
 1. Install with Mod Organizer 2 or Vortex (the installer asks about the
    optional NPC slots; keep them unless you don't want a plugin). Without a
    mod manager: copy what's inside "00 Core" into your Skyrim Data folder, and
-   SkyLinkAI.esl from "10 NPC slots" if you want the slots
+   SkyLinkAI.esp from "10 NPC slots" if you want the slots
 2. Install .NET 10 Runtime if not already installed
 3. Configure Claude Desktop (see below)
 

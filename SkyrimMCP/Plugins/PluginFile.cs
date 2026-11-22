@@ -444,6 +444,8 @@ public sealed class NewPlugin
 
 public abstract class NewRecord
 {
+    /// <summary>A fixed object ID (0x800-0xFFF), or null for the next free one. Records added later must not move earlier ones.</summary>
+    public uint? ObjectId { get; init; }
     public required string EditorId { get; init; }
     public abstract string Type { get; }
 }
@@ -498,6 +500,15 @@ public sealed class NewNpc : NewRecord
         foreach (var (r, _) in Factions) yield return r;
         foreach (var r in HeadParts) yield return r;
     }
+}
+
+/// <summary>A faction with named ranks (1.6, FEAT-304). Relations: reaction 0 neutral, 1 enemy, 2 ally, 3 friend; "this" is itself.</summary>
+public sealed class NewFaction : NewRecord
+{
+    public override string Type => "FACT";
+    public string? Name { get; init; }
+    public List<(int Rank, string? Male, string? Female)> Ranks { get; init; } = [];
+    public List<(string Ref, int Reaction)> Relations { get; init; } = [];
 }
 
 public sealed record NewScript(string Name, List<NewProperty> Properties);
@@ -564,6 +575,10 @@ public static class PluginWriter
             foreach (var p in q.Scripts.SelectMany(s => s.Properties).Where(p => p.Kind == "object"))
                 if (p.Value?.ToString() is string v && ObjectRef.Match(v) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
                     AddMaster(m.Groups["plugin"].Value);
+        foreach (var npc in spec.Records.OfType<NewFaction>())
+            foreach (var (r, _) in npc.Relations)
+                if (ObjectRef.Match(r) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
+                    AddMaster(m.Groups["plugin"].Value);
         foreach (var npc in spec.Records.OfType<NewNpc>())
             foreach (var r in npc.References())
                 if (ObjectRef.Match(r) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
@@ -582,14 +597,24 @@ public static class PluginWriter
         var assigned = new List<(string Type, string EditorId, uint FormId)>();
         uint next = 0x800;
         var needs171 = false;
+        var taken = new HashSet<uint>();
+        foreach (var r in spec.Records)
+        {
+            if (r.ObjectId is not uint fixedId) continue;
+            if (fixedId is < 0x800 or > 0xFFF) throw new ArgumentException($"{r.EditorId}: a fixed object ID is 0x800 to 0xFFF.");
+            if (!taken.Add(fixedId)) throw new ArgumentException($"{r.EditorId}: object ID 0x{fixedId:X3} is used twice.");
+        }
         foreach (var r in spec.Records.OrderBy(r => GroupIndex(r.Type)))
         {
+            if (r.ObjectId is uint own) { assigned.Add((r.Type, r.EditorId, top | own)); continue; }
+            while (taken.Contains(next)) next++;
             if (light && next > 0xFFF) { next = 0x001; needs171 = true; }
             if (light && needs171 && next >= 0x800) throw new ArgumentException($"Too many records for a light plugin ({spec.Records.Count}; at most 4,095).");
             assigned.Add((r.Type, r.EditorId, top | next));
             next++;
         }
         if (needs171) notes.Add("More than 2,048 records: object IDs below 0x800 are used, so the header is 1.71 (needs game version 1.6.1130 or later).");
+        if (taken.Count > 0 && !needs171) next = Math.Max(next, taken.Max() + 1);
         var ids = assigned.ToDictionary(a => a.EditorId, a => a.FormId, StringComparer.OrdinalIgnoreCase);
 
         uint ResolveObject(string text, string where)
@@ -640,6 +665,9 @@ public static class PluginWriter
                         Field(fields, "NEXT", []);
                         Field(fields, "ANAM", new byte[4]);
                         break;
+                    case NewFaction faction:
+                        WriteFaction(fields, faction, text => text.Equals("this", StringComparison.OrdinalIgnoreCase) ? ids[faction.EditorId] : ResolveObject(text, $"{faction.EditorId}.relations"));
+                        break;
                     case NewNpc npc:
                         WriteNpc(fields, npc, ResolveObject);
                         break;
@@ -677,6 +705,33 @@ public static class PluginWriter
             Bytes = output.ToArray(), Masters = masters, Assigned = assigned, Version = version, NextObjectId = next,
             NumRecords = spec.Records.Count + groups, Flags = fileFlags, Notes = notes,
         };
+    }
+
+    // Field order and sizes as Skyrim.esm's own factions with ranks (CollegeofWinterholdArchMageFaction, read 2026-11-22).
+    static void WriteFaction(Stream f, NewFaction n, Func<string, uint> resolve)
+    {
+        Field(f, "EDID", ZString(n.EditorId));
+        if (!string.IsNullOrEmpty(n.Name)) Field(f, "FULL", ZString(n.Name));
+        foreach (var (other, reaction) in n.Relations)
+        {
+            var xnam = new byte[12];
+            BinaryPrimitives.WriteUInt32LittleEndian(xnam, resolve(other));
+            BinaryPrimitives.WriteInt32LittleEndian(xnam.AsSpan(8), reaction);
+            Field(f, "XNAM", xnam);
+        }
+        Field(f, "DATA", new byte[4]);
+        var crva = new byte[20];
+        crva[0] = crva[1] = 1;
+        Field(f, "CRVA", crva);
+        foreach (var (rank, male, female) in n.Ranks.OrderBy(r => r.Rank))
+        {
+            var rnam = new byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(rnam, rank);
+            Field(f, "RNAM", rnam);
+            if (!string.IsNullOrEmpty(male)) Field(f, "MNAM", ZString(male));
+            if (!string.IsNullOrEmpty(female)) Field(f, "FNAM", ZString(female));
+        }
+        Field(f, "VENV", new byte[12]);
     }
 
     // Field order and sizes as Skyrim.esm's own NPC records have them (Northwatch Prisoner, 000C1AA3, read 2026-11-22).
@@ -892,6 +947,12 @@ public static class PluginWriter
             var kind = (Str("record") ?? Str("type") ?? "").Trim().ToUpperInvariant();
             var edid = Str("editorId") ?? Str("edid") ?? throw new ArgumentException($"Record {i} has no editorId.");
             var where = $"Record {i} ({edid})";
+            uint? objectId = null;
+            if (Str("objectId") is { Length: > 0 } oid)
+            {
+                var hex = oid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? oid[2..] : oid;
+                objectId = uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var parsedId) ? parsedId : throw new ArgumentException($"{where}: objectId '{oid}' isn't a hexadecimal number.");
+            }
             switch (kind)
             {
                 case "GLOB" or "GLOBAL":
@@ -933,7 +994,7 @@ public static class PluginWriter
                     List<string> Refs(string k) => (o[k] as JsonArray ?? []).Select(x => x?.ToString() ?? "").Where(x => x.Length > 0).ToList();
                     list.Add(new NewNpc
                     {
-                        EditorId = edid, Name = Str("name"), Female = Flag("female"), Essential = Flag("essential"), Protected = Flag("protected"),
+                        EditorId = edid, ObjectId = objectId, Name = Str("name"), Female = Flag("female"), Essential = Flag("essential"), Protected = Flag("protected"),
                         Unique = o["unique"] == null || Flag("unique"),
                         Race = Str("race") ?? throw new ArgumentException($"{where}: an NPC needs a race (\"Skyrim.esm|0x00013746\")."),
                         Voice = Str("voice"), Class = Str("class"), Outfit = Str("outfit"), CombatStyle = Str("combatStyle"),
@@ -946,7 +1007,24 @@ public static class PluginWriter
                         Weight = o["weight"] == null ? 50f : (float)Number(o["weight"], where),
                     });
                     break;
-                default: throw new ArgumentException($"{where}: type '{kind}' isn't supported yet (GLOB, QUST, NPC_).");
+                case "FACT" or "FACTION":
+                    var ranks = new List<(int, string?, string?)>();
+                    foreach (var rn in o["ranks"] as JsonArray ?? [])
+                    {
+                        if (rn is not JsonObject ro || ro["rank"] == null) throw new ArgumentException($"{where}: each rank needs a number (\"rank\").");
+                        var number = (int)Number(ro["rank"], where);
+                        if (number is < 0 or > 127) throw new ArgumentException($"{where}: ranks are 0 to 127.");
+                        ranks.Add((number, ro["male"]?.ToString(), ro["female"]?.ToString()));
+                    }
+                    if (ranks.Select(r => r.Item1).Distinct().Count() != ranks.Count) throw new ArgumentException($"{where}: a rank number is used twice.");
+                    list.Add(new NewFaction
+                    {
+                        EditorId = edid, ObjectId = objectId, Name = Str("name"), Ranks = ranks,
+                        Relations = (o["relations"] as JsonArray ?? []).OfType<JsonObject>().Select(r => (r["faction"]?.ToString()
+                            ?? throw new ArgumentException($"{where}: each relation needs a \"faction\"."), (int)(r["reaction"] == null ? 2 : Number(r["reaction"], where)))).ToList(),
+                    });
+                    break;
+                default: throw new ArgumentException($"{where}: type '{kind}' isn't supported yet (GLOB, QUST, NPC_, FACT).");
             }
         }
         return list;
