@@ -1108,6 +1108,35 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    json HomeMarkers(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* cell = actor ? actor->GetParentCell() : nullptr;
+        if (!cell) return {{"error", "Actor not found or in no cell: " + refId}};
+        // An alias can only be given a reference that always exists (persistent), and one every player has (the base game's).
+        static constexpr std::string_view kBase[] = { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm" };
+        struct Found { RE::TESObjectREFR* ref; float distance; };
+        std::vector<Found> found;
+        cell->ForEachReference([&](RE::TESObjectREFR* ref) {
+            auto* base = ref ? ref->GetBaseObject() : nullptr;
+            auto* file = ref ? ref->GetFile(0) : nullptr;
+            if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter)) return RE::BSContainer::ForEachResult::kContinue;
+            if (!(ref->GetFormFlags() & RE::TESForm::RecordFlags::kPersistent)) return RE::BSContainer::ForEachResult::kContinue;
+            if (std::find(std::begin(kBase), std::end(kBase), file->GetFilename()) == std::end(kBase)) return RE::BSContainer::ForEachResult::kContinue;
+            found.push_back({ ref, ref->GetPosition().GetDistance(actor->GetPosition()) });
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.distance < b.distance; });
+        json markers = json::array();
+        for (const auto& f : found) {
+            auto* base = f.ref->GetBaseObject();
+            const bool marker = base->GetFormID() == 0x3B || base->GetFormID() == 0x34;  // XMarker, XMarkerHeading
+            markers.push_back({{"stableId", StableId(f.ref)}, {"distance", f.distance}, {"marker", marker},
+                               {"what", marker ? json("marker") : json(base->GetName() && base->GetName()[0] ? base->GetName() : RE::FormTypeToString(base->GetFormType()).data())}});
+            if (markers.size() >= 25) break;
+        }
+        return {{"cell", cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+    }
+
     json CharacterForms(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* npc = actor ? actor->GetActorBase() : nullptr;
@@ -1155,7 +1184,10 @@ namespace SkyrimMCP::NPCManager {
             add(item, worn ? "worn" : "carried", worn ? "worn" : "carried");
         }
         return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
-                {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)}};
+                {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
+                {"faceData", FaceDataOf(npc)}, {"height", npc->GetHeight()}, {"level", actor->GetLevel()},
+                {"essential", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)},
+                {"protected", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kProtected)}};
     }
 
     json CopyOutfit(const std::string& refId) {
