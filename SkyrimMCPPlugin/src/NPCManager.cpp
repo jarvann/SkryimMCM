@@ -662,7 +662,7 @@ namespace SkyrimMCP::NPCManager {
             constexpr RE::FormID kCitizenClass = 0x0001326B;
             using Flag = RE::ACTOR_BASE_DATA::Flag;
             RE::TESNPC* best = nullptr;
-            int bestScore = -1;
+            int bestScore = -100;
             for (auto* npc : data->GetFormArray<RE::TESNPC>()) {
                 if (!npc || npc->GetFormID() == 0x7 || npc->race != race) continue;
                 if ((npc->GetSex() == RE::SEX::kFemale) != female) continue;
@@ -679,6 +679,7 @@ namespace SkyrimMCP::NPCManager {
                 if (!npc->IsUnique()) score += 2;
                 if (npc->defaultOutfit) score += 1;
                 if (!flags.any(Flag::kEssential, Flag::kProtected)) score += 1;
+                if (npc->GetAggressionLevel() >= RE::ACTOR_AGGRESSION::kVeryAggressive) score -= 8;  // someone's enemy: the last choice
                 if (score > bestScore) {
                     bestScore = score;
                     best = npc;
@@ -696,6 +697,8 @@ namespace SkyrimMCP::NPCManager {
             if (auto* stay = RE::TESForm::LookupByID<RE::TESPackage>(0x000956B8)) npc->aiPackages.packages.push_front(stay);  // DefaultSandboxCurrentLocation256
             npc->factions.clear();
             npc->crimeFaction = nullptr;
+            // Peaceful: a Snow Elf copied from a mod's hostile one attacked the inn (2026-11-22). It still defends itself.
+            npc->SetAggressionLevel(RE::ACTOR_AGGRESSION::kUnaggressive);
         }
     }
 
