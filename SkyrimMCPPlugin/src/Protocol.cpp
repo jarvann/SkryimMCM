@@ -277,6 +277,7 @@ namespace SkyrimMCP::Protocol {
             bool follower = params.value("follower", true);
             return GameThread(id, [ref, follower]() { return NPCManager::SetFollower(ref, follower); });
         };
+        formIdParam("character_forms", "refId", [](const std::string& r) { return NPCManager::CharacterForms(r); });
         formIdParam("copy_outfit", "refId", [](const std::string& r) { return NPCManager::CopyOutfit(r); });
         formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
         formIdParam("get_face_data", "refId", [](const std::string& r) { return NPCManager::GetFaceData(r); });

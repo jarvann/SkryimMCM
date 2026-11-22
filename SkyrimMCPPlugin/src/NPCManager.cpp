@@ -1105,6 +1105,56 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    json CharacterForms(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc) return {{"error", "Actor not found: " + refId}};
+        json forms = json::array();
+        // kind: what it is; need: "record" (written into an exported NPC), "carried" (in the inventory, maybe put there by a distributor).
+        auto add = [&](RE::TESForm* form, const char* kind, const char* need, const char* model = nullptr) {
+            if (!form) return;
+            auto* file = form->GetFile(0);
+            if (!file) return;  // made at run time: nothing to depend on
+            json f = {{"formId", std::format("{:08X}", form->GetFormID())}, {"kind", kind}, {"need", need}, {"plugin", std::string(file->GetFilename())},
+                      {"stableId", StableId(form)}, {"name", form->GetName() && form->GetName()[0] ? json(form->GetName()) : json(nullptr)}};
+            if (const char* e = form->GetFormEditorID(); e && e[0]) f["editorId"] = e;
+            if (model && model[0]) f["model"] = model;
+            // A record another plugin changes: the look may come from the last one.
+            if (auto* files = form->sourceFiles.array; files && files->size() > 1) f["lastChangedBy"] = std::string(files->back()->GetFilename());
+            forms.push_back(f);
+        };
+        add(npc->race, "race", "record");
+        add(npc->voiceType, "voice", "record");
+        add(npc->npcClass, "class", "record");
+        add(npc->combatStyle, "combat style", "record");
+        add(npc->skin, "skin", "record");
+        add(npc->defaultOutfit, "outfit", "record");
+        add(npc->sleepOutfit, "sleep outfit", "record");
+        if (auto* head = npc->headRelatedData) {
+            add(head->hairColor, "hair colour", "record");
+            add(head->faceDetails, "head texture set", "record");
+        }
+        for (int i = 0; npc->headParts && i < npc->numHeadParts; ++i) {
+            if (auto* part = npc->headParts[i]) {
+                add(part, "head part", "record", part->GetModel());
+                add(part->textureSet, "head part textures", "record");
+            }
+        }
+        for (const auto& f : npc->factions) add(f.faction, "faction", "record");
+        for (auto* package : npc->aiPackages.packages) add(package, "package", "record");
+        if (auto* spells = npc->GetSpellList()) {
+            for (std::uint32_t i = 0; spells->spells && i < spells->numSpells; ++i) add(spells->spells[i], "spell", "record");
+        }
+        for (std::uint32_t i = 0; npc->perks && i < npc->perkCount; ++i) add(npc->perks[i].perk, "perk", "record");
+        for (auto& [item, entry] : actor->GetInventory()) {
+            if (!item || entry.first <= 0) continue;
+            const bool worn = entry.second && entry.second->IsWorn();
+            add(item, worn ? "worn" : "carried", worn ? "worn" : "carried");
+        }
+        return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
+                {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)}};
+    }
+
     json CopyOutfit(const std::string& refId) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
