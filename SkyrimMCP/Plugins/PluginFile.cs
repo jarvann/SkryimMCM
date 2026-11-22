@@ -466,6 +466,25 @@ public sealed class NewQuest : NewRecord
     public bool RunOnce { get; init; }
     public byte Priority { get; init; }
     public List<NewScript> Scripts { get; init; } = [];
+    public List<NewAlias> Aliases { get; init; } = [];
+}
+
+/// <summary>A quest alias: an existing reference (Forced), or one the quest makes (Create, a base form) at another alias.</summary>
+public sealed record NewAlias(uint Id, string Name, string? Forced = null, string? Create = null, uint CreateAt = 0);
+
+/// <summary>A colour (hair, skin). 1.6: an exported character's own hair colour.</summary>
+public sealed class NewColour : NewRecord
+{
+    public override string Type => "CLFM";
+    public byte Red { get; init; }
+    public byte Green { get; init; }
+    public byte Blue { get; init; }
+}
+
+public sealed class NewOutfit : NewRecord
+{
+    public override string Type => "OTFT";
+    public List<string> Items { get; init; } = [];
 }
 
 /// <summary>
@@ -488,6 +507,15 @@ public sealed class NewNpc : NewRecord
     public List<string> Packages { get; init; } = [];
     public List<(string Ref, sbyte Rank)> Factions { get; init; } = [];
     public List<string> HeadParts { get; init; } = [];
+    public string? HairColour { get; init; }
+    public string? HeadTexture { get; init; }
+    public string? Skin { get; init; }
+    public (byte R, byte G, byte B)? BodyTint { get; init; }
+    /// <summary>Grows with the player (level is then the multiplier times 1000).</summary>
+    public bool LevelsWithPlayer { get; init; }
+    public byte Aggression { get; init; }
+    public byte Confidence { get; init; } = 2;
+    public byte Assistance { get; init; }
     public ushort Level { get; init; } = 1;
     public float Height { get; init; } = 1f;
     public float Weight { get; init; } = 50f;
@@ -495,7 +523,7 @@ public sealed class NewNpc : NewRecord
     internal IEnumerable<string> References()
     {
         yield return Race;
-        foreach (var r in new[] { Voice, Class, Outfit, CombatStyle }) if (!string.IsNullOrWhiteSpace(r)) yield return r;
+        foreach (var r in new[] { Voice, Class, Outfit, CombatStyle, HairColour, HeadTexture, Skin }) if (!string.IsNullOrWhiteSpace(r)) yield return r;
         foreach (var r in Packages) yield return r;
         foreach (var (r, _) in Factions) yield return r;
         foreach (var r in HeadParts) yield return r;
@@ -575,6 +603,10 @@ public static class PluginWriter
             foreach (var p in q.Scripts.SelectMany(s => s.Properties).Where(p => p.Kind == "object"))
                 if (p.Value?.ToString() is string v && ObjectRef.Match(v) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
                     AddMaster(m.Groups["plugin"].Value);
+        foreach (var r in spec.Records.OfType<NewOutfit>().SelectMany(o => o.Items)
+                     .Concat(spec.Records.OfType<NewQuest>().SelectMany(q => q.Aliases).SelectMany(a => new[] { a.Forced, a.Create }).OfType<string>()))
+            if (ObjectRef.Match(r) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
+                AddMaster(m.Groups["plugin"].Value);
         foreach (var npc in spec.Records.OfType<NewFaction>())
             foreach (var (r, _) in npc.Relations)
                 if (ObjectRef.Match(r) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
@@ -663,7 +695,22 @@ public static class PluginWriter
                         Field(fields, "DNAM", dnam);
                         // Vanilla quests carry the condition-list marker and the next alias ID even when both are empty.
                         Field(fields, "NEXT", []);
-                        Field(fields, "ANAM", new byte[4]);
+                        var nextAlias = new byte[4];
+                        BinaryPrimitives.WriteUInt32LittleEndian(nextAlias, q.Aliases.Count == 0 ? 0 : q.Aliases.Max(a => a.Id) + 1);
+                        Field(fields, "ANAM", nextAlias);
+                        foreach (var a in q.Aliases) WriteAlias(fields, a, text => ResolveObject(text, $"{q.EditorId}.{a.Name}"));
+                        break;
+                    case NewColour colour:
+                        Field(fields, "EDID", ZString(colour.EditorId));
+                        Field(fields, "CNAM", [colour.Red, colour.Green, colour.Blue, 0]);
+                        Field(fields, "FNAM", new byte[4]);
+                        break;
+                    case NewOutfit outfit:
+                        Field(fields, "EDID", ZString(outfit.EditorId));
+                        var inam = new byte[4 * outfit.Items.Count];
+                        for (var k = 0; k < outfit.Items.Count; k++)
+                            BinaryPrimitives.WriteUInt32LittleEndian(inam.AsSpan(4 * k), ResolveObject(outfit.Items[k], $"{outfit.EditorId}.items"));
+                        Field(fields, "INAM", inam);
                         break;
                     case NewFaction faction:
                         WriteFaction(fields, faction, text => text.Equals("this", StringComparison.OrdinalIgnoreCase) ? ids[faction.EditorId] : ResolveObject(text, $"{faction.EditorId}.relations"));
@@ -705,6 +752,25 @@ public static class PluginWriter
             Bytes = output.ToArray(), Masters = masters, Assigned = assigned, Version = version, NextObjectId = next,
             NumRecords = spec.Records.Count + groups, Flags = fileFlags, Notes = notes,
         };
+    }
+
+    // Aliases as vanilla quests write them (WEJS28 000105D19 and WERJ13 000F5BC1, read 2026-11-22): a forced reference, or one created
+    // at another alias, then no voice types and the end marker.
+    static void WriteAlias(Stream f, NewAlias a, Func<string, uint> resolve)
+    {
+        static byte[] U32(uint v) { var b = new byte[4]; BinaryPrimitives.WriteUInt32LittleEndian(b, v); return b; }
+        Field(f, "ALST", U32(a.Id));
+        Field(f, "ALID", ZString(a.Name));
+        Field(f, "FNAM", U32(0));
+        if (a.Forced != null) Field(f, "ALFR", U32(resolve(a.Forced)));
+        if (a.Create != null)
+        {
+            Field(f, "ALCO", U32(resolve(a.Create)));
+            Field(f, "ALCA", U32(a.CreateAt));
+            Field(f, "ALCL", U32(0));
+        }
+        Field(f, "VTCK", U32(0));
+        Field(f, "ALED", []);
     }
 
     // Field order and sizes as Skyrim.esm's own factions with ranks (CollegeofWinterholdArchMageFaction, read 2026-11-22).
@@ -749,8 +815,10 @@ public static class PluginWriter
         if (n.Essential) flags |= 0x2;
         if (n.Unique) flags |= 0x20;
         if (n.Protected) flags |= 0x800;
+        if (n.LevelsWithPlayer) flags |= 0x80;
         BinaryPrimitives.WriteUInt32LittleEndian(acbs, flags);
-        BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(8), Math.Max(n.Level, (ushort)1));
+        BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(8), n.LevelsWithPlayer ? (ushort)1000 : Math.Max(n.Level, (ushort)1));
+        if (n.LevelsWithPlayer) BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(10), Math.Max(n.Level, (ushort)1));   // never below this level
         BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(14), 100);   // speed
         BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(16), 35);    // disposition base
         Field(f, "ACBS", acbs);
@@ -764,9 +832,12 @@ public static class PluginWriter
         }
         if (!string.IsNullOrWhiteSpace(n.Voice)) Field(f, "VTCK", Id(Ref(n.Voice, "voice")));
         Field(f, "RNAM", Id(Ref(n.Race, "race")));
+        if (!string.IsNullOrWhiteSpace(n.Skin)) Field(f, "WNAM", Id(Ref(n.Skin, "skin")));
 
         var aidt = new byte[20];
-        aidt[1] = 2;    // confidence: average
+        aidt[0] = n.Aggression;
+        aidt[1] = n.Confidence;
+        aidt[5] = n.Assistance;
         aidt[2] = 50;   // energy
         aidt[3] = 3;    // morality: no crime
         Field(f, "AIDT", aidt);
@@ -783,13 +854,16 @@ public static class PluginWriter
         Field(f, "DNAM", dnam);
 
         foreach (var part in n.HeadParts) Field(f, "PNAM", Id(Ref(part, "headParts")));
+        if (!string.IsNullOrWhiteSpace(n.HairColour)) Field(f, "HCLF", Id(Ref(n.HairColour, "hairColour")));
         if (!string.IsNullOrWhiteSpace(n.CombatStyle)) Field(f, "ZNAM", Id(Ref(n.CombatStyle, "combatStyle")));
         Field(f, "NAM5", [0xFF, 0x00]);
         Field(f, "NAM6", Float(n.Height));
         Field(f, "NAM7", Float(n.Weight));
         Field(f, "NAM8", Id(1));                                                      // sound level: normal
         if (!string.IsNullOrWhiteSpace(n.Outfit)) Field(f, "DOFT", Id(Ref(n.Outfit, "outfit")));
-        Field(f, "QNAM", [.. Float(0.5f), .. Float(0.5f), .. Float(0.5f)]);
+        if (!string.IsNullOrWhiteSpace(n.HeadTexture)) Field(f, "FTST", Id(Ref(n.HeadTexture, "headTexture")));
+        var (qr, qg, qb) = n.BodyTint is { } t ? (t.R / 255f, t.G / 255f, t.B / 255f) : (0.5f, 0.5f, 0.5f);
+        Field(f, "QNAM", [.. Float(qr), .. Float(qg), .. Float(qb)]);
     }
 
     static bool IsSelf(string plugin, string self) =>
