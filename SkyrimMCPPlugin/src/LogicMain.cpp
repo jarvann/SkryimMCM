@@ -10,7 +10,9 @@
 #include "BuildInfo.h"
 #include "HostApi.h"
 #include "LogicHost.h"
+#include "NPCManager.h"
 #include "Protocol.h"
+#include "TaskQueue.h"
 
 #include <nlohmann/json.hpp>
 
@@ -83,6 +85,7 @@ extern "C" __declspec(dllexport) int SkyLink_Init(const SkyLinkHostApi* host) no
 
         SKSE::log::info("SkyLinkLogic v{} (built {}) initialised", SKYLINK_VERSION_STRING,
             SkyrimMCP::BuildInfo::GetBuildTime());
+        SkyrimMCP::TaskQueue::Post([]() { SkyrimMCP::NPCManager::ReapplySlots(); });  // before a save loads its slot characters
         return 0;
     } catch (...) {
         g_host = nullptr;

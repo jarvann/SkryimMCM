@@ -32,6 +32,9 @@ namespace SkyrimMCP {
         // The parts of a look that sit on the NPC record and no face file holds: hair colour, body tone, head texture set, weight, voice.
         json GetFaceData(const std::string& refId);
         json SetFaceData(const json& params);
+        // Slot characters: what saves don't keep (original race, hair colour, head texture set, voice), from slots.json. Run at
+        // start-up and after loads; "rebuild" lists references whose 3D was made before it was put back.
+        json ReapplySlots();
         // Voice type (form ID or editor ID) of a spawned NPC.
         json SetNpcVoice(const std::string& refId, const std::string& voice);
         json SetSpawnedNpcEnabled(const std::string& refId, bool enable);

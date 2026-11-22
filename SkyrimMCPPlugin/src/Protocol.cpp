@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
 #include "Studio.h"
+#include <thread>
 #include "FaceState.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
@@ -490,7 +491,22 @@ namespace SkyrimMCP::Protocol {
             return MakeResponse(id, true, out).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         registry["reapply_face_state"] = [](const std::string& id, const json&) {
-            return GameThread(id, []() { return FaceState::Reapply(); });
+            // Slot characters first; a head made before its data was put back is made again (off, then on a moment later).
+            const auto slots = TaskQueue::RunOnGameThread([]() { return NPCManager::ReapplySlots(); });
+            if (slots.contains("rebuild") && !slots["rebuild"].empty()) {
+                for (const bool enable : { false, true }) {
+                    for (const auto& ref : slots["rebuild"]) {
+                        const auto r = ref.get<std::string>();
+                        TaskQueue::RunOnGameThread([r, enable]() { return NPCManager::SetSpawnedNpcEnabled(r, enable); });
+                    }
+                    if (!enable) std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+                }
+            }
+            return GameThread(id, [slots]() {
+                auto result = FaceState::Reapply();
+                result["slots"] = slots;
+                return result;
+            });
         };
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);

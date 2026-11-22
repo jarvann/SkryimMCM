@@ -149,7 +149,9 @@ public partial class RaceMenuTools
             SlotRegistry.Reserve(slotIndex, new JsonObject
             {
                 ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
-                ["face"] = face, ["template"] = spawned["template"]?.ToString(), ["characterId"] = characterId,
+                ["face"] = face, ["template"] = spawned["template"]?.ToString(),
+                // What saves don't keep: the plugin puts it back at start-up and after loads (ReapplySlots).
+                ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
             });
             slotFace = problem == null

@@ -9,6 +9,8 @@
 #include <vector>
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <numbers>
 #include <optional>
 #include <format>
@@ -791,6 +793,62 @@ namespace SkyrimMCP::NPCManager {
         }
     }
 
+    json ReapplySlots() {
+        auto* data = RE::TESDataHandler::GetSingleton();
+        json result = {{"slots", json::array()}, {"rebuild", json::array()}};
+        if (!data || !SlotPluginLoaded()) return result;
+        json registry;
+        try {
+            const auto folder = Helpers::GameDocumentsFolder();
+            std::ifstream in(folder / "SkyLinkAI" / "slots.json");
+            if (folder.empty() || !in) return result;
+            registry = json::parse(in);
+        } catch (const std::exception& e) {
+            result["problem"] = std::string("slots.json unreadable: ") + e.what();
+            return result;
+        }
+        if (!registry.is_object()) return result;
+        for (auto& [key, entry] : registry.items()) {
+            int slot = -1;
+            try { slot = std::stoi(key); } catch (...) {}
+            if (slot < 0 || slot >= kSlotsPerSex * 2 || !entry.is_object()) continue;
+            auto* form = data->LookupForm(kFirstSlot + slot, kSlotPlugin);
+            auto* npc = form ? form->As<RE::TESNPC>() : nullptr;
+            if (!npc) continue;
+            bool changed = false;
+            const bool used = npc->GetName() && SlotDefaultName(slot) != npc->GetName();
+            // The game uses an NPC's face file only while its race is its original one, and a slot's record is a Nord's: without
+            // this a Breton's head was built from parts, with no skin texture (Steam, 2026-11-22).
+            RE::TESRace* race = nullptr;
+            if (entry.contains("raceId") && entry["raceId"].is_string()) {
+                if (auto* r = FromStableId(entry["raceId"].get<std::string>())) race = r->As<RE::TESRace>();
+            }
+            if (used) race = npc->race;
+            if (race && npc->originalRace != race) {
+                npc->originalRace = race;
+                changed = true;
+            }
+            if (used && entry.contains("faceData") && entry["faceData"].is_object()) {
+                const auto now = FaceDataOf(npc);
+                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice" }) {
+                    if (entry["faceData"].contains(field) && entry["faceData"][field].is_string() && now[field] != entry["faceData"][field]) {
+                        ApplyFaceData(npc, entry["faceData"]);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}});
+            if (changed && used && entry.contains("refId") && entry["refId"].is_string()) {
+                RE::TESForm* r = nullptr;
+                try { r = RE::TESForm::LookupByID(Helpers::ParseFormId(entry["refId"].get<std::string>())); } catch (...) {}
+                auto* actor = r ? r->As<RE::Actor>() : nullptr;
+                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) result["rebuild"].push_back(entry["refId"]);
+            }
+        }
+        return result;
+    }
+
     json GetFaceData(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* npc = actor ? actor->GetActorBase() : nullptr;
@@ -846,6 +904,8 @@ namespace SkyrimMCP::NPCManager {
         json result = {{"refId", refId}, {"shapes", shapes}};
         if (auto* npc = actor->GetActorBase()) {
             result["bodyTint"] = std::format("#{:02X}{:02X}{:02X}", npc->bodyTintColor.red, npc->bodyTintColor.green, npc->bodyTintColor.blue);
+            result["race"] = npc->race ? json(npc->race->GetName()) : json(nullptr);
+            result["originalRace"] = npc->originalRace ? json(npc->originalRace->GetName()) : json(nullptr);
             result["isChargenPreset"] = npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kIsChargenFacePreset);
             result["baseFlags"] = std::format("{:08X}", npc->actorData.actorBaseFlags.underlying());
             result["templateUseFlags"] = std::format("{:04X}", npc->actorData.templateUseFlags.underlying());
@@ -904,6 +964,7 @@ namespace SkyrimMCP::NPCManager {
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
         npc->race = race;
+        npc->originalRace = race;  // its face file is used only while the two match
         if (!params.value("keepSchedule", false)) MakeStayPut(npc);
 
         const auto name = params.value("name", std::string());
@@ -944,6 +1005,7 @@ namespace SkyrimMCP::NPCManager {
             {"name", npc->GetName()},
             {"race", std::format("{:08X}", race->GetFormID())},
             {"raceName", race->GetName()},
+            {"raceId", StableId(race)},
             {"female", female},
             {"template", std::format("{:08X}", tmpl->GetFormID())},
             {"templateName", tmpl->GetName()},
