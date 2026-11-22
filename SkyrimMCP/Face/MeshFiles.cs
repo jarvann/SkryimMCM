@@ -40,6 +40,34 @@ public static class MeshFiles
         return null;
     }
 
+    /// <summary>
+    /// A texture by its path relative to Data: loose first, then the archives of the plugin it belongs to (its own "... - Textures"
+    /// archives, or the base game's). Only those archives are opened: a big load order has hundreds.
+    /// </summary>
+    public static byte[]? ReadTexture(string dataRelativePath, string plugin)
+    {
+        var p = dataRelativePath.Replace('/', '\\').TrimStart('\\');
+        var folders = SkyLinkSettings.GameFileFolders();
+        folders.Reverse();
+        foreach (var f in folders)
+        {
+            var loose = Path.Combine(f, p);
+            if (File.Exists(loose)) return File.ReadAllBytes(loose);
+        }
+        var stem = Path.GetFileNameWithoutExtension(plugin);
+        string[] baseGame = ["Skyrim", "Update", "Dawnguard", "HearthFires", "Dragonborn"];
+        var stems = baseGame.Contains(stem, StringComparer.OrdinalIgnoreCase) ? baseGame.Prepend(stem) : [stem];
+        foreach (var f in folders.Where(Directory.Exists))
+            foreach (var st in stems.Distinct(StringComparer.OrdinalIgnoreCase))
+                foreach (var file in Directory.EnumerateFiles(f, st + "*.bsa").OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                {
+                    var name = Path.GetFileName(file);
+                    if (!name.Contains("Textures", StringComparison.OrdinalIgnoreCase) && !Path.GetFileNameWithoutExtension(name).Equals(st, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (BsaArchive.Open(file) is { } bsa && bsa.Contains(p) && bsa.Read(p) is byte[] bytes) return bytes;
+                }
+        return null;
+    }
+
     // BUG-065: a path given relative to Data (meshes\actors\...) was looked up under meshes\meshes, so a follower's loose face
     // file read as missing.
     private static string Relative(string meshPath)

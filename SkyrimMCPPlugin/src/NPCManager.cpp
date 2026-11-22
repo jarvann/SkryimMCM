@@ -4,7 +4,9 @@
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
+#include <algorithm>
 #include <unordered_set>
+#include <vector>
 
 #include <format>
 
@@ -580,6 +582,16 @@ namespace SkyrimMCP::NPCManager {
         constexpr RE::FormID kFirstSlot = 0x800;
         constexpr int kSlotsPerSex = 10;
 
+        // The plugin and object ID a template's FaceGen files are named by: its own, or the NPC it borrows its face from.
+        json FaceSource(RE::TESNPC* npc) {
+            auto* from = npc ? npc->GetRootFaceNPC() : nullptr;
+            if (!from) from = npc;
+            auto* file = from ? from->GetFile(0) : nullptr;
+            if (!file) return nullptr;
+            const auto local = file->IsLight() ? (from->GetFormID() & 0xFFF) : (from->GetFormID() & 0xFFFFFF);
+            return {{"plugin", std::string(file->GetFilename())}, {"objectId", std::format("{:08X}", local)}};
+        }
+
         std::string SlotDefaultName(int index) {
             const bool female = index < kSlotsPerSex;
             return std::format("SkyLink Character {}{:02d}", female ? 'F' : 'M', (female ? index : index - kSlotsPerSex) + 1);
@@ -599,11 +611,13 @@ namespace SkyrimMCP::NPCManager {
         }
 
         // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
-        RE::TESNPC* FreeSlot(bool female, int& index) {
+        RE::TESNPC* FreeSlot(bool female, int& index, const std::vector<int>& avoid) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data) return nullptr;
             const int first = female ? 0 : kSlotsPerSex;
             for (int i = first; i < first + kSlotsPerSex; ++i) {
+                // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
+                if (std::find(avoid.begin(), avoid.end(), i) != avoid.end()) continue;
                 auto* npc = data->LookupForm<RE::TESNPC>(kFirstSlot + i, kSlotPlugin);
                 if (npc && SlotDefaultName(i) == npc->GetName()) {
                     index = i;
@@ -677,7 +691,10 @@ namespace SkyrimMCP::NPCManager {
 
         // A slot of SkyLink's optional plugin when one is free (kept by saves), else a runtime form (this session only).
         int slotIndex = -1;
-        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex) : nullptr;
+        std::vector<int> avoid;
+        if (params.contains("avoidSlots") && params["avoidSlots"].is_array())
+            for (const auto& a : params["avoidSlots"]) if (a.is_number_integer()) avoid.push_back(a.get<int>());
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex, avoid) : nullptr;
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;
@@ -738,6 +755,8 @@ namespace SkyrimMCP::NPCManager {
             {"templateSharedHeadData", sharedHead},
             {"runtimeForm", (npc->GetFormID() >> 24) == 0xFF},
             {"slot", slot ? json(slotIndex) : json(nullptr)},
+            {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
+            {"faceSource", FaceSource(tmpl)},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }
