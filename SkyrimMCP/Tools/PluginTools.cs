@@ -315,10 +315,13 @@ public class PluginTools : ToolBase
         "trip) and its masters checked. Script .pex files are not written or checked: the scripts must exist in the game's Scripts.")]
     public async Task<object> CreatePlugin(string name,
         [Description("JSON array of record objects (or the array as a JSON string).")] JsonElement records, string[]? masters = null, string? author = null,
-        string? description = null, bool light = true, bool dryRun = true)
+        string? description = null, bool light = true, bool dryRun = true,
+        [Description("Page of the record list in the reply.")] int page = 1, [Description("Records per page, 5-200.")] int pageSize = 50)
     {
         return await Task.Run<object>(() =>
         {
+            pageSize = Math.Clamp(pageSize, 5, 200);
+            page = Math.Max(page, 1);
             name = (name ?? "").Trim();
             if (Path.GetExtension(name).Length == 0) name += ".esp";
             var ext = Path.GetExtension(name).ToLowerInvariant();
@@ -391,8 +394,8 @@ public class PluginTools : ToolBase
                     header = new { version = scan.Header.VersionText, flags = $"0x{scan.Header.Flags:X}", numRecords = scan.Header.NumRecords, nextObjectId = $"0x{scan.Header.NextObjectId:X6}", masters = scan.Header.Masters, author = scan.Header.Author },
                     counted = new { records = scan.Records, groups = scan.Groups, added = scan.NewRecords, overrides = scan.Overrides },
                     light = new { verdict = e.Verdict, eligible = e.Eligible },
-                    records = recs.Take(40).ToList(),
-                    recordsNotShown = Math.Max(0, recs.Count - 40),
+                    records = recs.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
+                    recordsRead = recs.Count,
                 };
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or IndexOutOfRangeException)
@@ -419,7 +422,10 @@ public class PluginTools : ToolBase
                     nextObjectId = $"0x{built.NextObjectId:X6}",
                     masters = built.Masters,
                 },
-                records = built.Assigned.Select(a => new { type = a.Type, editorId = a.EditorId, formId = $"0x{a.FormId:X8}", objectId = $"0x{a.FormId & 0xFFFFFF:X3}" }),
+                recordsShown = $"{Math.Min((page - 1) * pageSize + 1, built.Assigned.Count)}-{Math.Min(page * pageSize, built.Assigned.Count)} of {built.Assigned.Count}",
+                page,
+                pages = Math.Max(1, (built.Assigned.Count + pageSize - 1) / pageSize),
+                records = built.Assigned.Skip((page - 1) * pageSize).Take(pageSize).Select(a => new { type = a.Type, editorId = a.EditorId, formId = $"0x{a.FormId:X8}", objectId = $"0x{a.FormId & 0xFFFFFF:X3}" }),
                 roundTrip,
                 masterProblems = depProblems is { Count: > 0 } ? depProblems : null,
                 alreadyInLoadOrder = lo?.FileOf(name) is string other ? $"A plugin named {name} is already installed ({other}): installing this build would replace it." : null,
