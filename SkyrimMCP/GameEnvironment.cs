@@ -39,7 +39,7 @@ public sealed record GameEnvironment
     {
         var documents = SkyLinkSettings.DocumentsFolder;
         var (gameFolder, gameFrom) = SkyLinkSettings.SkyrimPath();
-        var gog = documents.TrimEnd('\\', '/').EndsWith(" GOG", StringComparison.OrdinalIgnoreCase) || IsGogFolder(gameFolder);
+        var gog = documents.TrimEnd('\\', '/').EndsWith(" GOG", StringComparison.OrdinalIgnoreCase) || SkyLinkSettings.IsGogInstall(gameFolder);
         var (mo2, profile) = SkyLinkSettings.Mo2Instance();
         var profileFolder = mo2 == null ? null : Path.Combine(mo2, "profiles", profile ?? "Default");
         var inis = IniNames.ToDictionary(n => n, n => Ini(n, documents, profileFolder), StringComparer.OrdinalIgnoreCase);
@@ -117,12 +117,6 @@ public sealed record GameEnvironment
         }
         catch (IOException) { }
         return null;
-    }
-
-    private static bool IsGogFolder(string? game)
-    {
-        try { return game != null && Directory.Exists(game) && (Directory.EnumerateFiles(game, "goggame-*.info").Any() || File.Exists(Path.Combine(game, "Galaxy64.dll"))); }
-        catch (Exception) { return false; }
     }
 
     private static string? VersionOf(string? file)

@@ -33,19 +33,26 @@ public static class SkyLinkSettings
     {
         get
         {
-            if (GameDocumentsFolder is { Length: > 0 } connected) return connected;
+            var running = RunningGameFolder();
+            // What the plugin said, unless another game is running now (Steam closed, GOG started, no call made yet).
+            if (GameDocumentsFolder is { Length: > 0 } connected &&
+                (running == null || GameInstallFolder == null || SameFolder(running, GameInstallFolder))) return connected;
             var games = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games");
-            if (RunningGameFolder() is string running)
-            {
-                bool gog;
-                try { gog = Directory.EnumerateFiles(running, "goggame-*.info").Any(); } catch (Exception) { gog = false; }
-                return Path.Combine(games, gog ? "Skyrim Special Edition GOG" : "Skyrim Special Edition");
-            }
-            return Path.Combine(games, "Skyrim Special Edition");
+            return Path.Combine(games, running != null && IsGogInstall(running) ? "Skyrim Special Edition GOG" : "Skyrim Special Edition");
         }
     }
 
     public static string Folder => Path.Combine(DocumentsFolder, "SkyLinkAI");
+
+    private static bool SameFolder(string a, string b) =>
+        string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A GOG install: goggame-*.info files or Galaxy64.dll beside the exe.</summary>
+    public static bool IsGogInstall(string? game)
+    {
+        try { return game != null && Directory.Exists(game) && (Directory.EnumerateFiles(game, "goggame-*.info").Any() || File.Exists(Path.Combine(game, "Galaxy64.dll"))); }
+        catch (Exception) { return false; }
+    }
 
     public static string FilePath => Path.Combine(Folder, "settings.json");
 
@@ -90,15 +97,13 @@ public static class SkyLinkSettings
     /// </summary>
     public static (string? Path, string Source) SkyrimPath()
     {
+        // INFRA-027: the game that is running decides, before anything set by hand or kept from an earlier game.
+        if (RunningGameFolder() is string process) return (process, "the running game");
         var s = Load();
         if (Str(s, "skyrimPath") is string configured) return (configured, "settings.json skyrimPath");
+        // The game that just quit (RestartGame, or after a crash) before a variable that may name another install.
+        if (GameInstallFolder is { Length: > 0 } last && Directory.Exists(last)) return (last, "the last connected game");
         if (Environment.GetEnvironmentVariable("SKYRIM_PATH") is string env && env.Length > 0) return (env, "SKYRIM_PATH variable");
-        if (GameInstallFolder is { Length: > 0 } running && Directory.Exists(running)) return (running, "the running game");
-        // Before the server has talked to the game (a freshly restarted server): the running game's own folder, from its process.
-        // Round B: RestartGame on a fresh server fell through to the server's install folder and relaunched the Steam game
-        // instead of the GOG game it had just quit.
-        if (RunningGameFolder() is string fromProcess) return (fromProcess, "the running game's process");
-
         foreach (var candidate in new[] { Environment.GetEnvironmentVariable("SKYLINK_SERVER_SOURCE"), typeof(SkyLinkSettings).Assembly.Location })
         {
             if (string.IsNullOrEmpty(candidate)) continue;
@@ -182,6 +187,13 @@ public static class SkyLinkSettings
         return folders;
     }
 
+    /// <summary>Where SkyLink puts game files of its own (slot faces): MO2's overwrite when MO2 runs the game, else Data.</summary>
+    public static string? WritableDataFolder()
+    {
+        var (mo2, _) = Mo2Instance();
+        return mo2 != null ? System.IO.Path.Combine(mo2, "overwrite") : DataPath();
+    }
+
     public static string? DataPath()
     {
         var s = Load();
@@ -204,13 +216,15 @@ public static class SkyLinkSettings
                 if (e is JsonValue v && v.TryGetValue<string>(out var f) && !string.IsNullOrWhiteSpace(f)) folders.Add(f.Trim());
         }
 
-        if (Str(s, "mo2Path") is string mo2)
+        // The running game's MO2 instance (found by itself; settings mo2Path when set), not only one named in the settings.
+        var (mo2, profile) = Mo2Instance();
+        if (mo2 != null)
         {
             folders.Add(Path.Combine(mo2, "overwrite", "SKSE", "Plugins"));
             var mods = Path.Combine(mo2, "mods");
             try
             {
-                foreach (var mod in Mo2ModsByPriority(mo2, Str(s, "mo2Profile")))
+                foreach (var mod in Mo2ModsByPriority(mo2, profile))
                 {
                     var plugins = Path.Combine(mods, mod, "SKSE", "Plugins");
                     if (Directory.Exists(plugins)) folders.Add(plugins);

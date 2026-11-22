@@ -18,8 +18,8 @@ public class NotesTools : ToolBase
 
     public NotesTools(IPipeClient pipe) : base(pipe) { }
 
-    internal static string NotesFolder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition", "SkyLinkAI", "notes");
+    // INFRA-027: the running game's own folder (Steam and GOG keep separate notes).
+    internal static string NotesFolder => Path.Combine(SkyLinkSettings.Folder, "notes");
 
     [McpServerTool]
     [Description("List the notes and goals kept for this character. Read them at the start of a session and when the player asks what " +

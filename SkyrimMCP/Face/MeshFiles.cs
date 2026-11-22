@@ -7,6 +7,7 @@ namespace SkyrimMCP.Face;
 public static class MeshFiles
 {
     private static List<BsaArchive>? _archives;
+    private static string? _archivesFor;
     private static readonly object ArchiveLock = new();
 
     /// <summary>The mesh's bytes, from a loose file or a BSA; null when it isn't found.</summary>
@@ -51,19 +52,12 @@ public static class MeshFiles
     {
         lock (ArchiveLock)
         {
-            if (_archives != null) return _archives;
-            var folders = new List<string>();
-            var settings = SkyLinkSettings.Load();
-            if (settings["mo2Path"]?.GetValue<string>() is { Length: > 0 } mo2)
-            {
-                try
-                {
-                    foreach (var mod in SkyLinkSettings.Mo2ModsByPriority(mo2, settings["mo2Profile"]?.GetValue<string>()))
-                        folders.Add(Path.Combine(mo2, "mods", mod));
-                }
-                catch (Exception) { }
-            }
-            if (SkyLinkSettings.DataPath() is string data) folders.Add(data);
+            // INFRA-027: the running game's folders, highest priority first; opened again when they change (another game, profile).
+            var folders = SkyLinkSettings.GameFileFolders();
+            folders.Reverse();
+            var key = string.Join("|", folders);
+            if (_archives != null && _archivesFor == key) return _archives;
+            _archivesFor = key;
             var list = new List<BsaArchive>();
             foreach (var folder in folders)
             {
@@ -83,19 +77,8 @@ public static class MeshFiles
     public static string? Find(string meshPath)
     {
         var relative = Path.Combine("meshes", Relative(meshPath));
-        var settings = SkyLinkSettings.Load();
-        var candidates = new List<string>();
-        if (settings["mo2Path"]?.GetValue<string>() is { Length: > 0 } mo2)
-        {
-            candidates.Add(Path.Combine(mo2, "overwrite", relative));
-            try
-            {
-                foreach (var mod in SkyLinkSettings.Mo2ModsByPriority(mo2, settings["mo2Profile"]?.GetValue<string>()))
-                    candidates.Add(Path.Combine(mo2, "mods", mod, relative));
-            }
-            catch (Exception) { /* fall through to Data */ }
-        }
-        if (SkyLinkSettings.DataPath() is string data) candidates.Add(Path.Combine(data, relative));
-        return candidates.FirstOrDefault(File.Exists);
+        var folders = SkyLinkSettings.GameFileFolders();
+        folders.Reverse();   // highest priority first
+        return folders.Select(f => Path.Combine(f, relative)).FirstOrDefault(File.Exists);
     }
 }
