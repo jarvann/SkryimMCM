@@ -141,20 +141,22 @@ public partial class RaceMenuTools
             var objectId = spawned!["slotObjectId"]!.ToString();
             byte[]? mesh = null, tint = null;
             var slotIndex = spawned["slot"]!.GetValue<int>();
-            List<string> repaired = [], unrepaired = [];
+            HeadRepair.Result? repair = null;
             if (face == "player" && ExportedHead(presetName) is { } exported)
             {
                 (mesh, tint) = (exported.mesh, exported.tint);
-                // BUG-102: shapes the export gave the face's textures take their own head part's.
                 try
                 {
                     var look = await _pipe.SendRequestAsync("get_appearance", new JsonObject { ["refId"] = refId });
-                    var models = (look?["headParts"] as JsonArray ?? []).Where(h => h?["editorId"] != null && h["model"] != null)
-                        .GroupBy(h => h!["editorId"]!.ToString(), StringComparer.OrdinalIgnoreCase)
-                        .ToDictionary(g => g.Key, g => g.First()!["model"]!.ToString(), StringComparer.OrdinalIgnoreCase);
-                    (mesh, repaired, unrepaired) = NifTextures.RepairExportedHead(mesh, shape => models.TryGetValue(shape, out var m) ? MeshFiles.Read(m) : null);
+                    var parts = (look?["headParts"] as JsonArray ?? []).Where(h => h?["editorId"] != null)
+                        .Select(h => (h!["editorId"]!.ToString(), h["model"]?.ToString())).ToList();
+                    repair = HeadRepair.Repair(mesh, parts, MeshFiles.Read);
+                    mesh = repair.Bytes;
                 }
-                catch (Exception ex) when (ex is McpException or InvalidDataException or IOException) { unrepaired.Add("not checked: " + ex.Message); }
+                catch (Exception ex) when (ex is McpException or InvalidDataException or IOException)
+                {
+                    repair = new HeadRepair.Result(mesh, [], [], [], ["The exported head wasn't checked: " + ex.Message]);
+                }
             }
             else if (face == "template" && spawned["faceSource"] is JsonObject src && src["plugin"]?.ToString() is string facePlugin)
                 (mesh, tint) = SlotRegistry.ReadFace(facePlugin, src["objectId"]!.ToString());
@@ -170,7 +172,7 @@ public partial class RaceMenuTools
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
             });
             slotFace = problem == null
-                ? new { written = files, texturesRepaired = repaired, texturesNotRepaired = unrepaired, note = "Seen after the next game start." }
+                ? new { written = files, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = "Seen after the next game start." }
                 : (object)new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
         }
         else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
