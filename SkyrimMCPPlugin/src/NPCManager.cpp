@@ -713,6 +713,67 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"stays", true}};
     }
 
+    json SetNpcVoice(const std::string& refId, const std::string& voice) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        RE::TESForm* v = RE::TESForm::LookupByEditorID(voice);
+        if (!v) try { v = RE::TESForm::LookupByID(Helpers::ParseFormId(voice)); } catch (...) {}
+        auto* type = v ? v->As<RE::BGSVoiceType>() : nullptr;
+        if (!type) return {{"error", "Not a voice type: " + voice}};
+        auto* old = npc->voiceType;
+        npc->voiceType = type;
+        auto label = [](RE::BGSVoiceType* t) { return t && t->GetFormEditorID() ? json(t->GetFormEditorID()) : json(nullptr); };
+        return {{"refId", refId}, {"was", label(old)}, {"voice", label(type)}, {"voiceId", std::format("{:08X}", type->GetFormID())}};
+    }
+
+    json HeadMaterials(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* face = actor && actor->Get3D(false) ? actor->GetFaceNodeSkinned() : nullptr;
+        if (!face) return {{"error", "That actor's head isn't loaded"}};
+        auto name = [](const RE::NiPointer<RE::NiSourceTexture>& t) -> json {
+            if (!t) return nullptr;
+            return t->name.c_str() ? json(t->name.c_str()) : json("(unnamed)");
+        };
+        auto colour = [](const RE::NiColor& c) {
+            return std::format("#{:02X}{:02X}{:02X}", static_cast<int>(std::clamp(c.red, 0.0f, 1.0f) * 255), static_cast<int>(std::clamp(c.green, 0.0f, 1.0f) * 255),
+                               static_cast<int>(std::clamp(c.blue, 0.0f, 1.0f) * 255));
+        };
+        json shapes = json::array();
+        RE::BSVisit::TraverseScenegraphGeometries(face, [&](RE::BSGeometry* geo) {
+            json s = {{"shape", geo->name.c_str() ? geo->name.c_str() : ""}};
+            auto* shader = geo->lightingShaderProp_cast();
+            auto* material = shader ? static_cast<RE::BSLightingShaderMaterialBase*>(shader->material) : nullptr;
+            if (material) {
+                const auto feature = material->GetFeature();
+                s["feature"] = static_cast<int>(feature);
+                s["diffuse"] = name(material->diffuseTexture);
+                if (feature == RE::BSShaderMaterial::Feature::kFaceGen) {
+                    auto* m = static_cast<RE::BSLightingShaderMaterialFacegen*>(material);
+                    s["tint"] = name(m->tintTexture);
+                    s["detail"] = name(m->detailTexture);
+                } else if (feature == RE::BSShaderMaterial::Feature::kHairTint) {
+                    s["tintColor"] = colour(static_cast<RE::BSLightingShaderMaterialHairTint*>(material)->tintColor);
+                } else if (feature == RE::BSShaderMaterial::Feature::kFaceGenRGBTint) {
+                    s["tintColor"] = colour(static_cast<RE::BSLightingShaderMaterialFacegenTint*>(material)->tintColor);
+                }
+            }
+            shapes.push_back(s);
+            return RE::BSVisit::BSVisitControl::kContinue;
+        });
+        json result = {{"refId", refId}, {"shapes", shapes}};
+        if (auto* npc = actor->GetActorBase()) {
+            result["bodyTint"] = std::format("#{:02X}{:02X}{:02X}", npc->bodyTintColor.red, npc->bodyTintColor.green, npc->bodyTintColor.blue);
+            result["faceNPC"] = npc->faceNPC ? json(std::format("{:08X}", npc->faceNPC->GetFormID())) : json(nullptr);
+            auto* hair = npc->headRelatedData ? npc->headRelatedData->hairColor : nullptr;
+            result["hairColor"] = hair ? json(std::format("{:08X} #{:02X}{:02X}{:02X}", hair->GetFormID(), hair->color.red, hair->color.green, hair->color.blue)) : json(nullptr);
+            result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
+        }
+        return result;
+    }
+
     json SpawnNpc(const json& params) {
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* playerBase = player ? player->GetActorBase() : nullptr;

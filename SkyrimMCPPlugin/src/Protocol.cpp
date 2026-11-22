@@ -262,6 +262,12 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [ref, enable]() { return NPCManager::SetSpawnedNpcEnabled(ref, enable); });
         };
         formIdParam("spawned_npc_stay", "refId", [](const std::string& r) { return NPCManager::SpawnedNpcStay(r); });
+        formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
+        registry["set_npc_voice"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string voice = params.value("voice", std::string());
+            return GameThread(id, [ref, voice]() { return NPCManager::SetNpcVoice(ref, voice); });
+        };
         formIdParam("remove_spawned_npc", "refId", [](const std::string& r) { return NPCManager::RemoveSpawnedNpc(r); });
         registry["play_idle"] = [](const std::string& id, const json& params) {
             std::string idleFormId = params.value("idleFormId", "");

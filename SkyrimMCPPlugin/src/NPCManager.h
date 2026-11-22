@@ -27,6 +27,10 @@ namespace SkyrimMCP {
         json SpawnNpc(const json& params);
         json RemoveSpawnedNpc(const std::string& refId);
         json SpawnedNpcStay(const std::string& refId);
+        // Every shape on the actor's loaded head: its material, the textures the game really loaded and the tint colours.
+        json HeadMaterials(const std::string& refId);
+        // Voice type (form ID or editor ID) of a spawned NPC.
+        json SetNpcVoice(const std::string& refId, const std::string& voice);
         json SetSpawnedNpcEnabled(const std::string& refId, bool enable);
     }
 
