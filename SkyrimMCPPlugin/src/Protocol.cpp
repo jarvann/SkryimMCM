@@ -430,7 +430,8 @@ namespace SkyrimMCP::Protocol {
             if (mode == "prepare") return GameThread(id, [=]() { return FaceCamera::Prepare(expression, strength, mouthOpen); });
             bool hideEffects = params.value("hideEffects", true);
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair, hideEffects); });
-            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
+            const std::string aimRef = params.value("refId", std::string());
+            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead, aimRef); });
             if (mode == "snapshot") return GameThread(id, []() { return FaceCamera::SculptSnapshot(); });
             if (mode == "check") return GameThread(id, []() { return FaceCamera::Check(); });
                         if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
