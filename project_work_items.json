@@ -5988,6 +5988,10 @@
             {
               "datetime": "2026-11-22T17:20",
               "note": "Faces seen on Steam: own files loaded at once for slots the game knew, skin right in all three races, resemblance 0.5. A loaded face file carries its own hair tint, so the player's colour is written into the file (twice the colour). Left to check: after a restart, how alike they look to Cory, rank dialogue."
+            },
+            {
+              "datetime": "2026-11-22T17:45",
+              "note": "Cory: the family faces look fine. Resemblance 0.5 stays the default."
             }
           ],
           "targetRelease": "",
