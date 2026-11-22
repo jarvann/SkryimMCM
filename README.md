@@ -60,7 +60,7 @@ Each kind of action has its own rule, applied by the tool itself, and `GetGameSa
 
 ## Installation
 
-1. Install with MO2 or Vortex, or extract the zip into your Skyrim `Data` folder (the zip starts at `SKSE\`)
+1. Install with MO2 or Vortex: the installer (FOMOD) asks about the optional NPC slots (`SkyLinkAI.esl`, selected by default; a light plugin that lets characters the AI creates be kept in saves). Without a mod manager, copy what's inside `00 Core` into your Skyrim `Data` folder, and `SkyLinkAI.esl` from `10 NPC slots` if you want the slots
 2. Install .NET 10 Runtime if not already installed
 3. Configure Claude Desktop (see below)
 4. Launch Skyrim via SKSE, then open Claude Desktop

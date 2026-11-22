@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+	<moduleName>SkyLink AI</moduleName>
+	<requiredInstallFiles>
+		<folder source="00 Core" destination="" priority="0" />
+	</requiredInstallFiles>
+	<installSteps order="Explicit">
+		<installStep name="Options">
+			<optionalFileGroups order="Explicit">
+				<group name="Characters" type="SelectAny">
+					<plugins order="Explicit">
+						<plugin name="NPC slots (SkyLinkAI.esl)">
+							<description>A tiny light plugin with blank character slots. Characters the AI creates for you use them, so they are kept in your saves. It doesn't count toward the 254 plugin limit. Without it, created characters last for one session.</description>
+							<files>
+								<folder source="10 NPC slots" destination="" priority="0" />
+							</files>
+							<typeDescriptor>
+								<type name="Recommended" />
+							</typeDescriptor>
+						</plugin>
+					</plugins>
+				</group>
+			</optionalFileGroups>
+		</installStep>
+	</installSteps>
+</config>
