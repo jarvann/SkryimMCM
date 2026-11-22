@@ -574,6 +574,45 @@ namespace SkyrimMCP::NPCManager {
             return form ? form->As<RE::TESRace>() : nullptr;
         }
 
+        // INFRA-024: SkyLinkAI.esl (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
+        // Their base forms belong to a plugin, so the game can keep changes to them and references to them in saves.
+        constexpr std::string_view kSlotPlugin = "SkyLinkAI.esl";
+        constexpr RE::FormID kFirstSlot = 0x800;
+        constexpr int kSlotsPerSex = 10;
+
+        std::string SlotDefaultName(int index) {
+            const bool female = index < kSlotsPerSex;
+            return std::format("SkyLink Character {}{:02d}", female ? 'F' : 'M', (female ? index : index - kSlotsPerSex) + 1);
+        }
+
+        int SlotIndex(const RE::TESForm* form) {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data || !form) return -1;
+            for (int i = 0; i < kSlotsPerSex * 2; ++i)
+                if (data->LookupForm(kFirstSlot + i, kSlotPlugin) == form) return i;
+            return -1;
+        }
+
+        bool SlotPluginLoaded() {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            return data && data->LookupForm(kFirstSlot, kSlotPlugin) != nullptr;
+        }
+
+        // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
+        RE::TESNPC* FreeSlot(bool female, int& index) {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data) return nullptr;
+            const int first = female ? 0 : kSlotsPerSex;
+            for (int i = first; i < first + kSlotsPerSex; ++i) {
+                auto* npc = data->LookupForm<RE::TESNPC>(kFirstSlot + i, kSlotPlugin);
+                if (npc && SlotDefaultName(i) == npc->GetName()) {
+                    index = i;
+                    return npc;
+                }
+            }
+            return nullptr;
+        }
+
         // A plain NPC of this race and sex to copy: not the player, not built from a template (its look and stats would come
         // from somewhere else), preferring one that isn't unique.
         RE::TESNPC* FindTemplate(RE::TESRace* race, bool female) {
@@ -618,8 +657,13 @@ namespace SkyrimMCP::NPCManager {
             if (!tmpl) return {{"error", std::format("No NPC of race {:08X} ({}) to copy from", race->GetFormID(), female ? "female" : "male")}};
         }
 
-        auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
-        auto* npc = factory ? factory->Create() : nullptr;
+        // A slot of SkyLink's optional plugin when one is free (kept by saves), else a runtime form (this session only).
+        int slotIndex = -1;
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex) : nullptr;
+        if (!npc) {
+            auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
+            npc = factory ? factory->Create() : nullptr;
+        }
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
         npc->race = race;
@@ -652,7 +696,15 @@ namespace SkyrimMCP::NPCManager {
             }
         }
 
-        auto ref = player->PlaceObjectAtMe(npc, false);
+        const bool slot = slotIndex >= 0;
+        if (slot) {
+            // Mark what changed on the slot so the game writes it into saves.
+            using CF = RE::TESNPC::ChangeFlags;
+            npc->AddChange(CF::kBaseData | CF::kAttributes | CF::kAIData | CF::kFullName | CF::kFactions | CF::kNPCSkills |
+                           CF::kClass | CF::kFace | CF::kDefaultOutfit | CF::kGender | CF::kRace);
+        }
+
+        auto ref = player->PlaceObjectAtMe(npc, slot);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
 
         return {
@@ -667,6 +719,8 @@ namespace SkyrimMCP::NPCManager {
             {"face", face},
             {"templateSharedHeadData", sharedHead},
             {"runtimeForm", (npc->GetFormID() >> 24) == 0xFF},
+            {"slot", slot ? json(slotIndex) : json(nullptr)},
+            {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }
 
@@ -677,7 +731,7 @@ namespace SkyrimMCP::NPCManager {
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
         auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
         auto* base = ref ? ref->GetBaseObject() : nullptr;
-        if (!ref || !base || (base->GetFormID() >> 24) != 0xFF) return {{"error", "Not a spawned NPC: " + refId}};
+        if (!ref || !base || ((base->GetFormID() >> 24) != 0xFF && SlotIndex(base) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
         if (enable) ref->Enable(false); else ref->Disable();
         return {{"refId", refId}, {"enabled", enable}};
     }
@@ -688,10 +742,18 @@ namespace SkyrimMCP::NPCManager {
         auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
         if (!ref) return {{"error", "Reference not found: " + refId}};
         auto* base = ref->GetBaseObject();
-        // Only what SkyLink made: a runtime base (FF...) placed at runtime.
-        if (!base || (base->GetFormID() >> 24) != 0xFF) return {{"error", "Not a spawned NPC (its base isn't a runtime form): " + refId}};
+        // Only what SkyLink made: a runtime base (FF...) or one of its slots.
+        const int slot = SlotIndex(base);
+        if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0)) return {{"error", "Not a spawned NPC (its base isn't SkyLink's): " + refId}};
         ref->Disable();
         ref->SetDelete(true);
+        if (slot >= 0) {
+            // The slot is free again once it has its own name back.
+            if (auto* npc = base->As<RE::TESNPC>()) {
+                npc->SetFullName(SlotDefaultName(slot).c_str());
+                npc->AddChange(RE::TESNPC::ChangeFlags::kFullName);
+            }
+        }
         return {{"removed", true}, {"refId", refId}};
     }
 }

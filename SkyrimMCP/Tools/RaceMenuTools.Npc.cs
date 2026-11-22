@@ -127,13 +127,18 @@ public partial class RaceMenuTools
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
         }
 
-        await NotifyInGame($"{name.Trim()} spawned (preview)");
+        var inSlot = spawned?["slot"] is JsonValue;
+        await NotifyInGame($"{name.Trim()} spawned" + (inSlot ? "" : " (preview)"));
         return new
         {
             spawned = DeserializeResponse(spawned),
             face = faceResult,
-            lasting = false,
-            note = "A preview for this session: it won't survive a save and load. GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
+            lasting = inSlot,
+            note = inSlot
+                ? "Uses one of SkyLinkAI.esl's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
+                : "A preview for this session: it won't survive a save and load" +
+                  (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esl is in use)." : " (SkyLinkAI.esl, the optional plugin with NPC slots, isn't in the load order).") +
+                  " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
         };
     }
 
