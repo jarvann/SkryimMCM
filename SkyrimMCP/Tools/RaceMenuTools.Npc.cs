@@ -73,11 +73,12 @@ public partial class RaceMenuTools
         "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
         "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
         "without a role lists them), any race, adults only, never marryable. resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
-        "face and hair colour take after the player's, in any race or sex. With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "face and hair colour take after the player's, in any race or sex. follower: can be recruited with the game's own dialogue (give it a voice " +
+        "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, string? family = null, double? resemblance = null, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, string? family = null, double? resemblance = null, bool follower = false, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -190,6 +191,13 @@ public partial class RaceMenuTools
             catch (McpException ex) { familyResult = new { error = ex.Message, note = "Spawned, but not in the family." }; }
         }
 
+        object? followerResult = null;
+        if (follower && refId != null)
+        {
+            try { followerResult = (await SetFollower(refId, true, chooseVoice: string.IsNullOrWhiteSpace(voice), spawned)).Reply; }
+            catch (McpException ex) { followerResult = new { error = ex.Message, note = "Spawned, but not as a follower." }; }
+        }
+
         object? outfitResult = null;
         if (dress == "player" && refId != null)
         {
@@ -263,6 +271,7 @@ public partial class RaceMenuTools
             face = faceResult,
             voice = voiceResult,
             family = familyResult,
+            follower = followerResult,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,
@@ -312,6 +321,42 @@ public partial class RaceMenuTools
             return (mesh, new { problem = "The family look couldn't be made (" + ex.Message + "). The relative has their own face." });
         }
     }
+
+    private async Task<(bool Ok, object Reply)> SetFollower(string refId, bool follower, bool chooseVoice, JsonNode? spawned = null)
+    {
+        var set = await _pipe.SendRequestAsync("set_follower", new JsonObject { ["refId"] = refId, ["follower"] = follower });
+        if (set?["error"] != null) return (false, DeserializeResponse(set));
+        string? note = null;
+        if (follower && set?["voiceHasFollowerLines"]?.GetValue<bool>() == false)
+        {
+            if (chooseVoice)
+            {
+                // FemaleEvenToned and MaleEvenToned: in every list of follower voices.
+                var female = (await _pipe.SendRequestAsync("get_appearance", new JsonObject { ["refId"] = refId }))?["sex"]?.ToString()?.StartsWith("f", StringComparison.OrdinalIgnoreCase)
+                    ?? spawned?["female"]?.GetValue<bool>() ?? false;
+                var changed = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = female ? "00013ADD" : "00013AD2" });
+                if (changed?["voiceStableId"] is JsonNode stable && spawned?["faceData"] is JsonObject fd) fd["voice"] = stable.DeepClone();
+                note = $"Its voice had no follower lines, so it now has {changed?["voice"] ?? changed?["voiceId"]}.";
+            }
+            else note = "This voice has no follower lines, so the recruit dialogue won't appear. Give it one of followerVoices.";
+        }
+        try
+        {
+            if (follower)
+                await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId, ["args"] = new JsonArray("00000014", 3),
+                });
+        }
+        catch (McpException ex) { note = (note + " The relationship rank wasn't set: " + ex.Message).Trim(); }
+        return (true, new { result = DeserializeResponse(set), note });
+    }
+
+    [McpServerTool]
+    [Description("Make a spawned character recruitable with the game's own follower dialogue (FEAT-282), or not (follower false). Sets the follower " +
+        "factions, ally of the player, brave and helpful, protected, level with the player, and checks that the voice has follower lines " +
+        "(followerVoices lists those that do). Follower frameworks such as Nether's pick it up when it's recruited. Adults only.")]
+    public async Task<object> MakeFollower(string refId, bool follower = true) => (await SetFollower(refId.Trim(), follower, chooseVoice: false)).Reply;
 
     private async Task<(bool Ok, object Reply)> SetFamily(string refId, string role)
     {

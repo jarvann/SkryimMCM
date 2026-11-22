@@ -39,6 +39,8 @@ namespace SkyrimMCP {
         json SetNpcVoice(const std::string& refId, const std::string& voice);
         // A slot character's own face file instead of its template's, from now on (the file must be where the game sees it).
         json UseOwnFace(const std::string& refId);
+        // FEAT-282: makes a spawned NPC recruitable with the game's own follower dialogue (or no longer). Adults only.
+        json SetFollower(const std::string& refId, bool follower);
         // FEAT-304: the Player Family faction's roles (its rank titles), and giving one to a spawned NPC ("none" takes it away).
         // Family members aren't marryable. Adults only.
         json FamilyRoles();

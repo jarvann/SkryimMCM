@@ -1034,6 +1034,65 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"ownFace", true}};
     }
 
+    json SetFollower(const std::string& refId, bool follower) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        if (npc->race && npc->race->IsChildRace()) return {{"error", "Followers are adults: this one is a child race"}};
+        auto* potential = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84D);  // PotentialFollowerFaction, rank 0
+        auto* current = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);    // CurrentFollowerFaction, rank -1 until recruited
+        if (!potential || !current) return {{"error", "The game's follower factions weren't found"}};
+
+        auto& list = npc->factions;
+        for (std::uint32_t i = list.size(); i-- > 0;) if (list[i].faction == potential || list[i].faction == current) list.erase(list.begin() + i);
+        if (!follower) {
+            if (actor->IsPlayerTeammate()) return {{"error", "This character is following the player: dismiss them first"}};
+            actor->RemoveFromFaction(potential);
+            actor->RemoveFromFaction(current);
+        } else {
+            list.push_back(RE::FACTION_RANK{ potential, 0 });
+            list.push_back(RE::FACTION_RANK{ current, -1 });
+            actor->AddToFaction(potential, 0);
+            actor->AddToFaction(current, -1);
+            // As the game's own followers: fights the player's enemies, holds its ground, helps friends, grows with the player.
+            npc->SetAggressionLevel(RE::ACTOR_AGGRESSION::kAggressive);
+            npc->SetConfidenceLevel(RE::ACTOR_CONFIDENCE::kBrave);
+            npc->SetAssistanceLevel(RE::ACTOR_ASSISTANCE::kHelpsFriends);
+            auto& data = npc->actorData;
+            if (!data.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)) data.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kProtected);
+            data.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kPCLevelMult, RE::ACTOR_BASE_DATA::Flag::kAutoCalcStats);
+            data.level = 1000;  // the player's level times 1.0
+            data.calcLevelMin = 5;
+            data.calcLevelMax = 0;
+        }
+        if (SlotIndex(npc) >= 0) {
+            using CF = RE::TESNPC::ChangeFlags;
+            npc->AddChange(CF::kFactions | CF::kAIData | CF::kBaseData);
+        }
+
+        // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows.
+        json result = {{"refId", refId}, {"follower", follower}};
+        if (auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7)) {
+            bool has = false;
+            json names = json::array();
+            const bool female = npc->GetSex() == RE::SEX::kFemale;
+            voices->ForEachForm([&](RE::TESForm* f) {
+                if (f == npc->voiceType) has = true;
+                if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
+                    const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
+                    if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
+                }
+                return RE::BSContainer::ForEachResult::kContinue;
+            });
+            result["voiceHasFollowerLines"] = has;
+            result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
+            result["followerVoices"] = names;
+        }
+        return result;
+    }
+
     json CopyOutfit(const std::string& refId) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
