@@ -5314,6 +5314,14 @@
             {
               "datetime": "2026-11-22T15:20",
               "note": "Clone wears the player's 15 worn pieces (copy_outfit; the base's default and sleep outfits removed, so the template's tunic doesn't come back), is peaceful and marryable (PotentialMarriageFaction): all kept through a save and an in-session load on Steam. Not checked: a full restart with the copied outfit; hair physics moving; marriage dialogue."
+            },
+            {
+              "datetime": "2026-11-22T17:35",
+              "note": "A spawned character's stay-around package let the sister stroll 450 units away in a few minutes: consider a smaller default radius or an option."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "A copy no longer carries the template's keys (the Key to Hjerim) or other unsaved container items: weapons, armour and ammo are given to the character itself."
             }
           ],
           "priority": "high",
@@ -5504,7 +5512,7 @@
         {
           "id": "FEAT-282",
           "type": "feature",
-          "status": "planned",
+          "status": "in-progress",
           "priority": "high",
           "title": "Create a follower from a blueprint",
           "description": "Make a spawned NPC a working follower: the vanilla follower factions and a follower-capable voice type so the game's own recruit dialogue works, sensible combat style and outfit, and a check for follower frameworks (Nether's Follower Framework, AFT, EFF) so they see it. Says plainly when the chosen voice type has no follower lines. Uses the game's own follower packages; custom AI packages are out of scope (2.1).",
@@ -5512,6 +5520,18 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Part of the character loop: description or photo, then face, then NPC, then follower, then mod."
+            },
+            {
+              "datetime": "2026-11-22T16:30",
+              "note": "Built, not tested in game: MakeFollower and SpawnNpc follower on the vanilla follower factions and VoicesFollowerAll. Cory: must be seamless with optional companion managers. Nether's Follower Framework (installed) replaces DialogueFollowerScript, so a vanilla recruit goes to its RecruitFollower; read from its compiled script, it keeps combat style and saved settings only for unique NPCs, so slot characters are unique. Clothes aren't forced (trading and outfit features), colours are put on the loaded head instead of switching the character off and on at loads, a character already following isn't changed or removed. To test: NFF recruit, outfit, dismiss, reload; a setup without NFF. Not checked: AFT, EFF (not installed)."
+            },
+            {
+              "datetime": "2026-11-22T17:35",
+              "note": "In game (Steam, Nether's Follower Framework): the player recruited the family sister with the normal dialogue. Teammate, ally, CurrentFollowerFaction 0, Framework Follower Faction and the framework's own state factions, and other follower mods' factions (Fading of Followers, Convenient Horses, Extra Storage); kept her face file, voice, family rank 4 and not marryable. Left: trade, outfit, wait, dismiss, reload and recruit again; a setup without the framework; SkyLink refusing to remove a following character (test on a throwaway, never a follower the player keeps)."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "With Nether's Follower Framework on Steam: recruit, trade, outfit, wait and dismiss all worked (Cory). After a full restart: own face, voice, rank, ally, what the player traded her still worn. A character following the player isn't removed (checked on a throwaway)."
             }
           ],
           "targetRelease": "1.6",
@@ -5618,7 +5638,7 @@
         {
           "id": "FEAT-290",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "low",
           "title": "LoadSave warns when the save is a different character",
           "description": "Loading another character's save over a running game can crash some mods (Wheeler CTD on 2026-11-21, loading the Aniya test save over Adventurer). LoadSave compares the save header's character with the loaded one and suggests loading from the main menu instead.",
@@ -5626,6 +5646,10 @@
             {
               "datetime": "2026-11-21T14:25",
               "note": "The Tester's idea after the Wheeler crash."
+            },
+            {
+              "datetime": "2026-11-22T16:10",
+              "note": "Built and merged 2026-11-22."
             }
           ],
           "targetRelease": "1.6",
@@ -5742,7 +5766,7 @@
         {
           "id": "FEAT-296",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Track a character's mod dependencies while it's built, for the export's requirements list",
           "description": "Every form a character uses is recorded with the plugin it comes from as the character is built: race, head parts (hair, eyes, brows, scars), face sliders and overlays from RaceMenu extensions (ECE and others), skin and body (CBBE, 3BA...), outfit and weapons, voice type, spells and perks, packages, and the template NPC. At export (FEAT-283) this becomes a requirements list: each plugin mapped to its Nexus mod (name, mod ID, page link) from MO2's meta.ini or Vortex's mod records, with 'required' or 'optional' and why, ready to pick on Nexus's Requirements page, plus a README section. Flags anything from paid Creations or mods that don't allow dependents, and suggests swapping a form for a vanilla one when a dependency is heavy for one item.",
@@ -5754,6 +5778,10 @@
             {
               "datetime": "2026-11-22T11:50",
               "note": "From the spike: a spawned NPC picks up items distributed at runtime (SPID outfits, wigs). Track only what the character was given, and list runtime-distributed items separately."
+            },
+            {
+              "datetime": "2026-11-22T17:20",
+              "note": "CharacterRequirements on the sister: 4 required mods (the Northern Women template's parts and textures), 4 optional texture replacers, 136 perks, spells and factions from 65 plugins set aside as handed out by SPID and the like. Vortex names give the Nexus ID in two styles. Not tried on MO2."
             }
           ],
           "targetRelease": "1.6",
@@ -5853,11 +5881,19 @@
           "id": "FEAT-302",
           "title": "Read and answer message boxes",
           "description": "Cory, 2026-11-22: a message box after a load couldn't be dismissed. SkyLink sees MessageBoxMenu is open but can't read its text or press a button. Read the text and buttons; press one only with the player's go-ahead.",
-          "status": "not-started",
+          "status": "implemented-untested",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "ReadMessageBox, AnswerMessageBox (only the box that was read; with the player's go-ahead) and the dismissMessageBoxes setting for single-button boxes the player agreed to. The grass cache warning at each load on Steam blocked a test."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "Read in game: 'Grass cache files are missing…', one button (Ok). Cory allows closing it on the Steam game; its text is in that game's dismissMessageBoxes. Answering a box and the automatic close not seen yet."
             }
           ],
           "type": "",
@@ -5869,11 +5905,19 @@
           "id": "INFRA-028",
           "title": "Slot plugin as a light-flagged ESP",
           "description": "An .esl always sorts with the masters, so the game moved SkyLinkAI.esl from last to position 197 and Vortex reported an outside change (only that plugin moved). A light-flagged .esp stays where it is put and still doesn't count toward 254. Decide before 1.6 ships: saves remember the file name, and face file folders use it.",
-          "status": "not-started",
+          "status": "implemented-untested",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T16:10",
+              "note": "Cory chose the ESP. SkyLinkAI.esp: light flag only (0x200), 500 slots at fixed object IDs 0x800-0x9F3 and the faction at 0xA00. IDs are fixed because the writer numbered records by type: adding a faction would have moved every slot."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "SkyLinkAI.esp on Steam through Vortex and two restarts: slots, faction and faces work."
             }
           ],
           "type": "",
@@ -5904,7 +5948,7 @@
         {
           "id": "FEAT-303",
           "type": "",
-          "status": "not-started",
+          "status": "in-progress",
           "priority": "",
           "title": "Startup timing and the Seasons of Skyrim cache fix",
           "description": "Time a launch from the SKSE logs and say which plugin each silent block belongs to. Seasons of Skyrim 1.9.1 rewrites its autogenerated MainFormSwap_WIN.ini every launch because it can't read its own ' = value' lines back; converting them to key-only lines took Statics from 78.9 s to 0.2 s and the launch from 299 s to 221 s on a 4,340-plugin list. Detect it, convert with a backup while the game is closed, again after a load-order change.",
@@ -5932,7 +5976,7 @@
         {
           "id": "FEAT-304",
           "type": "",
-          "status": "not-started",
+          "status": "in-progress",
           "priority": "",
           "title": "Player Family: relatives of the player character",
           "description": "Cory, 2026-11-22: make an NPC from the player's character as another race (Arya the Breton as a Nord or Imperial) with similar looks, and a faction called Player Family with specific interactions; the faction may be baked into the ESL. Plan: the human races share a head mesh, so take the player's face, vary some features (related, not a twin) and write it to the other race's slots; FACT record in SkyLinkAI.esl with ranks Father, Mother, Brother, Sister (any race; only the human races share a head mesh, others need a face that keeps a family look), membership and relationship rank set live; dialogue conditioned on the faction through FEAT-294's topics and FEAT-293's voices; packages for living and travelling together.",
@@ -5948,6 +5992,62 @@
             {
               "datetime": "2026-11-22T15:00",
               "note": "Cory: family members are not marryable; every other spawned character is (PotentialMarriageFaction; never a child race). Ranks for any family structure: Father, Mother, Brother, Sister, Son, Daughter, Uncle, Aunt, Niece, Nephew, Grandfather, Grandmother, plus placeholders (cousin, step and in-law, adopted, other)."
+            },
+            {
+              "datetime": "2026-11-22T16:10",
+              "note": "Built, not tested in game: SkyLinkPlayerFamily faction with 32 ranks (plugin/family-ranks.json), SetFamilyRole and SpawnNpc family (sex follows the role, adults only, never marryable, ally of the player), FaceBlend (part of the player's difference from the plain head mesh on any face, with eyes, mouth, brows and hair moving along) and the player's hair colour. Left: dialogue for the ranks (FEAT-294), packages, age, skin and eye colour."
+            },
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "In game (Steam): sister (Nord), brother (Imperial) and cousin (Wood Elf) spawned in their races' slots with ranks 4, 3, 15, ally, not marryable, the player's hair colour; the sister's voice has follower lines. Not saved (BUG-103): faces after a restart still to check."
+            },
+            {
+              "datetime": "2026-11-22T17:20",
+              "note": "Faces seen on Steam: own files loaded at once for slots the game knew, skin right in all three races, resemblance 0.5. A loaded face file carries its own hair tint, so the player's colour is written into the file (twice the colour). Left to check: after a restart, how alike they look to Cory, rank dialogue."
+            },
+            {
+              "datetime": "2026-11-22T17:45",
+              "note": "Cory: the family faces look fine. Resemblance 0.5 stays the default."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "After a full restart all three keep their own face file, hair colour, voice and family rank."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-103",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "SaveGame reported success when an older save of that name existed",
+          "description": "A save over an existing name that the game didn't write was reported as done (File.Exists), so three test characters were lost at a restart. Now the file must be newer than the request, and SaveGame refuses an existing name unless overwrite is true.",
+          "history": [
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "In game: an existing name is refused, a new save confirmed by its file time."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-305",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "New slot faces seen at once",
+          "description": "The game lists loose files as it starts: a face file added later isn't seen until the next start, one it already knows can be replaced. Ship or prepare small placeholder face files for the slots so a new character's face shows at once, with the player's faces kept safe from a reinstall.",
+          "history": [
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "Added."
             }
           ],
           "targetRelease": "",

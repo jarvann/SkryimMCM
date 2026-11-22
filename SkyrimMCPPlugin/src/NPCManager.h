@@ -37,6 +37,16 @@ namespace SkyrimMCP {
         json ReapplySlots();
         // Voice type (form ID or editor ID) of a spawned NPC.
         json SetNpcVoice(const std::string& refId, const std::string& voice);
+        // A slot character's own face file instead of its template's, from now on (the file must be where the game sees it).
+        json UseOwnFace(const std::string& refId);
+        // FEAT-282: makes a spawned NPC recruitable with the game's own follower dialogue (or no longer). Adults only.
+        json SetFollower(const std::string& refId, bool follower);
+        // FEAT-296: every form the character is made of, with the plugin it comes from and what it is for.
+        json CharacterForms(const std::string& refId);
+        // FEAT-304: the Player Family faction's roles (its rank titles), and giving one to a spawned NPC ("none" takes it away).
+        // Family members aren't marryable. Adults only.
+        json FamilyRoles();
+        json SetFamily(const std::string& refId, const std::string& role);
         // A spawned NPC takes what the player wears: its own outfit removed (and its default outfit, or it comes back on load), copies
         // of the worn armour added and put on. Player-made enchantments and tempering aren't copied.
         json CopyOutfit(const std::string& refId);

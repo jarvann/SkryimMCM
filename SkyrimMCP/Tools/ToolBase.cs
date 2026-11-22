@@ -100,8 +100,34 @@ public abstract class ToolBase
         catch (Exception) { return null; }
     }
 
+    /// <summary>
+    /// FEAT-302: closes message boxes the player has told SkyLink to close (setting dismissMessageBoxes): only boxes with a single button,
+    /// where closing decides nothing. Returns the text of those closed.
+    /// </summary>
+    protected async Task<List<string>> DismissKnownMessageBoxes()
+    {
+        List<string> closed = [];
+        if (SkyLinkSettings.Load()["dismissMessageBoxes"] is not JsonArray { Count: > 0 } known) return closed;
+        try
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var box = await _pipe.SendRequestAsync("get_message_box");
+                if (box?["readable"]?.GetValue<bool>() != true || (box["buttons"] as JsonArray)?.Count != 1) break;
+                var text = box["text"]?.ToString() ?? "";
+                if (!known.Any(k => k?.ToString() is { Length: >= 8 } piece && text.Contains(piece, StringComparison.OrdinalIgnoreCase))) break;
+                await _pipe.SendRequestAsync("answer_message_box", new JsonObject { ["boxId"] = box["boxId"]?.ToString(), ["button"] = 0 });
+                closed.Add(text);
+                await Task.Delay(700);
+            }
+        }
+        catch (Exception) { }
+        return closed;
+    }
+
     protected async Task<string?> SafetyBlock(string kind, string? actorRef = null)
     {
+        if (kind != "actor") await DismissKnownMessageBoxes();
         var reasons = new List<string>();
         var actor = string.IsNullOrWhiteSpace(actorRef) ? "player" : actorRef.Trim();
         // FEAT-261: MCM Recorder plays recorded menu settings step by step; between steps no menu is open, so the menu checks

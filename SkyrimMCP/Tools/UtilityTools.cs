@@ -84,6 +84,45 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("The message box on screen (FEAT-302): its text, its buttons and a boxId. Tell the player what it says and what the buttons are; " +
+        "answer it with AnswerMessageBox only as they say. Boxes the player asked to have closed are closed here and listed in 'dismissed'.")]
+    public async Task<object> ReadMessageBox()
+    {
+        var dismissed = await DismissKnownMessageBoxes();
+        var box = DeserializeResponse(await _pipe.SendRequestAsync("get_message_box"));
+        return new { box, dismissed = dismissed.Count == 0 ? null : dismissed };
+    }
+
+    [McpServerTool]
+    [Description("Press a button of the message box on screen (FEAT-302). Only with the player's go-ahead for this box and this button: the buttons " +
+        "can start quests, spend things or lock choices in. boxId: from ReadMessageBox (refused if another box is showing by then). button: " +
+        "its number, from 0. always: true remembers a box with a single button (OK) so SkyLink closes it by itself from now on, when the player asks for that.")]
+    public async Task<object> AnswerMessageBox(string boxId, int button, bool always = false)
+    {
+        var before = await _pipe.SendRequestAsync("get_message_box");
+        var text = before?["text"]?.ToString();
+        var single = (before?["buttons"] as JsonArray)?.Count == 1;
+        var answer = await _pipe.SendRequestAsync("answer_message_box", new JsonObject { ["boxId"] = boxId, ["button"] = button });
+        if (answer?["error"] != null) return DeserializeResponse(answer);
+        string? remembered = null;
+        if (always)
+        {
+            if (!single || text is not { Length: >= 8 } || before?["boxId"]?.ToString() != boxId) remembered = "Not remembered: only boxes with a single button and some text are closed by themselves.";
+            else
+            {
+                var piece = text.Length > 120 ? text[..120] : text;
+                var settings = SkyLinkSettings.Load();
+                var list = settings["dismissMessageBoxes"] as JsonArray ?? [];
+                if (!list.Any(x => x?.ToString() == piece)) list.Add(piece);
+                settings["dismissMessageBoxes"] = list.DeepClone();
+                SkyLinkSettings.Save(settings);
+                remembered = "From now on SkyLink closes this box by itself when it gets in the way. Remove it from dismissMessageBoxes with SetSkyLinkSetting to stop.";
+            }
+        }
+        return new { answer = DeserializeResponse(answer), remembered };
+    }
+
+    [McpServerTool]
     [Description("Reload the SKSE plugin's logic DLL (Data\\SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll) from disk without restarting Skyrim. " +
         "The plugin also reloads automatically on the next call after a newer DLL is deployed, so this is mainly for forcing a reload " +
         "or confirming one. Use after build_plugin.ps1 -Deploy. Returns reloaded, previousBuilt, built, reloads and elapsedMs; " +
@@ -299,12 +338,14 @@ public class UtilityTools : ToolBase
     [McpServerTool]
     [Description("Save the game (with no name: SkyLink_<date-time>), .ess plus the .skse co-save; waits until the file exists. " +
         "This is the console save: the game itself doesn't keep the character ID in such a save, so SkyLink stores it in its " +
-        "co-save record and puts it back on load (BUG-091). For a save to keep with no mods involved, save from the game menu. " +
+        "co-save record and puts it back on load (BUG-091). An existing save is never replaced unless overwrite is true. For a save to keep with no mods involved, save from the game menu. " +
         "CAUTION: Always save before performing risky operations like quest stage manipulation or teleporting.")]
-    public async Task<object> SaveGame(string? saveName = null)
+    public async Task<object> SaveGame(string? saveName = null, bool overwrite = false)
     {
         if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
         saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
+        if (!overwrite && File.Exists(Path.Combine(SaveTools.SaveFolder(), saveName + ".ess")))
+            return new { success = false, error = $"A save called {saveName} already exists. Use another name, or overwrite: true to replace it (with the player's agreement)." };
 
         var (notStarted, sheathed) = await SaveTools.RequestSaveEx(_pipe, saveName);
         if (notStarted != null) return new { success = false, error = notStarted };
@@ -784,7 +825,8 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set one SkyLink setting (see GetSkyLinkSettings for the list): skyrimPath, dataPath, mo2Path, mo2Profile, " +
-        "resaverPath, creationKitPath, xeditPath, lootPath, or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
+        "resaverPath, creationKitPath, xeditPath, lootPath, extraConfigFolders (comma-separated folders), or dismissMessageBoxes (adds one piece of " +
+        "a message box's text, with the player's agreement). An empty value removes the setting. Folders must exist. " +
         "Use this for MO2 or Wabbajack setups where config files aren't in the game's own Data folder.")]
     public Task<object> SetSkyLinkSetting(string key, string? value = null)
     {
@@ -802,6 +844,15 @@ public class UtilityTools : ToolBase
             var missing = folders.Where(f => !Directory.Exists(f)).ToArray();
             if (missing.Length > 0) return Task.FromResult<object>(new { error = $"Folder not found: {string.Join("; ", missing)}" });
             settings[key] = new JsonArray(folders.Select(f => (JsonNode)f).ToArray());
+        }
+        else if (key == "dismissMessageBoxes")
+        {
+            // One more piece of a box's text; an empty value forgets them all. SkyLink still closes only boxes with a single button.
+            var piece = value.Trim();
+            if (piece.Length < 8) return Task.FromResult<object>(new { error = "Pass at least 8 characters of the box's text, so it can't match other boxes." });
+            var list = settings[key] as JsonArray ?? [];
+            if (!list.Any(x => x?.ToString() == piece)) list.Add(piece);
+            settings[key] = list.DeepClone();
         }
         else if (key == "mo2Profile")
         {

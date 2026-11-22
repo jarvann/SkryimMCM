@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
 #include "Studio.h"
+#include "UIManager.h"
 #include <thread>
 #include "FaceState.h"
 #include "ScriptStats.h"
@@ -171,6 +172,12 @@ namespace SkyrimMCP::Protocol {
         noParam("toggle_immortal_mode", []() { return GameInterface::ToggleImmortalMode(); });
         noParam("get_combat_state", []() { return GameInterface::GetCombatState(); });
         noParam("get_menu_state", []() { return GameInterface::GetMenuState(); });
+        noParam("get_message_box", []() { return UIManager::GetMessageBox(); });
+        registry["answer_message_box"] = [](const std::string& id, const json& params) {
+            std::string box = params.value("boxId", std::string());
+            int button = params.value("button", -1);
+            return GameThread(id, [box, button]() { return UIManager::AnswerMessageBox(box, button); });
+        };
         noParam("get_game_safety", []() { return GameInterface::GetGameSafety(); });
         noParam("get_session_state", []() { return UtilityManager::GetSessionState(); });
         noParam("quit_game", []() { return UtilityManager::QuitGame(); });
@@ -263,6 +270,21 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [ref, enable]() { return NPCManager::SetSpawnedNpcEnabled(ref, enable); });
         };
         formIdParam("spawned_npc_stay", "refId", [](const std::string& r) { return NPCManager::SpawnedNpcStay(r); });
+        registry["family_roles"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return NPCManager::FamilyRoles(); });
+        };
+        registry["set_family"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string role = params.value("role", std::string());
+            return GameThread(id, [ref, role]() { return NPCManager::SetFamily(ref, role); });
+        };
+        formIdParam("use_own_face", "refId", [](const std::string& r) { return NPCManager::UseOwnFace(r); });
+        registry["set_follower"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            bool follower = params.value("follower", true);
+            return GameThread(id, [ref, follower]() { return NPCManager::SetFollower(ref, follower); });
+        };
+        formIdParam("character_forms", "refId", [](const std::string& r) { return NPCManager::CharacterForms(r); });
         formIdParam("copy_outfit", "refId", [](const std::string& r) { return NPCManager::CopyOutfit(r); });
         formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
         formIdParam("get_face_data", "refId", [](const std::string& r) { return NPCManager::GetFaceData(r); });

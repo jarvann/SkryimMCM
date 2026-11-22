@@ -67,6 +67,8 @@ public static class SkyLinkSettings
         ["xeditPath"] = "Folder of SSEEdit (xEdit), for CleanPlugins, when it isn't found by itself.",
         ["lootPath"] = "Folder of LOOT, for SortLoadOrder, when it isn't in Program Files.",
         ["extraConfigFolders"] = "More folders to search for SKSE plugin config files, as a list, searched first.",
+        ["dismissMessageBoxes"] = "Message boxes to close by themselves when they get in the way, as a list of pieces of their text. Only boxes with a single button, and " +
+            "only ones the player has agreed to (AnswerMessageBox always: true adds the one on screen).",
         ["creationKitPath"] = "Folder of the Creation Kit (the one with 'Papyrus Compiler'), when GetCreationKit doesn't find it.",
     };
 

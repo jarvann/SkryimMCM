@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -581,9 +582,9 @@ namespace SkyrimMCP::NPCManager {
             return form ? form->As<RE::TESRace>() : nullptr;
         }
 
-        // INFRA-024: SkyLinkAI.esl (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
+        // INFRA-024: SkyLinkAI.esp (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
         // Their base forms belong to a plugin, so the game can keep changes to them and references to them in saves.
-        constexpr std::string_view kSlotPlugin = "SkyLinkAI.esl";
+        constexpr std::string_view kSlotPlugin = "SkyLinkAI.esp";
         constexpr RE::FormID kFirstSlot = 0x800;
         // Slots by race (the game uses a face file only while an NPC's race is the one its record was made with), then sex, then
         // number. The same order as scripts/build-slot-plugin.py; it must never change once released.
@@ -770,7 +771,7 @@ namespace SkyrimMCP::NPCManager {
             return {{"bodyTint", Hex(npc->bodyTintColor)}, {"weight", npc->weight},
                     {"hairColor", head && head->hairColor ? json(Hex(head->hairColor->color)) : json(nullptr)},
                     {"headTexture", head ? StableId(head->faceDetails) : json(nullptr)},
-                    {"voice", StableId(npc->voiceType)}};
+                    {"voice", StableId(npc->voiceType)}, {"combatStyle", StableId(npc->combatStyle)}};
         }
         // Its own head data, never the template's: npc->Copy shares the pointer.
         void ApplyFaceData(RE::TESNPC* npc, const json& d) {
@@ -794,6 +795,9 @@ namespace SkyrimMCP::NPCManager {
                 if (const auto c = ParseHex(d["bodyTint"].get<std::string>())) npc->bodyTintColor = *c;
             }
             if (d.contains("weight") && d["weight"].is_number()) npc->weight = std::clamp(d["weight"].get<float>(), 0.0f, 100.0f);
+            if (d.contains("combatStyle") && d["combatStyle"].is_string()) {
+                if (auto* c = FromStableId(d["combatStyle"].get<std::string>())) if (auto* style = c->As<RE::TESCombatStyle>()) npc->combatStyle = style;
+            }
             if (d.contains("voice") && d["voice"].is_string()) {
                 if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
             }
@@ -851,22 +855,32 @@ namespace SkyrimMCP::NPCManager {
                 npc->originalRace = race;
                 changed = true;
             }
+            bool colours = false;
             if (used && entry.contains("faceData") && entry["faceData"].is_object()) {
                 const auto now = FaceDataOf(npc);
-                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice" }) {
+                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice", "combatStyle" }) {
                     if (entry["faceData"].contains(field) && entry["faceData"][field].is_string() && now[field] != entry["faceData"][field]) {
-                        ApplyFaceData(npc, entry["faceData"]);
-                        changed = true;
-                        break;
+                        if (!colours) ApplyFaceData(npc, entry["faceData"]);
+                        colours = true;
+                        // Only another head texture needs a new head. Colours are put on the loaded one: switching a character off and
+                        // on at every load is seen, and unsettles whatever a follower mod has it doing.
+                        if (std::string_view(field) == "headTexture") changed = true;
                     }
                 }
             }
-            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}});
-            if (changed && used && entry.contains("refId") && entry["refId"].is_string()) {
+            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}, {"colours", colours}});
+            if ((changed || colours) && used && entry.contains("refId") && entry["refId"].is_string()) {
                 RE::TESForm* r = nullptr;
                 try { r = RE::TESForm::LookupByID(Helpers::ParseFormId(entry["refId"].get<std::string>())); } catch (...) {}
                 auto* actor = r ? r->As<RE::Actor>() : nullptr;
-                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) result["rebuild"].push_back(entry["refId"]);
+                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) {
+                    if (changed && !actor->IsPlayerTeammate()) {
+                        result["rebuild"].push_back(entry["refId"]);
+                    } else {
+                        actor->UpdateHairColor();
+                        actor->UpdateSkinColor();
+                    }
+                }
             }
         }
         return result;
@@ -948,6 +962,202 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    namespace {
+        constexpr RE::FormID kFamilyFaction = 0xA00;
+        constexpr RE::FormID kMarriageFaction = 0x00019809;  // PotentialMarriageFaction
+
+        RE::TESFaction* FamilyFaction() {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            return data ? data->LookupForm<RE::TESFaction>(kFamilyFaction, kSlotPlugin) : nullptr;
+        }
+        std::string Lower(std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return s;
+        }
+        // Rank titles in rank order (the plugin numbers them from 0 without gaps): male title, female title.
+        std::vector<std::pair<std::string, std::string>> FamilyTitles(RE::TESFaction* faction) {
+            std::vector<std::pair<std::string, std::string>> titles;
+            for (auto* rank : faction->rankData) {
+                if (rank) titles.emplace_back(rank->maleRankTitle.c_str() ? rank->maleRankTitle.c_str() : "", rank->femaleRankTitle.c_str() ? rank->femaleRankTitle.c_str() : "");
+            }
+            return titles;
+        }
+    }
+
+    json FamilyRoles() {
+        auto* faction = FamilyFaction();
+        if (!faction) return {{"error", "The Player Family faction isn't in the game: SkyLinkAI.esp (the optional NPC plugin) isn't in the load order"}};
+        json roles = json::array();
+        int rank = 0;
+        for (const auto& [male, female] : FamilyTitles(faction)) {
+            roles.push_back({{"rank", rank++}, {"role", male.empty() ? female : male},
+                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}});
+        }
+        return {{"faction", std::format("{:08X}", faction->GetFormID())}, {"roles", roles}};
+    }
+
+    json SetFamily(const std::string& refId, const std::string& role) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        auto* faction = FamilyFaction();
+        if (!faction) return {{"error", "The Player Family faction isn't in the game: SkyLinkAI.esp (the optional NPC plugin) isn't in the load order"}};
+        const bool none = Lower(role) == "none";
+        if (!none && npc->race && npc->race->IsChildRace()) return {{"error", "Family characters are adults: this one is a child race"}};
+
+        int rank = -1;
+        if (!none) {
+            const bool female = npc->GetSex() == RE::SEX::kFemale;
+            int i = 0;
+            for (const auto& [male, fem] : FamilyTitles(faction)) {
+                if (Lower(male) == Lower(role) || Lower(fem) == Lower(role)) {
+                    if ((female ? fem : male).empty()) return {{"error", std::format("{} is a {} role and this character is {}", role, female ? "male" : "female", female ? "female" : "male")}};
+                    rank = i;
+                    break;
+                }
+                ++i;
+            }
+            if (rank < 0) return {{"error", "No family role called '" + role + "' (family_roles lists them)"}};
+        }
+        auto* marriage = RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
+        auto& list = npc->factions;
+        for (std::uint32_t i = list.size(); i-- > 0;) {
+            if (list[i].faction == faction || (!none && list[i].faction == marriage)) list.erase(list.begin() + i);
+        }
+        if (none) {
+            actor->RemoveFromFaction(faction);
+        } else {
+            list.push_back(RE::FACTION_RANK{ faction, static_cast<std::int8_t>(rank) });
+            if (marriage) actor->RemoveFromFaction(marriage);
+            actor->AddToFaction(faction, static_cast<std::int8_t>(rank));
+        }
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFactions);
+        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)}, {"marryable", false}};
+    }
+
+    json UseOwnFace(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || SlotIndex(npc) < 0) return {{"error", "Not a character in one of SkyLink's slots: " + refId}};
+        npc->faceNPC = nullptr;
+        return {{"refId", refId}, {"ownFace", true}};
+    }
+
+    json SetFollower(const std::string& refId, bool follower) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        if (npc->race && npc->race->IsChildRace()) return {{"error", "Followers are adults: this one is a child race"}};
+        auto* potential = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84D);  // PotentialFollowerFaction, rank 0
+        auto* current = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);    // CurrentFollowerFaction, rank -1 until recruited
+        if (!potential || !current) return {{"error", "The game's follower factions weren't found"}};
+
+        // Someone following already belongs to the follower dialogue or a follower mod: their rank there is not SkyLink's to reset.
+        if (follower && actor->IsPlayerTeammate()) return {{"error", "This character is already following the player"}};
+        auto& list = npc->factions;
+        for (std::uint32_t i = list.size(); i-- > 0;) if (list[i].faction == potential || list[i].faction == current) list.erase(list.begin() + i);
+        if (!follower) {
+            if (actor->IsPlayerTeammate()) return {{"error", "This character is following the player: dismiss them first"}};
+            actor->RemoveFromFaction(potential);
+            actor->RemoveFromFaction(current);
+        } else {
+            list.push_back(RE::FACTION_RANK{ potential, 0 });
+            list.push_back(RE::FACTION_RANK{ current, -1 });
+            actor->AddToFaction(potential, 0);
+            actor->AddToFaction(current, -1);
+            // As the game's own followers: fights the player's enemies, holds its ground, helps friends, grows with the player.
+            npc->SetAggressionLevel(RE::ACTOR_AGGRESSION::kAggressive);
+            npc->SetConfidenceLevel(RE::ACTOR_CONFIDENCE::kBrave);
+            npc->SetAssistanceLevel(RE::ACTOR_ASSISTANCE::kHelpsFriends);
+            auto& data = npc->actorData;
+            if (!data.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)) data.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kProtected);
+            data.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kPCLevelMult, RE::ACTOR_BASE_DATA::Flag::kAutoCalcStats);
+            data.level = 1000;  // the player's level times 1.0
+            data.calcLevelMin = 5;
+            data.calcLevelMax = 0;
+        }
+        if (SlotIndex(npc) >= 0) {
+            using CF = RE::TESNPC::ChangeFlags;
+            npc->AddChange(CF::kFactions | CF::kAIData | CF::kBaseData);
+        }
+
+        // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows.
+        json result = {{"refId", refId}, {"follower", follower}};
+        if (auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7)) {
+            bool has = false;
+            json names = json::array();
+            const bool female = npc->GetSex() == RE::SEX::kFemale;
+            voices->ForEachForm([&](RE::TESForm* f) {
+                if (f == npc->voiceType) has = true;
+                if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
+                    const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
+                    if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
+                }
+                return RE::BSContainer::ForEachResult::kContinue;
+            });
+            result["voiceHasFollowerLines"] = has;
+            result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
+            result["followerVoices"] = names;
+        }
+        return result;
+    }
+
+    json CharacterForms(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc) return {{"error", "Actor not found: " + refId}};
+        json forms = json::array();
+        // kind: what it is; need: "record" (written into an exported NPC), "carried" (in the inventory, maybe put there by a distributor).
+        auto add = [&](RE::TESForm* form, const char* kind, const char* need, const char* model = nullptr) {
+            if (!form) return;
+            auto* file = form->GetFile(0);
+            if (!file) return;  // made at run time: nothing to depend on
+            json f = {{"formId", std::format("{:08X}", form->GetFormID())}, {"kind", kind}, {"need", need}, {"plugin", std::string(file->GetFilename())},
+                      {"stableId", StableId(form)}, {"name", form->GetName() && form->GetName()[0] ? json(form->GetName()) : json(nullptr)}};
+            if (const char* e = form->GetFormEditorID(); e && e[0]) f["editorId"] = e;
+            if (model && model[0]) f["model"] = model;
+            // A record another plugin changes: the look may come from the last one.
+            if (auto* files = form->sourceFiles.array; files && files->size() > 1) f["lastChangedBy"] = std::string(files->back()->GetFilename());
+            forms.push_back(f);
+        };
+        add(npc->race, "race", "record");
+        add(npc->voiceType, "voice", "record");
+        add(npc->npcClass, "class", "record");
+        add(npc->combatStyle, "combat style", "record");
+        add(npc->skin, "skin", "record");
+        add(npc->defaultOutfit, "outfit", "record");
+        add(npc->sleepOutfit, "sleep outfit", "record");
+        if (auto* head = npc->headRelatedData) {
+            add(head->hairColor, "hair colour", "record");
+            add(head->faceDetails, "head texture set", "record");
+        }
+        for (int i = 0; npc->headParts && i < npc->numHeadParts; ++i) {
+            if (auto* part = npc->headParts[i]) {
+                add(part, "head part", "record", part->GetModel());
+                add(part->textureSet, "head part textures", "record");
+            }
+        }
+        for (const auto& f : npc->factions) add(f.faction, "faction", "record");
+        for (auto* package : npc->aiPackages.packages) add(package, "package", "record");
+        if (auto* spells = npc->GetSpellList()) {
+            for (std::uint32_t i = 0; spells->spells && i < spells->numSpells; ++i) add(spells->spells[i], "spell", "record");
+        }
+        for (std::uint32_t i = 0; npc->perks && i < npc->perkCount; ++i) add(npc->perks[i].perk, "perk", "record");
+        for (auto& [item, entry] : actor->GetInventory()) {
+            if (!item || entry.first <= 0) continue;
+            const bool worn = entry.second && entry.second->IsWorn();
+            add(item, worn ? "worn" : "carried", worn ? "worn" : "carried");
+        }
+        return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
+                {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)}};
+    }
+
     json CopyOutfit(const std::string& refId) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
@@ -974,7 +1184,8 @@ namespace SkyrimMCP::NPCManager {
         json items = json::array();
         for (auto* armor : worn) {
             actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
-            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);  // forced: its AI doesn't swap it for "better" armour
+            // Not forced: a forced item can't be taken off again by trading or by a follower mod's outfits.
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, false, false);
             items.push_back(armor->GetName() ? armor->GetName() : "");
         }
         return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
@@ -1023,6 +1234,16 @@ namespace SkyrimMCP::NPCManager {
         }
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
+        // The template's belongings: its keys open its house, not the copy's (2026-11-22: a copy of Tova Shatter-Shield had the Key to
+        // Hjerim), and a slot's own container isn't saved. Ordinary things are given to the character itself; keys and leveled lists aren't.
+        std::vector<std::pair<RE::TESBoundObject*, std::int32_t>> belongings;
+        tmpl->ForEachContainerObject([&](RE::ContainerObject& entry) {
+            if (entry.obj && entry.count > 0 && entry.obj->GetPlayable() &&
+                (entry.obj->Is(RE::FormType::Weapon) || entry.obj->Is(RE::FormType::Armor) || entry.obj->Is(RE::FormType::Ammo))) belongings.emplace_back(entry.obj, entry.count);
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        npc->containerObjects = nullptr;
+        npc->numContainerObjects = 0;
         npc->race = race;
         npc->originalRace = race;  // its face file is used only while the two match
         if (!params.value("keepSchedule", false)) MakeStayPut(npc);
@@ -1036,8 +1257,10 @@ namespace SkyrimMCP::NPCManager {
 
         const auto name = params.value("name", std::string());
         if (!name.empty()) npc->SetFullName(name.c_str());
-        // A copy of a unique NPC would share its "only one of me" rule; a spawned character is its own person.
-        npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        // A copy of a unique NPC would share its "only one of me" rule. A slot has one character, so it is unique in its own right:
+        // follower mods keep per-follower settings only for unique NPCs (Nether's Follower Framework asks IsUnique before it does).
+        if (slotIndex >= 0) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
         if (params.value("essential", false)) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kEssential);
 
         // The face: the template's own FaceGen (it has a file), or none, for RaceMenu's CharGen to build one.
@@ -1051,6 +1274,7 @@ namespace SkyrimMCP::NPCManager {
         if (face == "player") {
             auto data = FaceDataOf(playerBase);
             data.erase("voice");
+            data.erase("combatStyle");
             ApplyFaceData(npc, data);
         }
 
@@ -1064,6 +1288,7 @@ namespace SkyrimMCP::NPCManager {
 
         auto ref = player->PlaceObjectAtMe(npc, slot);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        for (const auto& [object, count] : belongings) ref->AddObjectToContainer(object, nullptr, count, nullptr);
         const float placedAt = PlaceInFront(ref.get(), player, std::clamp(params.value("distance", 160.0f), 60.0f, 600.0f));
 
         return {
@@ -1110,6 +1335,8 @@ namespace SkyrimMCP::NPCManager {
         // Only what SkyLink made: a runtime base (FF...) or one of its slots.
         const int slot = SlotIndex(base);
         if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0)) return {{"error", "Not a spawned NPC (its base isn't SkyLink's): " + refId}};
+        if (auto* follower = ref->As<RE::Actor>(); follower && follower->IsPlayerTeammate())
+            return {{"error", "This character is following the player. Dismiss them first (a follower mod would keep an empty place for them)."}};
         ref->Disable();
         ref->SetDelete(true);
         if (slot >= 0) {

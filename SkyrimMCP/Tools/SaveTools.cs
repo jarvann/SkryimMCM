@@ -44,6 +44,8 @@ public class SaveTools : ToolBase
     internal static async Task<(string? error, bool sheathed)> RequestSaveEx(IPipeClient pipe, string name)
     {
         var file = Path.Combine(SaveFolder(), name + ".ess");
+        // BUG-103: an older save of that name isn't this one (2026-11-22: a refused save over an existing name was reported as done).
+        var before = File.Exists(file) ? File.GetLastWriteTimeUtc(file) : DateTime.MinValue;
         // A drawn weapon or spell is enough for some load orders to refuse the save (seen in game): sheathe first and wait for it.
         var sheathed = false;
         try
@@ -69,7 +71,7 @@ public class SaveTools : ToolBase
             for (var waited = 0; waited < 6_000; waited += 500)
             {
                 await Task.Delay(500);
-                if (File.Exists(file)) return (null, sheathed);
+                if (File.Exists(file) && File.GetLastWriteTimeUtc(file) > before) return (null, sheathed);
             }
         }
         // Round B: a refused save near a runaway pile-up. Say what the game was doing, not only what it could be.
