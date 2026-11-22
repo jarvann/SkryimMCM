@@ -31,7 +31,8 @@ namespace SkyrimMCP {
         // -90 = on their left), distance units away, heightOffset above the head node, looking at the head.
         // aimFromHead: angles count from the way the head faces (its bone), not the body, so a turned head
         // is still shot straight on.
-        json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead);
+        // refId: another actor's head (FEAT-122: check a spawned NPC's face); empty is the player.
+        json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead, const std::string& refId = "");
 
         // FEAT-233: every vertex of the player's head parts projected onto the screen (x, y top-down in 0-1, and
         // distance from the camera), per part, with the part's chargen TRI path (RaceMenu's sculpt host) and how

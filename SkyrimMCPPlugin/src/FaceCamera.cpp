@@ -1,4 +1,5 @@
 #include "FaceCamera.h"
+#include "Helpers.h"
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 #include <algorithm>
@@ -254,14 +255,14 @@ namespace SkyrimMCP {
             return result;
         }
 
-        json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead) {
+        json Aim(float angleDeg, float distance, float heightOffset, bool aimFromHead, const std::string& refId) {
             auto* camera = RE::PlayerCamera::GetSingleton();
-            auto* player = RE::PlayerCharacter::GetSingleton();
-            if (!camera || !player) return {{"error", "Camera or player not available"}};
+            RE::Actor* player = refId.empty() ? RE::PlayerCharacter::GetSingleton() : Helpers::ResolveActor(refId);
+            if (!camera || !player) return {{"error", refId.empty() ? "Camera or player not available" : "Actor not found: " + refId}};
             if (!camera->IsInFreeCameraMode() || !camera->currentState) return {{"error", "Not in free camera: call enter first"}};
             auto* state = static_cast<RE::FreeCameraState*>(camera->currentState.get());
             auto* head = HeadNode(player);
-            if (!head) return {{"error", "The player's head isn't loaded"}};
+            if (!head) return {{"error", refId.empty() ? "The player's head isn't loaded" : "That actor's head isn't loaded (too far away?)"}};
 
             // Skyrim headings: 0 = +Y, clockwise seen from above, so the facing direction is (sin, cos).
             constexpr float pi = std::numbers::pi_v<float>;

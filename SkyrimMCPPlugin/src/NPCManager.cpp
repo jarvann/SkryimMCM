@@ -601,6 +601,11 @@ namespace SkyrimMCP::NPCManager {
         const bool female = params.contains("female") && params["female"].is_boolean()
             ? params["female"].get<bool>() : playerBase->GetSex() == RE::SEX::kFemale;
 
+        // RaceMenu's preset is the player's: another race or sex would get a face that doesn't fit the body.
+        if (params.value("face", std::string("template")) == "player" &&
+            (race != playerBase->race || female != (playerBase->GetSex() == RE::SEX::kFemale)))
+            return {{"error", "face 'player' needs the player's own race and sex (the face is theirs). Use face 'template' for another race or sex."}};
+
         RE::TESNPC* tmpl = nullptr;
         if (auto t = params.value("template", std::string()); !t.empty()) {
             RE::TESForm* form = nullptr;
@@ -629,6 +634,24 @@ namespace SkyrimMCP::NPCManager {
         const auto face = params.value("face", std::string("template"));
         npc->faceNPC = face == "template" ? (tmpl->faceNPC ? tmpl->faceNPC : tmpl) : nullptr;
 
+        // Spike 2026-11-22 (Steam): CharGen.LoadCharacter copies head parts and morphs but not the hair colour or body tone, so
+        // take the player's. The copy must not write through pointers the template still owns.
+        const bool sharedHead = npc->headRelatedData && npc->headRelatedData == tmpl->headRelatedData;
+        if (face == "player") {
+            npc->bodyTintColor = playerBase->bodyTintColor;
+            if (auto* from = playerBase->headRelatedData ? playerBase->headRelatedData->hairColor : nullptr) {
+                if (sharedHead) npc->headRelatedData = nullptr;
+                // Its own colour form: RaceMenu edits the player's in place.
+                auto* colors = RE::IFormFactory::GetConcreteFormFactoryByType<RE::BGSColorForm>();
+                auto* own = colors ? colors->Create() : nullptr;
+                if (own) {
+                    own->color = from->color;
+                    own->flags = from->flags;
+                }
+                npc->SetHairColor(own ? own : from);
+            }
+        }
+
         auto ref = player->PlaceObjectAtMe(npc, false);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
 
@@ -642,8 +665,21 @@ namespace SkyrimMCP::NPCManager {
             {"template", std::format("{:08X}", tmpl->GetFormID())},
             {"templateName", tmpl->GetName()},
             {"face", face},
+            {"templateSharedHeadData", sharedHead},
             {"runtimeForm", (npc->GetFormID() >> 24) == 0xFF},
         };
+    }
+
+    // Disable, then enable again in a later task, rebuilds the 3D: CharGen.LoadCharacter changes the base, but the head already
+    // built stays as it was (the spike's NPC kept her template's head until this).
+    json SetSpawnedNpcEnabled(const std::string& refId, bool enable) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+        auto* base = ref ? ref->GetBaseObject() : nullptr;
+        if (!ref || !base || (base->GetFormID() >> 24) != 0xFF) return {{"error", "Not a spawned NPC: " + refId}};
+        if (enable) ref->Enable(false); else ref->Disable();
+        return {{"refId", refId}, {"enabled", enable}};
     }
 
     json RemoveSpawnedNpc(const std::string& refId) {

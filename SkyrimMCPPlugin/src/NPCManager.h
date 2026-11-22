@@ -26,6 +26,7 @@ namespace SkyrimMCP {
         // aren't kept by saves: without SkyLink's NPC slot plugin the spawn is a preview for this session.
         json SpawnNpc(const json& params);
         json RemoveSpawnedNpc(const std::string& refId);
+        json SetSpawnedNpcEnabled(const std::string& refId, bool enable);
     }
 
 }

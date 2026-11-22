@@ -5282,7 +5282,7 @@
         {
           "id": "FEAT-122",
           "type": "feature",
-          "status": "planned",
+          "status": "in-progress",
           "title": "Spawn NPC from blueprint",
           "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face — RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy. 1.6 scope: spawn the NPC in the running game as a preview (runtime base from INFRA-024, recreated on load until it is exported by FEAT-283), with the face from the blueprint written by FEAT-281 so it never shows the grey or dark face.",
           "targetRelease": "1.6",
@@ -5294,6 +5294,10 @@
             {
               "datetime": "2026-11-21T15:45",
               "note": "Appearance via CharGen.LoadCharacter(npc, race, preset) through the Papyrus bridge when RaceMenu is installed. Open question: does the preset mapping survive a reload when SkyLink recreates the runtime base (new form ID)?"
+            },
+            {
+              "datetime": "2026-11-22T11:50",
+              "note": "Spike on Steam 1.7.104 (Arya's Save122, nothing saved, no crash): a runtime NPC copied from a plain NPC of the race and sex spawns and shows its template's FaceGen face with no dark-face seam. The player's face on it works after: CharGen.SaveCharacter (preset), ExportHead (writes the 4096 tint DDS; SaveCharacter wrote none, and a missing tint shows purple), tint copied to Textures\\CharGen\\Exported, LoadCharacter, hair colour and body tone copied from the player, then disable/enable to rebuild the 3D. One call end to end; hair, skin and face shape match, no seam. The template NPC itself is unchanged (checked with a fresh spawn). Outfit distributors (SPID) dress spawned NPCs like any other: the dependency list must not count those as the character's own."
             }
           ],
           "priority": "high",
@@ -5426,6 +5430,10 @@
             {
               "datetime": "2026-11-21T15:45",
               "note": "RaceMenu's CharGen has ExportHead (the player's head NIF and tint DDS), LoadCharacter (a preset onto any actor), SaveExternalCharacter/LoadExternalCharacter and DeleteFaceGenData. Plan: with RaceMenu, FaceGen files come from ExportHead after putting the face on the player; SkyLink's own NIF writer becomes the no-RaceMenu fallback (batch E). See docs/1.6-plan.md."
+            },
+            {
+              "datetime": "2026-11-22T11:50",
+              "note": "CharGen.ExportHead works on Steam: 4,096x4,096 uncompressed tint DDS (67 MB) and a 4.9 MB NIF in SKSE\\Plugins\\CharGen. The NIF is kept for inspection outside the game folder."
             }
           ],
           "targetRelease": "1.6",
@@ -5436,7 +5444,7 @@
         {
           "id": "INFRA-024",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "in-progress",
           "priority": "high",
           "title": "Runtime NPC base creation",
           "description": "Create a new NPC base form at runtime by copying a template (race and sex matching the blueprint) through the form factory, then set its face data, head parts, tints, skills, perks, spells, factions and outfit from the blueprint. Runtime forms aren't kept in saves, so SkyLink records them in its co-save and recreates them on load until the character is exported as a plugin (FEAT-283). Host-side form allocation, reusable later by the runtime spell and enchantment creators (FEAT-126/127, 2.0).",
@@ -5701,6 +5709,10 @@
             {
               "datetime": "2026-11-21T16:30",
               "note": "Cory: NPC development tracks the plugins and mods tied to the NPC, so when the player exports and hosts it on Nexus they know which dependencies to select."
+            },
+            {
+              "datetime": "2026-11-22T11:50",
+              "note": "From the spike: a spawned NPC picks up items distributed at runtime (SPID outfits, wigs). Track only what the character was given, and list runtime-distributed items separately."
             }
           ],
           "targetRelease": "1.6",

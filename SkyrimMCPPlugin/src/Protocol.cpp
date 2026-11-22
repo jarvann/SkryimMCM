@@ -256,6 +256,11 @@ namespace SkyrimMCP::Protocol {
         registry["spawn_npc"] = [](const std::string& id, const json& params) {
             return GameThread(id, [params]() { return NPCManager::SpawnNpc(params); });
         };
+        registry["set_spawned_npc_enabled"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            bool enable = params.value("enable", true);
+            return GameThread(id, [ref, enable]() { return NPCManager::SetSpawnedNpcEnabled(ref, enable); });
+        };
         formIdParam("remove_spawned_npc", "refId", [](const std::string& r) { return NPCManager::RemoveSpawnedNpc(r); });
         registry["play_idle"] = [](const std::string& id, const json& params) {
             std::string idleFormId = params.value("idleFormId", "");
@@ -430,7 +435,8 @@ namespace SkyrimMCP::Protocol {
             if (mode == "prepare") return GameThread(id, [=]() { return FaceCamera::Prepare(expression, strength, mouthOpen); });
             bool hideEffects = params.value("hideEffects", true);
             if (mode == "enter") return GameThread(id, [=]() { return FaceCamera::Enter(hideHud, hideHair, hideEffects); });
-            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead); });
+            const std::string aimRef = params.value("refId", std::string());
+            if (mode == "aim") return GameThread(id, [=]() { return FaceCamera::Aim(angle, distance, height, aimFromHead, aimRef); });
             if (mode == "snapshot") return GameThread(id, []() { return FaceCamera::SculptSnapshot(); });
             if (mode == "check") return GameThread(id, []() { return FaceCamera::Check(); });
                         if (mode == "exit") return GameThread(id, []() { return FaceCamera::Exit(); });
