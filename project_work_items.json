@@ -5504,7 +5504,7 @@
         {
           "id": "FEAT-282",
           "type": "feature",
-          "status": "planned",
+          "status": "in-progress",
           "priority": "high",
           "title": "Create a follower from a blueprint",
           "description": "Make a spawned NPC a working follower: the vanilla follower factions and a follower-capable voice type so the game's own recruit dialogue works, sensible combat style and outfit, and a check for follower frameworks (Nether's Follower Framework, AFT, EFF) so they see it. Says plainly when the chosen voice type has no follower lines. Uses the game's own follower packages; custom AI packages are out of scope (2.1).",
@@ -5512,6 +5512,10 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Part of the character loop: description or photo, then face, then NPC, then follower, then mod."
+            },
+            {
+              "datetime": "2026-11-22T16:30",
+              "note": "Built, not tested in game: MakeFollower and SpawnNpc follower on the vanilla follower factions and VoicesFollowerAll. Cory: must be seamless with optional companion managers. Nether's Follower Framework (installed) replaces DialogueFollowerScript, so a vanilla recruit goes to its RecruitFollower; read from its compiled script, it keeps combat style and saved settings only for unique NPCs, so slot characters are unique. Clothes aren't forced (trading and outfit features), colours are put on the loaded head instead of switching the character off and on at loads, a character already following isn't changed or removed. To test: NFF recruit, outfit, dismiss, reload; a setup without NFF. Not checked: AFT, EFF (not installed)."
             }
           ],
           "targetRelease": "1.6",
