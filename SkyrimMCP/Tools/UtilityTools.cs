@@ -801,7 +801,7 @@ public class UtilityTools : ToolBase
             return Task.FromResult<object>(new { error = $"Could not save settings: {ex.Message}" });
         }
         // Settings are kept per game (Steam and GOG have their own). Which one is decided by the game SkyLink last connected to.
-        var forGame = SkyLinkSettings.GameDocumentsFolder is string g ? Path.GetFileName(g.TrimEnd('\\')) : null;
+        var forGame = SkyLinkSettings.GameDocumentsFolder != null || SkyLinkSettings.RunningGameFolder() != null ? Path.GetFileName(SkyLinkSettings.DocumentsFolder.TrimEnd('\\')) : null;
         return Task.FromResult<object>(new
         {
             saved = string.IsNullOrWhiteSpace(value) ? null : key,

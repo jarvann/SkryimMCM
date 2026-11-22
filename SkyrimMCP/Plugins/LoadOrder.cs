@@ -60,8 +60,8 @@ public static class LoadOrder
 
     static bool? IsGog()
     {
-        if (SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } docs)
-            return Path.GetFileName(docs.TrimEnd('\\', '/')).EndsWith(" GOG", StringComparison.OrdinalIgnoreCase);
+        if (SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } || SkyLinkSettings.RunningGameFolder() != null)
+            return Path.GetFileName(SkyLinkSettings.DocumentsFolder.TrimEnd('\\', '/')).EndsWith(" GOG", StringComparison.OrdinalIgnoreCase);
         if (SkyLinkSettings.SkyrimPath().Path is string game && Directory.Exists(game))
         {
             try

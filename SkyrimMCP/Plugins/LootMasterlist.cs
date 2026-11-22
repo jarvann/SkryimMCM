@@ -28,10 +28,14 @@ public sealed class LootMasterlist
         // LOOT keeps one per game; Vortex keeps its own copy and updates it as it sorts (round B: LOOT's was 505 days old,
         // Vortex's from that day). Read the newest.
         var root = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LOOT", "games");
-        var candidates = new[] { "Skyrim Special Edition", "Skyrim Special Edition (GOG)", "Skyrim Special Edition GOG" }
-            .Select(g => System.IO.Path.Combine(root, g, "masterlist.yaml"))
-            .Append(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Vortex", "skyrimse", "masterlist", "masterlist.yaml"));
-        return candidates.Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
+        var gog = SkyLinkSettings.DocumentsFolder.TrimEnd('\\', '/').EndsWith(" GOG", StringComparison.OrdinalIgnoreCase);
+        // The list is the same game's data for every store, but a game's own LOOT copy comes first; any other is the fallback.
+        string[] own = gog ? ["Skyrim Special Edition (GOG)", "Skyrim Special Edition GOG"] : ["Skyrim Special Edition"];
+        string[] other = gog ? ["Skyrim Special Edition"] : ["Skyrim Special Edition (GOG)", "Skyrim Special Edition GOG"];
+        var vortex = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Vortex", "skyrimse", "masterlist", "masterlist.yaml");
+        string? Newest(IEnumerable<string> games) => games.Select(g => System.IO.Path.Combine(root, g, "masterlist.yaml"))
+            .Append(vortex).Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
+        return Newest(own) ?? Newest(other);
     }
 
     public static LootMasterlist? Load()

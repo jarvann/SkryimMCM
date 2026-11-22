@@ -51,8 +51,7 @@ public partial class RaceMenuTools
                     var target = Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset + ".dds");
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     File.Copy(dds, target, overwrite: true);
-                    // The mesh isn't needed for a preview (FEAT-283 exports its own).
-                    try { File.Delete(dds); File.Delete(Path.ChangeExtension(dds, ".nif")); } catch (Exception) { }
+                    // Kept (dds, nif) until SpawnNpc has used them for a slot's face files: ExportedHead reads and deletes them.
                     return null;
                 }
                 last = size;
@@ -64,14 +63,15 @@ public partial class RaceMenuTools
 
     [McpServerTool]
     [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: editor ID or form ID " +
-        "(default the player's race); female: true or false (default the player's sex); template: an NPC to copy stats, " +
+        "(default the template's, or the player's); female: true or false (likewise); template: an NPC to copy stats, " +
         "outfit and voice from (default: a plain NPC of that race and sex). face: 'template' (the template's own face, works " +
         "everywhere) or 'player' (the player's current face, e.g. one built with the face builder; needs RaceMenu). " +
-        "essential: can't be killed. A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
+        "the template's daily schedule, job and factions (a court wizard walks home). A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -84,8 +84,8 @@ public partial class RaceMenuTools
             {
                 dryRun = true,
                 name,
-                race = race ?? "the player's race",
-                sex = female is bool f ? (f ? "female" : "male") : "the player's sex",
+                race = race ?? (template != null ? "the template's race" : "the player's race"),
+                sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
                 face = face == "player" ? "the player's current face (RaceMenu CharGen)" : "the template's own face",
                 lasting = false,
@@ -101,12 +101,17 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
+        p["avoidSlots"] = new JsonArray(SlotRegistry.Reserved().Select(i => (JsonNode)i).ToArray());
         var spawned = await _pipe.SendRequestAsync("spawn_npc", p);
-        if (spawned?["error"] != null) return DeserializeResponse(spawned);
+        if (spawned?["error"] != null)
+        {
+            if (face == "player") ExportedHead(presetName);   // the exported head's files aren't needed
+            return DeserializeResponse(spawned);
+        }
         var refId = spawned?["refId"]?.ToString();
 
         object? faceResult = null;
@@ -128,17 +133,88 @@ public partial class RaceMenuTools
         }
 
         var inSlot = spawned?["slot"] is JsonValue;
+        object? slotFace = null;
+        if (inSlot && refId != null)
+        {
+            // The slot's own face files, so the face survives a restart (the pointer to the template's isn't saved).
+            var objectId = spawned!["slotObjectId"]!.ToString();
+            byte[]? mesh = null, tint = null;
+            var slotIndex = spawned["slot"]!.GetValue<int>();
+            if (face == "player" && ExportedHead(presetName) is { } exported) (mesh, tint) = (exported.mesh, exported.tint);
+            else if (face == "template" && spawned["faceSource"] is JsonObject src && src["plugin"]?.ToString() is string facePlugin)
+                (mesh, tint) = SlotRegistry.ReadFace(facePlugin, src["objectId"]!.ToString());
+            var problem = SlotRegistry.WriteFace(objectId, mesh, tint, out var files);
+            string? characterId = null;
+            try { characterId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+            SlotRegistry.Reserve(slotIndex, new JsonObject
+            {
+                ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
+                ["face"] = face, ["template"] = spawned["template"]?.ToString(), ["characterId"] = characterId,
+                ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
+            });
+            slotFace = problem == null
+                ? new { written = files, note = "Seen after the next game start (and at once in this session)." }
+                : new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
+        }
+        else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
         await NotifyInGame($"{name.Trim()} spawned" + (inSlot ? "" : " (preview)"));
         return new
         {
             spawned = DeserializeResponse(spawned),
             face = faceResult,
+            slotFace,
             lasting = inSlot,
             note = inSlot
                 ? "Uses one of SkyLinkAI.esl's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
                 : "A preview for this session: it won't survive a save and load" +
                   (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esl is in use)." : " (SkyLinkAI.esl, the optional plugin with NPC slots, isn't in the load order).") +
                   " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
+        };
+    }
+
+    /// <summary>The head RaceMenu exported for a preset (mesh and tint), then deletes the two big files.</summary>
+    private static (byte[] mesh, byte[] tint)? ExportedHead(string preset)
+    {
+        foreach (var plugins in SkyLinkSettings.ConfigFolders())
+        {
+            var dds = Path.Combine(plugins, "CharGen", preset + ".dds");
+            var nif = Path.ChangeExtension(dds, ".nif");
+            if (!File.Exists(dds) || !File.Exists(nif)) continue;
+            try
+            {
+                var result = (File.ReadAllBytes(nif), File.ReadAllBytes(dds));
+                File.Delete(dds);
+                File.Delete(nif);
+                return result;
+            }
+            catch (Exception) { }
+        }
+        return null;
+    }
+
+    [McpServerTool]
+    [Description("The characters kept in SkyLinkAI.esl's NPC slots (INFRA-024): slot, name, how the face was made, which character " +
+        "(save) made it, and whether its face files are in place. Slots are shared by all saves of the game, so a slot stays taken " +
+        "until RemoveSpawnedNpc (or freeSlot: the number of a slot whose character is gone from every save).")]
+    public async Task<object> ListNpcSlots(int? freeSlot = null)
+    {
+        if (freeSlot is int f)
+        {
+            if (SlotRegistry.Load()[f.ToString()] == null) return new { error = $"Slot {f} isn't reserved." };
+            return new { freed = f, filesDeleted = SlotRegistry.Release(f), note = "If a save still holds this character it keeps its place but loses its face files." };
+        }
+        JsonNode? state = null;
+        try { state = await _pipe.SendRequestAsync("get_session_state"); } catch (Exception) { }
+        var all = SlotRegistry.Load();
+        return new
+        {
+            registry = all.Select(kv => new
+            {
+                slot = kv.Key, name = kv.Value?["name"]?.ToString(), face = kv.Value?["face"]?.ToString(), characterId = kv.Value?["characterId"]?.ToString(),
+                created = kv.Value?["created"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
+            }),
+            taken = all.Count,
+            note = all.Count == 0 ? "No slots taken." : "Ten slots of each sex; a free slot is needed for a lasting character.",
         };
     }
 
@@ -162,6 +238,7 @@ public partial class RaceMenuTools
                     try { if (File.Exists(file)) File.Delete(file); } catch (Exception) { }
             }
         }
+        if (r?["error"] == null && SlotRegistry.SlotForRef(id) is int slotIndex) SlotRegistry.Release(slotIndex);
         return DeserializeResponse(r);
     }
 }

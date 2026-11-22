@@ -4,7 +4,9 @@
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
+#include <algorithm>
 #include <unordered_set>
+#include <vector>
 
 #include <format>
 
@@ -580,6 +582,16 @@ namespace SkyrimMCP::NPCManager {
         constexpr RE::FormID kFirstSlot = 0x800;
         constexpr int kSlotsPerSex = 10;
 
+        // The plugin and object ID a template's FaceGen files are named by: its own, or the NPC it borrows its face from.
+        json FaceSource(RE::TESNPC* npc) {
+            auto* from = npc ? npc->GetRootFaceNPC() : nullptr;
+            if (!from) from = npc;
+            auto* file = from ? from->GetFile(0) : nullptr;
+            if (!file) return nullptr;
+            const auto local = file->IsLight() ? (from->GetFormID() & 0xFFF) : (from->GetFormID() & 0xFFFFFF);
+            return {{"plugin", std::string(file->GetFilename())}, {"objectId", std::format("{:08X}", local)}};
+        }
+
         std::string SlotDefaultName(int index) {
             const bool female = index < kSlotsPerSex;
             return std::format("SkyLink Character {}{:02d}", female ? 'F' : 'M', (female ? index : index - kSlotsPerSex) + 1);
@@ -599,11 +611,13 @@ namespace SkyrimMCP::NPCManager {
         }
 
         // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
-        RE::TESNPC* FreeSlot(bool female, int& index) {
+        RE::TESNPC* FreeSlot(bool female, int& index, const std::vector<int>& avoid) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data) return nullptr;
             const int first = female ? 0 : kSlotsPerSex;
             for (int i = first; i < first + kSlotsPerSex; ++i) {
+                // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
+                if (std::find(avoid.begin(), avoid.end(), i) != avoid.end()) continue;
                 auto* npc = data->LookupForm<RE::TESNPC>(kFirstSlot + i, kSlotPlugin);
                 if (npc && SlotDefaultName(i) == npc->GetName()) {
                     index = i;
@@ -648,36 +662,68 @@ namespace SkyrimMCP::NPCManager {
         }
     }
 
+    namespace {
+        // 2026-11-22: a copy of Dawnstar's court wizard walked home to Dawnstar, schedule, job factions and all. A spawned
+        // character stays around where it stands and belongs to no one's faction until SkyLink gives it one.
+        void MakeStayPut(RE::TESNPC* npc) {
+            npc->aiPackages.packages.clear();
+            if (auto* stay = RE::TESForm::LookupByID<RE::TESPackage>(0x000956B8)) npc->aiPackages.packages.push_front(stay);  // DefaultSandboxCurrentLocation256
+            npc->factions.clear();
+            npc->crimeFaction = nullptr;
+        }
+    }
+
+    // Puts the stay-put behaviour on a character already spawned (and stops what it is doing).
+    json SpawnedNpcStay(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        MakeStayPut(npc);
+        using CF = RE::TESNPC::ChangeFlags;
+        if (SlotIndex(npc) >= 0) npc->AddChange(CF::kAIData | CF::kFactions);
+        actor->EvaluatePackage(true, false);
+        return {{"refId", refId}, {"stays", true}};
+    }
+
     json SpawnNpc(const json& params) {
         auto* player = RE::PlayerCharacter::GetSingleton();
         auto* playerBase = player ? player->GetActorBase() : nullptr;
         if (!player || !playerBase) return {{"error", "No player (load a game first)"}};
 
+        // A named template gives its race and sex unless the call says otherwise; without one, the player's.
+        RE::TESNPC* asked = nullptr;
+        if (auto t = params.value("template", std::string()); !t.empty()) {
+            RE::TESForm* form = nullptr;
+            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(t)); } catch (...) {}
+            if (!form) form = RE::TESForm::LookupByEditorID(t);
+            asked = form ? form->As<RE::TESNPC>() : nullptr;
+            if (!asked) return {{"error", "Template isn't an NPC base: " + t}};
+        }
+        const auto* like = asked ? asked : playerBase;
         auto* race = ResolveRace(params.value("race", std::string()));
-        if (!race) race = playerBase->race;
+        if (!race) race = like->race;
         const bool female = params.contains("female") && params["female"].is_boolean()
-            ? params["female"].get<bool>() : playerBase->GetSex() == RE::SEX::kFemale;
+            ? params["female"].get<bool>() : like->GetSex() == RE::SEX::kFemale;
 
         // RaceMenu's preset is the player's: another race or sex would get a face that doesn't fit the body.
         if (params.value("face", std::string("template")) == "player" &&
             (race != playerBase->race || female != (playerBase->GetSex() == RE::SEX::kFemale)))
             return {{"error", "face 'player' needs the player's own race and sex (the face is theirs). Use face 'template' for another race or sex."}};
 
-        RE::TESNPC* tmpl = nullptr;
-        if (auto t = params.value("template", std::string()); !t.empty()) {
-            RE::TESForm* form = nullptr;
-            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(t)); } catch (...) {}
-            if (!form) form = RE::TESForm::LookupByEditorID(t);
-            tmpl = form ? form->As<RE::TESNPC>() : nullptr;
-            if (!tmpl) return {{"error", "Template isn't an NPC base: " + t}};
-        } else {
+        RE::TESNPC* tmpl = asked;
+        if (!tmpl) {
             tmpl = FindTemplate(race, female);
             if (!tmpl) return {{"error", std::format("No NPC of race {:08X} ({}) to copy from", race->GetFormID(), female ? "female" : "male")}};
         }
 
         // A slot of SkyLink's optional plugin when one is free (kept by saves), else a runtime form (this session only).
         int slotIndex = -1;
-        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex) : nullptr;
+        std::vector<int> avoid;
+        if (params.contains("avoidSlots") && params["avoidSlots"].is_array())
+            for (const auto& a : params["avoidSlots"]) if (a.is_number_integer()) avoid.push_back(a.get<int>());
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex, avoid) : nullptr;
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;
@@ -685,6 +731,7 @@ namespace SkyrimMCP::NPCManager {
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
         npc->race = race;
+        if (!params.value("keepSchedule", false)) MakeStayPut(npc);
 
         const auto name = params.value("name", std::string());
         if (!name.empty()) npc->SetFullName(name.c_str());
@@ -738,6 +785,8 @@ namespace SkyrimMCP::NPCManager {
             {"templateSharedHeadData", sharedHead},
             {"runtimeForm", (npc->GetFormID() >> 24) == 0xFF},
             {"slot", slot ? json(slotIndex) : json(nullptr)},
+            {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
+            {"faceSource", FaceSource(tmpl)},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }
