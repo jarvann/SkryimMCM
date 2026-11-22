@@ -5314,6 +5314,10 @@
             {
               "datetime": "2026-11-22T15:20",
               "note": "Clone wears the player's 15 worn pieces (copy_outfit; the base's default and sleep outfits removed, so the template's tunic doesn't come back), is peaceful and marryable (PotentialMarriageFaction): all kept through a save and an in-session load on Steam. Not checked: a full restart with the copied outfit; hair physics moving; marriage dialogue."
+            },
+            {
+              "datetime": "2026-11-22T17:35",
+              "note": "A spawned character's stay-around package let the sister stroll 450 units away in a few minutes: consider a smaller default radius or an option."
             }
           ],
           "priority": "high",
@@ -5516,6 +5520,10 @@
             {
               "datetime": "2026-11-22T16:30",
               "note": "Built, not tested in game: MakeFollower and SpawnNpc follower on the vanilla follower factions and VoicesFollowerAll. Cory: must be seamless with optional companion managers. Nether's Follower Framework (installed) replaces DialogueFollowerScript, so a vanilla recruit goes to its RecruitFollower; read from its compiled script, it keeps combat style and saved settings only for unique NPCs, so slot characters are unique. Clothes aren't forced (trading and outfit features), colours are put on the loaded head instead of switching the character off and on at loads, a character already following isn't changed or removed. To test: NFF recruit, outfit, dismiss, reload; a setup without NFF. Not checked: AFT, EFF (not installed)."
+            },
+            {
+              "datetime": "2026-11-22T17:35",
+              "note": "In game (Steam, Nether's Follower Framework): the player recruited the family sister with the normal dialogue. Teammate, ally, CurrentFollowerFaction 0, Framework Follower Faction and the framework's own state factions, and other follower mods' factions (Fading of Followers, Convenient Horses, Extra Storage); kept her face file, voice, family rank 4 and not marryable. Left: trade, outfit, wait, dismiss, reload and recruit again; a setup without the framework; SkyLink refusing to remove a following character (test on a throwaway, never a follower the player keeps)."
             }
           ],
           "targetRelease": "1.6",
