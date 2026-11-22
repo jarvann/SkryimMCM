@@ -14,8 +14,8 @@ namespace SkyrimMCP {
     // ambient light, no sun or weather) and brought back to an exact marked spot.
     namespace Studio {
         // Puts the preset's lights around the player's head (replacing any studio lights): neutral, warm,
-        // daylight, soft, or off (removes them). Returns where each light is.
-        json Lights(const std::string& preset, float intensity);
+        // daylight, soft, or off (removes them). Returns where each light is. refId: light that actor instead (FEAT-122).
+        json Lights(const std::string& preset, float intensity, const std::string& refId = "");
 
         // Marks the player's spot (a persistent XMarker with her facing), then moves her to an interior cell by
         // editor ID. Refuses in combat or when a spot is already marked (call Return first).

@@ -673,6 +673,30 @@ namespace SkyrimMCP::NPCManager {
         }
     }
 
+    namespace {
+        // In front of the player, facing them, and not through a wall: PlaceObjectAtMe puts it on the player's own spot (in a
+        // photo the player's hair was in the way). Returns how far in front it ended up.
+        float PlaceInFront(RE::TESObjectREFR* ref, RE::PlayerCharacter* player, float distance) {
+            const float facing = player->GetAngleZ();
+            const RE::NiPoint3 dir{ std::sin(facing), std::cos(facing), 0.0f };
+            const auto at = player->GetPosition();
+            if (auto* cell = player->GetParentCell(); auto* world = cell ? cell->GetbhkWorld() : nullptr) {
+                const float scale = RE::bhkWorld::GetWorldScale();
+                RE::bhkPickData pick;
+                pick.rayInput.from = (at + RE::NiPoint3{ 0, 0, 70.0f }) * scale;
+                pick.rayInput.to = (at + RE::NiPoint3{ 0, 0, 70.0f } + dir * (distance + 40.0f)) * scale;
+                player->GetCollisionFilterInfo(pick.rayInput.filterInfo);
+                pick.rayInput.filterInfo.SetCollisionLayer(RE::COL_LAYER::kLOS);
+                RE::BSReadLockGuard lock(world->worldLock);
+                if (world->PickObject(pick); pick.rayOutput.HasHit())
+                    distance = std::max(0.0f, pick.rayOutput.hitFraction * (distance + 40.0f) - 40.0f);
+            }
+            ref->SetPosition(at + dir * distance);
+            ref->SetAngle(RE::NiPoint3{ 0.0f, 0.0f, std::fmod(facing + std::numbers::pi_v<float>, 2 * std::numbers::pi_v<float>) });
+            return distance;
+        }
+    }
+
     // Puts the stay-put behaviour on a character already spawned (and stops what it is doing).
     json SpawnedNpcStay(const std::string& refId) {
         RE::TESForm* form = nullptr;
@@ -771,6 +795,7 @@ namespace SkyrimMCP::NPCManager {
 
         auto ref = player->PlaceObjectAtMe(npc, slot);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        const float placedAt = PlaceInFront(ref.get(), player, std::clamp(params.value("distance", 160.0f), 60.0f, 600.0f));
 
         return {
             {"refId", std::format("{:08X}", ref->GetFormID())},
@@ -787,6 +812,7 @@ namespace SkyrimMCP::NPCManager {
             {"slot", slot ? json(slotIndex) : json(nullptr)},
             {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
             {"faceSource", FaceSource(tmpl)},
+            {"distance", placedAt},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }

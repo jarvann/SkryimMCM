@@ -414,7 +414,8 @@ namespace SkyrimMCP::Protocol {
             // Only return and cleanup take a marker; ParseFormId throws on an empty string (BUG-036).
             const std::string markerText = params.value("markerId", std::string{});
             const auto marker = markerText.empty() ? 0u : static_cast<std::uint32_t>(Helpers::ParseFormId(markerText));
-            if (mode == "lights") return GameThread(id, [=]() { return Studio::Lights(preset, intensity); });
+            const std::string lightRef = params.value("refId", std::string{});
+            if (mode == "lights") return GameThread(id, [=]() { return Studio::Lights(preset, intensity, lightRef); });
             if (mode == "go") return GameThread(id, [=]() { return Studio::Go(cell); });
             if (mode == "return") return GameThread(id, [=]() { return Studio::Return(marker); });
             if (mode == "cleanup") return GameThread(id, [=]() { return Studio::Cleanup(marker); });

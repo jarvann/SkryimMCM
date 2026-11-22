@@ -24,12 +24,12 @@ public class StudioTools : ToolBase
         "(indoor), daylight (warm key, cool fill), soft (key and fill equal), or off to remove them. intensity scales all three " +
         "(default 1). The lights are engine lights, not objects: nothing is saved, and they go away on a cell change or load. They " +
         "add to the scene's own light, so for steady colour use them indoors (StudioGo), always with the same preset; CaptureFace " +
-        "and MeasureFace report the preset in use.")]
-    public async Task<object> StudioLights(string preset = "neutral", double intensity = 1.0)
+        "and MeasureFace report the preset in use. refId: light that character instead of the player (a spawned NPC).")]
+    public async Task<object> StudioLights(string preset = "neutral", double intensity = 1.0, string? refId = null)
     {
         var data = await _pipe.SendRequestAsync("studio", new JsonObject
         {
-            ["mode"] = "lights", ["preset"] = preset.Trim().ToLowerInvariant(), ["intensity"] = intensity,
+            ["mode"] = "lights", ["preset"] = preset.Trim().ToLowerInvariant(), ["intensity"] = intensity, ["refId"] = refId?.Trim() ?? "",
         });
         return DeserializeResponse(data);
     }

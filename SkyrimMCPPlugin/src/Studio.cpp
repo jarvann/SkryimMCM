@@ -77,14 +77,22 @@ namespace SkyrimMCP {
 
     namespace Studio {
 
-        json Lights(const std::string& preset, float intensity) {
-            auto* player = RE::PlayerCharacter::GetSingleton();
+        json Lights(const std::string& preset, float intensity, const std::string& refId) {
+            RE::Actor* player = refId.empty() ? RE::PlayerCharacter::GetSingleton() : Helpers::ResolveActor(refId);
             auto* root = Root(player);
-            if (!root) return {{"error", "The player's 3D isn't loaded"}};
+            if (!root) return {{"error", refId.empty() ? "The player's 3D isn't loaded" : "That actor's 3D isn't loaded"}};
             auto* scene = SceneLights();
             if (!scene) return {{"error", "The renderer's light list isn't available"}};
 
-            const int removed = RemoveLights(root);
+            // One set of lights at a time, whoever carries it (2026-11-22: a photo of an NPC was lit at the player's head).
+            int removed = RemoveLights(root);
+            auto* self = RE::PlayerCharacter::GetSingleton();
+            if (self && self != player) removed += RemoveLights(Root(self));
+            if (auto* lists = RE::ProcessLists::GetSingleton()) {
+                for (auto& handle : lists->highActorHandles) {
+                    if (auto actor = handle.get(); actor && actor.get() != player) removed += RemoveLights(Root(actor.get()));
+                }
+            }
             if (preset == "off" || preset.empty()) return {{"removed", removed}, {"preset", "off"}};
 
             const auto specs = Preset(preset);

@@ -13,11 +13,14 @@ if [ "$OFF" != 0 ]; then
   for ax in "x $NX" "y $2"; do tool execute_console_command "{\"command\":\"\\\"$R\\\".setpos $ax\"}" >/dev/null 2>&1; done
   sleep 3
 fi
-tool studio_lights '{"preset":"neutral","intensity":1.0}' >/dev/null 2>&1
+pc call_papyrus_function "{\"className\":\"Actor\",\"functionName\":\"SetHeadTracking\",\"target\":\"$R\",\"args\":[false],\"wait\":false}" >/dev/null 2>&1
+pc studio "{\"mode\":\"lights\",\"preset\":\"${LIGHT:-neutral}\",\"intensity\":${INTENSITY:-1.0},\"refId\":\"$R\"}" 2>&1 | grep -o '"error":"[^"]*"'
+sleep 2
 for i in 1 2 3 4 5 6 7 8 9 10; do e=$(pc face_camera '{"mode":"enter","hideHud":true}' 2>&1); echo "$e" | grep -q '"freeCamera":true' && break; sleep 0.6; done
 sleep 1
 pc face_camera "{\"mode\":\"aim\",\"refId\":\"$R\",\"angleDeg\":0,\"distance\":$DIST,\"heightOffset\":-3}" 2>&1 | grep -o '"aimed":[a-z]*\|"error":"[^"]*"'
 sleep 2
 SKYLINK_MCP_IMAGES="$OUT" tool take_screenshot '{"crop":"0.3,0,0.4,1","previewWidth":900}' 2>&1 | grep -o 'image saved[^]]*\|"error[^,]*'
 pc face_camera '{"mode":"exit"}' >/dev/null 2>&1
-tool studio_lights '{"preset":"off"}' >/dev/null 2>&1
+pc studio '{"mode":"lights","preset":"off"}' >/dev/null 2>&1
+pc call_papyrus_function "{\"className\":\"Actor\",\"functionName\":\"SetHeadTracking\",\"target\":\"$R\",\"args\":[true],\"wait\":false}" >/dev/null 2>&1
