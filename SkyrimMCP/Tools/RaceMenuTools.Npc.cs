@@ -68,11 +68,13 @@ public partial class RaceMenuTools
         "outfit and voice from (default: a plain NPC of that race and sex). face: 'template' (the template's own face, works " +
         "everywhere) or 'player' (the player's current face, e.g. one built with the face builder; needs RaceMenu). " +
         "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
-        "the template's daily schedule, job and factions (a court wizard walks home). A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
+        "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
+        "preset. With SkyLinkAI.esl (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -115,6 +117,18 @@ public partial class RaceMenuTools
         }
         var refId = spawned?["refId"]?.ToString();
 
+        object? voiceResult = null;
+        if (!string.IsNullOrWhiteSpace(voice) && refId != null)
+        {
+            try
+            {
+                var set = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = voice.Trim() });
+                voiceResult = DeserializeResponse(set);
+                if (set?["voiceStableId"] is JsonNode stable && spawned?["faceData"] is JsonObject fd) fd["voice"] = stable.DeepClone();
+            }
+            catch (McpException ex) { voiceResult = new { error = ex.Message, note = "Spawned with the template's voice." }; }
+        }
+
         object? faceResult = null;
         if (face == "player" && refId != null)
         {
@@ -128,7 +142,15 @@ public partial class RaceMenuTools
                 var spawns = LoadSpawns();
                 spawns[refId] = presetName;
                 SaveSpawns(spawns);
-                faceResult = new { preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
+                // The player's body shape, when OBody is installed (its script function isn't there otherwise).
+                string? body = null;
+                try
+                {
+                    body = (await Papyrus("OBodyNative", "GetPresetAssignedToActor", "00000014"))?.ToString();
+                    if (!string.IsNullOrEmpty(body)) await Papyrus("OBodyNative", "ApplyPresetByName", refId, body);
+                }
+                catch (McpException) { body = null; }
+                faceResult = new { bodyPreset = string.IsNullOrEmpty(body) ? "none (OBody isn't installed, or gave none)" : body, preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
             }
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
         }
@@ -181,6 +203,7 @@ public partial class RaceMenuTools
         {
             spawned = DeserializeResponse(spawned),
             face = faceResult,
+            voice = voiceResult,
             slotFace,
             lasting = inSlot,
             note = inSlot

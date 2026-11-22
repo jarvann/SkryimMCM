@@ -740,22 +740,6 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"stays", true}};
     }
 
-    json SetNpcVoice(const std::string& refId, const std::string& voice) {
-        RE::TESForm* form = nullptr;
-        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
-        auto* actor = form ? form->As<RE::Actor>() : nullptr;
-        auto* npc = actor ? actor->GetActorBase() : nullptr;
-        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
-        RE::TESForm* v = RE::TESForm::LookupByEditorID(voice);
-        if (!v) try { v = RE::TESForm::LookupByID(Helpers::ParseFormId(voice)); } catch (...) {}
-        auto* type = v ? v->As<RE::BGSVoiceType>() : nullptr;
-        if (!type) return {{"error", "Not a voice type: " + voice}};
-        auto* old = npc->voiceType;
-        npc->voiceType = type;
-        auto label = [](RE::BGSVoiceType* t) { return t && t->GetFormEditorID() ? json(t->GetFormEditorID()) : json(nullptr); };
-        return {{"refId", refId}, {"was", label(old)}, {"voice", label(type)}, {"voiceId", std::format("{:08X}", type->GetFormID())}};
-    }
-
     namespace {
         std::string Hex(const RE::Color& c) { return std::format("#{:02X}{:02X}{:02X}", c.red, c.green, c.blue); }
         std::optional<RE::Color> ParseHex(const std::string& s) {
@@ -814,6 +798,22 @@ namespace SkyrimMCP::NPCManager {
                 if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
             }
         }
+    }
+
+    json SetNpcVoice(const std::string& refId, const std::string& voice) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        RE::TESForm* v = RE::TESForm::LookupByEditorID(voice);
+        if (!v) try { v = RE::TESForm::LookupByID(Helpers::ParseFormId(voice)); } catch (...) {}
+        auto* type = v ? v->As<RE::BGSVoiceType>() : nullptr;
+        if (!type) return {{"error", "Not a voice type: " + voice}};
+        auto* old = npc->voiceType;
+        npc->voiceType = type;
+        auto label = [](RE::BGSVoiceType* t) { return t && t->GetFormEditorID() ? json(t->GetFormEditorID()) : json(nullptr); };
+        return {{"refId", refId}, {"was", label(old)}, {"voice", label(type)}, {"voiceId", std::format("{:08X}", type->GetFormID())}, {"voiceStableId", StableId(type)}};
     }
 
     json ReapplySlots() {
