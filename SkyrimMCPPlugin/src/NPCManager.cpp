@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <format>
 
 namespace SkyrimMCP::NPCManager {
@@ -729,6 +730,85 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"was", label(old)}, {"voice", label(type)}, {"voiceId", std::format("{:08X}", type->GetFormID())}};
     }
 
+    namespace {
+        std::string Hex(const RE::Color& c) { return std::format("#{:02X}{:02X}{:02X}", c.red, c.green, c.blue); }
+        std::optional<RE::Color> ParseHex(const std::string& s) {
+            if (s.size() != 7 || s[0] != '#') return std::nullopt;
+            try {
+                const auto v = std::stoul(s.substr(1), nullptr, 16);
+                RE::Color c;
+                c.red = static_cast<std::uint8_t>(v >> 16);
+                c.green = static_cast<std::uint8_t>(v >> 8);
+                c.blue = static_cast<std::uint8_t>(v);
+                return c;
+            } catch (...) { return std::nullopt; }
+        }
+        // A plugin name and local ID, which stay right when the load order changes.
+        json StableId(RE::TESForm* form) {
+            auto* file = form ? form->GetFile(0) : nullptr;
+            if (!file) return nullptr;
+            return std::format("{}|{:06X}", file->GetFilename(), form->GetLocalFormID());
+        }
+        RE::TESForm* FromStableId(const std::string& id) {
+            const auto bar = id.rfind('|');
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (bar == std::string::npos || !data) return nullptr;
+            try { return data->LookupForm(static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16)), id.substr(0, bar)); } catch (...) { return nullptr; }
+        }
+        json FaceDataOf(RE::TESNPC* npc) {
+            auto* head = npc->headRelatedData;
+            return {{"bodyTint", Hex(npc->bodyTintColor)}, {"weight", npc->weight},
+                    {"hairColor", head && head->hairColor ? json(Hex(head->hairColor->color)) : json(nullptr)},
+                    {"headTexture", head ? StableId(head->faceDetails) : json(nullptr)},
+                    {"voice", StableId(npc->voiceType)}};
+        }
+        // Its own head data, never the template's: npc->Copy shares the pointer.
+        void ApplyFaceData(RE::TESNPC* npc, const json& d) {
+            auto* old = npc->headRelatedData;
+            auto* own = new RE::TESNPC::HeadRelatedData();
+            if (old) { own->hairColor = old->hairColor; own->faceDetails = old->faceDetails; }
+            npc->headRelatedData = own;
+            if (d.contains("headTexture") && d["headTexture"].is_string()) {
+                if (auto* t = FromStableId(d["headTexture"].get<std::string>())) own->faceDetails = t->As<RE::BGSTextureSet>();
+            }
+            if (d.contains("hairColor") && d["hairColor"].is_string()) {
+                if (const auto c = ParseHex(d["hairColor"].get<std::string>())) {
+                    auto* colors = RE::IFormFactory::GetConcreteFormFactoryByType<RE::BGSColorForm>();
+                    if (auto* form = colors ? colors->Create() : nullptr) {
+                        form->color = *c;
+                        own->hairColor = form;
+                    }
+                }
+            }
+            if (d.contains("bodyTint") && d["bodyTint"].is_string()) {
+                if (const auto c = ParseHex(d["bodyTint"].get<std::string>())) npc->bodyTintColor = *c;
+            }
+            if (d.contains("weight") && d["weight"].is_number()) npc->weight = std::clamp(d["weight"].get<float>(), 0.0f, 100.0f);
+            if (d.contains("voice") && d["voice"].is_string()) {
+                if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
+            }
+            if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+        }
+    }
+
+    json GetFaceData(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc) return {{"error", "Actor not found: " + refId}};
+        return FaceDataOf(npc);
+    }
+
+    json SetFaceData(const json& params) {
+        const auto refId = params.value("refId", std::string());
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        ApplyFaceData(npc, params);
+        return FaceDataOf(npc);
+    }
+
     json HeadMaterials(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* face = actor && actor->Get3D(false) ? actor->GetFaceNodeSkinned() : nullptr;
@@ -830,22 +910,14 @@ namespace SkyrimMCP::NPCManager {
         const auto face = params.value("face", std::string("template"));
         npc->faceNPC = face == "template" ? (tmpl->faceNPC ? tmpl->faceNPC : tmpl) : nullptr;
 
-        // Spike 2026-11-22 (Steam): CharGen.LoadCharacter copies head parts and morphs but not the hair colour or body tone, so
-        // take the player's. The copy must not write through pointers the template still owns.
+        // Spike 2026-11-22 (Steam): CharGen.LoadCharacter copies head parts and morphs but not the hair colour, body tone, weight
+        // or head texture set, and the template's texture set replaces the face file's own textures, its tint included (a white
+        // face with the template's wrinkles). So take the player's; never write through the head data the template still owns.
         const bool sharedHead = npc->headRelatedData && npc->headRelatedData == tmpl->headRelatedData;
         if (face == "player") {
-            npc->bodyTintColor = playerBase->bodyTintColor;
-            if (auto* from = playerBase->headRelatedData ? playerBase->headRelatedData->hairColor : nullptr) {
-                if (sharedHead) npc->headRelatedData = nullptr;
-                // Its own colour form: RaceMenu edits the player's in place.
-                auto* colors = RE::IFormFactory::GetConcreteFormFactoryByType<RE::BGSColorForm>();
-                auto* own = colors ? colors->Create() : nullptr;
-                if (own) {
-                    own->color = from->color;
-                    own->flags = from->flags;
-                }
-                npc->SetHairColor(own ? own : from);
-            }
+            auto data = FaceDataOf(playerBase);
+            data.erase("voice");
+            ApplyFaceData(npc, data);
         }
 
         const bool slot = slotIndex >= 0;
@@ -876,6 +948,7 @@ namespace SkyrimMCP::NPCManager {
             {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
             {"faceSource", FaceSource(tmpl)},
             {"distance", placedAt},
+            {"faceData", FaceDataOf(npc)},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }

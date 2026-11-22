@@ -263,6 +263,10 @@ namespace SkyrimMCP::Protocol {
         };
         formIdParam("spawned_npc_stay", "refId", [](const std::string& r) { return NPCManager::SpawnedNpcStay(r); });
         formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
+        formIdParam("get_face_data", "refId", [](const std::string& r) { return NPCManager::GetFaceData(r); });
+        registry["set_face_data"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return NPCManager::SetFaceData(params); });
+        };
         registry["set_npc_voice"] = [](const std::string& id, const json& params) {
             std::string ref = params.value("refId", std::string());
             std::string voice = params.value("voice", std::string());
