@@ -111,6 +111,13 @@ public partial class CharacterTools
 
         var requirements = JsonSerializer.SerializeToNode(await Task.Run(() => Requirements(data!))) as JsonObject ?? new JsonObject();
         if (outfit == "none") requirements["optional"] = new JsonArray();
+        // A mod whose plugin is a master has to be there, worn or not.
+        if (requirements["optional"] is JsonArray optional && requirements["required"] is JsonArray needed)
+            foreach (var m in optional.OfType<JsonObject>().Where(m => (m["plugins"] as JsonArray ?? []).Any(p => built.Masters.Contains(p?.ToString() ?? "", StringComparer.OrdinalIgnoreCase))).ToList())
+            {
+                optional.Remove(m);
+                needed.Add(m);
+            }
         var embedded = EmbeddedMeshes(mesh, forms);
         var folder = Path.Combine(SkyLinkSettings.Folder, "Build", modName);
         var files = new Dictionary<string, byte[]>
