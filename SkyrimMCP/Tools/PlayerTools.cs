@@ -67,7 +67,8 @@ public class PlayerTools : ToolBase
         "SkyLinkLauncher, launcherVersion is set, serverPath is the shadow copy and serverSource is the deployed DLL. " +
         "diagnostics (1.3+) shows the game's store (Steam, GOG, Epic), whether the Address Library file for this game build is " +
         "present, and gameThread counters: if tasksQueued is above 0 and tasksRun is 0, SKSE never runs SkyLink's game-thread " +
-        "calls, which is why every other tool fails; diagnostics.problem then says what to check.")]
+        "calls, which is why every other tool fails; diagnostics.problem then says what to check. environment names the running " +
+        "game's own folders (documents, saves, INIs), whatever other installs exist.")]
     public async Task<object> CheckConnection()
     {
         try
@@ -116,7 +117,8 @@ public class PlayerTools : ToolBase
                 serverBuilt = ServerBuilt,
                 serverPath = ServerPath,
                 serverSource = ServerSource,
-                launcherVersion = LauncherVersion
+                launcherVersion = LauncherVersion,
+                environment = Environment_(),
             };
         }
         catch (Exception ex)
@@ -132,6 +134,44 @@ public class PlayerTools : ToolBase
                 launcherVersion = LauncherVersion
             };
         }
+    }
+
+    // Short form beside the versions in CheckConnection (INFRA-027).
+    private static object Environment_()
+    {
+        try
+        {
+            var e = GameEnvironment.Current();
+            return new
+            {
+                store = e.Store, exeVersion = e.ExeVersion, gameFolder = e.GameFolder, documents = e.Documents, saves = e.Saves,
+                skyrimIni = e.Inis["Skyrim.ini"].Path, skyrimPrefsIni = e.Inis["SkyrimPrefs.ini"].Path,
+                modManager = e.ModManager, mo2Profile = e.Mo2Profile,
+                note = "GetGameEnvironment lists everything (all INIs, plugins.txt, logs, crash dumps, where each was decided from).",
+            };
+        }
+        catch (Exception ex) { return new { error = ex.Message }; }
+    }
+
+    [McpServerTool]
+    [Description("Where everything of the running game is (INFRA-027), decided only by the game that is running: store (Steam or GOG), " +
+        "exe and SKSE versions, game and Data folders, documents folder, saves folder, the INI files in use (the MO2 profile's own " +
+        "copies when its local settings are on), plugins.txt, SKSE logs, crash dump folders, mod manager, MO2 instance and profile. " +
+        "Use it before editing an INI, finding a save or a log by hand, or when Steam and GOG are both installed.")]
+    public Task<object> GetGameEnvironment()
+    {
+        var e = GameEnvironment.Current();
+        return Task.FromResult<object>(new
+        {
+            store = e.Store, exeVersion = e.ExeVersion, skseVersion = e.SkseVersion, exe = e.Exe,
+            gameFolder = e.GameFolder, gameFolderFrom = e.GameFolderFrom, data = e.Data,
+            documents = e.Documents, documentsFrom = e.DocumentsFrom,
+            saves = e.Saves, savesFrom = e.SavesFrom,
+            inis = e.Inis.ToDictionary(i => i.Key, i => new { path = i.Value.Path, exists = i.Value.Exists, from = i.Value.From }),
+            pluginsTxt = e.PluginsTxt, pluginsTxtFrom = e.PluginsTxtFrom,
+            skseLogs = e.SkseLogs, skylinkFolder = e.SkyLinkFolder, crashDumpFolders = e.CrashDumpFolders,
+            modManager = e.ModManager, mo2Instance = e.Mo2Instance, mo2Profile = e.Mo2Profile,
+        });
     }
 
     [McpServerTool]
