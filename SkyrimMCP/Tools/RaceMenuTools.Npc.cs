@@ -63,14 +63,15 @@ public partial class RaceMenuTools
 
     [McpServerTool]
     [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: editor ID or form ID " +
-        "(default the player's race); female: true or false (default the player's sex); template: an NPC to copy stats, " +
+        "(default the template's, or the player's); female: true or false (likewise); template: an NPC to copy stats, " +
         "outfit and voice from (default: a plain NPC of that race and sex). face: 'template' (the template's own face, works " +
         "everywhere) or 'player' (the player's current face, e.g. one built with the face builder; needs RaceMenu). " +
-        "essential: can't be killed. A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
+        "the template's daily schedule, job and factions (a court wizard walks home). A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -83,8 +84,8 @@ public partial class RaceMenuTools
             {
                 dryRun = true,
                 name,
-                race = race ?? "the player's race",
-                sex = female is bool f ? (f ? "female" : "male") : "the player's sex",
+                race = race ?? (template != null ? "the template's race" : "the player's race"),
+                sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
                 face = face == "player" ? "the player's current face (RaceMenu CharGen)" : "the template's own face",
                 lasting = false,
@@ -100,7 +101,7 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
