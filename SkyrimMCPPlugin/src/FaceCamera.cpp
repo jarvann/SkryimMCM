@@ -1,4 +1,5 @@
 #include "FaceCamera.h"
+#include "Helpers.h"
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 #include <algorithm>
@@ -329,7 +330,7 @@ namespace SkyrimMCP {
             auto* camera = RE::Main::WorldRootCamera();
             if (!npc || !root || !camera) return {{"error", "Player 3D or camera not available"}};
             auto* head = HeadNode(player);
-            if (!head) return {{"error", refId.empty() ? "The player's head isn't loaded" : "That actor's head isn't loaded (too far away?)"}};
+            if (!head) return {{"error", "The player's head isn't loaded"}};
             const RE::NiPoint3 camPos = camera->world.translate;
 
             // Screen y from WorldPtToScreenPt3 may grow upward: check with a point above the head and report top-down.
