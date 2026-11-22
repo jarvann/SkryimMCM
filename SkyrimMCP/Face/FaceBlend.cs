@@ -56,6 +56,22 @@ public static class FaceBlend
         return new Result(nif.ToBytes(), own.Length, ownPlain != null, shift.Average(v => v.Length()), shift.Max(v => v.Length()), with);
     }
 
+    /// <summary>
+    /// A loaded face file carries its own hair tint, and the colour on the character's record doesn't replace it (2026-11-22). Writes it into
+    /// every hair-tinted shape (hair, hairline, brows, beard): the game's tint is twice the colour.
+    /// </summary>
+    public static byte[] HairColour(byte[] face, byte red, byte green, byte blue)
+    {
+        var nif = NifDocument.Read(face);
+        foreach (var shader in Enumerable.Range(0, nif.Blocks.Count).Where(nif.IsShape).Select(nif.Lighting).OfType<(int Shader, int TextureSet, uint Type)>().Where(l => l.Type == 6).Select(l => l.Shader).Distinct())
+        {
+            var b = nif.Blocks[shader];
+            byte[] rgb = [red, green, blue];
+            for (var i = 0; i < 3; i++) BitConverter.GetBytes(Math.Min(2f * rgb[i] / 255f, 1f)).CopyTo(b, b.Length - 12 + 4 * i);
+        }
+        return nif.ToBytes();
+    }
+
     // The values at the four nearest points, by distance; full within 'near', fading to nothing at 'far'.
     private static Vector3 Interpolate(Vector3 at, Vector3[] points, Vector3[] values, float near, float far)
     {

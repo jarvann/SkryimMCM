@@ -311,7 +311,10 @@ public partial class RaceMenuTools
                 var set = await _pipe.SendRequestAsync("set_face_data", new JsonObject { ["refId"] = refId, ["hairColor"] = colour });
                 if (set?["hairColor"]?.ToString() is string now) { hair = now; if (spawned["faceData"] is JsonObject fd) fd["hairColor"] = now; }
             }
-            return (blend.Bytes, new
+            var bytes = blend.Bytes;
+            if (hair is { Length: 7 })
+                bytes = FaceBlend.HairColour(bytes, Convert.ToByte(hair[1..3], 16), Convert.ToByte(hair[3..5], 16), Convert.ToByte(hair[5..7], 16));
+            return (bytes, new
             {
                 amount, hairColor = hair, headVertices = blend.HeadVertices, averageMove = Math.Round(blend.AverageMove, 3), largestMove = Math.Round(blend.LargestMove, 2),
                 ownFeaturesReduced = blend.OwnFeaturesReduced,

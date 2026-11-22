@@ -47,12 +47,16 @@ public class CharacterTools : ToolBase
             if (!wanted.TryGetValue(key, out var list)) wanted[key] = list = [];
             list.Add((why, required));
         }
+        // Perks, spells and factions from mods come from distributors (SPID and the like) that give them to every NPC: an exported
+        // character leaves them out, and whoever has those mods gets them again.
+        var handedOut = new SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var creations = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in forms)
         {
             var plugin = f["plugin"]?.ToString() ?? "";
             if (BaseGame.Contains(plugin, StringComparer.OrdinalIgnoreCase) || plugin.Equals("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase)) continue;
             if (IsCreation(plugin)) { creations.Add(plugin); continue; }
+            if (f["kind"]?.ToString() is "perk" or "spell" or "faction") { handedOut[plugin] = handedOut.GetValueOrDefault(plugin) + 1; continue; }
             var inRecord = f["need"]?.ToString() == "record";
             Want(plugin, $"{f["kind"]}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", inRecord);
         }
@@ -71,7 +75,11 @@ public class CharacterTools : ToolBase
                     for (var s = 0; s < nif.Blocks.Count; s++)
                     {
                         if (!nif.IsShape(s) || nif.Lighting(s) is not { } light) continue;
-                        foreach (var t in nif.Textures(light.TextureSet).Where(t => t.Length > 0)) Want(DataPath(t), $"face file texture ({nif.Name(s)})", true);
+                        foreach (var t in nif.Textures(light.TextureSet).Where(t => t.Length > 0))
+                        {
+                            var replaces = BaseGameTexture(DataPath(t));
+                            Want(DataPath(t), $"{(replaces ? "replaces a base game texture" : "face file texture")} ({nif.Name(s)})", !replaces);
+                        }
                     }
                 }
                 catch (InvalidDataException ex) { faceNote = "The face file couldn't be read: " + ex.Message; }
@@ -124,12 +132,29 @@ public class CharacterTools : ToolBase
             required = required.Select(m => Row(m.Mod, m.Need)),
             optional = optional.Select(m => Row(m.Mod, m.Need)),
             untraced = unknown.Count == 0 ? null : unknown.Select(u => new { plugin = u.Key, required = u.Value.Required, why = u.Value.Why.Order().Take(6) }),
+            handedOutByOtherMods = handedOut.Count == 0 ? null : new { perksSpellsAndFactions = handedOut.Values.Sum(), plugins = handedOut.Count,
+                note = "Given to every NPC by other mods (SPID and similar). Not part of the character: an export leaves them out." },
             creationClub = creations.Count == 0 ? null : creations.ToList(),
             missingMeshes = missing.Count == 0 ? null : missing.ToList(),
             faceNote,
-            note = "A mod that only replaces textures or bodies for everyone (a skin or body mod) supplies files the character shows but doesn't need to be there: " +
-                   "check whether to list it. Files packed in archives count with their plugin.",
+            note = "optional also has mods that only replace base game textures (skins, mouths, eyes): the character shows them but works without. " +
+                   "Files packed in archives count with their plugin.",
         };
+    }
+
+    private static List<BsaArchive>? _baseTextures;
+
+    private static bool BaseGameTexture(string dataPath)
+    {
+        if (!dataPath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) || SkyLinkSettings.DataPath() is not string data) return false;
+        if (_baseTextures == null)
+        {
+            var list = new List<BsaArchive>();
+            foreach (var file in Directory.EnumerateFiles(data, "Skyrim - Textures*.bsa"))
+                if (BsaArchive.Open(file) is { } bsa) list.Add(bsa);
+            _baseTextures = list;
+        }
+        return _baseTextures.Any(b => b.Contains(dataPath));
     }
 
     // Texture and physics paths as meshes write them ("textures\...", "Data\textures\...", "Actors\...").

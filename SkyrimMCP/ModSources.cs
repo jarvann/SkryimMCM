@@ -51,6 +51,7 @@ public static partial class ModSources
     public static Mod FromFolderName(string folder)
     {
         var m = VortexName().Match(folder);
+        if (!m.Success) m = VortexCollectionName().Match(folder);
         return m.Success ? new Mod(m.Groups["name"].Value.Trim(), folder, int.Parse(m.Groups["id"].Value)) : new Mod(folder, folder, null);
     }
 
@@ -70,6 +71,10 @@ public static partial class ModSources
             }
         }
     }
+
+    // "Helmet Toggle 2 100617 3.6.3 2026-09-08T03-32Z 6...": name, Nexus mod ID, version, date (files Vortex fetched by itself).
+    [GeneratedRegex(@"^(?<name>.+?) (?<id>\d{1,7}) \S+ \d{4}-\d{2}-\d{2}T")]
+    private static partial Regex VortexCollectionName();
 
     [GeneratedRegex(@"^(?<name>.+?)-(?<id>\d{1,7})(-[0-9A-Za-z]+)*-\d{10}(\.\d+)?$")]
     private static partial Regex VortexName();
