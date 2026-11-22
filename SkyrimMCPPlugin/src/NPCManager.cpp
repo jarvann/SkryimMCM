@@ -806,6 +806,10 @@ namespace SkyrimMCP::NPCManager {
         auto* npc = actor ? actor->GetActorBase() : nullptr;
         if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
         ApplyFaceData(npc, params);
+        // Finding out why the game builds a head instead of using its face file (2026-11-22).
+        if (params.value("clearMorphs", false)) npc->faceData = nullptr;
+        if (params.value("clearTintLayers", false)) npc->tintLayers = nullptr;
+        if (params.value("removeFaceChange", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
         return FaceDataOf(npc);
     }
 
@@ -846,6 +850,12 @@ namespace SkyrimMCP::NPCManager {
         json result = {{"refId", refId}, {"shapes", shapes}};
         if (auto* npc = actor->GetActorBase()) {
             result["bodyTint"] = std::format("#{:02X}{:02X}{:02X}", npc->bodyTintColor.red, npc->bodyTintColor.green, npc->bodyTintColor.blue);
+            result["isChargenPreset"] = npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kIsChargenFacePreset);
+            result["baseFlags"] = std::format("{:08X}", npc->actorData.actorBaseFlags.underlying());
+            result["templateUseFlags"] = std::format("{:04X}", npc->actorData.templateUseFlags.underlying());
+            result["tintLayers"] = npc->tintLayers ? json(npc->tintLayers->size()) : json(nullptr);
+            result["hasMorphs"] = npc->faceData != nullptr;
+            result["overlays"] = npc->HasOverlays();
             result["faceNPC"] = npc->faceNPC ? json(std::format("{:08X}", npc->faceNPC->GetFormID())) : json(nullptr);
             auto* hair = npc->headRelatedData ? npc->headRelatedData->hairColor : nullptr;
             result["hairColor"] = hair ? json(std::format("{:08X} #{:02X}{:02X}{:02X}", hair->GetFormID(), hair->color.red, hair->color.green, hair->color.blue)) : json(nullptr);
