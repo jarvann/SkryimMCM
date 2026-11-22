@@ -55,8 +55,8 @@ public class CharacterTools : ToolBase
         {
             var plugin = f["plugin"]?.ToString() ?? "";
             if (BaseGame.Contains(plugin, StringComparer.OrdinalIgnoreCase) || plugin.Equals("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase)) continue;
-            if (IsCreation(plugin)) { creations.Add(plugin); continue; }
             if (f["kind"]?.ToString() is "perk" or "spell" or "faction") { handedOut[plugin] = handedOut.GetValueOrDefault(plugin) + 1; continue; }
+            if (IsCreation(plugin)) { creations.Add(plugin); continue; }
             var inRecord = f["need"]?.ToString() == "record";
             Want(plugin, $"{f["kind"]}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", inRecord);
         }
