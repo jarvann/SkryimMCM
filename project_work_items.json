@@ -5659,7 +5659,8 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": [
-            "FEAT-122"
+            "FEAT-122",
+            "INFRA-026"
           ]
         },
         {
@@ -5743,6 +5744,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "INFRA-026",
+          "type": "infrastructure",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Local page for API keys (Windows credential store)",
+          "description": "For services that need the player's own key (ElevenLabs in FEAT-293; the in-game AI in 2.0): SkyLink opens a page on the player's own machine (127.0.0.1, one-time token in the address, closes after use) with a key field per service. The key goes to the Windows credential store, encrypted, never to settings.json, a mod folder, logs or an AI chat. A tool reports only whether a key is set, and which service; tools never return a key. MCP clients sign in themselves and need no key here.",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:45",
+              "note": "Cory asked where players would enter a key; agreed the FOMOD isn't the place."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
@@ -5783,6 +5800,41 @@
           ],
           "targetRelease": "1.7",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-299",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Setup command: connect an AI client to SkyLink",
+          "description": "dotnet SkyLinkLauncher.dll --setup finds the installed clients (Claude Desktop, Gemini CLI, Antigravity CLI and others with a known config file), shows exactly what it will add, asks, backs the file up and writes the SkyLink entry (the MO2 mod folder path when MO2 is used). Also --check and --remove. Never touches another entry.",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:45",
+              "note": "Cory asked whether the FOMOD could collect the AI choice and API key; FOMOD has no text entry, so the choice goes in the FOMOD (FEAT-300) and the connecting here."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-300",
+          "type": "feature",
+          "status": "planned",
+          "priority": "low",
+          "title": "FOMOD: choose the AI client",
+          "description": "A FOMOD page where the player ticks the AI client(s) they use; it installs the matching example config and short setup steps. No text entry and no keys: mod managers store FOMOD choices as plain text and can include them in shared collections.",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:45",
+              "note": "Cory."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": [
+            "INFRA-025",
+            "FEAT-299"
+          ]
         }
       ]
     }
