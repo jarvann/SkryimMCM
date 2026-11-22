@@ -5912,6 +5912,10 @@
             {
               "datetime": "2026-11-22T14:50",
               "note": "Reported as powerof3/SeasonsOfSkyrim#13."
+            },
+            {
+              "datetime": "2026-11-22T15:10",
+              "note": "Profiler (scripts/startup-profile.ps1) on Steam. First ~30 s: one GetFileAttributes per loose file (1.03 million) because bInvalidateOlderFiles=1; setting it to 0 removed the wait but loose files stopped loading and the game crashed at the menu (never change it). 134-190 s: SkyrimSE+293060 scans a table of form ID lists to remove one ID, per placed reference (layout fits the large-reference lists; a hook with a reverse map could make it constant). 90-134 s: SkyrimSE+1E29E6 searches a list of pointer arrays one by one. XEMIUtil off: 233 s with the profiler, not the cause."
             }
           ],
           "targetRelease": "",
