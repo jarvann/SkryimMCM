@@ -825,7 +825,8 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Set one SkyLink setting (see GetSkyLinkSettings for the list): skyrimPath, dataPath, mo2Path, mo2Profile, " +
-        "resaverPath, creationKitPath, xeditPath, lootPath, or extraConfigFolders (comma-separated folders). An empty value removes the setting. Folders must exist. " +
+        "resaverPath, creationKitPath, xeditPath, lootPath, extraConfigFolders (comma-separated folders), or dismissMessageBoxes (adds one piece of " +
+        "a message box's text, with the player's agreement). An empty value removes the setting. Folders must exist. " +
         "Use this for MO2 or Wabbajack setups where config files aren't in the game's own Data folder.")]
     public Task<object> SetSkyLinkSetting(string key, string? value = null)
     {
@@ -843,6 +844,15 @@ public class UtilityTools : ToolBase
             var missing = folders.Where(f => !Directory.Exists(f)).ToArray();
             if (missing.Length > 0) return Task.FromResult<object>(new { error = $"Folder not found: {string.Join("; ", missing)}" });
             settings[key] = new JsonArray(folders.Select(f => (JsonNode)f).ToArray());
+        }
+        else if (key == "dismissMessageBoxes")
+        {
+            // One more piece of a box's text; an empty value forgets them all. SkyLink still closes only boxes with a single button.
+            var piece = value.Trim();
+            if (piece.Length < 8) return Task.FromResult<object>(new { error = "Pass at least 8 characters of the box's text, so it can't match other boxes." });
+            var list = settings[key] as JsonArray ?? [];
+            if (!list.Any(x => x?.ToString() == piece)) list.Add(piece);
+            settings[key] = list.DeepClone();
         }
         else if (key == "mo2Profile")
         {

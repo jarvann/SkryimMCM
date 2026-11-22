@@ -771,7 +771,7 @@ namespace SkyrimMCP::NPCManager {
             return {{"bodyTint", Hex(npc->bodyTintColor)}, {"weight", npc->weight},
                     {"hairColor", head && head->hairColor ? json(Hex(head->hairColor->color)) : json(nullptr)},
                     {"headTexture", head ? StableId(head->faceDetails) : json(nullptr)},
-                    {"voice", StableId(npc->voiceType)}};
+                    {"voice", StableId(npc->voiceType)}, {"combatStyle", StableId(npc->combatStyle)}};
         }
         // Its own head data, never the template's: npc->Copy shares the pointer.
         void ApplyFaceData(RE::TESNPC* npc, const json& d) {
@@ -795,6 +795,9 @@ namespace SkyrimMCP::NPCManager {
                 if (const auto c = ParseHex(d["bodyTint"].get<std::string>())) npc->bodyTintColor = *c;
             }
             if (d.contains("weight") && d["weight"].is_number()) npc->weight = std::clamp(d["weight"].get<float>(), 0.0f, 100.0f);
+            if (d.contains("combatStyle") && d["combatStyle"].is_string()) {
+                if (auto* c = FromStableId(d["combatStyle"].get<std::string>())) if (auto* style = c->As<RE::TESCombatStyle>()) npc->combatStyle = style;
+            }
             if (d.contains("voice") && d["voice"].is_string()) {
                 if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
             }
@@ -855,7 +858,7 @@ namespace SkyrimMCP::NPCManager {
             bool colours = false;
             if (used && entry.contains("faceData") && entry["faceData"].is_object()) {
                 const auto now = FaceDataOf(npc);
-                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice" }) {
+                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice", "combatStyle" }) {
                     if (entry["faceData"].contains(field) && entry["faceData"][field].is_string() && now[field] != entry["faceData"][field]) {
                         if (!colours) ApplyFaceData(npc, entry["faceData"]);
                         colours = true;
@@ -1231,6 +1234,16 @@ namespace SkyrimMCP::NPCManager {
         }
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
+        // The template's belongings: its keys open its house, not the copy's (2026-11-22: a copy of Tova Shatter-Shield had the Key to
+        // Hjerim), and a slot's own container isn't saved. Ordinary things are given to the character itself; keys and leveled lists aren't.
+        std::vector<std::pair<RE::TESBoundObject*, std::int32_t>> belongings;
+        tmpl->ForEachContainerObject([&](RE::ContainerObject& entry) {
+            if (entry.obj && entry.count > 0 && entry.obj->GetPlayable() &&
+                (entry.obj->Is(RE::FormType::Weapon) || entry.obj->Is(RE::FormType::Armor) || entry.obj->Is(RE::FormType::Ammo))) belongings.emplace_back(entry.obj, entry.count);
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        npc->containerObjects = nullptr;
+        npc->numContainerObjects = 0;
         npc->race = race;
         npc->originalRace = race;  // its face file is used only while the two match
         if (!params.value("keepSchedule", false)) MakeStayPut(npc);
@@ -1261,6 +1274,7 @@ namespace SkyrimMCP::NPCManager {
         if (face == "player") {
             auto data = FaceDataOf(playerBase);
             data.erase("voice");
+            data.erase("combatStyle");
             ApplyFaceData(npc, data);
         }
 
@@ -1274,6 +1288,7 @@ namespace SkyrimMCP::NPCManager {
 
         auto ref = player->PlaceObjectAtMe(npc, slot);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        for (const auto& [object, count] : belongings) ref->AddObjectToContainer(object, nullptr, count, nullptr);
         const float placedAt = PlaceInFront(ref.get(), player, std::clamp(params.value("distance", 160.0f), 60.0f, 600.0f));
 
         return {
