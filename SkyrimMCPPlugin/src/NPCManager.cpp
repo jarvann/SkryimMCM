@@ -864,6 +864,8 @@ namespace SkyrimMCP::NPCManager {
         auto* npc = actor ? actor->GetActorBase() : nullptr;
         if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
         ApplyFaceData(npc, params);
+        // "Face changed" on the record makes the game build the head from parts instead of loading its face file.
+        if (params.value("useFaceFile", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
         return FaceDataOf(npc);
     }
 
