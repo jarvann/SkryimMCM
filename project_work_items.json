@@ -5318,6 +5318,10 @@
             {
               "datetime": "2026-11-22T17:35",
               "note": "A spawned character's stay-around package let the sister stroll 450 units away in a few minutes: consider a smaller default radius or an option."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "A copy no longer carries the template's keys (the Key to Hjerim) or other unsaved container items: weapons, armour and ammo are given to the character itself."
             }
           ],
           "priority": "high",
@@ -5524,6 +5528,10 @@
             {
               "datetime": "2026-11-22T17:35",
               "note": "In game (Steam, Nether's Follower Framework): the player recruited the family sister with the normal dialogue. Teammate, ally, CurrentFollowerFaction 0, Framework Follower Faction and the framework's own state factions, and other follower mods' factions (Fading of Followers, Convenient Horses, Extra Storage); kept her face file, voice, family rank 4 and not marryable. Left: trade, outfit, wait, dismiss, reload and recruit again; a setup without the framework; SkyLink refusing to remove a following character (test on a throwaway, never a follower the player keeps)."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "With Nether's Follower Framework on Steam: recruit, trade, outfit, wait and dismiss all worked (Cory). After a full restart: own face, voice, rank, ally, what the player traded her still worn. A character following the player isn't removed (checked on a throwaway)."
             }
           ],
           "targetRelease": "1.6",
@@ -5882,6 +5890,10 @@
             {
               "datetime": "2026-11-22T16:55",
               "note": "ReadMessageBox, AnswerMessageBox (only the box that was read; with the player's go-ahead) and the dismissMessageBoxes setting for single-button boxes the player agreed to. The grass cache warning at each load on Steam blocked a test."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "Read in game: 'Grass cache files are missing…', one button (Ok). Cory allows closing it on the Steam game; its text is in that game's dismissMessageBoxes. Answering a box and the automatic close not seen yet."
             }
           ],
           "type": "",
@@ -5902,6 +5914,10 @@
             {
               "datetime": "2026-11-22T16:10",
               "note": "Cory chose the ESP. SkyLinkAI.esp: light flag only (0x200), 500 slots at fixed object IDs 0x800-0x9F3 and the faction at 0xA00. IDs are fixed because the writer numbered records by type: adding a faction would have moved every slot."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "SkyLinkAI.esp on Steam through Vortex and two restarts: slots, faction and faces work."
             }
           ],
           "type": "",
@@ -5992,6 +6008,10 @@
             {
               "datetime": "2026-11-22T17:45",
               "note": "Cory: the family faces look fine. Resemblance 0.5 stays the default."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "After a full restart all three keep their own face file, hair colour, voice and family rank."
             }
           ],
           "targetRelease": "",
@@ -6008,6 +6028,10 @@
             {
               "datetime": "2026-11-22T16:55",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T18:05",
+              "note": "In game: an existing name is refused, a new save confirmed by its file time."
             }
           ],
           "targetRelease": "",
