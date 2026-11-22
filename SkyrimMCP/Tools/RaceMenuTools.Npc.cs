@@ -216,7 +216,7 @@ public partial class RaceMenuTools
                 created = kv.Value?["created"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
             }),
             taken = all.Count,
-            note = all.Count == 0 ? "No slots taken." : "Ten slots of each sex; a free slot is needed for a lasting character.",
+            note = all.Count == 0 ? "No slots taken." : "25 slots of each race and sex; a free slot is needed for a lasting character.",
         };
     }
 

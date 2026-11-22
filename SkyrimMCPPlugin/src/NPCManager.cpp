@@ -585,7 +585,16 @@ namespace SkyrimMCP::NPCManager {
         // Their base forms belong to a plugin, so the game can keep changes to them and references to them in saves.
         constexpr std::string_view kSlotPlugin = "SkyLinkAI.esl";
         constexpr RE::FormID kFirstSlot = 0x800;
-        constexpr int kSlotsPerSex = 10;
+        // Slots by race (the game uses a face file only while an NPC's race is the one its record was made with), then sex, then
+        // number. The same order as scripts/build-slot-plugin.py; it must never change once released.
+        struct SlotRace { RE::FormID id; const char* name; };
+        constexpr SlotRace kSlotRaces[] = {
+            { 0x13741, "Breton" }, { 0x13746, "Nord" }, { 0x13744, "Imperial" }, { 0x13748, "Redguard" }, { 0x13743, "High Elf" },
+            { 0x13742, "Dark Elf" }, { 0x13749, "Wood Elf" }, { 0x13747, "Orc" }, { 0x13745, "Khajiit" }, { 0x13740, "Argonian" },
+        };
+        constexpr int kSlotRaceCount = static_cast<int>(std::size(kSlotRaces));
+        constexpr int kSlotsPerSex = 25;
+        constexpr int kSlotCount = kSlotRaceCount * 2 * kSlotsPerSex;
 
         // The plugin and object ID a template's FaceGen files are named by: its own, or the NPC it borrows its face from.
         json FaceSource(RE::TESNPC* npc) {
@@ -598,16 +607,18 @@ namespace SkyrimMCP::NPCManager {
         }
 
         std::string SlotDefaultName(int index) {
-            const bool female = index < kSlotsPerSex;
-            return std::format("SkyLink Character {}{:02d}", female ? 'F' : 'M', (female ? index : index - kSlotsPerSex) + 1);
+            const int inRace = index % (2 * kSlotsPerSex);
+            return std::format("SkyLink {} {}{:02d}", kSlotRaces[index / (2 * kSlotsPerSex)].name, inRace < kSlotsPerSex ? 'F' : 'M', inRace % kSlotsPerSex + 1);
         }
 
         int SlotIndex(const RE::TESForm* form) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data || !form) return -1;
-            for (int i = 0; i < kSlotsPerSex * 2; ++i)
-                if (data->LookupForm(kFirstSlot + i, kSlotPlugin) == form) return i;
-            return -1;
+            // By its plugin and local ID (asked for every NPC in the game when looking for a template).
+            auto* file = form->GetFile(0);
+            if (!file || file->GetFilename() != kSlotPlugin) return -1;
+            const int i = static_cast<int>(form->GetFormID() & 0xFFF) - static_cast<int>(kFirstSlot);
+            return i >= 0 && i < kSlotCount && data->LookupForm(kFirstSlot + i, kSlotPlugin) == form ? i : -1;
         }
 
         bool SlotPluginLoaded() {
@@ -616,10 +627,20 @@ namespace SkyrimMCP::NPCManager {
         }
 
         // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
-        RE::TESNPC* FreeSlot(bool female, int& index, const std::vector<int>& avoid) {
+        // The slots of that race and sex first. A race without its own (vampires, modded races) uses its parent race's or a Nord's,
+        // with the original race set on the slot (ReapplySlots).
+        RE::TESNPC* FreeSlot(RE::TESRace* race, bool female, int& index, const std::vector<int>& avoid) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data) return nullptr;
-            const int first = female ? 0 : kSlotsPerSex;
+            auto block = [](const RE::TESRace* r) {
+                for (int k = 0; r && k < kSlotRaceCount; ++k)
+                    if (kSlotRaces[k].id == r->GetFormID()) return k;
+                return -1;
+            };
+            int raceBlock = block(race);
+            if (raceBlock < 0 && race) raceBlock = block(race->armorParentRace);
+            if (raceBlock < 0) raceBlock = 1;
+            const int first = raceBlock * 2 * kSlotsPerSex + (female ? 0 : kSlotsPerSex);
             for (int i = first; i < first + kSlotsPerSex; ++i) {
                 // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
                 if (std::find(avoid.begin(), avoid.end(), i) != avoid.end()) continue;
@@ -811,7 +832,7 @@ namespace SkyrimMCP::NPCManager {
         for (auto& [key, entry] : registry.items()) {
             int slot = -1;
             try { slot = std::stoi(key); } catch (...) {}
-            if (slot < 0 || slot >= kSlotsPerSex * 2 || !entry.is_object()) continue;
+            if (slot < 0 || slot >= kSlotCount || !entry.is_object()) continue;
             auto* form = data->LookupForm(kFirstSlot + slot, kSlotPlugin);
             auto* npc = form ? form->As<RE::TESNPC>() : nullptr;
             if (!npc) continue;
@@ -956,7 +977,7 @@ namespace SkyrimMCP::NPCManager {
         std::vector<int> avoid;
         if (params.contains("avoidSlots") && params["avoidSlots"].is_array())
             for (const auto& a : params["avoidSlots"]) if (a.is_number_integer()) avoid.push_back(a.get<int>());
-        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex, avoid) : nullptr;
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(race, female, slotIndex, avoid) : nullptr;
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;

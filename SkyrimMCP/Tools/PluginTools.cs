@@ -379,7 +379,8 @@ public class PluginTools : ToolBase
                 var scan = PluginFile.Scan(s, name);
                 readBack = scan.Header;
                 s.Position = 0;
-                var recs = PluginFile.ReadRecords(s, name);
+                // Every record: the reader's default stops at 200, which failed the check of a 500-record plugin (2026-11-22).
+                var recs = PluginFile.ReadRecords(s, name, max: built.Assigned.Count + 1);
                 var e = PluginFile.CheckLight(scan);
                 var expected = built.Assigned.Select(a => a.FormId).OrderBy(x => x).ToList();
                 var found = recs.Select(r => Convert.ToUInt32(r["formId"]!.ToString()[2..], 16)).OrderBy(x => x).ToList();
@@ -390,7 +391,8 @@ public class PluginTools : ToolBase
                     header = new { version = scan.Header.VersionText, flags = $"0x{scan.Header.Flags:X}", numRecords = scan.Header.NumRecords, nextObjectId = $"0x{scan.Header.NextObjectId:X6}", masters = scan.Header.Masters, author = scan.Header.Author },
                     counted = new { records = scan.Records, groups = scan.Groups, added = scan.NewRecords, overrides = scan.Overrides },
                     light = new { verdict = e.Verdict, eligible = e.Eligible },
-                    records = recs,
+                    records = recs.Take(40).ToList(),
+                    recordsNotShown = Math.Max(0, recs.Count - 40),
                 };
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or IndexOutOfRangeException)
