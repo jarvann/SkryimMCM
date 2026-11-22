@@ -2,8 +2,8 @@
 # Run from PowerShell with VS 2022 (or Build Tools) C++ workload installed
 # Produces the release folder and SkyLinkAI-v<Version>.zip
 #
-# The zip's top level is SKSE\ (what goes inside Data), with no loose files beside it,
-# so MO2 and Vortex install it without asking where the files go. Docs go in
+# The zip is a FOMOD (INFRA-025): fomod\ (the installer), "00 Core" (required; what goes inside Data) and
+# "10 NPC slots" (SkyLinkAI.esl, optional and selected by default). MO2 and Vortex run it. Docs go in
 # SKSE\Plugins\SkyLinkAI\ so they don't land loose in the Data folder.
 
 param(
@@ -21,7 +21,9 @@ $env:VCPKG_ROOT = $VcpkgRoot
 
 # Clean output
 if (Test-Path $OutputDir) { Remove-Item -Recurse -Force $OutputDir }
-$Plugins = "$OutputDir\SKSE\Plugins"
+$Core = "$OutputDir\00 Core"
+$Slots = "$OutputDir\10 NPC slots"
+$Plugins = "$Core\SKSE\Plugins"
 $Docs = "$Plugins\SkyLinkAI"
 New-Item -ItemType Directory -Path "$Plugins\SkyLinkAI_Server" -Force | Out-Null
 New-Item -ItemType Directory -Path "$Plugins\SkyLinkAI_Launcher" -Force | Out-Null
@@ -43,6 +45,12 @@ if ($LASTEXITCODE -ne 0) { throw "Launcher build failed" }
 Write-Host "`n--- Packaging ---" -ForegroundColor Yellow
 Copy-Item "SkyrimMCPPlugin\output\SkyrimMCPPlugin.dll" "$Plugins\" -Force
 Copy-Item "SkyrimMCPPlugin\output\SkyLinkAI\SkyLinkLogic.dll" "$Plugins\SkyLinkAI\" -Force
+
+# FOMOD: the installer files, and the optional slot plugin.
+New-Item -ItemType Directory -Path "$OutputDir\fomod", $Slots -Force | Out-Null
+Copy-Item "fomod\ModuleConfig.xml" "$OutputDir\fomod\" -Force
+(Get-Content "fomod\info.xml" -Raw).Replace("@VERSION@", $Version) | Set-Content "$OutputDir\fomod\info.xml" -Encoding UTF8
+Copy-Item "plugin\SkyLinkAI.esl" "$Slots\" -Force
 
 # No .exe in the package: the server and launcher are run with "dotnet <dll>", and
 # SmartScreen and antivirus tools treat unsigned .exe files with more suspicion.
@@ -77,8 +85,10 @@ with Skyrim SE/AE's runtime engine via an SKSE plugin.
   morphs and overlays. Hair colour, skin tone and head parts work without it.
 
 ## Installation
-1. Install with Mod Organizer 2 or Vortex, or extract the zip into your
-   Skyrim Data folder (the zip starts at SKSE\)
+1. Install with Mod Organizer 2 or Vortex (the installer asks about the
+   optional NPC slots; keep them unless you don't want a plugin). Without a
+   mod manager: copy what's inside "00 Core" into your Skyrim Data folder, and
+   SkyLinkAI.esl from "10 NPC slots" if you want the slots
 2. Install .NET 10 Runtime if not already installed
 3. Configure Claude Desktop (see below)
 
@@ -154,20 +164,28 @@ and earlier.
 - Source: https://github.com/jarvann/SkryimMCM
 "@ | Set-Content "$Docs\README.txt"
 
-# Nothing may sit beside SKSE\ at the top of the package (MO2 then asks the player
-# where the Data folder is).
-$top = Get-ChildItem $OutputDir | Where-Object { $_.Name -ne "SKSE" }
-if ($top) { throw "Release has files outside SKSE\: $($top.Name -join ', ')" }
+# Exactly the FOMOD's folders at the top, and every folder the installer names must exist with files in it.
+$expected = @("fomod", "00 Core", "10 NPC slots")
+$top = Get-ChildItem $OutputDir | Where-Object { $expected -notcontains $_.Name }
+if ($top) { throw "Release has unexpected top-level items: $($top.Name -join ', ')" }
+[xml]$module = Get-Content "$OutputDir\fomod\ModuleConfig.xml" -Raw
+[xml]$null = Get-Content "$OutputDir\fomod\info.xml" -Raw
+foreach ($folder in $module.SelectNodes("//folder")) {
+    $path = Join-Path $OutputDir $folder.source
+    if (-not (Test-Path $path) -or -not (Get-ChildItem $path -Recurse -File)) { throw "FOMOD folder '$($folder.source)' is missing or empty" }
+}
+$coreTop = Get-ChildItem $Core | Where-Object { $_.Name -ne "SKSE" }
+if ($coreTop) { throw "Core has files outside SKSE\: $($coreTop.Name -join ', ')" }
 
 # Zip with Windows' tar (bsdtar), which writes "/" separators. Compress-Archive in
 # Windows PowerShell 5.1 writes "\", which some extractors turn into odd file names.
 $zip = Join-Path $PSScriptRoot "SkyLinkAI-v$Version.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
-& "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C $OutputDir SKSE
+& "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C $OutputDir "fomod" "00 Core" "10 NPC slots"
 if ($LASTEXITCODE -ne 0) { throw "Zip failed" }
 
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green
-Write-Host "Release folder: $OutputDir\ (top level: SKSE\)"
+Write-Host "Release folder: $OutputDir\ (FOMOD: fomod\, 00 Core\, 10 NPC slots\)"
 Write-Host "  SKSE Plugin: $Plugins\SkyrimMCPPlugin.dll"
 Write-Host "  Logic DLL:   $Plugins\SkyLinkAI\SkyLinkLogic.dll"
 Write-Host "  MCP Server:  $Plugins\SkyLinkAI_Server\"

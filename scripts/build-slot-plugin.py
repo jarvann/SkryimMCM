@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Build SkyLinkAI.esl (INFRA-024): blank NPC slots SkyLink fills from a blueprint, so spawned characters are saved normally.
+
+Runs SkyLink's own CreatePlugin through the deployed server (scripts/mcp-call.py), then copies the result to plugin/SkyLinkAI.esl,
+which the release ships as an optional FOMOD file. Slot editor IDs and order must never change once released: saves refer to them.
+
+    scripts/build-slot-plugin.py            # dry run: what would be written, and the round-trip check
+    scripts/build-slot-plugin.py --write    # write plugin/SkyLinkAI.esl
+"""
+import json
+import pathlib
+import shutil
+import subprocess
+import sys
+
+REPO = pathlib.Path(__file__).resolve().parent.parent
+SLOTS = 10  # of each sex
+BASE = {
+    "race": "Skyrim.esm|0x00013746",            # NordRace: SkyLink sets the real race when it fills the slot
+    "class": "Skyrim.esm|0x0001326B",           # Citizen
+    "packages": ["Skyrim.esm|0x000956B8"],      # DefaultSandboxCurrentLocation256: stays around where it stands
+    "unique": True,
+}
+VOICE = {True: "Skyrim.esm|0x00013ADD", False: "Skyrim.esm|0x00013AD2"}  # EvenToned: both have follower lines
+
+
+def records():
+    out = []
+    for female in (True, False):
+        for n in range(1, SLOTS + 1):
+            sex = "F" if female else "M"
+            out.append({"type": "NPC_", "editorId": f"SkyLinkSlot{sex}{n:02d}", "name": f"SkyLink Character {sex}{n:02d}",
+                        "female": female, "voice": VOICE[female], **BASE})
+    return out
+
+
+def main(write):
+    args = {"name": "SkyLinkAI.esl", "records": records(), "masters": ["Skyrim.esm"], "author": "SkyLink AI",
+            "description": "Blank NPC slots SkyLink AI fills from a blueprint (optional).", "light": True, "dryRun": not write}
+    run = subprocess.run([sys.executable, str(REPO / "scripts" / "mcp-call.py"), "create_plugin", json.dumps(args)],
+                         capture_output=True, text=True, timeout=180)
+    start = run.stdout.find("\n{")
+    reply = json.loads(run.stdout[start:]) if start >= 0 else {"error": run.stdout[-500:] + run.stderr[-500:]}
+    reply.pop("records", None)
+    print(json.dumps(reply, indent=1)[:4000])
+    if write:
+        built = pathlib.Path("/mnt/c/Users/cory/OneDrive/Documents/My Games/Skyrim Special Edition/SkyLinkAI/Build/SkyLinkAI/SkyLinkAI.esl")
+        target = REPO / "plugin" / "SkyLinkAI.esl"
+        target.parent.mkdir(exist_ok=True)
+        shutil.copyfile(built, target)
+        print(f"copied to {target} ({target.stat().st_size} bytes)")
+
+
+if __name__ == "__main__":
+    main("--write" in sys.argv)
