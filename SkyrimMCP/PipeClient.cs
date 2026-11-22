@@ -260,23 +260,8 @@ public class PipeClient : IPipeClient
         return value;
     }
 
-    static bool? ReadAlwaysActiveFromIni()
-    {
-        var docs = SkyLinkSettings.DocumentsFolder;
-        var ini = Path.Combine(docs, "Skyrim.ini");
-        if (!File.Exists(ini)) return null;
-        var section = "";
-        foreach (var raw in File.ReadLines(ini))
-        {
-            var line = raw.Trim();
-            if (line.StartsWith('[')) { section = line.Trim('[', ']'); continue; }
-            if (!section.Equals("General", StringComparison.OrdinalIgnoreCase)) continue;
-            var eq = line.IndexOf('=');
-            if (eq > 0 && line[..eq].Trim().Equals("bAlwaysActive", StringComparison.OrdinalIgnoreCase))
-                return line[(eq + 1)..].Trim() == "1";
-        }
-        return null;
-    }
+    static bool? ReadAlwaysActiveFromIni() =>
+        GameEnvironment.ReadValue(GameEnvironment.Ini("Skyrim.ini").Path, "General", "bAlwaysActive") is string v ? v == "1" : null;
 
     internal static string DescribeConnectFailure()
     {

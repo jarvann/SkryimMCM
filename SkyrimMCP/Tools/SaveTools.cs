@@ -17,24 +17,7 @@ public class SaveTools : ToolBase
     static readonly Regex CharacterIdInName = new(@"^(?:Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>The running game's save folder: Documents\My Games\&lt;game&gt;\ plus sLocalSavePath (default Saves\).</summary>
-    internal static string SaveFolder()
-    {
-        var docs = SkyLinkSettings.DocumentsFolder;
-        var local = "Saves\\";
-        foreach (var ini in new[] { "SkyrimCustom.ini", "Skyrim.ini" })
-        {
-            try
-            {
-                var file = Path.Combine(docs, ini);
-                if (!File.Exists(file)) continue;
-                var line = File.ReadLines(file).Select(l => l.Trim())
-                    .FirstOrDefault(l => l.StartsWith("sLocalSavePath", StringComparison.OrdinalIgnoreCase));
-                if (line?.Split('=', 2) is [_, var v] && v.Trim().Length > 0) { local = v.Trim(); break; }
-            }
-            catch (IOException) { }
-        }
-        return Path.Combine(docs, local.TrimEnd('\\', '/'));
-    }
+    internal static string SaveFolder() => GameEnvironment.Current().Saves;
 
     static bool IsSkyLinkSave(string file) =>
         file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
