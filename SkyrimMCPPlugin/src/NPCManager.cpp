@@ -789,7 +789,6 @@ namespace SkyrimMCP::NPCManager {
             if (d.contains("voice") && d["voice"].is_string()) {
                 if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
             }
-            if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
         }
     }
 
@@ -865,7 +864,10 @@ namespace SkyrimMCP::NPCManager {
         if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
         ApplyFaceData(npc, params);
         // "Face changed" on the record makes the game build the head from parts instead of loading its face file.
-        if (params.value("useFaceFile", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
+        if (SlotIndex(npc) >= 0) {
+            if (params.value("useFaceFile", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
+            else npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+        }
         return FaceDataOf(npc);
     }
 
