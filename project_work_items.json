@@ -5750,7 +5750,7 @@
         {
           "id": "FEAT-296",
           "type": "feature",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Track a character's mod dependencies while it's built, for the export's requirements list",
           "description": "Every form a character uses is recorded with the plugin it comes from as the character is built: race, head parts (hair, eyes, brows, scars), face sliders and overlays from RaceMenu extensions (ECE and others), skin and body (CBBE, 3BA...), outfit and weapons, voice type, spells and perks, packages, and the template NPC. At export (FEAT-283) this becomes a requirements list: each plugin mapped to its Nexus mod (name, mod ID, page link) from MO2's meta.ini or Vortex's mod records, with 'required' or 'optional' and why, ready to pick on Nexus's Requirements page, plus a README section. Flags anything from paid Creations or mods that don't allow dependents, and suggests swapping a form for a vanilla one when a dependency is heavy for one item.",
@@ -5762,6 +5762,10 @@
             {
               "datetime": "2026-11-22T11:50",
               "note": "From the spike: a spawned NPC picks up items distributed at runtime (SPID outfits, wigs). Track only what the character was given, and list runtime-distributed items separately."
+            },
+            {
+              "datetime": "2026-11-22T17:20",
+              "note": "CharacterRequirements on the sister: 4 required mods (the Northern Women template's parts and textures), 4 optional texture replacers, 136 perks, spells and factions from 65 plugins set aside as handed out by SPID and the like. Vortex names give the Nexus ID in two styles. Not tried on MO2."
             }
           ],
           "targetRelease": "1.6",
@@ -5972,6 +5976,10 @@
             {
               "datetime": "2026-11-22T16:55",
               "note": "In game (Steam): sister (Nord), brother (Imperial) and cousin (Wood Elf) spawned in their races' slots with ranks 4, 3, 15, ally, not marryable, the player's hair colour; the sister's voice has follower lines. Not saved (BUG-103): faces after a restart still to check."
+            },
+            {
+              "datetime": "2026-11-22T17:20",
+              "note": "Faces seen on Steam: own files loaded at once for slots the game knew, skin right in all three races, resemblance 0.5. A loaded face file carries its own hair tint, so the player's colour is written into the file (twice the colour). Left to check: after a restart, how alike they look to Cory, rank dialogue."
             }
           ],
           "targetRelease": "",
