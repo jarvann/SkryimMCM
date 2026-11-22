@@ -338,12 +338,14 @@ public class UtilityTools : ToolBase
     [McpServerTool]
     [Description("Save the game (with no name: SkyLink_<date-time>), .ess plus the .skse co-save; waits until the file exists. " +
         "This is the console save: the game itself doesn't keep the character ID in such a save, so SkyLink stores it in its " +
-        "co-save record and puts it back on load (BUG-091). For a save to keep with no mods involved, save from the game menu. " +
+        "co-save record and puts it back on load (BUG-091). An existing save is never replaced unless overwrite is true. For a save to keep with no mods involved, save from the game menu. " +
         "CAUTION: Always save before performing risky operations like quest stage manipulation or teleporting.")]
-    public async Task<object> SaveGame(string? saveName = null)
+    public async Task<object> SaveGame(string? saveName = null, bool overwrite = false)
     {
         if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
         saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
+        if (!overwrite && File.Exists(Path.Combine(SaveTools.SaveFolder(), saveName + ".ess")))
+            return new { success = false, error = $"A save called {saveName} already exists. Use another name, or overwrite: true to replace it (with the player's agreement)." };
 
         var (notStarted, sheathed) = await SaveTools.RequestSaveEx(_pipe, saveName);
         if (notStarted != null) return new { success = false, error = notStarted };

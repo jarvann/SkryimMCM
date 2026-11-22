@@ -71,6 +71,21 @@ public static class SlotRegistry
                 Path.Combine(root, "textures", "actors", "character", "facegendata", "facetint", "SkyLinkAI.esp", slotObjectId + ".dds"));
     }
 
+    /// <summary>
+    /// Whether the running game already knows this slot's face files: it lists the loose files as it starts, so ones added later aren't seen
+    /// until the next start, but a file it knows can be replaced (both seen on Steam, 2026-11-22).
+    /// </summary>
+    public static bool KnownToTheGame(string slotObjectId)
+    {
+        try
+        {
+            if (FaceFiles(slotObjectId) is not { } files || !File.Exists(files.mesh) || !File.Exists(files.tint)) return false;
+            using var game = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").FirstOrDefault();
+            return game != null && File.GetCreationTime(files.mesh) < game.StartTime && File.GetCreationTime(files.tint) < game.StartTime;
+        }
+        catch (Exception) { return false; }
+    }
+
     /// <summary>Writes both files for a slot, or neither. Null when done, else why not.</summary>
     public static string? WriteFace(string slotObjectId, byte[]? mesh, byte[]? tint, out List<string> written)
     {

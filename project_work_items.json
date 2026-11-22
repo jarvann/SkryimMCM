@@ -5861,11 +5861,15 @@
           "id": "FEAT-302",
           "title": "Read and answer message boxes",
           "description": "Cory, 2026-11-22: a message box after a load couldn't be dismissed. SkyLink sees MessageBoxMenu is open but can't read its text or press a button. Read the text and buttons; press one only with the player's go-ahead.",
-          "status": "not-started",
+          "status": "implemented-untested",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "ReadMessageBox, AnswerMessageBox (only the box that was read; with the player's go-ahead) and the dismissMessageBoxes setting for single-button boxes the player agreed to. The grass cache warning at each load on Steam blocked a test."
             }
           ],
           "type": "",
@@ -5964,6 +5968,42 @@
             {
               "datetime": "2026-11-22T16:10",
               "note": "Built, not tested in game: SkyLinkPlayerFamily faction with 32 ranks (plugin/family-ranks.json), SetFamilyRole and SpawnNpc family (sex follows the role, adults only, never marryable, ally of the player), FaceBlend (part of the player's difference from the plain head mesh on any face, with eyes, mouth, brows and hair moving along) and the player's hair colour. Left: dialogue for the ranks (FEAT-294), packages, age, skin and eye colour."
+            },
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "In game (Steam): sister (Nord), brother (Imperial) and cousin (Wood Elf) spawned in their races' slots with ranks 4, 3, 15, ally, not marryable, the player's hair colour; the sister's voice has follower lines. Not saved (BUG-103): faces after a restart still to check."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-103",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "SaveGame reported success when an older save of that name existed",
+          "description": "A save over an existing name that the game didn't write was reported as done (File.Exists), so three test characters were lost at a restart. Now the file must be newer than the request, and SaveGame refuses an existing name unless overwrite is true.",
+          "history": [
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "Added."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-305",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "New slot faces seen at once",
+          "description": "The game lists loose files as it starts: a face file added later isn't seen until the next start, one it already knows can be replaced. Ship or prepare small placeholder face files for the slots so a new character's face shows at once, with the player's faces kept safe from a reinstall.",
+          "history": [
+            {
+              "datetime": "2026-11-22T16:55",
+              "note": "Added."
             }
           ],
           "targetRelease": "",

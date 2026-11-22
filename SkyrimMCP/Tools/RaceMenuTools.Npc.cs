@@ -236,6 +236,7 @@ public partial class RaceMenuTools
                 (mesh, tint) = SlotRegistry.ReadFace(facePlugin, src["objectId"]!.ToString());
                 if (likeness > 0 && mesh != null) (mesh, likenessResult) = await FamilyFace(mesh, refId, likeness, spawned);
             }
+            var known = SlotRegistry.KnownToTheGame(objectId);
             var problem = SlotRegistry.WriteFace(objectId, mesh, tint, out var files);
             string? characterId = null;
             try { characterId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
@@ -248,7 +249,7 @@ public partial class RaceMenuTools
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
             });
             // A template's character shows the template's file until told otherwise; loose files a mod manager doesn't virtualize are seen at once.
-            if (problem == null && face == "template" && SkyLinkSettings.Mo2Instance().Item1 == null)
+            if (problem == null && known && face == "template" && SkyLinkSettings.Mo2Instance().Item1 == null)
             {
                 try
                 {
@@ -260,7 +261,7 @@ public partial class RaceMenuTools
                 catch (McpException) { }
             }
             slotFace = problem == null
-                ? new { written = files, resemblance = likenessResult, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = "Seen after the next game start." }
+                ? new { written = files, resemblance = likenessResult, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = known ? "Seen at once." : "Their own face is seen after the next game start" + (face == "template" ? "; until then they show the template's." : ".") }
                 : (object)new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
         }
         else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
