@@ -78,6 +78,12 @@ public static class SlotRegistry
         if (mesh is not { Length: > 0 }) return "the face mesh wasn't found";
         if (tint is not { Length: > 0 }) return "the face's skin texture (tint) wasn't found, and a mesh without it can crash the game";
         if (FaceFiles(slotObjectId) is not { } files) return "the game's Data folder wasn't found";
+        // The mesh names its skin texture by path: an exported head's temporary one, or the template's. Make it this slot's.
+        try
+        {
+            mesh = NifTextures.Replace(mesh, path => IsFaceTint(path) ? $@"data\textures\actors\character\facegendata\facetint\SkyLinkAI.esl\{slotObjectId}.dds" : null).Bytes;
+        }
+        catch (Exception ex) { return $"the face mesh couldn't be read ({ex.Message})"; }
         try
         {
             foreach (var (path, bytes) in new[] { (files.mesh, mesh), (files.tint, tint) })
@@ -94,6 +100,13 @@ public static class SlotRegistry
             written.Clear();
             return $"couldn't write the face files: {ex.Message}";
         }
+    }
+
+    // A FaceGen mesh's tint: RaceMenu's export names ...\SKSE\Plugins\CharGen\<name>.dds, the game's own ...\FaceTint\<plugin>\<id>.dds.
+    private static bool IsFaceTint(string path)
+    {
+        var p = path.Replace('/', '\\').ToLowerInvariant();
+        return p.Contains(@"\facegendata\facetint\") || p.Contains(@"\skse\plugins\chargen\");
     }
 
     /// <summary>The face files of an existing NPC, loose or packed: FaceGeom\plugin\id.nif and FaceTint\plugin\id.dds.</summary>
