@@ -5488,6 +5488,10 @@
             {
               "datetime": "2026-11-22T14:20",
               "note": "Slots per race (Cory's design): 10 playable races x 25 of each sex, 500 slots; SpawnNpc takes one of the character's race, a custom race uses its parent race's with originalRace set (Snow Elf in a High Elf slot still built its head: open). Six variants across a full restart on Steam: Breton and Nord with a template's face load their own face file; without the face-changed mark the head parts aren't saved and the file isn't used, so the mark stays."
+            },
+            {
+              "datetime": "2026-11-22T14:50",
+              "note": "Fresh clone of the player in one SpawnNpc call (slot 4, voice, OBody preset, all three head repairs) kept its face file, race, voice, hair colour and OBody preset after a full restart on Steam."
             }
           ],
           "targetRelease": "1.6",
@@ -5904,6 +5908,10 @@
             {
               "datetime": "2026-11-22T14:20",
               "note": "Added after measuring on Steam (two baselines 299 s and 298 s; converted 221 s)."
+            },
+            {
+              "datetime": "2026-11-22T14:50",
+              "note": "Reported as powerof3/SeasonsOfSkyrim#13."
             }
           ],
           "targetRelease": "",
@@ -5915,11 +5923,15 @@
           "status": "not-started",
           "priority": "",
           "title": "Player Family: relatives of the player character",
-          "description": "Cory, 2026-11-22: make an NPC from the player's character as another race (Arya the Breton as a Nord or Imperial) with similar looks, and a faction called Player Family with specific interactions; the faction may be baked into the ESL. Plan: the human races share a head mesh, so take the player's face, vary some features (related, not a twin) and write it to the other race's slots; FACT record in SkyLinkAI.esl with ranks (sister, mother, cousin), membership and relationship rank set live; dialogue conditioned on the faction through FEAT-294's topics and FEAT-293's voices; packages for living and travelling together.",
+          "description": "Cory, 2026-11-22: make an NPC from the player's character as another race (Arya the Breton as a Nord or Imperial) with similar looks, and a faction called Player Family with specific interactions; the faction may be baked into the ESL. Plan: the human races share a head mesh, so take the player's face, vary some features (related, not a twin) and write it to the other race's slots; FACT record in SkyLinkAI.esl with ranks Father, Mother, Brother, Sister (any race; only the human races share a head mesh, others need a face that keeps a family look), membership and relationship rank set live; dialogue conditioned on the faction through FEAT-294's topics and FEAT-293's voices; packages for living and travelling together.",
           "history": [
             {
               "datetime": "2026-11-22T14:40",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-22T14:50",
+              "note": "Cory: any race, not only human, and the faction's ranks are Father, Mother, Brother, Sister, with dialogue packages for each."
             }
           ],
           "targetRelease": "",
