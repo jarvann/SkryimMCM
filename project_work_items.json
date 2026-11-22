@@ -5456,6 +5456,10 @@
             {
               "datetime": "2026-11-21T16:30",
               "note": "Decided (Cory): SkyLinkAI.esl with NPC slots (and FEAT-293's carrier topics) ships as an optional FOMOD file, on by default. Without it, SpawnNpc makes a session-only preview from a runtime form. The lasting result is always the player's own ESP/ESL (FEAT-283), curated as their own mod. Built: spawn_npc / SpawnNpc (runtime copy of a plain NPC of the race and sex, face from the template or the player's via CharGen.SaveCharacter + LoadCharacter) and RemoveSpawnedNpc. Untested."
+            },
+            {
+              "datetime": "2026-11-22T12:20",
+              "note": "Built: PluginWriter writes NPC_ records (layout checked against Skyrim.esm 000C1AA3); plugin/SkyLinkAI.esl (10 female, 10 male slots, 6,322 bytes, light, round trip ok) from scripts/build-slot-plugin.py; SpawnNpc fills a free slot when the plugin is loaded and marks the base's changes for saves. Waiting on a save-and-reload test."
             }
           ],
           "targetRelease": "1.6",
@@ -5723,7 +5727,7 @@
         {
           "id": "INFRA-025",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "medium",
           "title": "FOMOD installer for the release zip",
           "description": "The release becomes a FOMOD (fomod\\ModuleConfig.xml and info.xml): SkyLink core (required) and SkyLinkAI.esl, NPC slots and voice carrier topics (optional, selected by default). build_release.ps1 builds the folders and checks the XML; manual install notes for players without a mod manager.",
@@ -5731,9 +5735,53 @@
             {
               "datetime": "2026-11-21T16:30",
               "note": "Cory: make it a FOMOD installer now; the NPC slot plugin is optional and defaults to on."
+            },
+            {
+              "datetime": "2026-11-22T12:20",
+              "note": "fomod/ModuleConfig.xml and info.xml, '00 Core' and '10 NPC slots'; build_release.ps1 checks the XML and folders. A 1.6.0-test zip built and its contents checked. Not yet installed through MO2 or Vortex."
             }
           ],
           "targetRelease": "1.6",
+          "dependsOn": []
+        }
+      ]
+    },
+    {
+      "phase": 19,
+      "name": "v1.7 — Other models and token care",
+      "priority": "medium",
+      "status": "planned",
+      "items": [
+        {
+          "id": "FEAT-297",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Test SkyLink with several AI models and clients",
+          "description": "A repeatable set of tasks run through different clients and models (Claude, Gemini CLI, Google Antigravity CLI, a local model through Ollama) recording whether the right tools were picked, calls needed, errors and tokens used; results per model with what to change in tool names and descriptions. Local models run on the CPU (GPU hidden) while the game needs the GPU, or with the game closed for tool-choice tests.",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:20",
+              "note": "Cory: testing multiple models as a 1.7 feature set. Antigravity CLI is installed for this; Ollama can be."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-298",
+          "type": "feature",
+          "status": "planned",
+          "priority": "medium",
+          "title": "Token care: warn before large replies and suggest ways to save tokens",
+          "description": "SkyLink estimates the size of a reply before sending it (inventory pages, long crash reports, full tool lists) and, when it would be large, says how big and offers a smaller version (count-only page, filter, summary) or asks whether to continue. A tool reports what SkyLink cost the current conversation (tool schemas plus replies) and recommends tricks: page=0 counts, filters, showImage=false, fewer tools. Also: a smaller tool set for models that struggle with 183 tools (the schemas alone are about 32,000 tokens).",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:20",
+              "note": "Cory: analyse the current AI using the MCP and recommend tricks for token management, or say when something might need a large token budget and ask permission to continue."
+            }
+          ],
+          "targetRelease": "1.7",
           "dependsOn": []
         }
       ]
@@ -6630,6 +6678,10 @@
       "buildsOn": "1.5 mod-building chain (FEAT-270..278) and 1.6's character export (FEAT-283)",
       "note": "Cory expects AI packages to be the hardest part.",
       "items": []
+    },
+    "1.7": {
+      "theme": "Other models and token care",
+      "note": "Cory, 2026-11-22: several models tested, token tips and large-budget warnings with permission. 2.1's 'build a mod from inside Skyrim' stays 2.1."
     }
   }
 }
