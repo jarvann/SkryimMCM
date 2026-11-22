@@ -53,8 +53,8 @@ public class CharacterTools : ToolBase
             var plugin = f["plugin"]?.ToString() ?? "";
             if (BaseGame.Contains(plugin, StringComparer.OrdinalIgnoreCase) || plugin.Equals("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase)) continue;
             if (IsCreation(plugin)) { creations.Add(plugin); continue; }
-            var required = f["need"]?.ToString() == "record";
-            Want(plugin, $"{f["kind"]}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", required);
+            var inRecord = f["need"]?.ToString() == "record";
+            Want(plugin, $"{f["kind"]}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", inRecord);
         }
 
         // The face file's own textures, and the physics settings its hair names.
