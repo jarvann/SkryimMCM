@@ -84,6 +84,45 @@ public class UtilityTools : ToolBase
     }
 
     [McpServerTool]
+    [Description("The message box on screen (FEAT-302): its text, its buttons and a boxId. Tell the player what it says and what the buttons are; " +
+        "answer it with AnswerMessageBox only as they say. Boxes the player asked to have closed are closed here and listed in 'dismissed'.")]
+    public async Task<object> ReadMessageBox()
+    {
+        var dismissed = await DismissKnownMessageBoxes();
+        var box = DeserializeResponse(await _pipe.SendRequestAsync("get_message_box"));
+        return new { box, dismissed = dismissed.Count == 0 ? null : dismissed };
+    }
+
+    [McpServerTool]
+    [Description("Press a button of the message box on screen (FEAT-302). Only with the player's go-ahead for this box and this button: the buttons " +
+        "can start quests, spend things or lock choices in. boxId: from ReadMessageBox (refused if another box is showing by then). button: " +
+        "its number, from 0. always: true remembers a box with a single button (OK) so SkyLink closes it by itself from now on, when the player asks for that.")]
+    public async Task<object> AnswerMessageBox(string boxId, int button, bool always = false)
+    {
+        var before = await _pipe.SendRequestAsync("get_message_box");
+        var text = before?["text"]?.ToString();
+        var single = (before?["buttons"] as JsonArray)?.Count == 1;
+        var answer = await _pipe.SendRequestAsync("answer_message_box", new JsonObject { ["boxId"] = boxId, ["button"] = button });
+        if (answer?["error"] != null) return DeserializeResponse(answer);
+        string? remembered = null;
+        if (always)
+        {
+            if (!single || text is not { Length: >= 8 } || before?["boxId"]?.ToString() != boxId) remembered = "Not remembered: only boxes with a single button and some text are closed by themselves.";
+            else
+            {
+                var piece = text.Length > 120 ? text[..120] : text;
+                var settings = SkyLinkSettings.Load();
+                var list = settings["dismissMessageBoxes"] as JsonArray ?? [];
+                if (!list.Any(x => x?.ToString() == piece)) list.Add(piece);
+                settings["dismissMessageBoxes"] = list.DeepClone();
+                SkyLinkSettings.Save(settings);
+                remembered = "From now on SkyLink closes this box by itself when it gets in the way. Remove it from dismissMessageBoxes with SetSkyLinkSetting to stop.";
+            }
+        }
+        return new { answer = DeserializeResponse(answer), remembered };
+    }
+
+    [McpServerTool]
     [Description("Reload the SKSE plugin's logic DLL (Data\\SKSE\\Plugins\\SkyLinkAI\\SkyLinkLogic.dll) from disk without restarting Skyrim. " +
         "The plugin also reloads automatically on the next call after a newer DLL is deployed, so this is mainly for forcing a reload " +
         "or confirming one. Use after build_plugin.ps1 -Deploy. Returns reloaded, previousBuilt, built, reloads and elapsedMs; " +

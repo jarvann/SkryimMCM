@@ -1,14 +1,50 @@
 #include "UIManager.h"
+#include "Helpers.h"
 
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
+#include <format>
+#include <functional>
 #include <string>
 
 namespace SkyrimMCP::UIManager {
 
     using json = nlohmann::json;
+
+    namespace {
+        // What is on screen and where it sits in the queue: another box, or the same text asked again, gets another ID.
+        std::string BoxId(const RE::MessageBoxData* data, const std::string& text) {
+            return std::format("{:08X}-{:X}", static_cast<std::uint32_t>(std::hash<std::string>{}(text)), reinterpret_cast<std::uintptr_t>(data) & 0xFFFFFFF);
+        }
+        std::string Utf8(const RE::BSString& s) { return Helpers::Utf8(s.c_str() ? s.c_str() : ""); }
+    }
+
+    json GetMessageBox() {
+        auto* ui = RE::UI::GetSingleton();
+        if (!ui || !ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME)) return {{"open", false}};
+        auto* data = RE::MessageBoxMenu::GetCurrentMessageBoxData();
+        if (!data) return {{"open", true}, {"readable", false}, {"note", "A message box is open but its text can't be read (a mod may draw its own)"}};
+        json buttons = json::array();
+        for (const auto& b : data->buttonText) buttons.push_back(Utf8(b));
+        const auto text = Utf8(data->bodyText);
+        return {{"open", true}, {"readable", true}, {"boxId", BoxId(data, text)}, {"text", text}, {"buttons", buttons},
+                {"cancelButton", data->cancelButtonIndex}, {"waiting", RE::MessageBoxMenu::GetQueueSize()}};
+    }
+
+    json AnswerMessageBox(const std::string& boxId, int button) {
+        auto* ui = RE::UI::GetSingleton();
+        auto* data = ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME) ? RE::MessageBoxMenu::GetCurrentMessageBoxData() : nullptr;
+        if (!data) return {{"error", "No message box is open"}};
+        const auto text = Utf8(data->bodyText);
+        if (BoxId(data, text) != boxId) return {{"error", "The box on screen isn't the one that was read: read it again before answering"}, {"now", text}};
+        const int count = static_cast<int>(data->buttonText.size());
+        if (button < 0 || button >= count) return {{"error", std::format("Button {} doesn't exist (0 to {})", button, count - 1)}};
+        const auto label = Utf8(data->buttonText[button]);
+        RE::MessageBoxMenu::SelectOption(button);
+        return {{"answered", label}, {"button", button}, {"text", text}};
+    }
 
     json GetMenuState() {
         auto* ui = RE::UI::GetSingleton();

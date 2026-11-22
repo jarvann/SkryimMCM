@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
 #include "Studio.h"
+#include "UIManager.h"
 #include <thread>
 #include "FaceState.h"
 #include "ScriptStats.h"
@@ -171,6 +172,12 @@ namespace SkyrimMCP::Protocol {
         noParam("toggle_immortal_mode", []() { return GameInterface::ToggleImmortalMode(); });
         noParam("get_combat_state", []() { return GameInterface::GetCombatState(); });
         noParam("get_menu_state", []() { return GameInterface::GetMenuState(); });
+        noParam("get_message_box", []() { return UIManager::GetMessageBox(); });
+        registry["answer_message_box"] = [](const std::string& id, const json& params) {
+            std::string box = params.value("boxId", std::string());
+            int button = params.value("button", -1);
+            return GameThread(id, [box, button]() { return UIManager::AnswerMessageBox(box, button); });
+        };
         noParam("get_game_safety", []() { return GameInterface::GetGameSafety(); });
         noParam("get_session_state", []() { return UtilityManager::GetSessionState(); });
         noParam("quit_game", []() { return UtilityManager::QuitGame(); });
