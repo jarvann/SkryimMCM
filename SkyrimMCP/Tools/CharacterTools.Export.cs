@@ -79,6 +79,9 @@ public partial class CharacterTools
         });
         if (hair is { } hc) records.Add(new NewColour { EditorId = id + "HairColour", ObjectId = 0x801, Red = hc.Item1, Green = hc.Item2, Blue = hc.Item3 });
         if (worn.Count > 0) records.Add(new NewOutfit { EditorId = id + "Outfit", ObjectId = 0x802, Items = worn });
+        // The recruit line asks for an ally: the relationship is written, as vanilla does for housecarls (an exported one had none).
+        if (isFollower || entry["family"]?.GetValue<string?>() != null)
+            records.Add(new NewPlayerRelationship { EditorId = id + "PlayerRelationship", ObjectId = 0x804, Npc = id, Rank = 1 });
         // Starts with the game and keeps running: the character is made once, at the marker.
         records.Add(new NewQuest
         {

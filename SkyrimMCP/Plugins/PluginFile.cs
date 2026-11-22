@@ -481,6 +481,14 @@ public sealed class NewColour : NewRecord
     public byte Blue { get; init; }
 }
 
+/// <summary>How an NPC starts out towards the player (rank 1 ally, as vanilla housecarls; 3 friend).</summary>
+public sealed class NewPlayerRelationship : NewRecord
+{
+    public override string Type => "RELA";
+    public required string Npc { get; init; }
+    public ushort Rank { get; init; } = 1;
+}
+
 public sealed class NewOutfit : NewRecord
 {
     public override string Type => "OTFT";
@@ -704,6 +712,15 @@ public static class PluginWriter
                         Field(fields, "EDID", ZString(colour.EditorId));
                         Field(fields, "CNAM", [colour.Red, colour.Green, colour.Blue, 0]);
                         Field(fields, "FNAM", new byte[4]);
+                        break;
+                    case NewPlayerRelationship rela:
+                        // As HousecarlWhiterunPlayerRelationship (00103AED): the NPC, the player, the rank, no association.
+                        Field(fields, "EDID", ZString(rela.EditorId));
+                        var relaData = new byte[16];
+                        BinaryPrimitives.WriteUInt32LittleEndian(relaData, ResolveObject(rela.Npc, $"{rela.EditorId}.npc"));
+                        BinaryPrimitives.WriteUInt32LittleEndian(relaData.AsSpan(4), ResolveObject("Skyrim.esm|0x00000007", $"{rela.EditorId}.player"));
+                        BinaryPrimitives.WriteUInt16LittleEndian(relaData.AsSpan(8), rela.Rank);
+                        Field(fields, "DATA", relaData);
                         break;
                     case NewOutfit outfit:
                         Field(fields, "EDID", ZString(outfit.EditorId));
