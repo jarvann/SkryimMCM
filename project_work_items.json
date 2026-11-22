@@ -5458,6 +5458,10 @@
             {
               "datetime": "2026-11-22T11:50",
               "note": "CharGen.ExportHead works on Steam: 4,096x4,096 uncompressed tint DDS (67 MB) and a 4.9 MB NIF in SKSE\\Plugins\\CharGen. The NIF is kept for inspection outside the game folder."
+            },
+            {
+              "datetime": "2026-11-22T18:40",
+              "note": "The RaceMenu path (exported head, HeadRepair, tint shrink) writes the face files; an own writer without RaceMenu is left."
             }
           ],
           "targetRelease": "1.6",
@@ -5542,7 +5546,7 @@
         {
           "id": "FEAT-283",
           "type": "feature",
-          "status": "planned",
+          "status": "in-progress",
           "priority": "high",
           "title": "Export a character as a standalone follower mod",
           "description": "Turn a spawned NPC or follower into a real mod: an NPC record and a placement in a light plugin (FEAT-273), the FaceGen files (FEAT-281), any RaceMenu overlays baked or listed as requirements, masters checked (FEAT-274), installed through the mod manager (FEAT-275) and packaged as a zip the player could share (FEAT-270's packaging). Then restart or main-menu reload (FEAT-278 / FEAT-277), load the save and check the NPC from the plugin replaced the runtime preview. This closes the loop and is the bridge to 2.1.",
@@ -5554,6 +5558,10 @@
             {
               "datetime": "2026-11-21T16:30",
               "note": "Cory: the goal is that the player exports into their own ESP/ESL to curate as a dedicated mod. Requirements come from FEAT-296."
+            },
+            {
+              "datetime": "2026-11-22T18:40",
+              "note": "ExportCharacter writes a standalone mod: light plugin (NPC with face, voice, follower fields; own hair colour CLFM; worn outfit OTFT; a start-up quest that creates the character at a lasting base game marker, no script and no cell edit), FaceGeom and a 1024 tint with mipmaps, README with the needed mods and whose meshes the face file holds, zip. Checked file by file on the sister (1,136 byte plugin, 3 masters, no SkyLinkAI.esp, 3.4 MB zip). Not installed or seen in game: does the quest create her, does her face load, follower dialogue from the exported record."
             }
           ],
           "targetRelease": "1.6",
