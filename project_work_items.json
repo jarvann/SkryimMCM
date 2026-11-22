@@ -5302,6 +5302,10 @@
             {
               "datetime": "2026-11-22T12:30",
               "note": "Slots are global to the game folder (the face files sit in Data), so a slot stays reserved through a registry file until RemoveSpawnedNpc, whatever save is loaded."
+            },
+            {
+              "datetime": "2026-11-22T13:20",
+              "note": "Template copies brought the template's AI schedule, job factions and crime faction (Madena's copy walked home to Dawnstar): a spawn now stays near where it stands and belongs to no faction unless keepSchedule is set. A named template gives race and sex."
             }
           ],
           "priority": "high",
@@ -5448,7 +5452,7 @@
         {
           "id": "INFRA-024",
           "type": "infrastructure",
-          "status": "in-progress",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "Runtime NPC base creation",
           "description": "Create a new NPC base form at runtime by copying a template (race and sex matching the blueprint) through the form factory, then set its face data, head parts, tints, skills, perks, spells, factions and outfit from the blueprint. Runtime forms aren't kept in saves, so SkyLink records them in its co-save and recreates them on load until the character is exported as a plugin (FEAT-283). Host-side form allocation, reusable later by the runtime spell and enchantment creators (FEAT-126/127, 2.0).",
@@ -5468,6 +5472,10 @@
             {
               "datetime": "2026-11-22T12:30",
               "note": "GOG vanilla (no RaceMenu) slot test: SkyLinkAI.esl loads (FE041), SpawnNpc uses a slot, and after save, reload and a full quit and relaunch the character keeps name, race, sex, class, outfit and head parts. The face fails (dark face): faceNPC, which points at the template, isn't saved. Fix proven by hand: the slot's own FaceGeom NIF and FaceTint DDS copied from the template's (from the BSAs) at facegeom\\SkyLinkAI.esl\\0000080A.nif and facetint\\...dds: full face after a restart, stable over four camera passes. With only the NIF, the game crashed (0xC0000005) as soon as the camera framed him: both files or neither. Default template picker fixed (it chose the Headless Horseman)."
+            },
+            {
+              "datetime": "2026-11-22T13:20",
+              "note": "GOG vanilla: SkyLink now writes both slot face files itself (mesh and tint read from loose files or the base game's archives, into MO2's overwrite) and reserves the slot in slots.json. Two characters (a Nord man, a Breton destruction mage copied from Madena) keep name, race, class, level, outfit and face after a full quit and relaunch, no dark face, no crash. Left: RaceMenu faces in a slot (Steam), slot reuse and removal, a full registry."
             }
           ],
           "targetRelease": "1.6",
@@ -5772,7 +5780,7 @@
         {
           "id": "INFRA-027",
           "type": "infrastructure",
-          "status": "planned",
+          "status": "implemented-untested",
           "priority": "high",
           "title": "GetGameEnvironment: one place that knows the running game's folders, INIs and versions",
           "description": "Everything SkyLink reads or writes by folder comes from one object decided only by the running game: store (Steam, GOG, VR), game version, exe folder, documents folder, saves folder (sLocalSavePath and MO2 profile saves), INI files in use (Skyrim.ini, SkyrimPrefs.ini, SkyrimCustom.ini, MO2 profile copies when local settings are on) and plugins.txt, SKSE log folder, crash log and dump folders, MO2 instance and profile, SKSE version and runtime. Reported in CheckConnection beside the SkyLink, SKSE and Address Library versions, and by its own tool; every tool uses it (replaces the separate folder guesses).",
@@ -5780,6 +5788,10 @@
             {
               "datetime": "2026-11-22T12:30",
               "note": "Cory: 'the mcp server should report back where save games and ini files and things like that are based solely on the version of the game running. Should work like the check for version of Skylink/SKSE'. Third bug of the kind (BUG-088, 095, 097, 101)."
+            },
+            {
+              "datetime": "2026-11-22T13:20",
+              "note": "Built: GameEnvironment and GetGameEnvironment; CheckConnection's environment. Paths audited and moved to it (saves, INIs, notes, meshes, configs, LOOT list, plugins.txt, crash and SkyLink folders); the running process decides before anything set by hand. Checked on GOG with a fresh server and on Steam with no game running."
             }
           ],
           "targetRelease": "1.6",
