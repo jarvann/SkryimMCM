@@ -466,6 +466,40 @@ public sealed class NewQuest : NewRecord
     public List<NewScript> Scripts { get; init; } = [];
 }
 
+/// <summary>
+/// An NPC (1.6, INFRA-024: SkyLink's NPC slots and the player's own exported characters). References are "Plugin.esm|0x00000014"
+/// or the editor ID of another record in the plugin.
+/// </summary>
+public sealed class NewNpc : NewRecord
+{
+    public override string Type => "NPC_";
+    public string? Name { get; init; }
+    public bool Female { get; init; }
+    public bool Unique { get; init; } = true;
+    public bool Essential { get; init; }
+    public bool Protected { get; init; }
+    public required string Race { get; init; }
+    public string? Voice { get; init; }
+    public string? Class { get; init; }
+    public string? Outfit { get; init; }
+    public string? CombatStyle { get; init; }
+    public List<string> Packages { get; init; } = [];
+    public List<(string Ref, sbyte Rank)> Factions { get; init; } = [];
+    public List<string> HeadParts { get; init; } = [];
+    public ushort Level { get; init; } = 1;
+    public float Height { get; init; } = 1f;
+    public float Weight { get; init; } = 50f;
+
+    internal IEnumerable<string> References()
+    {
+        yield return Race;
+        foreach (var r in new[] { Voice, Class, Outfit, CombatStyle }) if (!string.IsNullOrWhiteSpace(r)) yield return r;
+        foreach (var r in Packages) yield return r;
+        foreach (var (r, _) in Factions) yield return r;
+        foreach (var r in HeadParts) yield return r;
+    }
+}
+
 public sealed record NewScript(string Name, List<NewProperty> Properties);
 
 /// <summary>Kind: int, float, bool, string or object. An object value is "Plugin.esm|0x00000014", or an editor ID made in the same call.</summary>
@@ -530,7 +564,11 @@ public static class PluginWriter
             foreach (var p in q.Scripts.SelectMany(s => s.Properties).Where(p => p.Kind == "object"))
                 if (p.Value?.ToString() is string v && ObjectRef.Match(v) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
                     AddMaster(m.Groups["plugin"].Value);
-        if (masters.Count > asked) notes.Add($"Added as masters because script properties point at them: {string.Join(", ", masters.Skip(asked))}.");
+        foreach (var npc in spec.Records.OfType<NewNpc>())
+            foreach (var r in npc.References())
+                if (ObjectRef.Match(r) is { Success: true } m && !IsSelf(m.Groups["plugin"].Value, spec.Name))
+                    AddMaster(m.Groups["plugin"].Value);
+        if (masters.Count > asked) notes.Add($"Added as masters because records or script properties point at them: {string.Join(", ", masters.Skip(asked))}.");
         if (loadOrderIndex != null)
         {
             var sorted = masters.Select((m, i) => (m, i, at: loadOrderIndex(m))).OrderBy(t => t.at ?? int.MaxValue).ThenBy(t => t.i).Select(t => t.m).ToList();
@@ -602,6 +640,9 @@ public static class PluginWriter
                         Field(fields, "NEXT", []);
                         Field(fields, "ANAM", new byte[4]);
                         break;
+                    case NewNpc npc:
+                        WriteNpc(fields, npc, ResolveObject);
+                        break;
                     default: throw new ArgumentException($"Record type {r.Type} isn't supported yet.");
                 }
                 Record(g, r.Type, flags, ids[r.EditorId], fields.ToArray());
@@ -636,6 +677,64 @@ public static class PluginWriter
             Bytes = output.ToArray(), Masters = masters, Assigned = assigned, Version = version, NextObjectId = next,
             NumRecords = spec.Records.Count + groups, Flags = fileFlags, Notes = notes,
         };
+    }
+
+    // Field order and sizes as Skyrim.esm's own NPC records have them (Northwatch Prisoner, 000C1AA3, read 2026-11-22).
+    static void WriteNpc(Stream f, NewNpc n, Func<string, string, uint> resolve)
+    {
+        uint Ref(string text, string what) => resolve(text, $"{n.EditorId}.{what}");
+        static byte[] Id(uint id) { var b = new byte[4]; BinaryPrimitives.WriteUInt32LittleEndian(b, id); return b; }
+
+        Field(f, "EDID", ZString(n.EditorId));
+        Field(f, "OBND", new byte[12]);
+
+        var acbs = new byte[24];
+        uint flags = 0x10;                       // auto-calculated stats
+        if (n.Female) flags |= 0x1;
+        if (n.Essential) flags |= 0x2;
+        if (n.Unique) flags |= 0x20;
+        if (n.Protected) flags |= 0x800;
+        BinaryPrimitives.WriteUInt32LittleEndian(acbs, flags);
+        BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(8), Math.Max(n.Level, (ushort)1));
+        BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(14), 100);   // speed
+        BinaryPrimitives.WriteUInt16LittleEndian(acbs.AsSpan(16), 35);    // disposition base
+        Field(f, "ACBS", acbs);
+
+        foreach (var (faction, rank) in n.Factions)
+        {
+            var snam = new byte[8];
+            BinaryPrimitives.WriteUInt32LittleEndian(snam, Ref(faction, "factions"));
+            snam[4] = unchecked((byte)rank);
+            Field(f, "SNAM", snam);
+        }
+        if (!string.IsNullOrWhiteSpace(n.Voice)) Field(f, "VTCK", Id(Ref(n.Voice, "voice")));
+        Field(f, "RNAM", Id(Ref(n.Race, "race")));
+
+        var aidt = new byte[20];
+        aidt[1] = 2;    // confidence: average
+        aidt[2] = 50;   // energy
+        aidt[3] = 3;    // morality: no crime
+        Field(f, "AIDT", aidt);
+        foreach (var package in n.Packages) Field(f, "PKID", Id(Ref(package, "packages")));
+        if (!string.IsNullOrWhiteSpace(n.Class)) Field(f, "CNAM", Id(Ref(n.Class, "class")));
+        if (!string.IsNullOrEmpty(n.Name)) Field(f, "FULL", ZString(n.Name));
+        Field(f, "DATA", []);
+
+        var dnam = new byte[52];
+        for (var i = 0; i < 18; i++) dnam[i] = 15;                                    // skill base
+        BinaryPrimitives.WriteUInt16LittleEndian(dnam.AsSpan(36), 50);                // calculated health, magicka, stamina
+        BinaryPrimitives.WriteUInt16LittleEndian(dnam.AsSpan(38), 50);
+        BinaryPrimitives.WriteUInt16LittleEndian(dnam.AsSpan(40), 50);
+        Field(f, "DNAM", dnam);
+
+        foreach (var part in n.HeadParts) Field(f, "PNAM", Id(Ref(part, "headParts")));
+        if (!string.IsNullOrWhiteSpace(n.CombatStyle)) Field(f, "ZNAM", Id(Ref(n.CombatStyle, "combatStyle")));
+        Field(f, "NAM5", [0xFF, 0x00]);
+        Field(f, "NAM6", Float(n.Height));
+        Field(f, "NAM7", Float(n.Weight));
+        Field(f, "NAM8", Id(1));                                                      // sound level: normal
+        if (!string.IsNullOrWhiteSpace(n.Outfit)) Field(f, "DOFT", Id(Ref(n.Outfit, "outfit")));
+        Field(f, "QNAM", [.. Float(0.5f), .. Float(0.5f), .. Float(0.5f)]);
     }
 
     static bool IsSelf(string plugin, string self) =>
@@ -776,7 +875,7 @@ public static class PluginWriter
     }
 
     /// <summary>
-    /// Parses the records argument: a JSON array (or {"records": [...]}) of objects with "type" (GLOB or QUST; "record" also
+    /// Parses the records argument: a JSON array (or {"records": [...]}) of objects with "type" (GLOB, QUST or NPC_; "record" also
     /// accepted) and "editorId". Throws ArgumentException naming the bad entry.
     /// </summary>
     public static List<NewRecord> ParseRecords(JsonNode? json)
@@ -830,7 +929,24 @@ public static class PluginWriter
                         Priority = (byte)priority, Scripts = scripts,
                     });
                     break;
-                default: throw new ArgumentException($"{where}: type '{kind}' isn't supported yet (GLOB, QUST).");
+                case "NPC_" or "NPC":
+                    List<string> Refs(string k) => (o[k] as JsonArray ?? []).Select(x => x?.ToString() ?? "").Where(x => x.Length > 0).ToList();
+                    list.Add(new NewNpc
+                    {
+                        EditorId = edid, Name = Str("name"), Female = Flag("female"), Essential = Flag("essential"), Protected = Flag("protected"),
+                        Unique = o["unique"] == null || Flag("unique"),
+                        Race = Str("race") ?? throw new ArgumentException($"{where}: an NPC needs a race (\"Skyrim.esm|0x00013746\")."),
+                        Voice = Str("voice"), Class = Str("class"), Outfit = Str("outfit"), CombatStyle = Str("combatStyle"),
+                        Packages = Refs("packages"), HeadParts = Refs("headParts"),
+                        Factions = (o["factions"] as JsonArray ?? []).Select(x => x is JsonObject fo
+                            ? (fo["faction"]?.ToString() ?? throw new ArgumentException($"{where}: each faction needs a \"faction\"."), (sbyte)(fo["rank"] == null ? 0 : Number(fo["rank"], where)))
+                            : (x?.ToString() ?? "", (sbyte)0)).ToList(),
+                        Level = (ushort)(o["level"] == null ? 1 : Math.Clamp(Number(o["level"], where), 1, 1000)),
+                        Height = o["height"] == null ? 1f : (float)Number(o["height"], where),
+                        Weight = o["weight"] == null ? 50f : (float)Number(o["weight"], where),
+                    });
+                    break;
+                default: throw new ArgumentException($"{where}: type '{kind}' isn't supported yet (GLOB, QUST, NPC_).");
             }
         }
         return list;
