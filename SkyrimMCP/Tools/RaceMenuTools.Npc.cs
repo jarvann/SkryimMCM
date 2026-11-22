@@ -71,11 +71,12 @@ public partial class RaceMenuTools
         "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
         "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
-        "asked to marry, adults only. With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
+        "without a role lists them), any race, adults only, never marryable. With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, string? family = null, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -85,11 +86,30 @@ public partial class RaceMenuTools
         var dress = string.IsNullOrWhiteSpace(outfit) ? face : outfit.Trim().ToLowerInvariant();
         if (dress is not ("template" or "player")) return new { error = "outfit must be 'template' or 'player'" };
 
+        // A role such as Sister says the sex; the plugin checks it against the character's.
+        string? familyRole = null;
+        if (!string.IsNullOrWhiteSpace(family))
+        {
+            JsonNode? roles;
+            try { roles = await _pipe.SendRequestAsync("family_roles"); }
+            catch (McpException ex) { return new { error = ex.Message }; }
+            var match = (roles?["roles"] as JsonArray ?? []).FirstOrDefault(r => string.Equals(r?["role"]?.ToString(), family.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (match == null) return new { error = $"No family role called '{family}'.", roles = (roles?["roles"] as JsonArray ?? []).Select(r => r?["role"]?.ToString()) };
+            familyRole = match["role"]!.ToString();
+            if (match["sex"]?.ToString() is string roleSex)
+            {
+                if (female is bool asked && asked != (roleSex == "female")) return new { error = $"{familyRole} is a {roleSex} role." };
+                female = roleSex == "female";
+            }
+            marryable = false;
+        }
+
         if (dryRun)
             return new
             {
                 dryRun = true,
                 name,
+                family = familyRole,
                 race = race ?? (template != null ? "the template's race" : "the player's race"),
                 sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
@@ -158,6 +178,13 @@ public partial class RaceMenuTools
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
         }
 
+        object? familyResult = null;
+        if (familyRole != null && refId != null)
+        {
+            try { familyResult = (await SetFamily(refId, familyRole)).Reply; }
+            catch (McpException ex) { familyResult = new { error = ex.Message, note = "Spawned, but not in the family." }; }
+        }
+
         object? outfitResult = null;
         if (dress == "player" && refId != null)
         {
@@ -198,7 +225,7 @@ public partial class RaceMenuTools
             SlotRegistry.Reserve(slotIndex, new JsonObject
             {
                 ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
-                ["face"] = face, ["template"] = spawned["template"]?.ToString(),
+                ["face"] = face, ["family"] = familyRole, ["template"] = spawned["template"]?.ToString(),
                 // What saves don't keep: the plugin puts it back at start-up and after loads (ReapplySlots).
                 ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
@@ -214,6 +241,7 @@ public partial class RaceMenuTools
             spawned = DeserializeResponse(spawned),
             face = faceResult,
             voice = voiceResult,
+            family = familyResult,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,
@@ -223,6 +251,41 @@ public partial class RaceMenuTools
                   (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esp is in use)." : " (SkyLinkAI.esp, the optional plugin with NPC slots, isn't in the load order).") +
                   " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
         };
+    }
+
+    private async Task<(bool Ok, object Reply)> SetFamily(string refId, string role)
+    {
+        var set = await _pipe.SendRequestAsync("set_family", new JsonObject { ["refId"] = refId, ["role"] = role });
+        if (set?["error"] != null) return (false, DeserializeResponse(set));
+        string? liking = null;
+        try
+        {
+            // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId,
+                ["args"] = new JsonArray("00000014", set?["role"] is JsonValue ? 3 : 0),
+            });
+        }
+        catch (McpException ex) { liking = "The relationship rank wasn't set: " + ex.Message; }
+        return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
+    }
+
+    [McpServerTool]
+    [Description("Player Family (FEAT-304): give a spawned character a role in the player's family (a rank of the Player Family faction in " +
+        "SkyLinkAI.esp), so dialogue and other mods can ask for it. Without role: the list of roles (Father, Mother, Brother, Sister, Son, " +
+        "Daughter, Cousin, step and in-law roles and more). role 'none' takes the character out. Any race, adults only; family members can't be married.")]
+    public async Task<object> SetFamilyRole(string? refId = null, string? role = null)
+    {
+        if (string.IsNullOrWhiteSpace(role) || string.IsNullOrWhiteSpace(refId)) return DeserializeResponse(await _pipe.SendRequestAsync("family_roles"));
+        var (ok, reply) = await SetFamily(refId.Trim(), role.Trim());
+        if (ok && SlotRegistry.SlotForRef(refId.Trim()) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
+        {
+            var copy = entry.DeepClone().AsObject();
+            copy["family"] = role.Trim().Equals("none", StringComparison.OrdinalIgnoreCase) ? null : role.Trim();
+            SlotRegistry.Reserve(slot, copy);
+        }
+        return reply;
     }
 
     /// <summary>The head RaceMenu exported for a preset (mesh and tint), then deletes the two big files.</summary>
@@ -263,7 +326,7 @@ public partial class RaceMenuTools
         {
             registry = all.Select(kv => new
             {
-                slot = kv.Key, name = kv.Value?["name"]?.ToString(), face = kv.Value?["face"]?.ToString(), characterId = kv.Value?["characterId"]?.ToString(),
+                slot = kv.Key, name = kv.Value?["name"]?.ToString(), family = kv.Value?["family"]?.ToString(), face = kv.Value?["face"]?.ToString(), characterId = kv.Value?["characterId"]?.ToString(),
                 created = kv.Value?["created"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
             }),
             taken = all.Count,

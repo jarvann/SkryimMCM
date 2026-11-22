@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -946,6 +947,81 @@ namespace SkyrimMCP::NPCManager {
             result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
         }
         return result;
+    }
+
+    namespace {
+        constexpr RE::FormID kFamilyFaction = 0xA00;
+        constexpr RE::FormID kMarriageFaction = 0x00019809;  // PotentialMarriageFaction
+
+        RE::TESFaction* FamilyFaction() {
+            auto* data = RE::TESDataHandler::GetSingleton();
+            return data ? data->LookupForm<RE::TESFaction>(kFamilyFaction, kSlotPlugin) : nullptr;
+        }
+        std::string Lower(std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return s;
+        }
+        // Rank titles in rank order (the plugin numbers them from 0 without gaps): male title, female title.
+        std::vector<std::pair<std::string, std::string>> FamilyTitles(RE::TESFaction* faction) {
+            std::vector<std::pair<std::string, std::string>> titles;
+            for (auto* rank : faction->rankData) {
+                if (rank) titles.emplace_back(rank->maleRankTitle.c_str() ? rank->maleRankTitle.c_str() : "", rank->femaleRankTitle.c_str() ? rank->femaleRankTitle.c_str() : "");
+            }
+            return titles;
+        }
+    }
+
+    json FamilyRoles() {
+        auto* faction = FamilyFaction();
+        if (!faction) return {{"error", "The Player Family faction isn't in the game: SkyLinkAI.esp (the optional NPC plugin) isn't in the load order"}};
+        json roles = json::array();
+        int rank = 0;
+        for (const auto& [male, female] : FamilyTitles(faction)) {
+            roles.push_back({{"rank", rank++}, {"role", male.empty() ? female : male},
+                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}});
+        }
+        return {{"faction", std::format("{:08X}", faction->GetFormID())}, {"roles", roles}};
+    }
+
+    json SetFamily(const std::string& refId, const std::string& role) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        auto* faction = FamilyFaction();
+        if (!faction) return {{"error", "The Player Family faction isn't in the game: SkyLinkAI.esp (the optional NPC plugin) isn't in the load order"}};
+        const bool none = Lower(role) == "none";
+        if (!none && npc->race && npc->race->IsChildRace()) return {{"error", "Family characters are adults: this one is a child race"}};
+
+        int rank = -1;
+        if (!none) {
+            const bool female = npc->GetSex() == RE::SEX::kFemale;
+            int i = 0;
+            for (const auto& [male, fem] : FamilyTitles(faction)) {
+                if (Lower(male) == Lower(role) || Lower(fem) == Lower(role)) {
+                    if ((female ? fem : male).empty()) return {{"error", std::format("{} is a {} role and this character is {}", role, female ? "male" : "female", female ? "female" : "male")}};
+                    rank = i;
+                    break;
+                }
+                ++i;
+            }
+            if (rank < 0) return {{"error", "No family role called '" + role + "' (family_roles lists them)"}};
+        }
+        auto* marriage = RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
+        auto& list = npc->factions;
+        for (std::uint32_t i = list.size(); i-- > 0;) {
+            if (list[i].faction == faction || (!none && list[i].faction == marriage)) list.erase(list.begin() + i);
+        }
+        if (none) {
+            actor->RemoveFromFaction(faction);
+        } else {
+            list.push_back(RE::FACTION_RANK{ faction, static_cast<std::int8_t>(rank) });
+            if (marriage) actor->RemoveFromFaction(marriage);
+            actor->AddToFaction(faction, static_cast<std::int8_t>(rank));
+        }
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFactions);
+        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)}, {"marryable", false}};
     }
 
     json CopyOutfit(const std::string& refId) {
