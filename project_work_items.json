@@ -5908,6 +5908,22 @@
           ],
           "targetRelease": "",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-304",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "Player Family: relatives of the player character",
+          "description": "Cory, 2026-11-22: make an NPC from the player's character as another race (Arya the Breton as a Nord or Imperial) with similar looks, and a faction called Player Family with specific interactions; the faction may be baked into the ESL. Plan: the human races share a head mesh, so take the player's face, vary some features (related, not a twin) and write it to the other race's slots; FACT record in SkyLinkAI.esl with ranks (sister, mother, cousin), membership and relationship rank set live; dialogue conditioned on the faction through FEAT-294's topics and FEAT-293's voices; packages for living and travelling together.",
+          "history": [
+            {
+              "datetime": "2026-11-22T14:40",
+              "note": "Added."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
         }
       ]
     },
