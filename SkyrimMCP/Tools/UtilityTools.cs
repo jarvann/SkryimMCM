@@ -583,8 +583,9 @@ public class UtilityTools : ToolBase
 
     [McpServerTool]
     [Description("Load a save game by name. Immediately begins loading — current game state is lost. " +
-        "CAUTION: Any unsaved progress will be lost. Use SaveGame first if needed.")]
-    public async Task<object> LoadSave(string saveName)
+        "CAUTION: Any unsaved progress will be lost. Use SaveGame first if needed. A save of a different character than the one in " +
+        "the game is refused at first (some mods crash on it: go through the main menu); otherCharacter: true loads it anyway.")]
+    public async Task<object> LoadSave(string saveName, bool otherCharacter = false)
     {
         // Round C: a name that doesn't exist answered {"loading":true} and the game stayed where it was.
         var folder = SaveTools.SaveFolder();
@@ -603,6 +604,33 @@ public class UtilityTools : ToolBase
                 .Select(f => (name: Path.GetFileNameWithoutExtension(f.Name), hits: words.Count(w => f.Name.Contains(w, StringComparison.OrdinalIgnoreCase)), f.LastWriteTimeUtc))
                 .Where(x => x.hits > 0).OrderByDescending(x => x.hits).ThenByDescending(x => x.LastWriteTimeUtc).Take(5).Select(x => x.name).ToArray();
             return new { error = $"No save named \"{bare}\" in {folder}. Nothing was loaded.", closeMatches = close.Length > 0 ? close : null, hint = "ListSaves(filter) finds saves by name, character or location." };
+        }
+        // FEAT-290: another character's save loaded over a running game crashed Wheeler (Steam, 2026-11-21); from the main menu
+        // the same save loads fine.
+        var file = new[] { Path.Combine(folder, bare + ".ess"), profileSaves != null ? Path.Combine(profileSaves, bare + ".ess") : null }.FirstOrDefault(f => f != null && File.Exists(f));
+        if (file != null && !otherCharacter)
+        {
+            try
+            {
+                var state = await _pipe.SendRequestAsync("get_session_state");
+                if (state?["gameLoaded"]?.GetValue<bool>() == true)
+                {
+                    var me = await _pipe.SendRequestAsync("get_appearance");
+                    var (id, name) = SaveTools.CharacterOf(file);
+                    var myId = me?["characterId"]?.ToString()?.ToUpperInvariant();
+                    var myName = me?["name"]?.ToString();
+                    var different = id != null && !string.IsNullOrEmpty(myId) ? id != myId : name != null && myName != null && !name.Equals(myName, StringComparison.Ordinal);
+                    if (different)
+                        return new
+                        {
+                            loaded = false,
+                            reason = $"That save is {name ?? "another character"}'s and {myName ?? "a different character"} is in the game. Loading another character over a running game can crash some mods (Wheeler, seen on Steam).",
+                            safer = "Go back to the main menu first (RestartGame with saveFirst=true, then LoadSave), or ask the player to quit to the menu.",
+                            toLoadAnyway = "Call again with otherCharacter: true after the player agrees.",
+                        };
+                }
+            }
+            catch (Exception) { /* not connected, or no answer: load as asked */ }
         }
         var data = await _pipe.SendRequestAsync("load_save", new JsonObject { ["saveName"] = saveName });
         return DeserializeResponse(data);

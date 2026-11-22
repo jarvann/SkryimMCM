@@ -19,6 +19,15 @@ public class SaveTools : ToolBase
     /// <summary>The running game's save folder: Documents\My Games\&lt;game&gt;\ plus sLocalSavePath (default Saves\).</summary>
     internal static string SaveFolder() => GameEnvironment.Current().Saves;
 
+    /// <summary>The character a save belongs to: the ID in a game-made name, else the header's player name.</summary>
+    internal static (string? Id, string? Name) CharacterOf(string path)
+    {
+        var id = CharacterIdInName.Match(Path.GetFileName(path)) is { Success: true } m ? m.Groups[1].Value.ToUpperInvariant() : null;
+        string? name = null;
+        try { name = EssScanner.ReadHeader(path).PlayerName; } catch (Exception) { }
+        return (id, name);
+    }
+
     static bool IsSkyLinkSave(string file) =>
         file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
 
