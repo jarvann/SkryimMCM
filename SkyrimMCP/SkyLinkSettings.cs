@@ -24,9 +24,28 @@ public static class SkyLinkSettings
     // GOG game's files when the GOG game is the one connected.
     public static string? GameInstallFolder { get; set; }
 
-    public static string Folder => GameDocumentsFolder is { Length: > 0 } game
-        ? Path.Combine(game, "SkyLinkAI")
-        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition", "SkyLinkAI");
+    /// <summary>
+    /// The game's documents folder: the connected game's (it says, and SkyLink keeps it after a crash), else the running game's
+    /// by its exe folder (GOG installs carry goggame-*.info), else Steam's. BUG-101: a freshly started server used Steam's until
+    /// its first call reached the game, so a save made on GOG was reported as not made (it looked in Steam's Saves).
+    /// </summary>
+    public static string DocumentsFolder
+    {
+        get
+        {
+            if (GameDocumentsFolder is { Length: > 0 } connected) return connected;
+            var games = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games");
+            if (RunningGameFolder() is string running)
+            {
+                bool gog;
+                try { gog = Directory.EnumerateFiles(running, "goggame-*.info").Any(); } catch (Exception) { gog = false; }
+                return Path.Combine(games, gog ? "Skyrim Special Edition GOG" : "Skyrim Special Edition");
+            }
+            return Path.Combine(games, "Skyrim Special Edition");
+        }
+    }
+
+    public static string Folder => Path.Combine(DocumentsFolder, "SkyLinkAI");
 
     public static string FilePath => Path.Combine(Folder, "settings.json");
 

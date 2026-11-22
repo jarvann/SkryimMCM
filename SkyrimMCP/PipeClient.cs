@@ -262,8 +262,7 @@ public class PipeClient : IPipeClient
 
     static bool? ReadAlwaysActiveFromIni()
     {
-        var docs = SkyLinkSettings.GameDocumentsFolder
-                   ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition");
+        var docs = SkyLinkSettings.DocumentsFolder;
         var ini = Path.Combine(docs, "Skyrim.ini");
         if (!File.Exists(ini)) return null;
         var section = "";

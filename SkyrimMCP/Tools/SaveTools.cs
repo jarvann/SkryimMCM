@@ -19,9 +19,7 @@ public class SaveTools : ToolBase
     /// <summary>The running game's save folder: Documents\My Games\&lt;game&gt;\ plus sLocalSavePath (default Saves\).</summary>
     internal static string SaveFolder()
     {
-        var docs = SkyLinkSettings.GameDocumentsFolder is { Length: > 0 } g
-            ? g
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Skyrim Special Edition");
+        var docs = SkyLinkSettings.DocumentsFolder;
         var local = "Saves\\";
         foreach (var ini in new[] { "SkyrimCustom.ini", "Skyrim.ini" })
         {
