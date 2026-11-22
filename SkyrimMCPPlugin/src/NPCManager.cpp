@@ -8,6 +8,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <cmath>
+#include <numbers>
 #include <format>
 
 namespace SkyrimMCP::NPCManager {
