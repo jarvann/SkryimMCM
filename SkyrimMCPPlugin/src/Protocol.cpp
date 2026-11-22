@@ -271,6 +271,7 @@ namespace SkyrimMCP::Protocol {
             std::string role = params.value("role", std::string());
             return GameThread(id, [ref, role]() { return NPCManager::SetFamily(ref, role); });
         };
+        formIdParam("use_own_face", "refId", [](const std::string& r) { return NPCManager::UseOwnFace(r); });
         formIdParam("copy_outfit", "refId", [](const std::string& r) { return NPCManager::CopyOutfit(r); });
         formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
         formIdParam("get_face_data", "refId", [](const std::string& r) { return NPCManager::GetFaceData(r); });

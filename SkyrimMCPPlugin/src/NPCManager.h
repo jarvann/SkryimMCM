@@ -37,6 +37,8 @@ namespace SkyrimMCP {
         json ReapplySlots();
         // Voice type (form ID or editor ID) of a spawned NPC.
         json SetNpcVoice(const std::string& refId, const std::string& voice);
+        // A slot character's own face file instead of its template's, from now on (the file must be where the game sees it).
+        json UseOwnFace(const std::string& refId);
         // FEAT-304: the Player Family faction's roles (its rank titles), and giving one to a spawned NPC ("none" takes it away).
         // Family members aren't marryable. Adults only.
         json FamilyRoles();

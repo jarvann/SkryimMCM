@@ -1024,6 +1024,16 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)}, {"marryable", false}};
     }
 
+    json UseOwnFace(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || SlotIndex(npc) < 0) return {{"error", "Not a character in one of SkyLink's slots: " + refId}};
+        npc->faceNPC = nullptr;
+        return {{"refId", refId}, {"ownFace", true}};
+    }
+
     json CopyOutfit(const std::string& refId) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
