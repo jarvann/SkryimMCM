@@ -667,7 +667,7 @@ namespace SkyrimMCP::NPCManager {
         // character stays around where it stands and belongs to no one's faction until SkyLink gives it one.
         void MakeStayPut(RE::TESNPC* npc) {
             npc->aiPackages.packages.clear();
-            if (auto* stay = RE::TESForm::LookupByID<RE::TESPackage>(0x000956B8)) npc->aiPackages.packages.push_back(stay);  // DefaultSandboxCurrentLocation256
+            if (auto* stay = RE::TESForm::LookupByID<RE::TESPackage>(0x000956B8)) npc->aiPackages.packages.push_front(stay);  // DefaultSandboxCurrentLocation256
             npc->factions.clear();
             npc->crimeFaction = nullptr;
         }
