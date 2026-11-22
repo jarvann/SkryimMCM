@@ -852,22 +852,32 @@ namespace SkyrimMCP::NPCManager {
                 npc->originalRace = race;
                 changed = true;
             }
+            bool colours = false;
             if (used && entry.contains("faceData") && entry["faceData"].is_object()) {
                 const auto now = FaceDataOf(npc);
                 for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice" }) {
                     if (entry["faceData"].contains(field) && entry["faceData"][field].is_string() && now[field] != entry["faceData"][field]) {
-                        ApplyFaceData(npc, entry["faceData"]);
-                        changed = true;
-                        break;
+                        if (!colours) ApplyFaceData(npc, entry["faceData"]);
+                        colours = true;
+                        // Only another head texture needs a new head. Colours are put on the loaded one: switching a character off and
+                        // on at every load is seen, and unsettles whatever a follower mod has it doing.
+                        if (std::string_view(field) == "headTexture") changed = true;
                     }
                 }
             }
-            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}});
-            if (changed && used && entry.contains("refId") && entry["refId"].is_string()) {
+            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}, {"colours", colours}});
+            if ((changed || colours) && used && entry.contains("refId") && entry["refId"].is_string()) {
                 RE::TESForm* r = nullptr;
                 try { r = RE::TESForm::LookupByID(Helpers::ParseFormId(entry["refId"].get<std::string>())); } catch (...) {}
                 auto* actor = r ? r->As<RE::Actor>() : nullptr;
-                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) result["rebuild"].push_back(entry["refId"]);
+                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) {
+                    if (changed && !actor->IsPlayerTeammate()) {
+                        result["rebuild"].push_back(entry["refId"]);
+                    } else {
+                        actor->UpdateHairColor();
+                        actor->UpdateSkinColor();
+                    }
+                }
             }
         }
         return result;
@@ -1045,6 +1055,8 @@ namespace SkyrimMCP::NPCManager {
         auto* current = RE::TESForm::LookupByID<RE::TESFaction>(0x0005C84E);    // CurrentFollowerFaction, rank -1 until recruited
         if (!potential || !current) return {{"error", "The game's follower factions weren't found"}};
 
+        // Someone following already belongs to the follower dialogue or a follower mod: their rank there is not SkyLink's to reset.
+        if (follower && actor->IsPlayerTeammate()) return {{"error", "This character is already following the player"}};
         auto& list = npc->factions;
         for (std::uint32_t i = list.size(); i-- > 0;) if (list[i].faction == potential || list[i].faction == current) list.erase(list.begin() + i);
         if (!follower) {
@@ -1119,7 +1131,8 @@ namespace SkyrimMCP::NPCManager {
         json items = json::array();
         for (auto* armor : worn) {
             actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
-            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);  // forced: its AI doesn't swap it for "better" armour
+            // Not forced: a forced item can't be taken off again by trading or by a follower mod's outfits.
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, false, false);
             items.push_back(armor->GetName() ? armor->GetName() : "");
         }
         return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
@@ -1181,8 +1194,10 @@ namespace SkyrimMCP::NPCManager {
 
         const auto name = params.value("name", std::string());
         if (!name.empty()) npc->SetFullName(name.c_str());
-        // A copy of a unique NPC would share its "only one of me" rule; a spawned character is its own person.
-        npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        // A copy of a unique NPC would share its "only one of me" rule. A slot has one character, so it is unique in its own right:
+        // follower mods keep per-follower settings only for unique NPCs (Nether's Follower Framework asks IsUnique before it does).
+        if (slotIndex >= 0) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
         if (params.value("essential", false)) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kEssential);
 
         // The face: the template's own FaceGen (it has a file), or none, for RaceMenu's CharGen to build one.
@@ -1255,6 +1270,8 @@ namespace SkyrimMCP::NPCManager {
         // Only what SkyLink made: a runtime base (FF...) or one of its slots.
         const int slot = SlotIndex(base);
         if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0)) return {{"error", "Not a spawned NPC (its base isn't SkyLink's): " + refId}};
+        if (auto* follower = ref->As<RE::Actor>(); follower && follower->IsPlayerTeammate())
+            return {{"error", "This character is following the player. Dismiss them first (a follower mod would keep an empty place for them)."}};
         ref->Disable();
         ref->SetDelete(true);
         if (slot >= 0) {
