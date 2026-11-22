@@ -14,6 +14,42 @@ namespace SkyrimMCP.Tools;
 /// </summary>
 public partial class RaceMenuTools
 {
+    // refId -> preset, so removing a spawned NPC removes the face files made for it.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> SpawnPresets = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Exports the player's head (CharGen.ExportHead writes CharGen\<name>.dds and .nif) and puts the tint where LoadCharacter
+    /// looks, Textures\CharGen\Exported\<name>.dds. Null when done, else what went wrong. Works in MO2 too: the game writes into
+    /// its virtual folders, which SkyLink finds in overwrite.
+    /// </summary>
+    private async Task<string?> ExportTintFor(string preset)
+    {
+        await Papyrus("CharGen", "ExportHead", preset);
+        long last = -1;
+        for (var i = 0; i < 60; i++)
+        {
+            foreach (var plugins in SkyLinkSettings.ConfigFolders())
+            {
+                var dds = Path.Combine(plugins, "CharGen", preset + ".dds");
+                if (!File.Exists(dds)) continue;
+                var size = new FileInfo(dds).Length;
+                if (size > 128 && size == last)
+                {
+                    var dataRoot = Path.GetFullPath(Path.Combine(plugins, "..", ".."));
+                    var target = Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset + ".dds");
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    File.Copy(dds, target, overwrite: true);
+                    // The mesh isn't needed for a preview (FEAT-283 exports its own).
+                    try { File.Delete(dds); File.Delete(Path.ChangeExtension(dds, ".nif")); } catch (Exception) { }
+                    return null;
+                }
+                last = size;
+            }
+            await Task.Delay(250);
+        }
+        return "RaceMenu's ExportHead didn't write the skin texture (CharGen\\" + preset + ".dds) within 15 s, so the face would turn purple. Nothing was spawned.";
+    }
+
     [McpServerTool]
     [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: editor ID or form ID " +
         "(default the player's race); female: true or false (default the player's sex); template: an NPC to copy stats, " +
@@ -44,6 +80,15 @@ public partial class RaceMenuTools
                 note = "Spawns next to the player as a preview for this session. Pass dryRun: false to spawn.",
             };
 
+        // The face files first: if the export fails nothing has been spawned. SaveCharacter writes the preset (.jslot) but, seen
+        // on Steam, no tint texture, and a missing tint shows purple; ExportHead does write it (with the head's mesh).
+        var presetName = "SkyLink_" + new string(name.Trim().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
+        if (face == "player")
+        {
+            await Papyrus("CharGen", "SaveCharacter", presetName);
+            if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
+        }
+
         var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
@@ -55,16 +100,17 @@ public partial class RaceMenuTools
         object? faceResult = null;
         if (face == "player" && refId != null)
         {
-            // CharGen.SaveCharacter writes the player's look (CharGen\<name>.jslot and its tint); LoadCharacter maps it onto
-            // the NPC, and RaceMenu rebuilds the head and tint, so no dark face.
-            var presetName = "SkyLink_" + new string(name.Trim().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
             try
             {
-                await Papyrus("CharGen", "SaveCharacter", presetName);
                 var loaded = await Papyrus("CharGen", "LoadCharacter", refId, spawned?["race"]?.ToString(), presetName);
-                faceResult = new { preset = presetName, loaded = loaded?.ToString() };
+                // The 3D is rebuilt from the changed base: off, then on again a moment later.
+                await _pipe.SendRequestAsync("set_spawned_npc_enabled", new JsonObject { ["refId"] = refId, ["enable"] = false });
+                await Task.Delay(1500);
+                await _pipe.SendRequestAsync("set_spawned_npc_enabled", new JsonObject { ["refId"] = refId, ["enable"] = true });
+                SpawnPresets[refId] = presetName;
+                faceResult = new { preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
             }
-            catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned; its face is the template's head without its FaceGen file, which can look dark." }; }
+            catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
         }
 
         await NotifyInGame($"{name.Trim()} spawned (preview)");
@@ -82,7 +128,18 @@ public partial class RaceMenuTools
         "spawned NPCs (runtime bases), never on the game's own characters.")]
     public async Task<object> RemoveSpawnedNpc(string refId)
     {
-        var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = refId.Trim() });
+        var id = refId.Trim();
+        var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+        if (r?["error"] == null && SpawnPresets.TryRemove(id, out var preset) && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
+        {
+            // Only the files SpawnNpc made for this NPC (named SkyLink_...).
+            foreach (var plugins in SkyLinkSettings.ConfigFolders())
+            {
+                var dataRoot = Path.GetFullPath(Path.Combine(plugins, "..", ".."));
+                foreach (var file in new[] { Path.Combine(plugins, "CharGen", "Exported", preset + ".jslot"), Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset + ".dds") })
+                    try { if (File.Exists(file)) File.Delete(file); } catch (Exception) { }
+            }
+        }
         return DeserializeResponse(r);
     }
 }
