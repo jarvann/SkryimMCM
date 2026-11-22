@@ -14,6 +14,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SLOTS = 25  # of each race and sex
@@ -48,8 +49,11 @@ def records():
 def main(write):
     args = {"name": "SkyLinkAI.esp", "records": records(), "masters": ["Skyrim.esm"], "author": "SkyLink AI",
             "description": "Blank NPC slots SkyLink AI fills from a blueprint (optional).", "light": True, "dryRun": not write}
-    run = subprocess.run([sys.executable, str(REPO / "scripts" / "mcp-call.py"), "create_plugin", json.dumps(args)],
-                         capture_output=True, text=True, timeout=180)
+    with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as f:
+        json.dump(args, f)
+        f.flush()
+        run = subprocess.run([sys.executable, str(REPO / "scripts" / "mcp-call.py"), "create_plugin", "@" + f.name],
+                             capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
     start = run.stdout.find("\n{")
     reply = json.loads(run.stdout[start:]) if start >= 0 else {"error": run.stdout[-500:] + run.stderr[-500:]}
     reply.pop("records", None)

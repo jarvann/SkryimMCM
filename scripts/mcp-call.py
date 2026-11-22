@@ -33,6 +33,10 @@ def main(argv):
         if i + 1 < len(argv) and argv[i + 1].lstrip().startswith("{"):
             args = json.loads(argv[i + 1])
             i += 1
+        elif i + 1 < len(argv) and argv[i + 1].startswith("@"):   # @file: arguments too long for a command line
+            with open(argv[i + 1][1:], encoding="utf-8") as f:
+                args = json.load(f)
+            i += 1
         calls.append((name, args))
         i += 1
     if not calls:
