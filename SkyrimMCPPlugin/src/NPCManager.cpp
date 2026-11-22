@@ -8,6 +8,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <numbers>
+#include <optional>
 #include <format>
 
 namespace SkyrimMCP::NPCManager {
@@ -580,7 +585,16 @@ namespace SkyrimMCP::NPCManager {
         // Their base forms belong to a plugin, so the game can keep changes to them and references to them in saves.
         constexpr std::string_view kSlotPlugin = "SkyLinkAI.esl";
         constexpr RE::FormID kFirstSlot = 0x800;
-        constexpr int kSlotsPerSex = 10;
+        // Slots by race (the game uses a face file only while an NPC's race is the one its record was made with), then sex, then
+        // number. The same order as scripts/build-slot-plugin.py; it must never change once released.
+        struct SlotRace { RE::FormID id; const char* name; };
+        constexpr SlotRace kSlotRaces[] = {
+            { 0x13741, "Breton" }, { 0x13746, "Nord" }, { 0x13744, "Imperial" }, { 0x13748, "Redguard" }, { 0x13743, "High Elf" },
+            { 0x13742, "Dark Elf" }, { 0x13749, "Wood Elf" }, { 0x13747, "Orc" }, { 0x13745, "Khajiit" }, { 0x13740, "Argonian" },
+        };
+        constexpr int kSlotRaceCount = static_cast<int>(std::size(kSlotRaces));
+        constexpr int kSlotsPerSex = 25;
+        constexpr int kSlotCount = kSlotRaceCount * 2 * kSlotsPerSex;
 
         // The plugin and object ID a template's FaceGen files are named by: its own, or the NPC it borrows its face from.
         json FaceSource(RE::TESNPC* npc) {
@@ -593,16 +607,18 @@ namespace SkyrimMCP::NPCManager {
         }
 
         std::string SlotDefaultName(int index) {
-            const bool female = index < kSlotsPerSex;
-            return std::format("SkyLink Character {}{:02d}", female ? 'F' : 'M', (female ? index : index - kSlotsPerSex) + 1);
+            const int inRace = index % (2 * kSlotsPerSex);
+            return std::format("SkyLink {} {}{:02d}", kSlotRaces[index / (2 * kSlotsPerSex)].name, inRace < kSlotsPerSex ? 'F' : 'M', inRace % kSlotsPerSex + 1);
         }
 
         int SlotIndex(const RE::TESForm* form) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data || !form) return -1;
-            for (int i = 0; i < kSlotsPerSex * 2; ++i)
-                if (data->LookupForm(kFirstSlot + i, kSlotPlugin) == form) return i;
-            return -1;
+            // By its plugin and local ID (asked for every NPC in the game when looking for a template).
+            auto* file = form->GetFile(0);
+            if (!file || file->GetFilename() != kSlotPlugin) return -1;
+            const int i = static_cast<int>(form->GetFormID() & 0xFFF) - static_cast<int>(kFirstSlot);
+            return i >= 0 && i < kSlotCount && data->LookupForm(kFirstSlot + i, kSlotPlugin) == form ? i : -1;
         }
 
         bool SlotPluginLoaded() {
@@ -611,10 +627,20 @@ namespace SkyrimMCP::NPCManager {
         }
 
         // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
-        RE::TESNPC* FreeSlot(bool female, int& index, const std::vector<int>& avoid) {
+        // The slots of that race and sex first. A race without its own (vampires, modded races) uses its parent race's or a Nord's,
+        // with the original race set on the slot (ReapplySlots).
+        RE::TESNPC* FreeSlot(RE::TESRace* race, bool female, int& index, const std::vector<int>& avoid) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data) return nullptr;
-            const int first = female ? 0 : kSlotsPerSex;
+            auto block = [](const RE::TESRace* r) {
+                for (int k = 0; r && k < kSlotRaceCount; ++k)
+                    if (kSlotRaces[k].id == r->GetFormID()) return k;
+                return -1;
+            };
+            int raceBlock = block(race);
+            if (raceBlock < 0 && race) raceBlock = block(race->armorParentRace);
+            if (raceBlock < 0) raceBlock = 1;
+            const int first = raceBlock * 2 * kSlotsPerSex + (female ? 0 : kSlotsPerSex);
             for (int i = first; i < first + kSlotsPerSex; ++i) {
                 // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
                 if (std::find(avoid.begin(), avoid.end(), i) != avoid.end()) continue;
@@ -636,7 +662,7 @@ namespace SkyrimMCP::NPCManager {
             constexpr RE::FormID kCitizenClass = 0x0001326B;
             using Flag = RE::ACTOR_BASE_DATA::Flag;
             RE::TESNPC* best = nullptr;
-            int bestScore = -1;
+            int bestScore = -100;
             for (auto* npc : data->GetFormArray<RE::TESNPC>()) {
                 if (!npc || npc->GetFormID() == 0x7 || npc->race != race) continue;
                 if ((npc->GetSex() == RE::SEX::kFemale) != female) continue;
@@ -653,6 +679,7 @@ namespace SkyrimMCP::NPCManager {
                 if (!npc->IsUnique()) score += 2;
                 if (npc->defaultOutfit) score += 1;
                 if (!flags.any(Flag::kEssential, Flag::kProtected)) score += 1;
+                if (npc->GetAggressionLevel() >= RE::ACTOR_AGGRESSION::kVeryAggressive) score -= 8;  // someone's enemy: the last choice
                 if (score > bestScore) {
                     bestScore = score;
                     best = npc;
@@ -670,6 +697,32 @@ namespace SkyrimMCP::NPCManager {
             if (auto* stay = RE::TESForm::LookupByID<RE::TESPackage>(0x000956B8)) npc->aiPackages.packages.push_front(stay);  // DefaultSandboxCurrentLocation256
             npc->factions.clear();
             npc->crimeFaction = nullptr;
+            // Peaceful: a Snow Elf copied from a mod's hostile one attacked the inn (2026-11-22). It still defends itself.
+            npc->SetAggressionLevel(RE::ACTOR_AGGRESSION::kUnaggressive);
+        }
+    }
+
+    namespace {
+        // In front of the player, facing them, and not through a wall: PlaceObjectAtMe puts it on the player's own spot (in a
+        // photo the player's hair was in the way). Returns how far in front it ended up.
+        float PlaceInFront(RE::TESObjectREFR* ref, RE::PlayerCharacter* player, float distance) {
+            const float facing = player->GetAngleZ();
+            const RE::NiPoint3 dir{ std::sin(facing), std::cos(facing), 0.0f };
+            const auto at = player->GetPosition();
+            if (auto* cell = player->GetParentCell(); auto* world = cell ? cell->GetbhkWorld() : nullptr) {
+                const float scale = RE::bhkWorld::GetWorldScale();
+                RE::bhkPickData pick;
+                pick.rayInput.from = (at + RE::NiPoint3{ 0, 0, 70.0f }) * scale;
+                pick.rayInput.to = (at + RE::NiPoint3{ 0, 0, 70.0f } + dir * (distance + 40.0f)) * scale;
+                player->GetCollisionFilterInfo(pick.rayInput.filterInfo);
+                pick.rayInput.filterInfo.SetCollisionLayer(RE::COL_LAYER::kLOS);
+                RE::BSReadLockGuard lock(world->worldLock);
+                if (world->PickObject(pick); pick.rayOutput.HasHit())
+                    distance = std::max(0.0f, pick.rayOutput.hitFraction * (distance + 40.0f) - 40.0f);
+            }
+            ref->SetPosition(at + dir * distance);
+            ref->SetAngle(RE::NiPoint3{ 0.0f, 0.0f, std::fmod(facing + std::numbers::pi_v<float>, 2 * std::numbers::pi_v<float>) });
+            return distance;
         }
     }
 
@@ -685,6 +738,246 @@ namespace SkyrimMCP::NPCManager {
         if (SlotIndex(npc) >= 0) npc->AddChange(CF::kAIData | CF::kFactions);
         actor->EvaluatePackage(true, false);
         return {{"refId", refId}, {"stays", true}};
+    }
+
+    namespace {
+        std::string Hex(const RE::Color& c) { return std::format("#{:02X}{:02X}{:02X}", c.red, c.green, c.blue); }
+        std::optional<RE::Color> ParseHex(const std::string& s) {
+            if (s.size() != 7 || s[0] != '#') return std::nullopt;
+            try {
+                const auto v = std::stoul(s.substr(1), nullptr, 16);
+                RE::Color c;
+                c.red = static_cast<std::uint8_t>(v >> 16);
+                c.green = static_cast<std::uint8_t>(v >> 8);
+                c.blue = static_cast<std::uint8_t>(v);
+                return c;
+            } catch (...) { return std::nullopt; }
+        }
+        // A plugin name and local ID, which stay right when the load order changes.
+        json StableId(RE::TESForm* form) {
+            auto* file = form ? form->GetFile(0) : nullptr;
+            if (!file) return nullptr;
+            return std::format("{}|{:06X}", file->GetFilename(), form->GetLocalFormID());
+        }
+        RE::TESForm* FromStableId(const std::string& id) {
+            const auto bar = id.rfind('|');
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (bar == std::string::npos || !data) return nullptr;
+            try { return data->LookupForm(static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16)), id.substr(0, bar)); } catch (...) { return nullptr; }
+        }
+        json FaceDataOf(RE::TESNPC* npc) {
+            auto* head = npc->headRelatedData;
+            return {{"bodyTint", Hex(npc->bodyTintColor)}, {"weight", npc->weight},
+                    {"hairColor", head && head->hairColor ? json(Hex(head->hairColor->color)) : json(nullptr)},
+                    {"headTexture", head ? StableId(head->faceDetails) : json(nullptr)},
+                    {"voice", StableId(npc->voiceType)}};
+        }
+        // Its own head data, never the template's: npc->Copy shares the pointer.
+        void ApplyFaceData(RE::TESNPC* npc, const json& d) {
+            auto* old = npc->headRelatedData;
+            auto* own = new RE::TESNPC::HeadRelatedData();
+            if (old) { own->hairColor = old->hairColor; own->faceDetails = old->faceDetails; }
+            npc->headRelatedData = own;
+            if (d.contains("headTexture") && d["headTexture"].is_string()) {
+                if (auto* t = FromStableId(d["headTexture"].get<std::string>())) own->faceDetails = t->As<RE::BGSTextureSet>();
+            }
+            if (d.contains("hairColor") && d["hairColor"].is_string()) {
+                if (const auto c = ParseHex(d["hairColor"].get<std::string>())) {
+                    auto* colors = RE::IFormFactory::GetConcreteFormFactoryByType<RE::BGSColorForm>();
+                    if (auto* form = colors ? colors->Create() : nullptr) {
+                        form->color = *c;
+                        own->hairColor = form;
+                    }
+                }
+            }
+            if (d.contains("bodyTint") && d["bodyTint"].is_string()) {
+                if (const auto c = ParseHex(d["bodyTint"].get<std::string>())) npc->bodyTintColor = *c;
+            }
+            if (d.contains("weight") && d["weight"].is_number()) npc->weight = std::clamp(d["weight"].get<float>(), 0.0f, 100.0f);
+            if (d.contains("voice") && d["voice"].is_string()) {
+                if (auto* v = FromStableId(d["voice"].get<std::string>())) if (auto* type = v->As<RE::BGSVoiceType>()) npc->voiceType = type;
+            }
+        }
+    }
+
+    json SetNpcVoice(const std::string& refId, const std::string& voice) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        RE::TESForm* v = RE::TESForm::LookupByEditorID(voice);
+        if (!v) try { v = RE::TESForm::LookupByID(Helpers::ParseFormId(voice)); } catch (...) {}
+        auto* type = v ? v->As<RE::BGSVoiceType>() : nullptr;
+        if (!type) return {{"error", "Not a voice type: " + voice}};
+        auto* old = npc->voiceType;
+        npc->voiceType = type;
+        auto label = [](RE::BGSVoiceType* t) { return t && t->GetFormEditorID() ? json(t->GetFormEditorID()) : json(nullptr); };
+        return {{"refId", refId}, {"was", label(old)}, {"voice", label(type)}, {"voiceId", std::format("{:08X}", type->GetFormID())}, {"voiceStableId", StableId(type)}};
+    }
+
+    json ReapplySlots() {
+        auto* data = RE::TESDataHandler::GetSingleton();
+        json result = {{"slots", json::array()}, {"rebuild", json::array()}};
+        if (!data || !SlotPluginLoaded()) return result;
+        json registry;
+        try {
+            const auto folder = Helpers::GameDocumentsFolder();
+            std::ifstream in(folder / "SkyLinkAI" / "slots.json");
+            if (folder.empty() || !in) return result;
+            registry = json::parse(in);
+        } catch (const std::exception& e) {
+            result["problem"] = std::string("slots.json unreadable: ") + e.what();
+            return result;
+        }
+        if (!registry.is_object()) return result;
+        for (auto& [key, entry] : registry.items()) {
+            int slot = -1;
+            try { slot = std::stoi(key); } catch (...) {}
+            if (slot < 0 || slot >= kSlotCount || !entry.is_object()) continue;
+            auto* form = data->LookupForm(kFirstSlot + slot, kSlotPlugin);
+            auto* npc = form ? form->As<RE::TESNPC>() : nullptr;
+            if (!npc) continue;
+            bool changed = false;
+            const bool used = npc->GetName() && SlotDefaultName(slot) != npc->GetName();
+            // The game uses an NPC's face file only while its race is its original one, and a slot's record is a Nord's: without
+            // this a Breton's head was built from parts, with no skin texture (Steam, 2026-11-22).
+            RE::TESRace* race = nullptr;
+            if (entry.contains("raceId") && entry["raceId"].is_string()) {
+                if (auto* r = FromStableId(entry["raceId"].get<std::string>())) race = r->As<RE::TESRace>();
+            }
+            if (used) race = npc->race;
+            if (race && npc->originalRace != race) {
+                npc->originalRace = race;
+                changed = true;
+            }
+            if (used && entry.contains("faceData") && entry["faceData"].is_object()) {
+                const auto now = FaceDataOf(npc);
+                for (const char* field : { "hairColor", "headTexture", "bodyTint", "voice" }) {
+                    if (entry["faceData"].contains(field) && entry["faceData"][field].is_string() && now[field] != entry["faceData"][field]) {
+                        ApplyFaceData(npc, entry["faceData"]);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            result["slots"].push_back({{"slot", slot}, {"used", used}, {"changed", changed}});
+            if (changed && used && entry.contains("refId") && entry["refId"].is_string()) {
+                RE::TESForm* r = nullptr;
+                try { r = RE::TESForm::LookupByID(Helpers::ParseFormId(entry["refId"].get<std::string>())); } catch (...) {}
+                auto* actor = r ? r->As<RE::Actor>() : nullptr;
+                if (actor && actor->GetActorBase() == npc && actor->Get3D(false) && !actor->IsDisabled()) result["rebuild"].push_back(entry["refId"]);
+            }
+        }
+        return result;
+    }
+
+    json GetFaceData(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc) return {{"error", "Actor not found: " + refId}};
+        return FaceDataOf(npc);
+    }
+
+    json SetFaceData(const json& params) {
+        const auto refId = params.value("refId", std::string());
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        ApplyFaceData(npc, params);
+        // "Face changed" on the record makes the game build the head from parts instead of loading its face file.
+        if (SlotIndex(npc) >= 0) {
+            if (params.value("useFaceFile", false)) npc->RemoveChange(RE::TESNPC::ChangeFlags::kFace);
+            else npc->AddChange(RE::TESNPC::ChangeFlags::kFace);
+        }
+        return FaceDataOf(npc);
+    }
+
+    json HeadMaterials(const std::string& refId) {
+        auto* actor = Helpers::ResolveActor(refId);
+        auto* face = actor && actor->Get3D(false) ? actor->GetFaceNodeSkinned() : nullptr;
+        if (!face) return {{"error", "That actor's head isn't loaded"}};
+        auto name = [](const RE::NiPointer<RE::NiSourceTexture>& t) -> json {
+            if (!t) return nullptr;
+            return t->name.c_str() ? json(t->name.c_str()) : json("(unnamed)");
+        };
+        auto colour = [](const RE::NiColor& c) {
+            return std::format("#{:02X}{:02X}{:02X}", static_cast<int>(std::clamp(c.red, 0.0f, 1.0f) * 255), static_cast<int>(std::clamp(c.green, 0.0f, 1.0f) * 255),
+                               static_cast<int>(std::clamp(c.blue, 0.0f, 1.0f) * 255));
+        };
+        json shapes = json::array();
+        RE::BSVisit::TraverseScenegraphGeometries(face, [&](RE::BSGeometry* geo) {
+            json s = {{"shape", geo->name.c_str() ? geo->name.c_str() : ""}};
+            auto* shader = geo->lightingShaderProp_cast();
+            auto* material = shader ? static_cast<RE::BSLightingShaderMaterialBase*>(shader->material) : nullptr;
+            if (material) {
+                const auto feature = material->GetFeature();
+                s["feature"] = static_cast<int>(feature);
+                s["diffuse"] = name(material->diffuseTexture);
+                if (feature == RE::BSShaderMaterial::Feature::kFaceGen) {
+                    auto* m = static_cast<RE::BSLightingShaderMaterialFacegen*>(material);
+                    s["tint"] = name(m->tintTexture);
+                    s["detail"] = name(m->detailTexture);
+                } else if (feature == RE::BSShaderMaterial::Feature::kHairTint) {
+                    s["tintColor"] = colour(static_cast<RE::BSLightingShaderMaterialHairTint*>(material)->tintColor);
+                } else if (feature == RE::BSShaderMaterial::Feature::kFaceGenRGBTint) {
+                    s["tintColor"] = colour(static_cast<RE::BSLightingShaderMaterialFacegenTint*>(material)->tintColor);
+                }
+            }
+            shapes.push_back(s);
+            return RE::BSVisit::BSVisitControl::kContinue;
+        });
+        json result = {{"refId", refId}, {"shapes", shapes}};
+        if (auto* npc = actor->GetActorBase()) {
+            result["bodyTint"] = std::format("#{:02X}{:02X}{:02X}", npc->bodyTintColor.red, npc->bodyTintColor.green, npc->bodyTintColor.blue);
+            result["race"] = npc->race ? json(npc->race->GetName()) : json(nullptr);
+            result["originalRace"] = npc->originalRace ? json(npc->originalRace->GetName()) : json(nullptr);
+            result["isChargenPreset"] = npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kIsChargenFacePreset);
+            result["baseFlags"] = std::format("{:08X}", npc->actorData.actorBaseFlags.underlying());
+            result["templateUseFlags"] = std::format("{:04X}", npc->actorData.templateUseFlags.underlying());
+            result["tintLayers"] = npc->tintLayers ? json(npc->tintLayers->size()) : json(nullptr);
+            result["hasMorphs"] = npc->faceData != nullptr;
+            result["overlays"] = npc->HasOverlays();
+            result["faceNPC"] = npc->faceNPC ? json(std::format("{:08X}", npc->faceNPC->GetFormID())) : json(nullptr);
+            auto* hair = npc->headRelatedData ? npc->headRelatedData->hairColor : nullptr;
+            result["hairColor"] = hair ? json(std::format("{:08X} #{:02X}{:02X}{:02X}", hair->GetFormID(), hair->color.red, hair->color.green, hair->color.blue)) : json(nullptr);
+            result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
+        }
+        return result;
+    }
+
+    json CopyOutfit(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* equip = RE::ActorEquipManager::GetSingleton();
+        if (!player || !equip) return {{"error", "Player not available"}};
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+
+        std::vector<RE::TESObjectARMO*> worn;
+        for (auto& [item, entry] : player->GetInventory([](RE::TESBoundObject& o) { return o.Is(RE::FormType::Armor); })) {
+            if (entry.second && entry.second->IsWorn()) if (auto* armor = item->As<RE::TESObjectARMO>()) worn.push_back(armor);
+        }
+        for (auto* outfit : { npc->defaultOutfit, npc->sleepOutfit }) if (outfit) actor->RemoveOutfitItems(outfit);
+        npc->defaultOutfit = nullptr;
+        npc->sleepOutfit = nullptr;
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kDefaultOutfit | RE::TESNPC::ChangeFlags::kSleepOutfit);
+
+        // What it has on already (a distributor such as SPID may have dressed it) comes off; it keeps those items.
+        for (auto& [item, entry] : actor->GetInventory([](RE::TESBoundObject& o) { return o.Is(RE::FormType::Armor); })) {
+            if (entry.second && entry.second->IsWorn()) equip->UnequipObject(actor, item, nullptr, 1, nullptr, true, true, false);
+        }
+        json items = json::array();
+        for (auto* armor : worn) {
+            actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);  // forced: its AI doesn't swap it for "better" armour
+            items.push_back(armor->GetName() ? armor->GetName() : "");
+        }
+        return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
     }
 
     json SpawnNpc(const json& params) {
@@ -723,7 +1016,7 @@ namespace SkyrimMCP::NPCManager {
         std::vector<int> avoid;
         if (params.contains("avoidSlots") && params["avoidSlots"].is_array())
             for (const auto& a : params["avoidSlots"]) if (a.is_number_integer()) avoid.push_back(a.get<int>());
-        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(female, slotIndex, avoid) : nullptr;
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(race, female, slotIndex, avoid) : nullptr;
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;
@@ -731,7 +1024,15 @@ namespace SkyrimMCP::NPCManager {
         if (!npc) return {{"error", "The game's NPC form factory didn't create a form"}};
         npc->Copy(tmpl);
         npc->race = race;
+        npc->originalRace = race;  // its face file is used only while the two match
         if (!params.value("keepSchedule", false)) MakeStayPut(npc);
+        // Marryable unless asked otherwise (family members aren't); never a child. The game's marriage talk also needs a voice that has it.
+        bool marryable = params.value("marryable", true) && race && !race->IsChildRace();
+        if (auto* faction = marryable ? RE::TESForm::LookupByID<RE::TESFaction>(0x00019809) : nullptr) {  // PotentialMarriageFaction
+            npc->factions.push_back(RE::FACTION_RANK{ faction, 0 });
+        } else {
+            marryable = false;
+        }
 
         const auto name = params.value("name", std::string());
         if (!name.empty()) npc->SetFullName(name.c_str());
@@ -743,22 +1044,14 @@ namespace SkyrimMCP::NPCManager {
         const auto face = params.value("face", std::string("template"));
         npc->faceNPC = face == "template" ? (tmpl->faceNPC ? tmpl->faceNPC : tmpl) : nullptr;
 
-        // Spike 2026-11-22 (Steam): CharGen.LoadCharacter copies head parts and morphs but not the hair colour or body tone, so
-        // take the player's. The copy must not write through pointers the template still owns.
+        // Spike 2026-11-22 (Steam): CharGen.LoadCharacter copies head parts and morphs but not the hair colour, body tone, weight
+        // or head texture set, and the template's texture set replaces the face file's own textures, its tint included (a white
+        // face with the template's wrinkles). So take the player's; never write through the head data the template still owns.
         const bool sharedHead = npc->headRelatedData && npc->headRelatedData == tmpl->headRelatedData;
         if (face == "player") {
-            npc->bodyTintColor = playerBase->bodyTintColor;
-            if (auto* from = playerBase->headRelatedData ? playerBase->headRelatedData->hairColor : nullptr) {
-                if (sharedHead) npc->headRelatedData = nullptr;
-                // Its own colour form: RaceMenu edits the player's in place.
-                auto* colors = RE::IFormFactory::GetConcreteFormFactoryByType<RE::BGSColorForm>();
-                auto* own = colors ? colors->Create() : nullptr;
-                if (own) {
-                    own->color = from->color;
-                    own->flags = from->flags;
-                }
-                npc->SetHairColor(own ? own : from);
-            }
+            auto data = FaceDataOf(playerBase);
+            data.erase("voice");
+            ApplyFaceData(npc, data);
         }
 
         const bool slot = slotIndex >= 0;
@@ -771,6 +1064,7 @@ namespace SkyrimMCP::NPCManager {
 
         auto ref = player->PlaceObjectAtMe(npc, slot);
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        const float placedAt = PlaceInFront(ref.get(), player, std::clamp(params.value("distance", 160.0f), 60.0f, 600.0f));
 
         return {
             {"refId", std::format("{:08X}", ref->GetFormID())},
@@ -778,6 +1072,7 @@ namespace SkyrimMCP::NPCManager {
             {"name", npc->GetName()},
             {"race", std::format("{:08X}", race->GetFormID())},
             {"raceName", race->GetName()},
+            {"raceId", StableId(race)},
             {"female", female},
             {"template", std::format("{:08X}", tmpl->GetFormID())},
             {"templateName", tmpl->GetName()},
@@ -787,6 +1082,9 @@ namespace SkyrimMCP::NPCManager {
             {"slot", slot ? json(slotIndex) : json(nullptr)},
             {"slotObjectId", slot ? json(std::format("{:08X}", kFirstSlot + slotIndex)) : json(nullptr)},
             {"faceSource", FaceSource(tmpl)},
+            {"distance", placedAt},
+            {"marryable", marryable},
+            {"faceData", FaceDataOf(npc)},
             {"slotPluginLoaded", SlotPluginLoaded()},
         };
     }

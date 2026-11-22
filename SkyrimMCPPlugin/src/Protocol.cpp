@@ -5,6 +5,7 @@
 #include "AppearanceManager.h"
 #include "FaceCamera.h"
 #include "Studio.h"
+#include <thread>
 #include "FaceState.h"
 #include "ScriptStats.h"
 #include "BlueprintManager.h"
@@ -262,6 +263,17 @@ namespace SkyrimMCP::Protocol {
             return GameThread(id, [ref, enable]() { return NPCManager::SetSpawnedNpcEnabled(ref, enable); });
         };
         formIdParam("spawned_npc_stay", "refId", [](const std::string& r) { return NPCManager::SpawnedNpcStay(r); });
+        formIdParam("copy_outfit", "refId", [](const std::string& r) { return NPCManager::CopyOutfit(r); });
+        formIdParam("head_materials", "refId", [](const std::string& r) { return NPCManager::HeadMaterials(r); });
+        formIdParam("get_face_data", "refId", [](const std::string& r) { return NPCManager::GetFaceData(r); });
+        registry["set_face_data"] = [](const std::string& id, const json& params) {
+            return GameThread(id, [params]() { return NPCManager::SetFaceData(params); });
+        };
+        registry["set_npc_voice"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string voice = params.value("voice", std::string());
+            return GameThread(id, [ref, voice]() { return NPCManager::SetNpcVoice(ref, voice); });
+        };
         formIdParam("remove_spawned_npc", "refId", [](const std::string& r) { return NPCManager::RemoveSpawnedNpc(r); });
         registry["play_idle"] = [](const std::string& id, const json& params) {
             std::string idleFormId = params.value("idleFormId", "");
@@ -414,7 +426,8 @@ namespace SkyrimMCP::Protocol {
             // Only return and cleanup take a marker; ParseFormId throws on an empty string (BUG-036).
             const std::string markerText = params.value("markerId", std::string{});
             const auto marker = markerText.empty() ? 0u : static_cast<std::uint32_t>(Helpers::ParseFormId(markerText));
-            if (mode == "lights") return GameThread(id, [=]() { return Studio::Lights(preset, intensity); });
+            const std::string lightRef = params.value("refId", std::string{});
+            if (mode == "lights") return GameThread(id, [=]() { return Studio::Lights(preset, intensity, lightRef); });
             if (mode == "go") return GameThread(id, [=]() { return Studio::Go(cell); });
             if (mode == "return") return GameThread(id, [=]() { return Studio::Return(marker); });
             if (mode == "cleanup") return GameThread(id, [=]() { return Studio::Cleanup(marker); });
@@ -479,7 +492,22 @@ namespace SkyrimMCP::Protocol {
             return MakeResponse(id, true, out).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         registry["reapply_face_state"] = [](const std::string& id, const json&) {
-            return GameThread(id, []() { return FaceState::Reapply(); });
+            // Slot characters first; a head made before its data was put back is made again (off, then on a moment later).
+            const auto slots = TaskQueue::RunOnGameThread([]() { return NPCManager::ReapplySlots(); });
+            if (slots.contains("rebuild") && !slots["rebuild"].empty()) {
+                for (const bool enable : { false, true }) {
+                    for (const auto& ref : slots["rebuild"]) {
+                        const auto r = ref.get<std::string>();
+                        TaskQueue::RunOnGameThread([r, enable]() { return NPCManager::SetSpawnedNpcEnabled(r, enable); });
+                    }
+                    if (!enable) std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+                }
+            }
+            return GameThread(id, [slots]() {
+                auto result = FaceState::Reapply();
+                result["slots"] = slots;
+                return result;
+            });
         };
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);

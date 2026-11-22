@@ -226,6 +226,9 @@ namespace SkyrimMCP {
                 s_hidHud = false;
                 s_hiddenNodes.clear();
             }
+            // With no input for a while the idle (vanity) camera takes over and swings around: leave it, and start its timer again.
+            if (camera->IsCurrentState(RE::CameraState::kAutoVanity, RE::CameraState::kAutoVanity)) camera->ForceThirdPerson();
+            camera->GetRuntimeData2().idleTimer = 0.0f;
             if (!camera->IsInFreeCameraMode()) camera->ToggleFreeCameraMode(true);
 
             auto* ui = RE::UI::GetSingleton();

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
+using SkyrimMCP.Face;
 
 namespace SkyrimMCP.Tools;
 
@@ -67,17 +68,22 @@ public partial class RaceMenuTools
         "outfit and voice from (default: a plain NPC of that race and sex). face: 'template' (the template's own face, works " +
         "everywhere) or 'player' (the player's current face, e.g. one built with the face builder; needs RaceMenu). " +
         "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
-        "the template's daily schedule, job and factions (a court wizard walks home). A PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
+        "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
+        "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
+        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
+        "asked to marry, adults only. With SkyLinkAI.esl (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
         "dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
         if (string.IsNullOrWhiteSpace(name)) return new { error = "name is required" };
         if (await SafetyBlock("move") is string blocked) return new { error = "Not now: " + blocked };
         if (face == "player" && await RaceMenuOpenError() is string open) return new { error = open };
+        var dress = string.IsNullOrWhiteSpace(outfit) ? face : outfit.Trim().ToLowerInvariant();
+        if (dress is not ("template" or "player")) return new { error = "outfit must be 'template' or 'player'" };
 
         if (dryRun)
             return new
@@ -101,7 +107,7 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
@@ -113,6 +119,18 @@ public partial class RaceMenuTools
             return DeserializeResponse(spawned);
         }
         var refId = spawned?["refId"]?.ToString();
+
+        object? voiceResult = null;
+        if (!string.IsNullOrWhiteSpace(voice) && refId != null)
+        {
+            try
+            {
+                var set = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = voice.Trim() });
+                voiceResult = DeserializeResponse(set);
+                if (set?["voiceStableId"] is JsonNode stable && spawned?["faceData"] is JsonObject fd) fd["voice"] = stable.DeepClone();
+            }
+            catch (McpException ex) { voiceResult = new { error = ex.Message, note = "Spawned with the template's voice." }; }
+        }
 
         object? faceResult = null;
         if (face == "player" && refId != null)
@@ -127,9 +145,24 @@ public partial class RaceMenuTools
                 var spawns = LoadSpawns();
                 spawns[refId] = presetName;
                 SaveSpawns(spawns);
-                faceResult = new { preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
+                // The player's body shape, when OBody is installed (its script function isn't there otherwise).
+                string? body = null;
+                try
+                {
+                    body = (await Papyrus("OBodyNative", "GetPresetAssignedToActor", "00000014"))?.ToString();
+                    if (!string.IsNullOrEmpty(body)) await Papyrus("OBodyNative", "ApplyPresetByName", refId, body);
+                }
+                catch (McpException) { body = null; }
+                faceResult = new { bodyPreset = string.IsNullOrEmpty(body) ? "none (OBody isn't installed, or gave none)" : body, preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
             }
             catch (McpException ex) { faceResult = new { error = ex.Message, note = "The NPC was spawned, but its face may be wrong." }; }
+        }
+
+        object? outfitResult = null;
+        if (dress == "player" && refId != null)
+        {
+            try { outfitResult = DeserializeResponse(await _pipe.SendRequestAsync("copy_outfit", new JsonObject { ["refId"] = refId })); }
+            catch (McpException ex) { outfitResult = new { error = ex.Message, note = "Spawned in the template's outfit." }; }
         }
 
         var inSlot = spawned?["slot"] is JsonValue;
@@ -140,7 +173,23 @@ public partial class RaceMenuTools
             var objectId = spawned!["slotObjectId"]!.ToString();
             byte[]? mesh = null, tint = null;
             var slotIndex = spawned["slot"]!.GetValue<int>();
-            if (face == "player" && ExportedHead(presetName) is { } exported) (mesh, tint) = (exported.mesh, exported.tint);
+            HeadRepair.Result? repair = null;
+            if (face == "player" && ExportedHead(presetName) is { } exported)
+            {
+                (mesh, tint) = (exported.mesh, exported.tint);
+                try
+                {
+                    var look = await _pipe.SendRequestAsync("get_appearance", new JsonObject { ["refId"] = refId });
+                    var parts = (look?["headParts"] as JsonArray ?? []).Where(h => h?["editorId"] != null)
+                        .Select(h => (h!["editorId"]!.ToString(), h["model"]?.ToString())).ToList();
+                    repair = HeadRepair.Repair(mesh, parts, MeshFiles.Read);
+                    mesh = repair.Bytes;
+                }
+                catch (Exception ex) when (ex is McpException or InvalidDataException or IOException)
+                {
+                    repair = new HeadRepair.Result(mesh, [], [], [], ["The exported head wasn't checked: " + ex.Message]);
+                }
+            }
             else if (face == "template" && spawned["faceSource"] is JsonObject src && src["plugin"]?.ToString() is string facePlugin)
                 (mesh, tint) = SlotRegistry.ReadFace(facePlugin, src["objectId"]!.ToString());
             var problem = SlotRegistry.WriteFace(objectId, mesh, tint, out var files);
@@ -149,12 +198,14 @@ public partial class RaceMenuTools
             SlotRegistry.Reserve(slotIndex, new JsonObject
             {
                 ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
-                ["face"] = face, ["template"] = spawned["template"]?.ToString(), ["characterId"] = characterId,
+                ["face"] = face, ["template"] = spawned["template"]?.ToString(),
+                // What saves don't keep: the plugin puts it back at start-up and after loads (ReapplySlots).
+                ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
             });
             slotFace = problem == null
-                ? new { written = files, note = "Seen after the next game start (and at once in this session)." }
-                : new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
+                ? new { written = files, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = "Seen after the next game start." }
+                : (object)new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
         }
         else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
         await NotifyInGame($"{name.Trim()} spawned" + (inSlot ? "" : " (preview)"));
@@ -162,6 +213,8 @@ public partial class RaceMenuTools
         {
             spawned = DeserializeResponse(spawned),
             face = faceResult,
+            voice = voiceResult,
+            outfit = outfitResult,
             slotFace,
             lasting = inSlot,
             note = inSlot
@@ -214,7 +267,7 @@ public partial class RaceMenuTools
                 created = kv.Value?["created"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
             }),
             taken = all.Count,
-            note = all.Count == 0 ? "No slots taken." : "Ten slots of each sex; a free slot is needed for a lasting character.",
+            note = all.Count == 0 ? "No slots taken." : "25 slots of each race and sex; a free slot is needed for a lasting character.",
         };
     }
 

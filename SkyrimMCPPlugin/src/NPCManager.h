@@ -27,6 +27,19 @@ namespace SkyrimMCP {
         json SpawnNpc(const json& params);
         json RemoveSpawnedNpc(const std::string& refId);
         json SpawnedNpcStay(const std::string& refId);
+        // Every shape on the actor's loaded head: its material, the textures the game really loaded and the tint colours.
+        json HeadMaterials(const std::string& refId);
+        // The parts of a look that sit on the NPC record and no face file holds: hair colour, body tone, head texture set, weight, voice.
+        json GetFaceData(const std::string& refId);
+        json SetFaceData(const json& params);
+        // Slot characters: what saves don't keep (original race, hair colour, head texture set, voice), from slots.json. Run at
+        // start-up and after loads; "rebuild" lists references whose 3D was made before it was put back.
+        json ReapplySlots();
+        // Voice type (form ID or editor ID) of a spawned NPC.
+        json SetNpcVoice(const std::string& refId, const std::string& voice);
+        // A spawned NPC takes what the player wears: its own outfit removed (and its default outfit, or it comes back on load), copies
+        // of the worn armour added and put on. Player-made enchantments and tempering aren't copied.
+        json CopyOutfit(const std::string& refId);
         json SetSpawnedNpcEnabled(const std::string& refId, bool enable);
     }
 
