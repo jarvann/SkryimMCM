@@ -5298,6 +5298,10 @@
             {
               "datetime": "2026-11-22T11:50",
               "note": "Spike on Steam 1.7.104 (Arya's Save122, nothing saved, no crash): a runtime NPC copied from a plain NPC of the race and sex spawns and shows its template's FaceGen face with no dark-face seam. The player's face on it works after: CharGen.SaveCharacter (preset), ExportHead (writes the 4096 tint DDS; SaveCharacter wrote none, and a missing tint shows purple), tint copied to Textures\\CharGen\\Exported, LoadCharacter, hair colour and body tone copied from the player, then disable/enable to rebuild the 3D. One call end to end; hair, skin and face shape match, no seam. The template NPC itself is unchanged (checked with a fresh spawn). Outfit distributors (SPID) dress spawned NPCs like any other: the dependency list must not count those as the character's own."
+            },
+            {
+              "datetime": "2026-11-22T12:30",
+              "note": "Slots are global to the game folder (the face files sit in Data), so a slot stays reserved through a registry file until RemoveSpawnedNpc, whatever save is loaded."
             }
           ],
           "priority": "high",
@@ -5460,6 +5464,10 @@
             {
               "datetime": "2026-11-22T12:20",
               "note": "Built: PluginWriter writes NPC_ records (layout checked against Skyrim.esm 000C1AA3); plugin/SkyLinkAI.esl (10 female, 10 male slots, 6,322 bytes, light, round trip ok) from scripts/build-slot-plugin.py; SpawnNpc fills a free slot when the plugin is loaded and marks the base's changes for saves. Waiting on a save-and-reload test."
+            },
+            {
+              "datetime": "2026-11-22T12:30",
+              "note": "GOG vanilla (no RaceMenu) slot test: SkyLinkAI.esl loads (FE041), SpawnNpc uses a slot, and after save, reload and a full quit and relaunch the character keeps name, race, sex, class, outfit and head parts. The face fails (dark face): faceNPC, which points at the template, isn't saved. Fix proven by hand: the slot's own FaceGeom NIF and FaceTint DDS copied from the template's (from the BSAs) at facegeom\\SkyLinkAI.esl\\0000080A.nif and facetint\\...dds: full face after a restart, stable over four camera passes. With only the NIF, the game crashed (0xC0000005) as soon as the camera framed him: both files or neither. Default template picker fixed (it chose the Headless Horseman)."
             }
           ],
           "targetRelease": "1.6",
@@ -5756,6 +5764,38 @@
             {
               "datetime": "2026-11-22T12:45",
               "note": "Cory asked where players would enter a key; agreed the FOMOD isn't the place."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "INFRA-027",
+          "type": "infrastructure",
+          "status": "planned",
+          "priority": "high",
+          "title": "GetGameEnvironment: one place that knows the running game's folders, INIs and versions",
+          "description": "Everything SkyLink reads or writes by folder comes from one object decided only by the running game: store (Steam, GOG, VR), game version, exe folder, documents folder, saves folder (sLocalSavePath and MO2 profile saves), INI files in use (Skyrim.ini, SkyrimPrefs.ini, SkyrimCustom.ini, MO2 profile copies when local settings are on) and plugins.txt, SKSE log folder, crash log and dump folders, MO2 instance and profile, SKSE version and runtime. Reported in CheckConnection beside the SkyLink, SKSE and Address Library versions, and by its own tool; every tool uses it (replaces the separate folder guesses).",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:30",
+              "note": "Cory: 'the mcp server should report back where save games and ini files and things like that are based solely on the version of the game running. Should work like the check for version of Skylink/SKSE'. Third bug of the kind (BUG-088, 095, 097, 101)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-101",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "medium",
+          "title": "A fresh server used Steam's documents folder until its first game call (GOG saves reported missing)",
+          "description": "Folder paths came from GameDocumentsFolder, set on connecting; a call that computed a path before any pipe request used Steam's (SaveGame on GOG said the game didn't save although it did). SkyLinkSettings.DocumentsFolder now falls back to the running game (GOG by its goggame files).",
+          "history": [
+            {
+              "datetime": "2026-11-22T12:30",
+              "note": "Found in the slot test; GOG saves list and load correctly after the fix."
             }
           ],
           "targetRelease": "1.6",
