@@ -463,9 +463,13 @@ namespace SkyrimMCP::WorldManager {
         if (cell->IsInteriorCell()) return {{"error", "The player is indoors: go outside first"}};
         searchRadius = std::clamp(searchRadius, 0.0f, 4000.0f);
         size = std::clamp(size, 300.0f, 3000.0f);
-        std::vector<RE::NiPoint3> blockers;
+        struct Blocker { RE::NiPoint3 at; float radius; };
+        std::vector<Blocker> blockers;  // a rock's origin can be far outside the square while its mesh covers it: count its size
         tes->ForEachReferenceInRange(player, searchRadius + size, [&](RE::TESObjectREFR* ref) {
-            if (Blocks(ref)) blockers.push_back(ref->GetPosition());
+            if (Blocks(ref)) {
+                const auto span = ref->GetBoundMax() - ref->GetBoundMin();
+                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale() });
+            }
             return RE::BSContainer::ForEachResult::kContinue;
         });
         const auto origin = player->GetPosition();
@@ -485,7 +489,7 @@ namespace SkyrimMCP::WorldManager {
                     }
                 if (!land) continue;
                 int clutter = 0;
-                for (const auto& b : blockers) if (std::hypot(b.x - c.x, b.y - c.y) < size * 0.6f) ++clutter;
+                for (const auto& b : blockers) if (std::hypot(b.at.x - c.x, b.at.y - c.y) < size * 0.6f + b.radius) ++clutter;
                 float ground = 0; tes->GetLandHeight({ c.x, c.y, c.z + 5000.0f }, ground);
                 spots.push_back({{"x", c.x}, {"y", c.y}, {"z", ground}, {"slope", hi - lo}, {"objects", clutter}, {"fromPlayer", r}});
             }
