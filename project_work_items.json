@@ -5282,7 +5282,7 @@
         {
           "id": "FEAT-122",
           "type": "feature",
-          "status": "in-progress",
+          "status": "complete",
           "title": "Spawn NPC from blueprint",
           "description": "Spawn a new NPC from blueprint JSON. PlaceAtMe with persist flag or quest alias for persistence. Apply appearance via native TESNPC face data + RaceMenu CharGen if available. Body morphs via NiOverride.SetBodyMorph() Papyrus calls. Stats/perks/spells/equipment via same native APIs as FEAT-121. FaceGen NIF/texture baking needed to avoid grey face — RaceMenu CharGen handles this. Detect installed frameworks (RaceMenu, NiOverride, CBBE) and adapt strategy. 1.6 scope: spawn the NPC in the running game as a preview (runtime base from INFRA-024, recreated on load until it is exported by FEAT-283), with the face from the blueprint written by FEAT-281 so it never shows the grey or dark face.",
           "targetRelease": "1.6",
@@ -5322,6 +5322,10 @@
             {
               "datetime": "2026-11-22T18:05",
               "note": "A copy no longer carries the template's keys (the Key to Hjerim) or other unsaved container items: weapons, armour and ammo are given to the character itself."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "1.6 scope done: spawning (template or player face, any race and sex, slots kept by saves) proved on GOG and Steam. Blueprint-from-description goes with the face builder track (moved out of 1.6)."
             }
           ],
           "priority": "high",
@@ -5349,9 +5353,13 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-281",
             "FEAT-254"
@@ -5376,9 +5384,13 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-235"
           ]
@@ -5406,9 +5418,13 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-231"
           ]
@@ -5432,9 +5448,13 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Moved from 1.5 to 1.6, the Characters release (Cory)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-254"
           ]
@@ -5462,9 +5482,13 @@
             {
               "datetime": "2026-11-22T18:40",
               "note": "The RaceMenu path (exported head, HeadRepair, tint shrink) writes the face files; an own writer without RaceMenu is left."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-254"
           ]
@@ -5472,7 +5496,7 @@
         {
           "id": "INFRA-024",
           "type": "infrastructure",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Runtime NPC base creation",
           "description": "Create a new NPC base form at runtime by copying a template (race and sex matching the blueprint) through the form factory, then set its face data, head parts, tints, skills, perks, spells, factions and outfit from the blueprint. Runtime forms aren't kept in saves, so SkyLink records them in its co-save and recreates them on load until the character is exported as a plugin (FEAT-283). Host-side form allocation, reusable later by the runtime spell and enchantment creators (FEAT-126/127, 2.0).",
@@ -5508,6 +5532,10 @@
             {
               "datetime": "2026-11-22T14:50",
               "note": "Fresh clone of the player in one SpawnNpc call (slot 4, voice, OBody preset, all three head repairs) kept its face file, race, voice, hair colour and OBody preset after a full restart on Steam."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Proved repeatedly on GOG 2026-11-22/23 (slot NPCs kept by saves and restarts)."
             }
           ],
           "targetRelease": "1.6",
@@ -5516,7 +5544,7 @@
         {
           "id": "FEAT-282",
           "type": "feature",
-          "status": "in-progress",
+          "status": "complete",
           "priority": "high",
           "title": "Create a follower from a blueprint",
           "description": "Make a spawned NPC a working follower: the vanilla follower factions and a follower-capable voice type so the game's own recruit dialogue works, sensible combat style and outfit, and a check for follower frameworks (Nether's Follower Framework, AFT, EFF) so they see it. Says plainly when the chosen voice type has no follower lines. Uses the game's own follower packages; custom AI packages are out of scope (2.1).",
@@ -5540,6 +5568,10 @@
             {
               "datetime": "2026-11-22T19:50",
               "note": "An exported follower was recruited too, with the original sister following at the same time."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Proved on GOG: followers recruited with the game's dialogue; MakeFollower takes a voice; rank fallback for fresh spawns (Test Suitor: Ally)."
             }
           ],
           "targetRelease": "1.6",
@@ -5550,7 +5582,7 @@
         {
           "id": "FEAT-283",
           "type": "feature",
-          "status": "in-progress",
+          "status": "complete",
           "priority": "high",
           "title": "Export a character as a standalone follower mod",
           "description": "Turn a spawned NPC or follower into a real mod: an NPC record and a placement in a light plugin (FEAT-273), the FaceGen files (FEAT-281), any RaceMenu overlays baked or listed as requirements, masters checked (FEAT-274), installed through the mod manager (FEAT-275) and packaged as a zip the player could share (FEAT-270's packaging). Then restart or main-menu reload (FEAT-278 / FEAT-277), load the save and check the NPC from the plugin replaced the runtime preview. This closes the loop and is the bridge to 2.1.",
@@ -5574,6 +5606,10 @@
             {
               "datetime": "2026-11-23T10:50",
               "note": "GOG/MO2 full cycle: sister with the player face, KSSMP Honey hair and a High Poly Head part spawned, exported (masters High Poly Head.esm, KSHairdosSMP.esp), installed as an MO2 mod, restarted: she appears from her own mod with her face file, hair physics and follower dialogue (Cory: looks good)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "1.6 scope done: export proved end to end on GOG (SMP hair, High Poly Head, family). Face-builder dependencies moved out of 1.6."
             }
           ],
           "targetRelease": "1.6",
@@ -5596,9 +5632,13 @@
             {
               "datetime": "2026-11-20T20:15",
               "note": "Defines 'done' for the Characters release."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved out of 1.6 (Cory agreed 2026-11-23): faces come from RaceMenu ExportHead plus HeadRepair, which works; the face builder track goes to 2.0."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "2.0",
           "dependsOn": [
             "FEAT-232",
             "FEAT-282",
@@ -5620,9 +5660,13 @@
             {
               "datetime": "2026-11-20T18:00",
               "note": "Moved to 1.6 (Cory and the Tester): Journal Redesigned, the only journal mod on the test setups, re-skins the journal with no notes of its own, so nothing could test it before 1.5's release."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): polish."
             }
           ],
-          "targetRelease": "1.6"
+          "targetRelease": "1.7"
         },
         {
           "id": "FEAT-289",
@@ -5635,9 +5679,13 @@
             {
               "datetime": "2026-11-20T19:15",
               "note": "Cory's idea; the Tester and dev agreed on 1.6 (1.5's save diagnosis covers combat, overload and a drawn weapon). Estimate 6-10 human hours; Claude ~1-1.5 h, 0.4-0.6M tokens."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): polish."
             }
           ],
-          "targetRelease": "1.6"
+          "targetRelease": "1.7"
         },
         {
           "id": "BUG-098",
@@ -5650,15 +5698,19 @@
             {
               "datetime": "2026-11-21T12:50",
               "note": "Caused by the dev session launching GOG without checking it was running. Host DLL change: needs a game restart to test."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): polish."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": []
         },
         {
           "id": "FEAT-290",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "low",
           "title": "LoadSave warns when the save is a different character",
           "description": "Loading another character's save over a running game can crash some mods (Wheeler CTD on 2026-11-21, loading the Aniya test save over Adventurer). LoadSave compares the save header's character with the loaded one and suggests loading from the main menu instead.",
@@ -5670,6 +5722,10 @@
             {
               "datetime": "2026-11-22T16:10",
               "note": "Built and merged 2026-11-22."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: LoadSave of Prisoner's quicksave while Adventurer plays refused with the reason and the safer way."
             }
           ],
           "targetRelease": "1.6",
@@ -5686,9 +5742,13 @@
             {
               "datetime": "2026-11-21T15:05",
               "note": "The Tester's suggestions after the 1.5 retest; Cory's notification question."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): polish."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": []
         },
         {
@@ -5702,9 +5762,13 @@
             {
               "datetime": "2026-11-21T16:00",
               "note": "DutchiesCanadian on Nexus: 'Why you no use ReSaver Plus Plus? I had a moment with figuring out I was using the wrong one'. Cory: add it. Estimate 4-8 human hours; Claude ~1-1.5 h, 0.4-0.6M tokens."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): polish."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": []
         },
         {
@@ -5718,6 +5782,10 @@
             {
               "datetime": "2026-11-21T15:45",
               "note": "Found while planning 1.6 (looking for RaceMenu's CharGen API). GetScriptSource part fixed and checked from WSL: CharGen.psc read from RaceMenu.bsa in 1.4 s. CompileScript part open."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: GetScriptSource found RelationshipMarriageSpouseHouseScript in the prepared LE sources before any BSA (the LE copy is older than USSEP's BSA source, which has the CC houses): check the BSA path and the order on Steam, where USSEP's BSA carries sources."
             }
           ],
           "targetRelease": "1.6",
@@ -5735,9 +5803,13 @@
             {
               "datetime": "2026-11-21T16:05",
               "note": "Cory: voice gen packaged with the follower, 'what do you want them to say', play it, link it to the dialogue. Agreed as a 1.6 stretch, voice first. Estimate 15-25 human hours; Claude 2-3 h, 0.8-1.2M tokens."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): voice and dialogue are the stretch."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": [
             "FEAT-122",
             "INFRA-026"
@@ -5755,9 +5827,13 @@
             {
               "datetime": "2026-11-21T16:05",
               "note": "Cory: 'develop' dialogue beyond the out-of-the-box lines, not a full mod. Estimate 10-15 human hours; Claude 1.5-2 h, 0.6-0.8M tokens."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): voice and dialogue are the stretch."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": [
             "FEAT-293",
             "FEAT-283"
@@ -5775,9 +5851,13 @@
             {
               "datetime": "2026-11-21T16:05",
               "note": "Cory: AI packages beyond the out-of-the-box ones, if we can swing it. Estimate 8-12 human hours; Claude 1-1.5 h, 0.4-0.6M tokens."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): voice and dialogue are the stretch."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": [
             "FEAT-122",
             "FEAT-293"
@@ -5786,7 +5866,7 @@
         {
           "id": "FEAT-296",
           "type": "feature",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "Track a character's mod dependencies while it's built, for the export's requirements list",
           "description": "Every form a character uses is recorded with the plugin it comes from as the character is built: race, head parts (hair, eyes, brows, scars), face sliders and overlays from RaceMenu extensions (ECE and others), skin and body (CBBE, 3BA...), outfit and weapons, voice type, spells and perks, packages, and the template NPC. At export (FEAT-283) this becomes a requirements list: each plugin mapped to its Nexus mod (name, mod ID, page link) from MO2's meta.ini or Vortex's mod records, with 'required' or 'optional' and why, ready to pick on Nexus's Requirements page, plus a README section. Flags anything from paid Creations or mods that don't allow dependents, and suggests swapping a form for a vanilla one when a dependency is heavy for one item.",
@@ -5802,6 +5882,10 @@
             {
               "datetime": "2026-11-22T17:20",
               "note": "CharacterRequirements on the sister: 4 required mods (the Northern Women template's parts and textures), 4 optional texture replacers, 136 perks, spells and factions from 65 plugins set aside as handed out by SPID and the like. Vortex names give the Nexus ID in two styles. Not tried on MO2."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: CharacterRequirements on a slot character lists CBBE (optional), nothing required."
             }
           ],
           "targetRelease": "1.6",
@@ -5824,6 +5908,10 @@
             {
               "datetime": "2026-11-22T12:20",
               "note": "fomod/ModuleConfig.xml and info.xml, '00 Core' and '10 NPC slots'; build_release.ps1 checks the XML and folders. A 1.6.0-test zip built and its contents checked. Not yet installed through MO2 or Vortex."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "ModuleConfig.xml and info.xml parse; sources 00 Core and 10 NPC slots match the release layout. Still to install a release zip through MO2."
             }
           ],
           "targetRelease": "1.6",
@@ -5840,15 +5928,19 @@
             {
               "datetime": "2026-11-22T12:45",
               "note": "Cory asked where players would enter a key; agreed the FOMOD isn't the place."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Moved from 1.6 to 1.7 (Cory agreed 2026-11-23): voice and dialogue are the stretch."
             }
           ],
-          "targetRelease": "1.6",
+          "targetRelease": "1.7",
           "dependsOn": []
         },
         {
           "id": "INFRA-027",
           "type": "infrastructure",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "high",
           "title": "GetGameEnvironment: one place that knows the running game's folders, INIs and versions",
           "description": "Everything SkyLink reads or writes by folder comes from one object decided only by the running game: store (Steam, GOG, VR), game version, exe folder, documents folder, saves folder (sLocalSavePath and MO2 profile saves), INI files in use (Skyrim.ini, SkyrimPrefs.ini, SkyrimCustom.ini, MO2 profile copies when local settings are on) and plugins.txt, SKSE log folder, crash log and dump folders, MO2 instance and profile, SKSE version and runtime. Reported in CheckConnection beside the SkyLink, SKSE and Address Library versions, and by its own tool; every tool uses it (replaces the separate folder guesses).",
@@ -5860,6 +5952,10 @@
             {
               "datetime": "2026-11-22T13:20",
               "note": "Built: GameEnvironment and GetGameEnvironment; CheckConnection's environment. Paths audited and moved to it (saves, INIs, notes, meshes, configs, LOOT list, plugins.txt, crash and SkyLink folders); the running process decides before anything set by hand. Checked on GOG with a fresh server and on Steam with no game running."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: GetGameEnvironment gives GOG's documents, saves, INIs and MO2's plugins.txt, SKSE 2.2.6."
             }
           ],
           "targetRelease": "1.6",
@@ -5868,7 +5964,7 @@
         {
           "id": "BUG-101",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "medium",
           "title": "A fresh server used Steam's documents folder until its first game call (GOG saves reported missing)",
           "description": "Folder paths came from GameDocumentsFolder, set on connecting; a call that computed a path before any pipe request used Steam's (SaveGame on GOG said the game didn't save although it did). SkyLinkSettings.DocumentsFolder now falls back to the running game (GOG by its goggame files).",
@@ -5876,6 +5972,10 @@
             {
               "datetime": "2026-11-22T12:30",
               "note": "Found in the slot test; GOG saves list and load correctly after the fix."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: a fresh server (mcp-call) reported GOG's documents and saves, read from the running game."
             }
           ],
           "targetRelease": "1.6",
@@ -5890,18 +5990,22 @@
             {
               "datetime": "2026-11-22T13:40",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "In 1.6 (Cory agreed 2026-11-23)."
             }
           ],
           "type": "",
           "priority": "",
-          "targetRelease": "",
+          "targetRelease": "1.6",
           "dependsOn": []
         },
         {
           "id": "FEAT-302",
           "title": "Read and answer message boxes",
           "description": "Cory, 2026-11-22: a message box after a load couldn't be dismissed. SkyLink sees MessageBoxMenu is open but can't read its text or press a button. Read the text and buttons; press one only with the player's go-ahead.",
-          "status": "implemented-untested",
+          "status": "complete",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
@@ -5918,6 +6022,10 @@
             {
               "datetime": "2026-11-22T19:50",
               "note": "Answered in game: the grass cache box was read at the main menu, matched (one button, Ok), pressed and remembered, before the save loaded."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: a Debug.MessageBox was read (text, box id, buttons) and answered OK; closed."
             }
           ],
           "type": "",
@@ -5929,7 +6037,7 @@
           "id": "INFRA-028",
           "title": "Slot plugin as a light-flagged ESP",
           "description": "An .esl always sorts with the masters, so the game moved SkyLinkAI.esl from last to position 197 and Vortex reported an outside change (only that plugin moved). A light-flagged .esp stays where it is put and still doesn't count toward 254. Decide before 1.6 ships: saves remember the file name, and face file folders use it.",
-          "status": "implemented-untested",
+          "status": "complete",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
@@ -5942,6 +6050,10 @@
             {
               "datetime": "2026-11-22T18:05",
               "note": "SkyLinkAI.esp on Steam through Vortex and two restarts: slots, faction and faces work."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: SkyLinkAI.esp has the light flag (0x200); the Player Family faction resolves to FE04CA00."
             }
           ],
           "type": "",
@@ -5953,7 +6065,7 @@
           "id": "BUG-102",
           "title": "RaceMenu exported heads name face textures on other shapes",
           "description": "ExportHead gave KSSMP_Desirae (hair) and one scar shape the head's texture set (Desirae.nif and FemaleMaskLeftSide.nif name their own). Take each shape's textures from its head part's own mesh or texture set. HDT bones are renamed hdtSSEPhysics_AutoRename_Head_… and the physics reference is missing.",
-          "status": "implemented-untested",
+          "status": "complete",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
@@ -5962,6 +6074,10 @@
             {
               "datetime": "2026-11-22T14:20",
               "note": "Cause of the white face on a player copy: the game rejects the whole face file when a head part with a mesh has no shape in it. KS Hairdos SMP's VirtualHairCollision_2 names VirtualHairCollision_2_1.nif, which is in no folder or archive (757 searched), so RaceMenu's export has no such shape. A stand-in shape of that name made the game use the file at once. Hair: export renames the physics bones and puts them all at the origin (strands bunch up); original names plus rest positions from the part's own mesh fixed it. Done by hand on slot 2, photographed (face, makeup, skin, scars, brows, hair right with no RaceMenu preset). Texture repair is in the server (RepairExportedHead); stand-in shapes and bones are next. Not checked: hair physics moving, and the final file after a restart."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG test round: a fresh face-player clone (KS Honey SMP hair, scar) had its exported head repaired: textures renamed on the scar and hair shapes; live head shapes use their own textures."
             }
           ],
           "type": "",
@@ -6000,7 +6116,7 @@
         {
           "id": "FEAT-304",
           "type": "",
-          "status": "in-progress",
+          "status": "complete",
           "priority": "",
           "title": "Player Family: relatives of the player character",
           "description": "Cory, 2026-11-22: make an NPC from the player's character as another race (Arya the Breton as a Nord or Imperial) with similar looks, and a faction called Player Family with specific interactions; the faction may be baked into the ESL. Plan: the human races share a head mesh, so take the player's face, vary some features (related, not a twin) and write it to the other race's slots; FACT record in SkyLinkAI.esl with ranks Father, Mother, Brother, Sister (any race; only the human races share a head mesh, others need a face that keeps a family look), membership and relationship rank set live; dialogue conditioned on the faction through FEAT-294's topics and FEAT-293's voices; packages for living and travelling together.",
@@ -6040,6 +6156,10 @@
             {
               "datetime": "2026-11-23T10:54",
               "note": "Export keeps the role only when asked (needsChoice until family is given). In game (GOG/MO2): GOG Brother exported with family true (masters Skyrim.esm + SkyLinkAI.esp, SkyLink AI required in the README), installed, restarted: he arrives from his own mod in Player Family at rank 3 with his own face file."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Proved on GOG: roles, ranks, refusals; step-siblings marryable; an export keeps Player Family on request."
             }
           ],
           "targetRelease": "",
@@ -6048,7 +6168,7 @@
         {
           "id": "BUG-103",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "SaveGame reported success when an older save of that name existed",
           "description": "A save over an existing name that the game didn't write was reported as done (File.Exists), so three test characters were lost at a restart. Now the file must be newer than the request, and SaveGame refuses an existing name unless overwrite is true.",
@@ -6060,6 +6180,10 @@
             {
               "datetime": "2026-11-22T18:05",
               "note": "In game: an existing name is refused, a new save confirmed by its file time."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "GOG 2026-11-23: SaveGame refused an existing SkyLink_Homestead and overwrote it with overwrite: true."
             }
           ],
           "targetRelease": "",
@@ -6204,15 +6328,19 @@
             {
               "datetime": "2026-11-22T16:55",
               "note": "Added."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "In 1.6 (Cory agreed 2026-11-23)."
             }
           ],
-          "targetRelease": "",
+          "targetRelease": "1.6",
           "dependsOn": []
         },
         {
           "id": "FEAT-306",
           "type": "",
-          "status": "in-progress",
+          "status": "complete",
           "priority": "",
           "title": "Ask, never assume: follower, marriage and attraction",
           "description": "Every character made (SpawnNpc, ExportCharacter) asks the player whether it follows and whether it can be married, and, when a mod that keeps it is installed (ORomance, OSL Aroused), whom it is attracted to: women, men, everyone, no one, or left to the mods. LGBTQIA+ friendly: no orientation is assumed, and the base game already lets anyone marry anyone. An export also refuses a follower whose voice has no follower lines.",
@@ -6224,6 +6352,10 @@
             {
               "datetime": "2026-11-23T14:05",
               "note": "GOG test: spawn with nothing set asked follower + marryable and spawned nothing; Sister asked only follower; no attraction question (no such mod on GOG). Spawned Dunmer Stepbrother, Stepsister (marryable), Mother, Father, Stepfather (not): factions right. With RelationshipMarriage stage 10 done (5 isn't enough), both step-siblings offered the Amulet of Mara proposal and the Stepsister accepted (stage 20). Found and fixed: relationship rank refused by Papyrus for a fresh spawn (console fallback); a marryable voice must be in the VoicesMarriage lists (SpawnNpc switches it, export refuses). Both fixes not yet seen in game. Attraction untested (Steam only)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Proved on GOG: questions asked before spawn/export; step-siblings proposed, wedding with Maramal; marriage voice switch (Khajiit got FemaleEvenToned); rank fallback."
             }
           ],
           "targetRelease": "",
@@ -6248,6 +6380,10 @@
             {
               "datetime": "2026-11-23T15:25",
               "note": "Homestead rebuilt at the woods' edge in cell (2,-2) where Cory pointed: burning tundra campfire (in Survival_WarmUpObjectsList), SetSpouseHome moved the husband and the quest marker. Lessons: z matters most (Cory: 'z-index is important for placement'): lowest-corner grounding buried a farmhouse on a 290-unit slope, now the footprint average; trees block pieces the clutter check can't see well in woods. To do: a nudge tool (up/down/turn/move), a 'place it where I stand' mode, find_open_space weighting giant cliff bounds less. Survival stats reset by setting the need globals (cold returns outdoors; fire or warm clothes). Saved SkyLink_Homestead."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Layout tools proved on GOG: SaveHomeLayout (19 pieces), BuildHomeLayout here (turned to the player, all placed), RemoveHomeLayout (20 removed), original intact; placed_objects searches the persistent cell (from 14000 units away it found nothing before). Runtime map markers don't fast travel: markers go in SkyLinkAI.esp (FEAT-309)."
             }
           ],
           "targetRelease": "1.6",
@@ -6270,9 +6406,13 @@
             {
               "datetime": "2026-11-23T15:45",
               "note": "Hand-tuning the runtime homestead (raise/lower, foundation terraces, corner piece, lower course) showed the limits of building in game: no terrain edits, no navmesh, no interiors, trial-and-error rotations. Cory: building homes/cities will be real work, with more flexibility in the Creation Kit and other utilities. Direction: runtime placement for quick, player-driven homesteads; shipped homes built in CK (landscape flattening under the house instead of foundations, navmesh, interiors, snapping), xEdit for records."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "In 1.6 (Cory agreed 2026-11-23)."
             }
           ],
-          "targetRelease": "",
+          "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-307"
           ]
@@ -6292,9 +6432,13 @@
             {
               "datetime": "2026-11-23T16:20",
               "note": "Map marker spike: a MapMarker placed at run time with its own ExtraMapMarker (visible, fast travel) could not be fast travelled to (Cory, Survival off, vanilla fast travel working); removed. Map markers for homes go in SkyLinkAI.esp: one persistent, disabled marker per kit (or a small pool) in the Tamriel persistent cell, moved to the home and enabled when built. Also: SaveHomeLayout / BuildHomeLayout / RemoveHomeLayout built (layout JSON, shipped HomeLayouts)."
+            },
+            {
+              "datetime": "2026-11-23T16:50",
+              "note": "Target 2.1: CK level design and packaging, the 2.1 theme."
             }
           ],
-          "targetRelease": "",
+          "targetRelease": "2.1",
           "dependsOn": [
             "FEAT-307"
           ]
