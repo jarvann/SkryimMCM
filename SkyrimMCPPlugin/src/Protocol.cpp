@@ -199,6 +199,11 @@ namespace SkyrimMCP::Protocol {
             return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         // get_script_functions is registered below with other formIdParam entries
+        registry["alias_handle"] = [](const std::string& id, const json& params) {
+            std::string quest = params.value("quest", std::string());
+            std::string alias = params.value("alias", std::string());
+            return GameThread(id, [quest, alias]() { return PapyrusBridge::AliasHandle(quest, alias); });
+        };
         registry["call_papyrus_function"] = [](const std::string& id, const json& params) {
             std::string className = params.value("className", "");
             std::string functionName = params.value("functionName", "");

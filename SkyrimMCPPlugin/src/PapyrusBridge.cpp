@@ -6,6 +6,7 @@
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -313,6 +314,30 @@ namespace SkyrimMCP::PapyrusBridge {
 
     // Lists a class's functions from the VM's own type info, which covers scripts the catalog can't
     // see (packed in BSAs). Runs on the game thread. GetScriptObjectType loads the class if needed.
+    json AliasHandle(const std::string& questId, const std::string& alias) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(questId)); } catch (...) {}
+        if (!form) form = RE::TESForm::LookupByEditorID(questId);
+        auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
+        if (!quest) return {{"error", "Quest not found: " + questId}};
+        RE::BGSBaseAlias* found = nullptr;
+        for (auto* a : quest->aliases) {
+            if (!a) continue;
+            const bool idMatch = !alias.empty() && std::all_of(alias.begin(), alias.end(), ::isdigit) && a->aliasID == static_cast<std::uint32_t>(std::stoul(alias));
+            if (idMatch || _stricmp(a->aliasName.c_str(), alias.c_str()) == 0) { found = a; break; }
+        }
+        if (!found) return {{"error", "No alias '" + alias + "' on that quest"}};
+        auto* vm = RE::SkyrimVM::GetSingleton();
+        auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;
+        auto* policy = impl ? impl->GetObjectHandlePolicy1() : nullptr;
+        if (!policy) return {{"error", "Papyrus VM not available"}};
+        const auto handle = policy->GetHandleForObject(found->GetVMTypeID(), found);
+        if (!handle || handle == policy->EmptyHandle()) return {{"error", "The alias has no script handle"}};
+        return {{"quest", std::format("{:08X}", quest->GetFormID())}, {"alias", found->aliasName.c_str()}, {"id", found->aliasID},
+                {"type", found->GetVMTypeID() == RE::BGSRefAlias::VMTYPEID ? "ReferenceAlias" : "LocationAlias"},
+                {"handle", std::format("handle:{:X}", handle)}};
+    }
+
     static json FunctionsFromVM(const std::string& className) {
         auto* vm = RE::SkyrimVM::GetSingleton();
         auto* impl = vm ? vm->GetVMRuntimeData().impl.get() : nullptr;

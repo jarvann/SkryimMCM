@@ -25,6 +25,9 @@ namespace SkyrimMCP {
 
         // Get capabilities for a specific script class
         json GetScriptFunctions(const std::string& className);
+        // A quest alias's script handle ("handle:..."), to call ReferenceAlias / LocationAlias functions (ForceRefTo, Clear)
+        // through CallPapyrusFunction. alias: its name or ID. Game thread.
+        json AliasHandle(const std::string& questId, const std::string& alias);
     }
 
 }
