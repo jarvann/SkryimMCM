@@ -107,18 +107,25 @@ public partial class ModBuildTools : ToolBase
 
     [McpServerTool]
     [Description("Read a script's Papyrus source (.psc) by name, from loose files in the Data folder, MO2 mods (highest priority " +
-        "first), the unpacked base-game sources, then mods' BSA archives. Says which folder, mod or archive it came from, and whether only the compiled .pex exists " +
+        "first), then mods' BSA archives, then the base game's sources (Creation Kit or unpacked by SkyLink), as the game ranks them. Says which folder, mod or archive it came from, and whether only the compiled .pex exists " +
         "(many mods ship no source; SkyLink has no decompiler). Read-only. maxChars caps the text returned.")]
     public Task<object> GetScriptSource(string scriptName, int maxChars = 20000)
     {
         var name = Path.GetFileNameWithoutExtension(scriptName.Trim());
         var ck = FindCreationKit(out _);
-        foreach (var folder in AllSourceFolders(ck))
+        // The Creation Kit's and SkyLink's unpacked base-game sources come last: a mod's own source, loose or in its BSA, is the
+        // one the game runs (USSEP's RelationshipMarriageSpouseHouseScript has the CC houses; the base copy doesn't; GOG, 2026-11-23).
+        var baseGame = ck == null ? new HashSet<string>() : new[]
+        {
+            Path.Combine(ck.Folder, "Data", "Source", "Scripts"), Path.Combine(ck.Folder, "Data", "Scripts", "Source"), VanillaState(ck).folder,
+        }.OfType<string>().Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var folders = AllSourceFolders(ck);
+        object? FromFolder(string folder)
         {
             var path = Path.Combine(folder, name + ".psc");
-            if (!File.Exists(path)) continue;
+            if (!File.Exists(path)) return null;
             var text = File.ReadAllText(path);
-            return Task.FromResult<object>(new
+            return new
             {
                 script = name,
                 path,
@@ -126,8 +133,10 @@ public partial class ModBuildTools : ToolBase
                 lines = text.Count(c => c == '\n') + 1,
                 truncated = text.Length > maxChars,
                 source = text.Length > maxChars ? text[..maxChars] : text,
-            });
+            };
         }
+        foreach (var folder in folders.Where(f => !baseGame.Contains(Path.GetFullPath(f))))
+            if (FromFolder(folder) is { } hit) return Task.FromResult(hit);
         // BUG-100: many mods pack their sources in their BSA (RaceMenu's CharGen.psc), under either layout.
         foreach (var inArchive in new[] { $"scripts\\source\\{name}.psc", $"source\\scripts\\{name}.psc" })
         {
@@ -143,6 +152,8 @@ public partial class ModBuildTools : ToolBase
                 source = text.Length > maxChars ? text[..maxChars] : text,
             });
         }
+        foreach (var folder in folders.Where(f => baseGame.Contains(Path.GetFullPath(f))))
+            if (FromFolder(folder) is { } hit) return Task.FromResult(hit);
         // No source: say whether the game has the compiled script at all.
         var compiled = SkyLinkSettings.GameFileFolders().Select(f => Path.Combine(f, "Scripts", name + ".pex")).FirstOrDefault(File.Exists);
         return Task.FromResult<object>(new
