@@ -6058,6 +6058,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-104",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "A spawned NPC could be copied from a Bethesda debug actor",
+          "description": "FindTemplate chose \"Warehouse Traps Reset Test Guy\", a test-cell actor, as the template for an Argonian family member (GOG, 2026-11-23). Templates whose name or editor ID has Test or Dummy as a word or camel-case part are now skipped.",
+          "history": [
+            {
+              "datetime": "2026-11-23T10:05",
+              "note": "Found in the first GOG round; fixed, unit-checked on sample names."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "not-started",
