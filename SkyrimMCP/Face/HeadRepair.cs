@@ -6,7 +6,7 @@ namespace SkyrimMCP.Face;
 /// BUG-102: makes RaceMenu's exported head (CharGen.ExportHead) into a face file the game accepts on its own, without RaceMenu. Found
 /// on Steam, 2026-11-22: (1) some shapes got the face's texture set; (2) a head part with a mesh but no shape in the file makes the game
 /// ignore the whole file and build the head without its skin texture (KS Hairdos SMP names a mesh it doesn't contain); (3) physics bones
-/// are renamed and all put at the origin, so loose hair bunches up.
+/// are renamed and all put at the origin, so loose hair bunches up; (4) a hair's physics marker is left out (BUG-107).
 /// </summary>
 public static partial class HeadRepair
 {
@@ -68,7 +68,23 @@ public static partial class HeadRepair
                 : $"{editorId}: RaceMenu didn't export it, so it won't be seen on this character");
         }
 
-        // 3. Physics bones: their own names, at rest where their part's mesh has them relative to the head.
+        // 3. Physics markers: a hair's mesh names its physics file in an "HDT Skinned Mesh Physics Object" string on its root, and the
+        //    export leaves it out, so FSMP gave a clone's KS hair no physics (BUG-107, GOG 2026-11-23). Copied onto the face file's root.
+        var root = faceNode >= 0 ? faceNode : 0;
+        var have = nif.ExtraData(root).Select(nif.StringExtraData).OfType<(string Name, string Text)>().ToHashSet();
+        foreach (var (editorId, model) in models)
+        {
+            if (Source(model) is not { } source) continue;
+            for (var i = 0; i < source.Blocks.Count; i++)
+            {
+                if (source.StringExtraData(i) is not { } marker || !marker.Name.StartsWith("HDT", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!have.Add(marker)) continue;
+                nif.AddExtraData(root, nif.AddStringExtraData(marker.Name, marker.Text));
+                bones.Add($"{editorId}: physics {marker.Text}");
+            }
+        }
+
+        // 4. Physics bones: their own names, at rest where their part's mesh has them relative to the head.
         var taken = nif.Strings.ToHashSet();
         for (var i = 0; i < nif.Blocks.Count; i++)
         {
