@@ -6208,6 +6208,22 @@
           ],
           "targetRelease": "",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-306",
+          "type": "",
+          "status": "in-progress",
+          "priority": "",
+          "title": "Ask, never assume: follower, marriage and attraction",
+          "description": "Every character made (SpawnNpc, ExportCharacter) asks the player whether it follows and whether it can be married, and, when a mod that keeps it is installed (ORomance, OSL Aroused), whom it is attracted to: women, men, everyone, no one, or left to the mods. LGBTQIA+ friendly: no orientation is assumed, and the base game already lets anyone marry anyone. An export also refuses a follower whose voice has no follower lines.",
+          "history": [
+            {
+              "datetime": "2026-11-23T13:20",
+              "note": "Cory: \"when making any NPC of any type, the AI should confirm if it needs to be a follower\", \"and confirm if it's marryable\", sexual preferences where a mod uses them, \"overall LGTBQIA+ friendly\", and only when such a mod exists. Built: CharacterChoices questions, attraction_mods/set_attraction, SetAttraction tool, MakeFollower voice, export voice check. Not yet tested in game."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
         }
       ]
     },
