@@ -524,14 +524,17 @@ namespace SkyrimMCP::WorldManager {
         float low = z, high = z;
         if (onGround) if (auto* tes = RE::TES::GetSingleton()) {
             low = 1e9f; high = -1e9f;
+            float sum = 0; int samples = 0;
             for (const auto& [lx, ly] : std::initializer_list<std::pair<float, float>>{ { lo.x, lo.y }, { lo.x, hi.y }, { hi.x, lo.y }, { hi.x, hi.y }, { 0, 0 } }) {
                 const float wx = x + lx * std::cos(a) + ly * std::sin(a), wy = y - lx * std::sin(a) + ly * std::cos(a);
                 float h = 0;
-                if (tes->GetLandHeight({ wx, wy, z + 5000.0f }, h)) { low = std::min(low, h); high = std::max(high, h); }
+                if (tes->GetLandHeight({ wx, wy, z + 5000.0f }, h)) { low = std::min(low, h); high = std::max(high, h); sum += h; ++samples; }
             }
-            if (low > 1e8f) low = high = z;
+            if (samples == 0) { low = high = sum = z; samples = 1; }
             float centre = z; tes->GetLandHeight({ x, y, z + 5000.0f }, centre);
-            z = span > 300.0f ? low - std::min(40.0f, 0.1f * (high - low) + 10.0f) : centre;
+            // Lowest corner buried the uphill side of a farmhouse on a 290-unit slope (Cory: "it's in the ground"); about 60% of the way
+            // up looked right, which the average of the corners and centre gives on an even slope. A little sunk hides the edges.
+            z = span > 300.0f ? sum / samples - 15.0f : centre;
         }
         ref->SetPosition(x, y, z);
         return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", std::format("{:08X}", base->GetFormID())}, {"x", x}, {"y", y}, {"z", z},
