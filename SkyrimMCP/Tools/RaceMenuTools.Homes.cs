@@ -30,6 +30,114 @@ public partial class RaceMenuTools
         output != null && output.LastIndexOf(">>", StringComparison.Ordinal) is var i and >= 0 && double.TryParse(output[(i + 2)..].Trim().Split(' ')[0],
             System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
 
+    private sealed record HomeChoice(string Name, string Kind, string Ref, string? Location);
+
+    /// <summary>Where a character can live: the player's houses, the family homes, SkyLink homes (built for this character).</summary>
+    private async Task<(List<HomeChoice> Homes, string? CharacterId, string? Error)> HomeChoices()
+    {
+        var cid = await CharacterId();
+        var homes = new List<HomeChoice>();
+        string? error = null;
+        try
+        {
+            var houses = await _pipe.SendRequestAsync("owned_houses");
+            if (houses?["error"] != null) error = houses["error"]!.ToString();
+            foreach (var h in (houses?["owned"] as JsonArray ?? []).OfType<JsonObject>())
+                if (h["ref"]?.ToString() is string r) homes.Add(new(h["name"]?.ToString() ?? r, "house", r, h["location"]?.ToString()));
+        }
+        catch (McpException ex) { error = ex.Message; }
+        foreach (var (center, entry) in HomeRegistry.Load())
+            if (entry is JsonObject e && (e["characterId"]?.ToString() == cid || e["characterId"] == null))
+                homes.Add(new(e["name"]?.ToString() ?? center, "skylink", center, null));
+        return (homes, cid, error);
+    }
+
+    /// <summary>The home a choice names: "here", "family" (the main family home), a house or SkyLink home by name, or a reference.</summary>
+    private static HomeChoice? ResolveHome(string home, List<HomeChoice> homes, string? characterId)
+    {
+        var key = home.Trim();
+        if (key.StartsWith("family", StringComparison.OrdinalIgnoreCase))
+            return FamilyHomes.Of(characterId).FirstOrDefault() is { } f ? new(f["name"]!.ToString(), f["kind"]!.ToString(), f["ref"]!.ToString(), f["location"]?.ToString()) : null;
+        key = key.Replace("(SkyLink home)", "", StringComparison.OrdinalIgnoreCase).Trim();
+        return homes.FirstOrDefault(h => h.Name.Equals(key, StringComparison.OrdinalIgnoreCase) || h.Ref.Equals(key, StringComparison.OrdinalIgnoreCase))
+            ?? homes.FirstOrDefault(h => h.Name.StartsWith(key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static List<string> HomeOptionNames(List<HomeChoice> homes, string? characterId)
+    {
+        var names = new List<string> { "here (stays where it stands)" };
+        if (FamilyHomes.Of(characterId).FirstOrDefault() is { } f) names.Add($"family ({f["name"]})");
+        names.AddRange(homes.Select(h => h.Kind == "skylink" ? $"{h.Name} (SkyLink home)" : h.Name));
+        return names.Distinct().ToList();
+    }
+
+    /// <summary>
+    /// Gives a character its home: the spouse through the marriage quest (SetSpouseHome), anyone else through set_home (lives there,
+    /// the place counts as theirs). A relative's first home becomes the family home.
+    /// </summary>
+    private async Task<object> ApplyHome(string refId, string home, string? familyRole)
+    {
+        if (home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase)) return new { home = "here", note = "Stays where it stands." };
+        var (homes, cid, error) = await HomeChoices();
+        if (ResolveHome(home, homes, cid) is not { } chosen)
+            return new { error = $"No home called {home}.", choices = HomeOptionNames(homes, cid), houses = error };
+        string? spouse = null;
+        try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); } catch (McpException) { }
+        object applied;
+        if (string.Equals(spouse, refId, StringComparison.OrdinalIgnoreCase))
+            applied = chosen.Kind == "skylink" ? await SetSpouseHome("skylink", chosen.Ref) : await SetSpouseHome(chosen.Name);
+        else
+        {
+            var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = refId, ["at"] = chosen.Ref });
+            applied = DeserializeResponse(set);
+            if (set?["error"] != null) return applied;
+        }
+        string? family = null;
+        if (familyRole != null && cid != null && FamilyHomes.Of(cid).Count == 0)
+        {
+            FamilyHomes.Add(cid, new JsonObject { ["name"] = chosen.Name, ["kind"] = chosen.Kind, ["ref"] = chosen.Ref, ["location"] = chosen.Location }, main: true);
+            family = $"{chosen.Name} is now the family home.";
+        }
+        if (SlotRegistry.SlotForRef(refId) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
+        {
+            var copy = entry.DeepClone().AsObject();
+            copy["home"] = new JsonObject { ["name"] = chosen.Name, ["kind"] = chosen.Kind, ["ref"] = chosen.Ref };
+            SlotRegistry.Reserve(slot, copy);
+        }
+        return new { home = chosen.Name, kind = chosen.Kind, applied, familyHome = family };
+    }
+
+    [McpServerTool]
+    [Description("Where a spawned character lives (FEAT-307). Without home: the choices (the player's own houses, the family home, SkyLink homes). " +
+        "home: 'here', 'family', a house by name (Breezehome...) or a SkyLink home. The spouse moves through the marriage quest (SetSpouseHome), so " +
+        "'your spouse's house' follows. A relative's first home becomes the family home. Ask the player which.")]
+    public async Task<object> SetHome(string refId, string? home = null)
+    {
+        var (homes, cid, error) = await HomeChoices();
+        if (string.IsNullOrWhiteSpace(home)) return new { choices = HomeOptionNames(homes, cid), houses = error };
+        string? role = null;
+        if (SlotRegistry.SlotForRef(refId.Trim()) is int slot) role = SlotRegistry.Load()[slot.ToString()]?["family"]?.GetValue<string?>();
+        return await ApplyHome(refId.Trim(), home, role);
+    }
+
+    [McpServerTool]
+    [Description("The family's homes (FEAT-307), kept per player character: one of the player's own houses or a SkyLink home. Without home: " +
+        "the family homes and the choices. home: add one (main: true makes it the one relatives are offered first). remove: a family home's name.")]
+    public async Task<object> SetFamilyHome(string? home = null, bool main = true, string? remove = null)
+    {
+        var (homes, cid, error) = await HomeChoices();
+        if (cid == null) return new { error = "No player character (load a game first)." };
+        if (!string.IsNullOrWhiteSpace(remove))
+            return FamilyHomes.Remove(cid, remove.Trim()) ? new { removed = remove.Trim(), familyHomes = FamilyHomes.Of(cid) } : new { error = $"No family home called {remove}." };
+        if (string.IsNullOrWhiteSpace(home))
+            return new { familyHomes = FamilyHomes.Of(cid), choices = homes.Select(h => h.Kind == "skylink" ? $"{h.Name} (SkyLink home)" : h.Name), houses = error,
+                note = homes.Count == 0 ? "The player owns no house yet: buy one, or build a SkyLink home (BuildHomeLayout)." : null };
+        if (ResolveHome(home, homes, null) is not { } chosen || home.Trim().StartsWith("family", StringComparison.OrdinalIgnoreCase))
+            return new { error = $"No house or SkyLink home called {home}.", choices = homes.Select(h => h.Name) };
+        FamilyHomes.Add(cid, new JsonObject { ["name"] = chosen.Name, ["kind"] = chosen.Kind, ["ref"] = chosen.Ref, ["location"] = chosen.Location }, main);
+        return new { familyHomes = FamilyHomes.Of(cid) };
+    }
+
     /// <summary>A home's own pieces: those given, else SkyLink's record of the home; null when neither exists.</summary>
     private static HashSet<string>? OwnPieces(string center, string? given) =>
         string.IsNullOrWhiteSpace(given)

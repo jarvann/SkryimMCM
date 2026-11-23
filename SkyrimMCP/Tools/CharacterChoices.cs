@@ -13,7 +13,8 @@ internal static class CharacterChoices
     /// </summary>
     public static object? Ask(string name, bool? follower, bool? marryable, string? familyRole, string note,
         bool askFamily = false, bool? family = null, (bool follower, bool marryable)? current = null,
-        IReadOnlyList<string>? attractionMods = null, string? attraction = null, bool roleMarryable = false)
+        IReadOnlyList<string>? attractionMods = null, string? attraction = null, bool roleMarryable = false,
+        IReadOnlyList<string>? homeOptions = null, string? home = null, bool firstFamilyHome = false)
     {
         var asked = new List<string>();
         var questions = new List<object>();
@@ -36,6 +37,12 @@ internal static class CharacterChoices
         if (marryable == null && (!relative || familyOpen))
             Add("marryable", (familyOpen ? "Only if family is false: c" : "C") + $"an {name} be married (the Amulet of Mara dialogue)? Adults only." +
                 Now(current?.marryable, "marryable"), "marryable: true", "marryable: false");
+        // Every character lives somewhere (FEAT-307): where it stands, one of the player's houses, the family home or a SkyLink home.
+        if (homeOptions is { Count: > 0 } && home == null)
+            Add("home", $"Where does {name} live?" + (firstFamilyHome
+                    ? " They're family and no family home is set yet: the house chosen becomes the family home (it can be changed with SetFamilyHome)."
+                    : ""),
+                homeOptions.Select(o => "home: " + o).ToArray());
         // Asked only when a mod uses it (Cory, 2026-11-23); open to every orientation, none assumed.
         if (attractionMods is { Count: > 0 } && attraction == null)
             Add("attraction", $"Who is {name} attracted to? ({string.Join(" and ", attractionMods)} use it.)",

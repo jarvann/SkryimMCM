@@ -315,6 +315,9 @@ namespace SkyrimMCP::Protocol {
             int type = params.value("type", 13);  // Farm
             return GameThread(id, [at, name, type]() { return WorldManager::AddMapMarker(at, name, type); });
         };
+        registry["owned_houses"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return WorldManager::OwnedHouses(); });
+        };
         registry["remove_object"] = [](const std::string& id, const json& params) {
             std::string ref = params.value("refId", std::string());
             return GameThread(id, [ref]() { return WorldManager::RemoveObject(ref); });

@@ -16,10 +16,10 @@ d=json.load(sys.stdin); e=d.get('error'); d=d.get('data') or {}
 head=[s for s in d.get('shapes',[]) if s.get('feature')==4]
 print('  $v',e or '', d.get('race'), d.get('voice'), 'tint:', (head[0].get('tint') or 'NONE (built head)')[-44:] if head else '-')"; done < "$OUT/refs.txt"; }
 echo "=== spawning"; date +%T
-spawn clone '{"name":"GOG Clone","face":"player","follower":false,"marryable":true,"attraction":"everyone","dryRun":false}'
-spawn sister '{"name":"GOG Sister","race":"BretonRace","family":"Sister","follower":true,"voice":"FemaleYoungEager","attraction":"women","dryRun":false}'
-spawn brother '{"name":"GOG Brother","race":"NordRace","family":"Brother","follower":false,"attraction":"mods decide","dryRun":false}'
-spawn cousin '{"name":"GOG Cousin","race":"ArgonianRace","family":"Cousin","female":false,"follower":false,"attraction":"no one","dryRun":false}'
+spawn clone '{"name":"GOG Clone","face":"player","follower":false,"marryable":true,"attraction":"everyone","home":"here","dryRun":false}'
+spawn sister '{"name":"GOG Sister","race":"BretonRace","family":"Sister","follower":true,"voice":"FemaleYoungEager","attraction":"women","home":"here","dryRun":false}'
+spawn brother '{"name":"GOG Brother","race":"NordRace","family":"Brother","follower":false,"attraction":"mods decide","home":"here","dryRun":false}'
+spawn cousin '{"name":"GOG Cousin","race":"ArgonianRace","family":"Cousin","female":false,"follower":false,"attraction":"no one","home":"here","dryRun":false}'
 echo "=== now (new face files show after a restart under MO2)"; check
 S=$(awk '/sister/{print $2}' "$OUT/refs.txt")
 echo "=== requirements of the sister"; mcp character_requirements "{\"refId\":\"$S\"}" | json | python3 -c "
