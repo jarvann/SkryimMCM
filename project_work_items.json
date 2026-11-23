@@ -6266,6 +6266,10 @@
             {
               "datetime": "2026-11-23T14:55",
               "note": "Cory's idea, recorded with a homeland-to-region table and the two ways to place homes."
+            },
+            {
+              "datetime": "2026-11-23T15:45",
+              "note": "Hand-tuning the runtime homestead (raise/lower, foundation terraces, corner piece, lower course) showed the limits of building in game: no terrain edits, no navmesh, no interiors, trial-and-error rotations. Cory: building homes/cities will be real work, with more flexibility in the Creation Kit and other utilities. Direction: runtime placement for quick, player-driven homesteads; shipped homes built in CK (landscape flattening under the house instead of foundations, navmesh, interiors, snapping), xEdit for records."
             }
           ],
           "targetRelease": "",
