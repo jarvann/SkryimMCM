@@ -31,19 +31,20 @@ public partial class RaceMenuTools
     }
 
     /// <summary>
-    /// Exports the player's head (CharGen.ExportHead writes CharGen\<name>.dds and .nif) and puts the tint where LoadCharacter
-    /// looks, Textures\CharGen\Exported\<name>.dds. Null when done, else what went wrong. Works in MO2 too: the game writes into
-    /// its virtual folders, which SkyLink finds in overwrite.
+    /// Exports the player's head where LoadCharacter looks for the tint, Textures\CharGen\Exported\<name>.dds (and .nif), by giving
+    /// ExportHead a name that leads there from its own CharGen folder. The game writes the files itself, so under MO2 they land in
+    /// overwrite AND the running game sees them: a copy SkyLink made there was invisible to the game until a restart, and the face
+    /// showed purple (BUG-106, 2026-11-23). Null when done, else what went wrong.
     /// </summary>
     private async Task<string?> ExportTintFor(string preset)
     {
-        await Papyrus("CharGen", "ExportHead", preset);
+        foreach (var file in ExportedFiles(preset)) { TryDelete(file.dds); TryDelete(file.nif); }   // never take an old export
+        await Papyrus("CharGen", "ExportHead", @"..\..\..\Textures\CharGen\Exported\" + preset);
         long last = -1;
         for (var i = 0; i < 60; i++)
         {
-            foreach (var plugins in SkyLinkSettings.ConfigFolders())
+            foreach (var (dds, _) in ExportedFiles(preset))
             {
-                var dds = Path.Combine(plugins, "CharGen", preset + ".dds");
                 if (!File.Exists(dds)) continue;
                 var size = new FileInfo(dds).Length;
                 if (size > 128 && size == last)
@@ -59,19 +60,25 @@ public partial class RaceMenuTools
                         }
                         catch (McpException) { }   // left grey: still a face, not a purple one
                     }
-                    var dataRoot = Path.GetFullPath(Path.Combine(plugins, "..", ".."));
-                    var target = Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset + ".dds");
-                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                    File.Copy(dds, target, overwrite: true);
-                    // Kept (dds, nif) until SpawnNpc has used them for a slot's face files: ExportedHead reads and deletes them.
+                    // Kept until SpawnNpc has used them: ExportedHead reads both and deletes the mesh; LoadCharacter needs the tint.
                     return null;
                 }
                 last = size;
             }
             await Task.Delay(250);
         }
-        return "RaceMenu's ExportHead didn't write the skin texture (CharGen\\" + preset + ".dds) within 15 s, so the face would turn purple. Nothing was spawned.";
+        return "RaceMenu's ExportHead didn't write the skin texture (Textures\\CharGen\\Exported\\" + preset + ".dds) within 15 s, so the face would turn purple. Nothing was spawned.";
     }
+
+    /// <summary>Where an export of this name lands, in each folder the game's Data may be (MO2's overwrite among them).</summary>
+    private static IEnumerable<(string dds, string nif)> ExportedFiles(string preset) =>
+        SkyLinkSettings.ConfigFolders().Select(plugins =>
+        {
+            var dds = Path.Combine(Path.GetFullPath(Path.Combine(plugins, "..", "..")), "Textures", "CharGen", "Exported", preset + ".dds");
+            return (dds, Path.ChangeExtension(dds, ".nif"));
+        });
+
+    private static void TryDelete(string path) { try { File.Delete(path); } catch (Exception) { } }
 
     [McpServerTool]
     [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: editor ID or form ID " +
@@ -304,8 +311,7 @@ public partial class RaceMenuTools
             if (await RaceMenuOpenError() is string open) return (mesh, new { problem = open + " The relative has their own face." });
             if (await ExportTintFor(export) is string exportError) return (mesh, new { problem = exportError });
             var head = ExportedHead(export);
-            foreach (var plugins in SkyLinkSettings.ConfigFolders())   // the copy made for LoadCharacter isn't needed here
-                try { File.Delete(Path.Combine(Path.GetFullPath(Path.Combine(plugins, "..", "..")), "Textures", "CharGen", "Exported", export + ".dds")); } catch (Exception) { }
+            foreach (var (dds, _) in ExportedFiles(export)) TryDelete(dds);   // the tint is for LoadCharacter, not used here
             if (head is not { } playerHead) return (mesh, new { problem = "The player's head wasn't exported." });
 
             var player = await _pipe.SendRequestAsync("get_appearance");
@@ -408,19 +414,16 @@ public partial class RaceMenuTools
         return reply;
     }
 
-    /// <summary>The head RaceMenu exported for a preset (mesh and tint), then deletes the two big files.</summary>
+    /// <summary>The head RaceMenu exported for a preset (mesh and tint). Deletes the mesh; the tint stays for LoadCharacter.</summary>
     private static (byte[] mesh, byte[] tint)? ExportedHead(string preset)
     {
-        foreach (var plugins in SkyLinkSettings.ConfigFolders())
+        foreach (var (dds, nif) in ExportedFiles(preset))
         {
-            var dds = Path.Combine(plugins, "CharGen", preset + ".dds");
-            var nif = Path.ChangeExtension(dds, ".nif");
             if (!File.Exists(dds) || !File.Exists(nif)) continue;
             try
             {
                 var result = (File.ReadAllBytes(nif), File.ReadAllBytes(dds));
-                File.Delete(dds);
-                File.Delete(nif);
+                TryDelete(nif);
                 return result;
             }
             catch (Exception) { }
