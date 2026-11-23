@@ -6328,7 +6328,7 @@
         {
           "id": "BUG-110",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "",
           "title": "Home layouts took the game's own objects near a home as its pieces",
           "description": "placed_objects lists every object created at run time near a centre: the game makes its own (12 bees, 2 butterflies, 22 copies of Skyrim.esm|0C2D47 around the GOG homestead), so SaveHomeLayout would have saved them and RemoveHomeLayout deleted them. Fix: HomeRegistry (homes.json) records each home's pieces (BuildHomeLayout records; pieces: reference IDs for a home SkyLink didn't build); save and remove touch only those.",
@@ -6341,7 +6341,8 @@
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-307"
-          ]
+          ],
+          "testNotes": "2026-11-23 GOG (SkyLink_HomeQuestion): RemoveHomeLayout dry run listed exactly the 19 recorded pieces plus the centre marker; SaveHomeLayout saved 19; no game objects."
         },
         {
           "id": "FEAT-305",
@@ -6415,7 +6416,8 @@
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-306"
-          ]
+          ],
+          "testNotes": "2026-11-23 GOG (SkyLink_HomeQuestion): SpawnNpc asks home (marryable skipped for an aunt); spawned into the homestead, which became the family home; SetHome moved GOG Mother to the family home, refused a follower; SetFamilyHome remove/add; homes kept through save and reload. Homestead bench turned to 340 (seated actors faced the house). Still to test: a save that owns a player house (owned_houses)."
         },
         {
           "id": "FEAT-308",
