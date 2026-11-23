@@ -383,16 +383,33 @@ public partial class RaceMenuTools
             }
             else note = "This voice has no follower lines, so the recruit dialogue won't appear. Give it one of followerVoices.";
         }
+        if (follower && await SetRelationshipToPlayer(refId, 3) is string failed) note = (note + " The relationship rank wasn't set: " + failed).Trim();
+        return (true, new { result = DeserializeResponse(set), note });
+    }
+
+    /// <summary>
+    /// The character's relationship rank with the player (3 ally, 0 acquaintance). Null when set, else why not. A character spawned
+    /// moments ago isn't bound in the script engine yet, so Papyrus refuses it (seen on GOG, 2026-11-23); the console's
+    /// setrelationshiprank does the same and works at once.
+    /// </summary>
+    private async Task<string?> SetRelationshipToPlayer(string refId, int rank)
+    {
         try
         {
-            if (follower)
-                await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
-                {
-                    ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId, ["args"] = new JsonArray("00000014", 3),
-                });
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId, ["args"] = new JsonArray("00000014", rank),
+            });
+            return null;
         }
-        catch (McpException ex) { note = (note + " The relationship rank wasn't set: " + ex.Message).Trim(); }
-        return (true, new { result = DeserializeResponse(set), note });
+        catch (McpException) { }
+        try
+        {
+            var target = char.IsDigit(refId[0]) ? $"\"{refId}\"" : refId;
+            var run = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"{target}.setrelationshiprank player {rank}" });
+            return run?["error"]?.ToString();
+        }
+        catch (McpException ex) { return ex.Message; }
     }
 
     [McpServerTool]
@@ -426,17 +443,9 @@ public partial class RaceMenuTools
     {
         var set = await _pipe.SendRequestAsync("set_family", new JsonObject { ["refId"] = refId, ["role"] = role });
         if (set?["error"] != null) return (false, DeserializeResponse(set));
-        string? liking = null;
-        try
-        {
-            // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
-            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
-            {
-                ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId,
-                ["args"] = new JsonArray("00000014", set?["role"] is JsonValue ? 3 : 0),
-            });
-        }
-        catch (McpException ex) { liking = "The relationship rank wasn't set: " + ex.Message; }
+        // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
+        var failed = await SetRelationshipToPlayer(refId, set?["role"] is JsonValue ? 3 : 0);
+        var liking = failed == null ? null : "The relationship rank wasn't set: " + failed;
         return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
     }
 
