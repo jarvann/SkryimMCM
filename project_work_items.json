@@ -6246,6 +6246,24 @@
           "dependsOn": [
             "FEAT-306"
           ]
+        },
+        {
+          "id": "FEAT-308",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "Family origin: the family story and a family home in the world",
+          "description": "When the player starts the family, the MCP walks them through narrating the family's history (homeland, standing, wealth, the living and the lost), kept per player character, and suggests the relatives and a family home that fits: a home in the world near the border of their homeland, in a style for their standing (shack to manor). Either new homes in SkyLinkAI.esp (exterior edits, CK level design) or existing buildings claimed at run time (Cell.SetFactionOwner, no world edits). See docs/1.6-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-23T14:55",
+              "note": "Cory's idea, recorded with a homeland-to-region table and the two ways to place homes."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": [
+            "FEAT-307"
+          ]
         }
       ]
     },
