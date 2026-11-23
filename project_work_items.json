@@ -6074,6 +6074,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-105",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "A clone of a player with no skin-tone layers has a grey face",
+          "description": "RaceMenu's ExportHead writes a flat mid-grey tint (127, no tint) for a player with no tint layers, e.g. a character started with coc. The clone's face was grey against a skin-coloured body (GOG, 2026-11-23). A flat export is now filled with the player's skin colour; the game's own NPC tints average close to their skin colour (measured on three family NPCs).",
+          "history": [
+            {
+              "datetime": "2026-11-23T10:25",
+              "note": "Found by Cory on the first GOG round; fixed."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "not-started",

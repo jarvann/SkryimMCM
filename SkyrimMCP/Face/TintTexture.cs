@@ -6,6 +6,48 @@ namespace SkyrimMCP.Face;
 /// </summary>
 public static class TintTexture
 {
+    /// <summary>
+    /// True for an uncompressed 32-bit texture of one colour. RaceMenu's ExportHead writes plain mid-grey (127, "no tint") for a
+    /// player with no skin-tone layers, such as a character started with coc that never went through character creation; on an
+    /// NPC that leaves the face grey against a skin-coloured body (2026-11-23, GOG).
+    /// </summary>
+    public static bool IsFlat(byte[] dds)
+    {
+        if (!Plain(dds, out var width, out var height)) return false;
+        for (var at = 128; at < 128 + 4 * width * height; at += 4)
+            for (var k = 0; k < 3; k++)
+                if (Math.Abs(dds[at + k] - dds[128 + k]) > 3) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// The same texture filled with one colour (#RRGGBB). The game's own face tints average out close to the NPC's skin colour,
+    /// so a flat export is replaced by the skin colour. Anything but an uncompressed 32-bit texture is returned as it is.
+    /// </summary>
+    public static byte[] Fill(byte[] dds, string hex)
+    {
+        if (!Plain(dds, out var width, out var height) || hex.Length != 7 || hex[0] != '#') return dds;
+        var rgb = Convert.FromHexString(hex[1..]);
+        var redFirst = BitConverter.ToUInt32(dds, 92) == 0xFF;
+        var copy = (byte[])dds.Clone();
+        for (var at = 128; at < 128 + 4 * width * height; at += 4)
+        {
+            copy[at] = redFirst ? rgb[0] : rgb[2];
+            copy[at + 1] = rgb[1];
+            copy[at + 2] = redFirst ? rgb[2] : rgb[0];
+        }
+        return copy;
+    }
+
+    private static bool Plain(byte[] dds, out int width, out int height)
+    {
+        width = height = 0;
+        if (dds.Length < 128 || dds[0] != 'D' || dds[1] != 'D' || dds[2] != 'S') return false;
+        height = BitConverter.ToInt32(dds, 12); width = BitConverter.ToInt32(dds, 16);
+        return (BitConverter.ToInt32(dds, 80) & 0x4) == 0 && BitConverter.ToInt32(dds, 88) == 32 && width > 0 && height > 0 &&
+               dds.Length >= 128 + 4L * width * height;
+    }
+
     public static byte[] Shrink(byte[] dds, int size)
     {
         if (dds.Length < 128 || dds[0] != 'D' || dds[1] != 'D' || dds[2] != 'S') return dds;

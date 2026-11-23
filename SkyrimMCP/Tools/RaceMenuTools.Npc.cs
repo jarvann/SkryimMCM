@@ -48,6 +48,17 @@ public partial class RaceMenuTools
                 var size = new FileInfo(dds).Length;
                 if (size > 128 && size == last)
                 {
+                    // No skin-tone layers on the player: a flat grey tint. The skin colour instead, as the game's own tints are.
+                    var bytes = await File.ReadAllBytesAsync(dds);
+                    if (Face.TintTexture.IsFlat(bytes))
+                    {
+                        try
+                        {
+                            var skin = (await _pipe.SendRequestAsync("head_materials", new JsonObject { ["refId"] = "00000014" }))?["bodyTint"]?.ToString();
+                            if (skin != null) await File.WriteAllBytesAsync(dds, Face.TintTexture.Fill(bytes, skin));
+                        }
+                        catch (McpException) { }   // left grey: still a face, not a purple one
+                    }
                     var dataRoot = Path.GetFullPath(Path.Combine(plugins, "..", ".."));
                     var target = Path.Combine(dataRoot, "Textures", "CharGen", "Exported", preset + ".dds");
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
