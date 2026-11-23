@@ -94,6 +94,35 @@ public sealed class NifDocument
     public int TranslationAt(int block) => FlagsAt(block) + 4;
     private int AfterAvObject(int block) => TranslationAt(block) + 12 + 36 + 4 + 4;
 
+    /// <summary>The blocks in a node's or shape's extra data list.</summary>
+    public IEnumerable<int> ExtraData(int block)
+    {
+        for (var k = 0; k < Int(block, 4); k++) if (Int(block, 8 + 4 * k) is >= 0 and var d) yield return d;
+    }
+
+    public void AddExtraData(int block, int data)
+    {
+        var count = Int(block, 4);
+        var end = 8 + 4 * count;
+        var b = Blocks[block];
+        Blocks[block] = [.. b[..4], .. BitConverter.GetBytes(count + 1), .. b[8..end], .. BitConverter.GetBytes(data), .. b[end..]];
+    }
+
+    /// <summary>A block type's index, added to the file's type list when it isn't there yet.</summary>
+    public ushort TypeIndex(string type)
+    {
+        var i = Types.IndexOf(type);
+        if (i < 0) { Types.Add(type); i = Types.Count - 1; }
+        return (ushort)i;
+    }
+
+    /// <summary>An NiStringExtraData's name and text (both string-table entries).</summary>
+    public (string Name, string Text)? StringExtraData(int block) =>
+        TypeOf(block) == "NiStringExtraData" && Int(block, 4) is var t && t >= 0 && t < Strings.Count ? (Name(block), Strings[t]) : null;
+
+    public int AddStringExtraData(string name, string text) =>
+        Add(TypeIndex("NiStringExtraData"), [.. BitConverter.GetBytes(AddString(name)), .. BitConverter.GetBytes(AddString(text))]);
+
     public bool IsNode(int block) => TypeOf(block) is "NiNode" or "BSFadeNode" or "BSFaceGenNiNode";
     public bool IsShape(int block) => TypeOf(block) is "BSDynamicTriShape" or "BSTriShape";
 

@@ -6106,6 +6106,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-107",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "A clone's SMP hair has no physics once its face file is used",
+          "description": "RaceMenu's ExportHead leaves out the hair mesh's NiStringExtraData 'HDT Skinned Mesh Physics Object' (the path of its physics XML), so FSMP gave the hair no physics after a restart, while the live (RaceMenu) clone's hair moved (GOG, KSSMP Honey, 2026-11-23). HeadRepair now copies each head part's HDT markers onto the face file's root.",
+          "history": [
+            {
+              "datetime": "2026-11-23T10:30",
+              "note": "Found by Cory on GOG; fixed."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "not-started",
