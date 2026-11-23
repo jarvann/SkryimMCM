@@ -6116,6 +6116,10 @@
             {
               "datetime": "2026-11-23T10:30",
               "note": "Found by Cory on GOG; fixed."
+            },
+            {
+              "datetime": "2026-11-23T10:36",
+              "note": "In game: with the marker on the root the hair has physics (BUG-109 made it hang to the floor)."
             }
           ],
           "targetRelease": "",
@@ -6132,6 +6136,22 @@
             {
               "datetime": "2026-11-23T10:45",
               "note": "Crash on GOG while respawning the Hair Clone into slot 51; fixed."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-109",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "A clone's SMP hair falls to the floor once its face file is used",
+          "description": "RaceMenu's export keeps only the bones some vertex uses, so a hair chain's fixed top bones (KSSMP Honey: Honey Back 1, L1, R1) were missing. FSMP builds an NPC's hair physics from the face file, found no anchors, and the hair hung stretched to the floor (GOG, 2026-11-23). HeadRepair adds every non-skeleton node a part's mesh has below the head, at its place relative to the head.",
+          "history": [
+            {
+              "datetime": "2026-11-23T10:40",
+              "note": "Found by Cory on GOG after BUG-107 gave the hair physics; cause read in FSMP ActorManager::processGeometry; fixed."
             }
           ],
           "targetRelease": "",

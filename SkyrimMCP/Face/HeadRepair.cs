@@ -104,6 +104,30 @@ public static partial class HeadRepair
                 break;
             }
         }
+        // 5. Physics bones no vertex uses, such as the fixed bone a hair chain hangs from ("Honey Back 1"): the export leaves them out,
+        //    and FSMP, building the physics from the face file, found no anchor, so the hair fell to the floor (BUG-109, GOG
+        //    2026-11-23). Every node a part's mesh has below the head that isn't the skeleton's is added beside the others, at its
+        //    place relative to the head (FSMP moves the root's nodes under the head).
+        var inFile = Enumerable.Range(0, nif.Blocks.Count).Where(nif.IsNode).Select(nif.Name).ToHashSet();
+        var template = Enumerable.Range(1, nif.Blocks.Count - 1).FirstOrDefault(i => nif.TypeOf(i) == "NiNode" && !nif.Name(i).StartsWith("NPC ") &&
+            nif.Name(i) != "BSFaceGenNiNodeSkinned" && !nif.Children(i).Any() && !nif.ExtraData(i).Any(), -1);   // a bare bone to copy
+        if (template >= 0)
+            foreach (var model in models.Values.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (Source(model) is not { } source) continue;
+                for (var k = 0; k < source.Blocks.Count; k++)
+                {
+                    if (!source.IsNode(k) || source.Name(k) is var own && (own.StartsWith("NPC ") || inFile.Contains(own))) continue;
+                    if (RelativeToHead(source, own) is not { } rest || rest.Translation.All(v => v == 0) && own == "NPC Head [Head]") continue;
+                    var bone = nif.Add(nif.BlockTypes[template], (byte[])nif.Blocks[template].Clone());
+                    nif.SetInt(bone, 0, nif.AddString(own));
+                    nif.SetTransform(bone, rest.Translation, rest.Rotation);
+                    nif.AddChild(0, bone);
+                    inFile.Add(own);
+                    bones.Add($"{own} (added: no vertex uses it)");
+                }
+            }
+
         var untouched = textures.Count + standIns.Count + bones.Count == 0;
         return new Result(untouched ? mesh : nif.ToBytes(), textures, standIns, bones, problems);
     }
