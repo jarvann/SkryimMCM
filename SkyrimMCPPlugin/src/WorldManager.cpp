@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 #include <format>
 #include <unordered_map>
 #include <vector>
@@ -506,10 +507,45 @@ namespace SkyrimMCP::WorldManager {
         return {{"size", size}, {"spots", spots}, {"note", "slope: highest minus lowest ground over the square (game units); objects: buildings, trees, rocks and furniture in it. Water isn't checked."}};
     }
 
+    namespace {
+        // "Plugin.esp|0B11AC" (stays right when the load order changes) or a form ID.
+        RE::TESForm* FormFromId(const std::string& id) {
+            if (const auto bar = id.rfind('|'); bar != std::string::npos) {
+                auto* data = RE::TESDataHandler::GetSingleton();
+                try { return data ? data->LookupForm(static_cast<RE::FormID>(std::stoul(id.substr(bar + 1), nullptr, 16)), id.substr(0, bar)) : nullptr; } catch (...) { return nullptr; }
+            }
+            try { return RE::TESForm::LookupByID(Helpers::ParseFormId(id)); } catch (...) { return nullptr; }
+        }
+        std::string StableIdOf(RE::TESForm* form) {
+            auto* file = form ? form->GetFile(0) : nullptr;
+            return file ? std::format("{}|{:06X}", file->GetFilename(), form->GetLocalFormID()) : std::format("{:08X}", form ? form->GetFormID() : 0);
+        }
+    }
+
+    json PlacedObjects(const std::string& centerRef, float radius) {
+        auto* center = FormFromId(centerRef);
+        auto* at = center ? center->As<RE::TESObjectREFR>() : nullptr;
+        auto* tes = RE::TES::GetSingleton();
+        if (!at || !tes) return {{"error", "Not a reference: " + centerRef}};
+        const auto c = at->GetPosition();
+        json pieces = json::array();
+        tes->ForEachReferenceInRange(at, std::clamp(radius, 100.0f, 6000.0f), [&](RE::TESObjectREFR* ref) {
+            auto* base = ref ? ref->GetBaseObject() : nullptr;
+            if (!base || ref == at || (ref->GetFormID() >> 24) != 0xFF || ref->IsDisabled() || ref->IsDeleted() || ref->Is(RE::FormType::ActorCharacter)) return RE::BSContainer::ForEachResult::kContinue;
+            const auto p = ref->GetPosition();
+            const char* ed = base->GetFormEditorID();
+            pieces.push_back({{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", StableIdOf(base)}, {"type", RE::FormTypeToString(base->GetFormType())},
+                              {"what", ed && *ed ? json(ed) : json(base->GetName() && *base->GetName() ? base->GetName() : "")},
+                              {"offset", { std::round((p.x - c.x) * 10) / 10, std::round((p.y - c.y) * 10) / 10, std::round((p.z - c.z) * 10) / 10 }},
+                              {"angle", std::round(ref->GetAngleZ() * 57.2957795f * 10) / 10}, {"scale", ref->GetScale()}});
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        return {{"center", { c.x, c.y, c.z }}, {"facing", at->GetAngleZ() * 57.2957795f}, {"pieces", pieces}};
+    }
+
     json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround) {
         auto* player = RE::PlayerCharacter::GetSingleton();
-        RE::TESForm* form = nullptr;
-        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(baseId)); } catch (...) {}
+        RE::TESForm* form = FormFromId(baseId);
         auto* base = form ? form->As<RE::TESBoundObject>() : nullptr;
         if (!player || !base) return {{"error", "Not a placeable base object: " + baseId}};
         if (onGround) if (auto* tes = RE::TES::GetSingleton()) { float h = 0; if (tes->GetLandHeight({ x, y, z + 5000.0f }, h)) z = h; }
@@ -539,6 +575,38 @@ namespace SkyrimMCP::WorldManager {
         ref->SetPosition(x, y, z);
         return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", std::format("{:08X}", base->GetFormID())}, {"x", x}, {"y", y}, {"z", z},
                 {"footprint", span}, {"groundRise", high - low}};
+    }
+
+    // FEAT-307 spike: a map marker for a home placed in game. The game's MapMarker object, placed at the home, given marker data
+    // (name, shown and fast travel, type). The data's TESFullName has a vtable, so it starts as a copy of a known marker's.
+    json AddMapMarker(const std::string& atRef, const std::string& name, int type) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* atForm = FormFromId(atRef);
+        auto* at = atForm ? atForm->As<RE::TESObjectREFR>() : nullptr;
+        auto* markerBase = RE::TESForm::LookupByID<RE::TESBoundObject>(0x00000010);  // MapMarker
+        if (!player || !at || !markerBase) return {{"error", "Not a reference, or no MapMarker object: " + atRef}};
+        RE::MapMarkerData* known = nullptr;
+        for (auto& handle : player->GetPlayerRuntimeData().currentMapMarkers) {
+            auto ref = handle.get();
+            auto* extra = ref ? ref->extraList.GetByType<RE::ExtraMapMarker>() : nullptr;
+            if (extra && extra->mapData) { known = extra->mapData; break; }
+        }
+        if (!known) return {{"error", "No map marker known to copy from (discover one first)"}};
+        auto ref = player->PlaceObjectAtMe(markerBase, true);
+        if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        ref->SetPosition(at->GetPosition());
+        auto* data = RE::malloc<RE::MapMarkerData>();
+        std::memset(static_cast<void*>(data), 0, sizeof(RE::MapMarkerData));
+        std::memcpy(static_cast<void*>(data), static_cast<const void*>(known), sizeof(void*));  // the TESFullName vtable only
+        data->locationName.fullName = name;
+        data->flags.set(RE::MapMarkerData::Flag::kVisible, RE::MapMarkerData::Flag::kCanTravelTo);
+        data->type = static_cast<RE::MARKER_TYPE>(type);
+        auto* extra = RE::BSExtraData::Create<RE::ExtraMapMarker>();
+        extra->mapData = data;
+        ref->extraList.Add(extra);
+        player->GetPlayerRuntimeData().currentMapMarkers.push_back(ref->GetHandle());
+        return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"name", name}, {"type", type},
+                {"note", "Spike: check the world map, then save and reload to see whether it stays."}};
     }
 
     json RemoveObject(const std::string& refId) {

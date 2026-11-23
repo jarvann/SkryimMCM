@@ -304,6 +304,17 @@ namespace SkyrimMCP::Protocol {
             bool ground = params.value("onGround", true);
             return GameThread(id, [=]() { return WorldManager::PlaceObject(base, x, y, z, a, ground); });
         };
+        registry["placed_objects"] = [](const std::string& id, const json& params) {
+            std::string center = params.value("center", std::string());
+            float radius = params.value("radius", 1500.0f);
+            return GameThread(id, [center, radius]() { return WorldManager::PlacedObjects(center, radius); });
+        };
+        registry["add_map_marker"] = [](const std::string& id, const json& params) {
+            std::string at = params.value("at", std::string());
+            std::string name = params.value("name", std::string("Homestead"));
+            int type = params.value("type", 13);  // Farm
+            return GameThread(id, [at, name, type]() { return WorldManager::AddMapMarker(at, name, type); });
+        };
         registry["remove_object"] = [](const std::string& id, const json& params) {
             std::string ref = params.value("refId", std::string());
             return GameThread(id, [ref]() { return WorldManager::RemoveObject(ref); });

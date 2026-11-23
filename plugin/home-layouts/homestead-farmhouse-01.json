@@ -1,6 +1,6 @@
 {
   "name": "Homestead: farmhouse 01",
-  "note": "Built by hand in game on GOG, 2026-11-23 (saved SkyLink_Homestead). Offsets are world units from the center marker, unrotated (the layout as placed, facing angle 340 from the marker to the house). Pieces are placed exactly (onGround false) at center + offset; rotate every offset and angle together to face another way. The house shell sat on a 290-unit slope: the foundation and footing walls hide the drop at the back.",
+  "note": "Built by hand in game on GOG, 2026-11-23 (saved SkyLink_Homestead). Offsets are world units from the center marker, unrotated (the layout as placed, facing angle 340 from the marker to the house). BuildHomeLayout places a new centre marker on the ground, then every piece exactly (onGround false) at center + offset; rotate every offset and angle together to face another way. The house shell sat on a 290-unit slope: the foundation and footing walls hide the drop at the back.",
   "world": {
     "worldspace": "Tamriel",
     "cell": [
@@ -14,18 +14,6 @@
     ]
   },
   "pieces": [
-    {
-      "role": "center",
-      "base": "Skyrim.esm|00003B",
-      "offset": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "angle": 340,
-      "what": "XMarker: the home marker (set_home, SetSpouseHome)",
-      "placedRef": "FF000E89"
-    },
     {
       "role": "house",
       "base": "Skyrim.esm|0B11AC",
@@ -262,5 +250,6 @@
       "home": "center",
       "spouse": true
     }
-  ]
+  ],
+  "facing": 340
 }
