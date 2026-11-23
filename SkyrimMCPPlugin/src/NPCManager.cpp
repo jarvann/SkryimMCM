@@ -654,6 +654,24 @@ namespace SkyrimMCP::NPCManager {
             return nullptr;
         }
 
+        // "Test" or "Dummy" as a word of its own or a camel-case part of an editor ID ("TestGuyArgonian", "WarehouseTestGuy"):
+        // capitalised, anything before it and no lower-case letter after it ("Testament" passes); lower-case "test" only as a
+        // separate word ("Contest", "attest" pass).
+        bool IsTestActor(const char* text) {
+            if (!text) return false;
+            const std::string_view s(text);
+            const auto lower = [&](size_t i) { return i < s.size() && std::islower(static_cast<unsigned char>(s[i])); };
+            const auto letter = [&](size_t i) { return i < s.size() && std::isalpha(static_cast<unsigned char>(s[i])); };
+            for (std::string_view word : { std::string_view("Test"), std::string_view("Dummy"), std::string_view("test") }) {
+                const bool capital = std::isupper(static_cast<unsigned char>(word[0]));
+                for (size_t at = s.find(word); at != std::string_view::npos; at = s.find(word, at + 1)) {
+                    const size_t end = at + word.size();
+                    if (capital ? !lower(end) : ((at == 0 || !letter(at - 1)) && !letter(end))) return true;
+                }
+            }
+            return false;
+        }
+
         // A plain NPC of this race and sex to copy: not the player, not built from a template (its look and stats would come
         // from somewhere else), preferring one that isn't unique.
         // (2026-11-22: the first version took the first match in the form list, which for a Nord man was the Headless Horseman.)
@@ -673,6 +691,9 @@ namespace SkyrimMCP::NPCManager {
                               Flag::kIsChargenFacePreset, Flag::kUsesTemplate)) continue;
                 // No head of its own, no name, or a plugin's script on it: not an ordinary person to copy.
                 if (npc->numHeadParts < 3 || !npc->GetName() || !*npc->GetName()) continue;
+                // Bethesda's debug actors, who live in the test cells (2026-11-23: an Argonian cousin was copied from
+                // "Warehouse Traps Reset Test Guy"). The editor ID is there only when a mod such as po3 Tweaks keeps it.
+                if (IsTestActor(npc->GetName()) || IsTestActor(npc->GetFormEditorID())) continue;
                 const auto id = npc->GetFormID();
                 int score = 0;
                 if ((id >> 24) == 0x00) score += 2;                            // the base game
