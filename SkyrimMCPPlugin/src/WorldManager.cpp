@@ -463,12 +463,15 @@ namespace SkyrimMCP::WorldManager {
         if (cell->IsInteriorCell()) return {{"error", "The player is indoors: go outside first"}};
         searchRadius = std::clamp(searchRadius, 0.0f, 4000.0f);
         size = std::clamp(size, 300.0f, 3000.0f);
-        struct Blocker { RE::NiPoint3 at; float radius; };
+        struct Blocker { RE::NiPoint3 at; float radius; std::string what; };
         std::vector<Blocker> blockers;  // a rock's origin can be far outside the square while its mesh covers it: count its size
         tes->ForEachReferenceInRange(player, searchRadius + size, [&](RE::TESObjectREFR* ref) {
             if (Blocks(ref)) {
                 const auto span = ref->GetBoundMax() - ref->GetBoundMin();
-                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale() });
+                auto* b = ref->GetBaseObject();
+                const char* ed = b->GetFormEditorID();
+                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale(),
+                                     std::format("{} {:08X}{}{} r{:.0f}", RE::FormTypeToString(b->GetFormType()), b->GetFormID(), ed && *ed ? " " : "", ed ? ed : "", 0.5f * std::max(span.x, span.y) * ref->GetScale()) });
             }
             return RE::BSContainer::ForEachResult::kContinue;
         });
@@ -489,9 +492,10 @@ namespace SkyrimMCP::WorldManager {
                     }
                 if (!land) continue;
                 int clutter = 0;
-                for (const auto& b : blockers) if (std::hypot(b.at.x - c.x, b.at.y - c.y) < size * 0.6f + b.radius) ++clutter;
+                json what = json::array();
+                for (const auto& b : blockers) if (std::hypot(b.at.x - c.x, b.at.y - c.y) < size * 0.6f + b.radius) { ++clutter; if (what.size() < 5) what.push_back(b.what); }
                 float ground = 0; tes->GetLandHeight({ c.x, c.y, c.z + 5000.0f }, ground);
-                spots.push_back({{"x", c.x}, {"y", c.y}, {"z", ground}, {"slope", hi - lo}, {"objects", clutter}, {"fromPlayer", r}});
+                spots.push_back({{"x", c.x}, {"y", c.y}, {"z", ground}, {"slope", hi - lo}, {"objects", clutter}, {"what", what}, {"fromPlayer", r}});
             }
         }
         std::sort(spots.begin(), spots.end(), [](const json& a, const json& b) {
