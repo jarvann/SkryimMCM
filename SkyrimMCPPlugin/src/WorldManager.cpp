@@ -511,9 +511,37 @@ namespace SkyrimMCP::WorldManager {
         if (onGround) if (auto* tes = RE::TES::GetSingleton()) { float h = 0; if (tes->GetLandHeight({ x, y, z + 5000.0f }, h)) z = h; }
         auto ref = player->PlaceObjectAtMe(base, true);  // persistent: kept by saves wherever the player goes
         if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        const float a = angleZ * 0.0174532925f;
+        ref->SetAngle({ 0.0f, 0.0f, a });
+        // The ground under the whole footprint, not just the centre: a big piece goes to its lowest corner, a little sunk, as the
+        // game's own buildings are (on a slope the low side floated and the high side sank, 2026-11-23); a small one to its centre.
+        const auto lo = ref->GetBoundMin(), hi = ref->GetBoundMax();
+        const float span = std::max(hi.x - lo.x, hi.y - lo.y) * ref->GetScale();
+        float low = z, high = z;
+        if (onGround) if (auto* tes = RE::TES::GetSingleton()) {
+            low = 1e9f; high = -1e9f;
+            for (const auto& [lx, ly] : std::initializer_list<std::pair<float, float>>{ { lo.x, lo.y }, { lo.x, hi.y }, { hi.x, lo.y }, { hi.x, hi.y }, { 0, 0 } }) {
+                const float wx = x + lx * std::cos(a) + ly * std::sin(a), wy = y - lx * std::sin(a) + ly * std::cos(a);
+                float h = 0;
+                if (tes->GetLandHeight({ wx, wy, z + 5000.0f }, h)) { low = std::min(low, h); high = std::max(high, h); }
+            }
+            if (low > 1e8f) low = high = z;
+            float centre = z; tes->GetLandHeight({ x, y, z + 5000.0f }, centre);
+            z = span > 300.0f ? low - std::min(40.0f, 0.1f * (high - low) + 10.0f) : centre;
+        }
         ref->SetPosition(x, y, z);
-        ref->SetAngle({ 0.0f, 0.0f, angleZ * 0.0174532925f });
-        return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", std::format("{:08X}", base->GetFormID())}, {"x", x}, {"y", y}, {"z", z}};
+        return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", std::format("{:08X}", base->GetFormID())}, {"x", x}, {"y", y}, {"z", z},
+                {"footprint", span}, {"groundRise", high - low}};
+    }
+
+    json RemoveObject(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+        if (!ref || (ref->GetFormID() >> 24) != 0xFF || ref->Is(RE::FormType::ActorCharacter)) return {{"error", "Only objects placed at run time can be removed: " + refId}};
+        ref->Disable();
+        ref->SetDelete(true);
+        return {{"refId", refId}, {"removed", true}};
     }
 
     json DiscoverAllMapMarkers() {

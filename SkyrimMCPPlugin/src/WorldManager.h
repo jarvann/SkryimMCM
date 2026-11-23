@@ -22,6 +22,7 @@ namespace SkyrimMCP {
         // a base object there for good (persistent, so saves keep it).
         json FindOpenSpace(float searchRadius, float size);
         json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround);
+        json RemoveObject(const std::string& refId);
         json GetGameTime();
         json SetGameTime(float hours);
         json ToggleCollision(const std::string& refFormIdHex = "");

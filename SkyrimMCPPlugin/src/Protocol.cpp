@@ -304,6 +304,10 @@ namespace SkyrimMCP::Protocol {
             bool ground = params.value("onGround", true);
             return GameThread(id, [=]() { return WorldManager::PlaceObject(base, x, y, z, a, ground); });
         };
+        registry["remove_object"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            return GameThread(id, [ref]() { return WorldManager::RemoveObject(ref); });
+        };
         registry["attraction_mods"] = [](const std::string& id, const json&) {
             return GameThread(id, []() { return NPCManager::AttractionMods(); });
         };
