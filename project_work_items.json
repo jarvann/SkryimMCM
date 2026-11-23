@@ -5570,6 +5570,10 @@
             {
               "datetime": "2026-11-22T19:50",
               "note": "In game (Steam, through Vortex): the exported sister's quest created her at its marker when a save was loaded; own face file, skin, hair colour (her own CLFM), Young Eager, the outfit, protected, follower factions. The first export had no relationship record (0 with the player); with ally set for the session the player recruited her. The export now writes a RELA (ally); v2 not installed yet."
+            },
+            {
+              "datetime": "2026-11-23T10:50",
+              "note": "GOG/MO2 full cycle: sister with the player face, KSSMP Honey hair and a High Poly Head part spawned, exported (masters High Poly Head.esm, KSHairdosSMP.esp), installed as an MO2 mod, restarted: she appears from her own mod with her face file, hair physics and follower dialogue (Cory: looks good)."
             }
           ],
           "targetRelease": "1.6",
@@ -6176,6 +6180,10 @@
             {
               "datetime": "2026-11-23T10:46",
               "note": "In game (GOG): anchor bones added before the face node; face and hair right after a restart (Cory)."
+            },
+            {
+              "datetime": "2026-11-23T10:50",
+              "note": "GOG/MO2 full cycle: sister with the player face, KSSMP Honey hair and a High Poly Head part spawned, exported (masters High Poly Head.esm, KSHairdosSMP.esp), installed as an MO2 mod, restarted: she appears from her own mod with her face file, hair physics and follower dialogue (Cory: looks good)."
             }
           ],
           "targetRelease": "",
