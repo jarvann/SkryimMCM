@@ -6244,6 +6244,10 @@
             {
               "datetime": "2026-11-23T15:10",
               "note": "Prototype on GOG: find_open_space, place_object (persistent) and set_home built a homestead (farmhouse shell, tent, bed, chest, table, cooking fire) on the Whiterun plains; all 12 pieces and the spouse's home survived save and reload. SetSpouseHome re-points the marriage quest (spouse kept in SpouseHouse, HouseCenter at the home marker, objective re-shown so the compass follows: map and compass confirmed by Cory); player houses use the game's MoveSpouseAdoption (not yet tried). Found: the clutter check ignored big rocks (fixed: count by size); pieces sit at their centre's ground height, so slopes clip. Cory: keep it simple to start (no interior)."
+            },
+            {
+              "datetime": "2026-11-23T15:25",
+              "note": "Homestead rebuilt at the woods' edge in cell (2,-2) where Cory pointed: burning tundra campfire (in Survival_WarmUpObjectsList), SetSpouseHome moved the husband and the quest marker. Lessons: z matters most (Cory: 'z-index is important for placement'): lowest-corner grounding buried a farmhouse on a 290-unit slope, now the footprint average; trees block pieces the clutter check can't see well in woods. To do: a nudge tool (up/down/turn/move), a 'place it where I stand' mode, find_open_space weighting giant cliff bounds less. Survival stats reset by setting the need globals (cold returns outdoors; fire or warm clothes). Saved SkyLink_Homestead."
             }
           ],
           "targetRelease": "1.6",
