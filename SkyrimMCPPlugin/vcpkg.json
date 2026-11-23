@@ -1,6 +1,6 @@
 {
   "name": "skyrim-mcp-plugin",
-  "version-string": "1.5.0",
+  "version-string": "1.6.0",
   "dependencies": [
     "directxmath",
     "directxtk",
