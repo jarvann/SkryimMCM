@@ -6036,6 +6036,10 @@
             {
               "datetime": "2026-11-22T18:05",
               "note": "After a full restart all three keep their own face file, hair colour, voice and family rank."
+            },
+            {
+              "datetime": "2026-11-23T10:54",
+              "note": "Export keeps the role only when asked (needsChoice until family is given). In game (GOG/MO2): GOG Brother exported with family true (masters Skyrim.esm + SkyLinkAI.esp, SkyLink AI required in the README), installed, restarted: he arrives from his own mod in Player Family at rank 3 with his own face file."
             }
           ],
           "targetRelease": "",
