@@ -1156,6 +1156,31 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    json SetHome(const std::string& refId, const std::string& atRefId) {
+        RE::TESForm* form = nullptr;
+        RE::TESForm* atForm = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        try { atForm = RE::TESForm::LookupByID(Helpers::ParseFormId(atRefId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        auto* at = atForm ? atForm->As<RE::TESObjectREFR>() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        if (!at) return {{"error", "Not a reference: " + atRefId}};
+        if (actor->IsPlayerTeammate()) return {{"error", "This character is following the player: dismiss them first, then give them a home"}};
+        auto* location = at->GetCurrentLocation();
+        actor->ForceEditorLocation(location);
+        if (auto* start = actor->extraList.GetByType<RE::ExtraStartingPosition>()) {
+            start->startPosition.pos = at->GetPosition();
+            start->location = location;
+        }
+        actor->MoveTo(at);
+        MakeStayPut(npc);  // sandboxes where they stand: at home
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kAIData | RE::TESNPC::ChangeFlags::kFactions);
+        actor->EvaluatePackage(true, false);
+        return {{"refId", refId}, {"home", atRefId}, {"location", location && location->GetName() ? json(location->GetName()) : json(nullptr)},
+                {"editorLocation", actor->GetEditorLocation1() && actor->GetEditorLocation1()->GetName() ? json(actor->GetEditorLocation1()->GetName()) : json(nullptr)}};
+    }
+
     // Mods that keep whom an NPC is attracted to (FEAT-306). Each may be missing; only those loaded are reported.
     // ORomance: StorageUtil int "or_k_sexu" (0 opposite sex, 1 both, 2 same sex), used only while its global ORSexuality is 1.
     // OSL Aroused (and SexLab Aroused): faction slaGenderPreference, rank 0 men, 1 women, 2 both.

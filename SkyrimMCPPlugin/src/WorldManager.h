@@ -18,6 +18,10 @@ namespace SkyrimMCP {
         json LockDoor(const std::string& refFormIdHex, int lockLevel);
         json GetContainerInventory(const std::string& refFormIdHex);
         json DiscoverAllMapMarkers();
+        // FEAT-307 prototype: flat, uncluttered ground near the player for a home (land heights and nearby objects), and placing
+        // a base object there for good (persistent, so saves keep it).
+        json FindOpenSpace(float searchRadius, float size);
+        json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround);
         json GetGameTime();
         json SetGameTime(float hours);
         json ToggleCollision(const std::string& refFormIdHex = "");

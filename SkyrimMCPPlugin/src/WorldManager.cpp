@@ -10,6 +10,7 @@
 #include <cmath>
 #include <format>
 #include <unordered_map>
+#include <vector>
 
 namespace SkyrimMCP::WorldManager {
 
@@ -437,6 +438,78 @@ namespace SkyrimMCP::WorldManager {
         } catch (...) {
             return {{"error", "Failed to read container: " + refFormIdHex}};
         }
+    }
+
+
+    namespace {
+        bool Blocks(RE::TESObjectREFR* ref) {
+            auto* base = ref ? ref->GetBaseObject() : nullptr;
+            if (!base || ref->IsDisabled() || ref->IsDeleted() || ref->Is(RE::FormType::ActorCharacter)) return false;
+            switch (base->GetFormType()) {
+            case RE::FormType::Static: case RE::FormType::MovableStatic: case RE::FormType::Tree: case RE::FormType::Furniture:
+            case RE::FormType::Container: case RE::FormType::Door: case RE::FormType::Activator: case RE::FormType::Flora:
+                return ref->GetBoundMax().x - ref->GetBoundMin().x > 40.0f;  // markers and pebbles don't count
+            default:
+                return false;
+            }
+        }
+    }
+
+    json FindOpenSpace(float searchRadius, float size) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* tes = RE::TES::GetSingleton();
+        auto* cell = player ? player->GetParentCell() : nullptr;
+        if (!player || !tes || !cell) return {{"error", "No player in the world"}};
+        if (cell->IsInteriorCell()) return {{"error", "The player is indoors: go outside first"}};
+        searchRadius = std::clamp(searchRadius, 0.0f, 4000.0f);
+        size = std::clamp(size, 300.0f, 3000.0f);
+        std::vector<RE::NiPoint3> blockers;
+        tes->ForEachReferenceInRange(player, searchRadius + size, [&](RE::TESObjectREFR* ref) {
+            if (Blocks(ref)) blockers.push_back(ref->GetPosition());
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        const auto origin = player->GetPosition();
+        json spots = json::array();
+        for (float r = 0; r <= searchRadius; r += 400.0f) {
+            const int steps = r == 0 ? 1 : 12;
+            for (int i = 0; i < steps; ++i) {
+                const float a = 6.2831853f * i / steps;
+                const RE::NiPoint3 c{ origin.x + r * std::sin(a), origin.y + r * std::cos(a), origin.z };
+                float lo = 1e9f, hi = -1e9f;
+                bool land = true;
+                for (int gx = -2; gx <= 2 && land; ++gx)
+                    for (int gy = -2; gy <= 2; ++gy) {
+                        float h = 0;
+                        if (!tes->GetLandHeight({ c.x + gx * size / 4, c.y + gy * size / 4, c.z + 5000.0f }, h)) { land = false; break; }
+                        lo = std::min(lo, h); hi = std::max(hi, h);
+                    }
+                if (!land) continue;
+                int clutter = 0;
+                for (const auto& b : blockers) if (std::hypot(b.x - c.x, b.y - c.y) < size * 0.6f) ++clutter;
+                float ground = 0; tes->GetLandHeight({ c.x, c.y, c.z + 5000.0f }, ground);
+                spots.push_back({{"x", c.x}, {"y", c.y}, {"z", ground}, {"slope", hi - lo}, {"objects", clutter}, {"fromPlayer", r}});
+            }
+        }
+        std::sort(spots.begin(), spots.end(), [](const json& a, const json& b) {
+            const float sa = a["slope"].get<float>() + a["objects"].get<int>() * 60.0f, sb = b["slope"].get<float>() + b["objects"].get<int>() * 60.0f;
+            return sa < sb;
+        });
+        if (spots.size() > 6) spots.erase(spots.begin() + 6, spots.end());
+        return {{"size", size}, {"spots", spots}, {"note", "slope: highest minus lowest ground over the square (game units); objects: buildings, trees, rocks and furniture in it. Water isn't checked."}};
+    }
+
+    json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(baseId)); } catch (...) {}
+        auto* base = form ? form->As<RE::TESBoundObject>() : nullptr;
+        if (!player || !base) return {{"error", "Not a placeable base object: " + baseId}};
+        if (onGround) if (auto* tes = RE::TES::GetSingleton()) { float h = 0; if (tes->GetLandHeight({ x, y, z + 5000.0f }, h)) z = h; }
+        auto ref = player->PlaceObjectAtMe(base, true);  // persistent: kept by saves wherever the player goes
+        if (!ref) return {{"error", "PlaceObjectAtMe returned nothing"}};
+        ref->SetPosition(x, y, z);
+        ref->SetAngle({ 0.0f, 0.0f, angleZ * 0.0174532925f });
+        return {{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", std::format("{:08X}", base->GetFormID())}, {"x", x}, {"y", y}, {"z", z}};
     }
 
     json DiscoverAllMapMarkers() {
