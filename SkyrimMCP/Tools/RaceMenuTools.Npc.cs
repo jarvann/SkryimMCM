@@ -230,6 +230,29 @@ public partial class RaceMenuTools
             catch (McpException ex) { followerResult = new { error = ex.Message, note = "Spawned, but not as a follower." }; }
         }
 
+        // The proposal only shows for voices in the game's marriage voice lists (GOG, 2026-11-23): one without them gets the even-toned
+        // voice when none was asked for (it has follower lines too), else a note.
+        string? marriageVoice = null;
+        if (marryable == true && refId != null)
+        {
+            try
+            {
+                var forms = await _pipe.SendRequestAsync("character_forms", new JsonObject { ["refId"] = refId });
+                if (forms?["voiceHasMarriageLines"]?.GetValue<bool?>() == false)
+                {
+                    if (string.IsNullOrWhiteSpace(voice))
+                    {
+                        var isFemale = spawned?["female"]?.GetValue<bool>() ?? false;
+                        var changed = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = isFemale ? "00013ADD" : "00013AD2" });
+                        if (changed?["voiceStableId"] is JsonNode stable && spawned?["faceData"] is JsonObject fd) fd["voice"] = stable.DeepClone();
+                        marriageVoice = $"Its voice had no marriage proposal lines, so it now has {changed?["voice"]}.";
+                    }
+                    else marriageVoice = $"The voice {voice} has no marriage proposal lines, so the Amulet of Mara talk won't appear. Even-toned voices have them.";
+                }
+            }
+            catch (McpException) { }
+        }
+
         object? attractionResult = null;
         if (attractionMods.Count > 0 && attraction != null && refId != null)
         {
@@ -313,6 +336,7 @@ public partial class RaceMenuTools
             family = familyResult,
             follower = followerResult,
             attraction = attractionResult,
+            marriageVoice,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,

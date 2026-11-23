@@ -1075,6 +1075,21 @@ namespace SkyrimMCP::NPCManager {
     }
 
     // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows. {has, names of this sex}, or null.
+    // The marriage proposal ("Interested in me, are you?") has one line per voice group (Skyrim.esm, RelationshipMarriage):
+    // VoicesMarriageNeutral, Arrogant, Rough, Nord, Orc, Argonian, and MaleDrunk alone. Mods that add voices add them to these lists.
+    // Null when none of the lists is in the game.
+    json VoiceHasMarriageLines(RE::TESNPC* npc) {
+        if (!npc || !npc->voiceType) return nullptr;
+        bool any = false, has = npc->voiceType->GetFormID() == 0x00013AD4;
+        for (RE::FormID id : { 0x000CCD78u, 0x000CCE3Fu, 0x000CCE4Du, 0x000CCE4Eu, 0x000CCE4Fu, 0x000CCE50u }) {
+            auto* list = RE::TESForm::LookupByID<RE::BGSListForm>(id);
+            if (!list) continue;
+            any = true;
+            if (list->HasForm(npc->voiceType)) has = true;
+        }
+        return any ? json(has) : json(nullptr);
+    }
+
     json FollowerVoices(RE::TESNPC* npc) {
         auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7);
         if (!voices) return nullptr;
@@ -1259,6 +1274,7 @@ namespace SkyrimMCP::NPCManager {
                 {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
                 {"faceData", FaceDataOf(npc)}, {"height", npc->GetHeight()}, {"level", actor->GetLevel()},
                 {"voiceHasFollowerLines", [&] { auto v = FollowerVoices(npc); return v.is_object() ? v["has"] : json(nullptr); }()},
+                {"voiceHasMarriageLines", VoiceHasMarriageLines(npc)},
                 {"essential", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)},
                 {"protected", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kProtected)}};
     }

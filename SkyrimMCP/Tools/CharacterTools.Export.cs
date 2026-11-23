@@ -74,6 +74,8 @@ public partial class CharacterTools
         var marry = marryable == true && !(familyRole != null && family == true && !roleMarryable);
         if (isFollower && data["voiceHasFollowerLines"]?.GetValue<bool>() == false)
             return new { error = $"{data["name"]}'s voice has no follower lines, so the recruit dialogue wouldn't appear in the exported mod. Make them a follower in the game first (MakeFollower, which gives them a voice that has them), then export." };
+        if (marry && data["voiceHasMarriageLines"]?.GetValue<bool?>() == false)
+            return new { error = $"{data["name"]}'s voice has no marriage proposal lines, so the Amulet of Mara talk wouldn't appear in the exported mod. Give them an even-toned voice in the game first (MakeFollower with voice), or export with marryable false." };
         if (family == true)
         {
             if (familyRole == null) return new { error = "This character has no Player Family role (SetFamilyRole gives one), so family can't be kept." };
