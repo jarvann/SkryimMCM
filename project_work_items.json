@@ -6288,6 +6288,10 @@
             {
               "datetime": "2026-11-23T15:55",
               "note": "Cory: design several options for exteriors with matching interiors and load them dynamically in game when requested."
+            },
+            {
+              "datetime": "2026-11-23T16:20",
+              "note": "Map marker spike: a MapMarker placed at run time with its own ExtraMapMarker (visible, fast travel) could not be fast travelled to (Cory, Survival off, vanilla fast travel working); removed. Map markers for homes go in SkyLinkAI.esp: one persistent, disabled marker per kit (or a small pool) in the Tamriel persistent cell, moved to the home and enabled when built. Also: SaveHomeLayout / BuildHomeLayout / RemoveHomeLayout built (layout JSON, shipped HomeLayouts)."
             }
           ],
           "targetRelease": "",
