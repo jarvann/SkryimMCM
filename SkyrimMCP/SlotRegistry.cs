@@ -89,7 +89,11 @@ public static class SlotRegistry
         Save(all);
     }
 
-    /// <summary>Forgets the slot and deletes the face files made for it. Returns how many files went.</summary>
+    /// <summary>
+    /// Forgets the slot and puts stand-ins over the face files made for it (FEAT-305): the game keeps knowing the files, so the slot's
+    /// next character shows its face at once, and a save that still holds this character finds a file rather than none (BUG-108).
+    /// Returns how many files were cleared.
+    /// </summary>
     public static int Release(int slot)
     {
         var all = Load();
@@ -98,7 +102,13 @@ public static class SlotRegistry
         {
             foreach (var f in entry["files"] as JsonArray ?? [])
                 if (f?.ToString() is string path && path.Contains("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase))
-                    try { if (File.Exists(path)) { File.Delete(path); deleted++; } } catch (Exception) { }
+                    try
+                    {
+                        if (!File.Exists(path)) continue;
+                        File.WriteAllBytes(path, path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ? PlaceholderFace.Tint() : PlaceholderFace.Mesh());
+                        deleted++;
+                    }
+                    catch (Exception) { }
             all.Remove(slot.ToString());
             Save(all);
             NoteFreed(slot);
@@ -122,15 +132,72 @@ public static class SlotRegistry
     /// Whether the running game already knows this slot's face files: it lists the loose files as it starts, so ones added later aren't seen
     /// until the next start, but a file it knows can be replaced (both seen on Steam, 2026-11-22).
     /// </summary>
-    public static bool KnownToTheGame(string slotObjectId)
+    public static bool KnownToTheGame(string slotObjectId) => KnownToTheGame(slotObjectId, GameStarted());
+
+    private static bool KnownToTheGame(string slotObjectId, DateTime? started)
     {
         try
         {
-            if (FaceFiles(slotObjectId) is not { } files || !File.Exists(files.mesh) || !File.Exists(files.tint)) return false;
-            using var game = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").FirstOrDefault();
-            return game != null && File.GetCreationTime(files.mesh) < game.StartTime && File.GetCreationTime(files.tint) < game.StartTime;
+            if (started is not DateTime start || FaceFiles(slotObjectId) is not { } files || !File.Exists(files.mesh) || !File.Exists(files.tint)) return false;
+            return File.GetCreationTime(files.mesh) < start && File.GetCreationTime(files.tint) < start;
         }
         catch (Exception) { return false; }
+    }
+
+    private static DateTime? GameStarted()
+    {
+        try
+        {
+            using var game = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").FirstOrDefault();
+            return game?.StartTime;
+        }
+        catch (Exception) { return null; }
+    }
+
+    // SkyLinkAI.esp: 500 slots from object ID 0x800, in blocks of 25 per race and sex (10 races, women then men).
+    public const int SlotCount = 500, SlotsPerBlock = 25;
+    public static string SlotObjectId(int slot) => (0x800 + slot).ToString("X8");
+
+    /// <summary>
+    /// FEAT-305: makes sure the first few free slots of each race and sex have face files, stand-ins where none exist, so that from
+    /// the next game start a new character's face shows at once. Returns the files written, or why none could be.
+    /// </summary>
+    public static (int Written, string? Problem) PrepareFaces(int perBlock = 2)
+    {
+        if (FaceFiles(SlotObjectId(0)) is null) return (0, "the game's Data folder wasn't found");
+        if (!SkyLinkSettings.GameFileFolders().Any(f => File.Exists(Path.Combine(f, "SkyLinkAI.esp")))) return (0, "SkyLinkAI.esp isn't installed");
+        var taken = Reserved().ToHashSet();
+        var written = 0;
+        try
+        {
+            for (var block = 0; block < SlotCount / SlotsPerBlock; block++)
+            {
+                var ready = 0;
+                for (var slot = block * SlotsPerBlock; slot < (block + 1) * SlotsPerBlock && ready < perBlock; slot++)
+                {
+                    if (taken.Contains(slot)) continue;
+                    ready++;
+                    var (mesh, tint) = FaceFiles(SlotObjectId(slot))!.Value;
+                    foreach (var (path, bytes) in new[] { (mesh, (Func<byte[]>)PlaceholderFace.Mesh), (tint, PlaceholderFace.Tint) })
+                    {
+                        if (File.Exists(path)) continue;
+                        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                        File.WriteAllBytes(path, bytes());
+                        written++;
+                    }
+                }
+            }
+            return (written, null);
+        }
+        catch (Exception ex) { return (written, ex.Message); }
+    }
+
+    /// <summary>Free slots whose face files the running game listed when it started: a character put in one shows its face at once.</summary>
+    public static int[] KnownFreeSlots()
+    {
+        if (GameStarted() is not DateTime started) return [];
+        var taken = Reserved().ToHashSet();
+        return Enumerable.Range(0, SlotCount).Where(i => !taken.Contains(i) && KnownToTheGame(SlotObjectId(i), started)).ToArray();
     }
 
     /// <summary>Writes both files for a slot, or neither. Null when done, else why not.</summary>

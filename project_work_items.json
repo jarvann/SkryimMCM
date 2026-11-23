@@ -6347,7 +6347,7 @@
         {
           "id": "FEAT-305",
           "type": "",
-          "status": "not-started",
+          "status": "implemented-untested",
           "priority": "",
           "title": "New slot faces seen at once",
           "description": "The game lists loose files as it starts: a face file added later isn't seen until the next start, one it already knows can be replaced. Ship or prepare small placeholder face files for the slots so a new character's face shows at once, with the player's faces kept safe from a reinstall.",
@@ -6359,6 +6359,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "In 1.6 (Cory agreed 2026-11-23)."
+            },
+            {
+              "datetime": "2026-11-23T18:40",
+              "note": "Stand-in face files (332-byte NIF, 4x4 tint) for the first two free slots of each race and sex, written on connect and after each spawn into overwrite/Data (not the mod's files, so reinstalls keep faces); SpawnNpc prefers slots the game listed at start (preferSlots) and swaps the face in at once under MO2 too; freeing a slot writes stand-ins instead of deleting (BUG-108). To test on GOG: restart after the stand-ins exist, spawn, face at once."
             }
           ],
           "targetRelease": "1.6",

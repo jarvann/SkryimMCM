@@ -630,7 +630,8 @@ namespace SkyrimMCP::NPCManager {
         // A slot is free while it still has its own name (SkyLink renames it when it fills one; the game saves that change).
         // The slots of that race and sex first. A race without its own (vampires, modded races) uses its parent race's or a Nord's,
         // with the original race set on the slot (ReapplySlots).
-        RE::TESNPC* FreeSlot(RE::TESRace* race, bool female, int& index, const std::vector<int>& avoid) {
+        // prefer: slots whose face files the game listed at start (FEAT-305), taken first so a new face shows at once.
+        RE::TESNPC* FreeSlot(RE::TESRace* race, bool female, int& index, const std::vector<int>& avoid, const std::vector<int>& prefer) {
             auto* data = RE::TESDataHandler::GetSingleton();
             if (!data) return nullptr;
             auto block = [](const RE::TESRace* r) {
@@ -642,14 +643,18 @@ namespace SkyrimMCP::NPCManager {
             if (raceBlock < 0 && race) raceBlock = block(race->armorParentRace);
             if (raceBlock < 0) raceBlock = 1;
             const int first = raceBlock * 2 * kSlotsPerSex + (female ? 0 : kSlotsPerSex);
-            for (int i = first; i < first + kSlotsPerSex; ++i) {
-                // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
-                if (std::find(avoid.begin(), avoid.end(), i) != avoid.end()) continue;
-                auto* npc = data->LookupForm<RE::TESNPC>(kFirstSlot + i, kSlotPlugin);
-                if (npc && SlotDefaultName(i) == npc->GetName()) {
-                    index = i;
-                    return npc;
+            auto listed = [](const std::vector<int>& list, int i) { return std::find(list.begin(), list.end(), i) != list.end(); };
+            for (const bool preferredOnly : { true, false }) {
+                for (int i = first; i < first + kSlotsPerSex; ++i) {
+                    // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
+                    if (listed(avoid, i) || (preferredOnly && !listed(prefer, i))) continue;
+                    auto* npc = data->LookupForm<RE::TESNPC>(kFirstSlot + i, kSlotPlugin);
+                    if (npc && SlotDefaultName(i) == npc->GetName()) {
+                        index = i;
+                        return npc;
+                    }
                 }
+                if (prefer.empty()) break;
             }
             return nullptr;
         }
@@ -1373,7 +1378,10 @@ namespace SkyrimMCP::NPCManager {
         std::vector<int> avoid;
         if (params.contains("avoidSlots") && params["avoidSlots"].is_array())
             for (const auto& a : params["avoidSlots"]) if (a.is_number_integer()) avoid.push_back(a.get<int>());
-        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(race, female, slotIndex, avoid) : nullptr;
+        std::vector<int> prefer;
+        if (params.contains("preferSlots") && params["preferSlots"].is_array())
+            for (const auto& a : params["preferSlots"]) if (a.is_number_integer()) prefer.push_back(a.get<int>());
+        RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(race, female, slotIndex, avoid, prefer) : nullptr;
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;

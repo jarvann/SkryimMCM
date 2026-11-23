@@ -175,6 +175,8 @@ public partial class RaceMenuTools
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
         p["avoidSlots"] = new JsonArray(SlotRegistry.Reserved().Select(i => (JsonNode)i).ToArray());
+        // FEAT-305: a slot whose face files the game listed at start shows the new face at once.
+        p["preferSlots"] = new JsonArray(SlotRegistry.KnownFreeSlots().Select(i => (JsonNode)i).ToArray());
         var spawned = await _pipe.SendRequestAsync("spawn_npc", p);
         if (spawned?["error"] != null)
         {
@@ -316,8 +318,9 @@ public partial class RaceMenuTools
                 ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
             });
-            // A template's character shows the template's file until told otherwise; loose files a mod manager doesn't virtualize are seen at once.
-            if (problem == null && known && face == "template" && SkyLinkSettings.Mo2Instance().Item1 == null)
+            // A template's character shows the template's file until told otherwise. A file the game listed at start is read again
+            // when replaced, under MO2 too (FEAT-305: the overwrite files SkyLink prepared before the start).
+            if (problem == null && known && face == "template")
             {
                 try
                 {
@@ -328,8 +331,11 @@ public partial class RaceMenuTools
                 }
                 catch (McpException) { }
             }
+            // Stand-ins for the next free slots, so the next character after a restart shows its face at once too.
+            var prepared = SlotRegistry.PrepareFaces();
             slotFace = problem == null
-                ? new { written = files, resemblance = likenessResult, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = known ? "Seen at once." : "Their own face is seen after the next game start" + (face == "template" ? "; until then they show the template's." : ".") }
+                ? new { written = files, resemblance = likenessResult, repairs = repair == null ? null : new { textures = repair.Textures, standIns = repair.StandIns, physicsBones = repair.Bones, notes = repair.Problems }, note = known ? "Seen at once." : "Their own face is seen after the next game start" + (face == "template" ? "; until then they show the template's." : ".") +
+                    (known || prepared.Problem != null ? "" : " From then on, new characters show their faces at once (FEAT-305).") }
                 : (object)new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
         }
         else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
@@ -679,7 +685,7 @@ public partial class RaceMenuTools
         if (freeSlot is int f)
         {
             if (SlotRegistry.Load()[f.ToString()] == null) return new { error = $"Slot {f} isn't reserved." };
-            return new { freed = f, filesDeleted = SlotRegistry.Release(f), note = "If a save still holds this character it keeps its place but loses its face files." };
+            return new { freed = f, filesCleared = SlotRegistry.Release(f), note = "If a save still holds this character it keeps its place, with a blank stand-in for a face." };
         }
         JsonNode? state = null;
         try { state = await _pipe.SendRequestAsync("get_session_state"); } catch (Exception) { }
