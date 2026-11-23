@@ -23,10 +23,12 @@ public partial class CharacterTools
         "SkyLink nor RaceMenu afterwards. Written to SkyLink's Build folder, never into Data. modName: the plugin's name. outfit: 'worn' (what it " +
         "wears now) or 'none'. follower: can be recruited (default: if it is one now). home: a reference from homeChoices (default the nearest " +
         "marker). textureSize: of the face's skin texture (1024 or 2048). author: shown in the plugin. dryRun (default true) says what would be made, " +
-        "with the requirements and whose meshes the face file contains (permission to share those is theirs to give). Player Family membership isn't " +
-        "exported (the faction is SkyLink's plugin). To see it: install it, remove the spawned one, start a save.")]
+        "with the requirements and whose meshes the face file contains (permission to share those is theirs to give). family: for a character with a " +
+        "Player Family role, ASK THE PLAYER which they want, then pass it: true keeps the role (the faction is in SkyLinkAI.esp, so the mod then " +
+        "needs SkyLink AI installed, a master), false drops it (fully standalone). Left out for such a character, nothing is written and the " +
+        "question comes back. To see it: install it, remove the spawned one, start a save.")]
     public async Task<object> ExportCharacter(string refId, string modName, string? author = null, string outfit = "worn", bool? follower = null,
-        string? home = null, int textureSize = 1024, bool dryRun = true)
+        string? home = null, int textureSize = 1024, bool? family = null, bool dryRun = true)
     {
         modName = (modName ?? "").Trim();
         if (modName.EndsWith(".esp", StringComparison.OrdinalIgnoreCase)) modName = modName[..^4];
@@ -50,6 +52,28 @@ public partial class CharacterTools
         string? One(string kind) => forms.FirstOrDefault(f => f["kind"]?.ToString() == kind)?["stableId"]?.ToString();
         var isFollower = follower ?? forms.Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == "Skyrim.esm|05C84D");
         var marry = forms.Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == "Skyrim.esm|019809") && entry["family"]?.GetValue<string?>() == null;
+        // Player Family only when asked: its faction is SkyLinkAI.esp's, so the mod then depends on SkyLink AI (Cory, 2026-11-23).
+        var familyRole = entry["family"]?.GetValue<string?>();
+        int? familyRank = null;
+        if (familyRole != null && family == null)
+            return new
+            {
+                needsChoice = "family",
+                askThePlayer = $"{data["name"]} is the player's {familyRole} (Player Family). Keep that in the exported mod? Keeping it makes the mod " +
+                    "need SkyLink AI installed (the faction is in SkyLinkAI.esp); dropping it keeps the mod fully standalone.",
+                options = new[] { "family: true (keep the role, needs SkyLink AI)", "family: false (fully standalone)" },
+                note = "Nothing was written. Ask the player, then export again with family set.",
+            };
+        if (family == true)
+        {
+            if (familyRole == null) return new { error = "This character has no Player Family role (SetFamilyRole gives one), so family can't be kept." };
+            JsonNode? roles;
+            try { roles = await _pipe.SendRequestAsync("family_roles"); }
+            catch (McpException ex) { return new { error = ex.Message }; }
+            familyRank = (roles?["roles"] as JsonArray ?? []).OfType<JsonObject>()
+                .FirstOrDefault(r => string.Equals(r["role"]?.ToString(), familyRole, StringComparison.OrdinalIgnoreCase))?["rank"]?.GetValue<int>();
+            if (familyRank == null) return new { error = $"The role '{familyRole}' isn't in SkyLinkAI.esp's Player Family faction." };
+        }
         var choices = (markers?["markers"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         var homeRef = home?.Trim() ?? (choices.FirstOrDefault(m => m["marker"]?.GetValue<bool>() == true) ?? choices.FirstOrDefault())?["stableId"]?.ToString();
         if (homeRef == null) return new { error = "No lasting base game reference was found in this place to put the character at. Move it somewhere else (an inn, a town) and export again." };
@@ -63,6 +87,7 @@ public partial class CharacterTools
         List<(string, sbyte)> factions = [];
         if (isFollower) { factions.Add(("Skyrim.esm|0005C84D", 0)); factions.Add(("Skyrim.esm|0005C84E", -1)); }
         if (marry) factions.Add(("Skyrim.esm|00019809", 0));
+        if (familyRank is int rank) factions.Add(("SkyLinkAI.esp|00000A00", (sbyte)rank));
         var worn = outfit == "worn" ? forms.Where(f => f["kind"]?.ToString() == "worn").Select(f => f["stableId"]?.ToString()).OfType<string>().Distinct().ToList() : [];
         var hair = Rgb("hairColor");
         records.Add(new NewNpc
@@ -99,7 +124,7 @@ public partial class CharacterTools
             built = PluginWriter.Build(new NewPlugin { Name = plugin, Author = author ?? "", Description = $"{data["name"]}, made with SkyLink AI.", Light = true, Masters = ["Skyrim.esm"], Records = records }, Position);
         }
         catch (ArgumentException ex) { return new { error = ex.Message }; }
-        if (built.Masters.Any(m => m.Equals("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase)))
+        if (family != true && built.Masters.Any(m => m.Equals("SkyLinkAI.esp", StringComparison.OrdinalIgnoreCase)))
             return new { error = "Something in this character still depends on SkyLinkAI.esp, so it wouldn't stand alone. Nothing was written.", masters = built.Masters };
 
         const string objectId = "00000800";
@@ -121,6 +146,12 @@ public partial class CharacterTools
                 optional.Remove(m);
                 needed.Add(m);
             }
+        if (family == true && requirements["required"] is JsonArray required)
+            required.Add(new JsonObject
+            {
+                ["mod"] = "SkyLink AI", ["nexusId"] = 175682, ["link"] = "https://www.nexusmods.com/skyrimspecialedition/mods/175682",
+                ["plugins"] = new JsonArray("SkyLinkAI.esp"), ["why"] = new JsonArray($"the Player Family faction ({familyRole})"),
+            });
         var embedded = EmbeddedMeshes(mesh, forms);
         var folder = Path.Combine(SkyLinkSettings.Folder, "Build", modName);
         var files = new Dictionary<string, byte[]>
@@ -128,7 +159,7 @@ public partial class CharacterTools
             [plugin] = built.Bytes,
             [$@"meshes\actors\character\facegendata\facegeom\{plugin}\{objectId}.nif"] = mesh,
             [$@"textures\actors\character\facegendata\facetint\{plugin}\{objectId}.dds"] = tint,
-            [$"{modName} README.txt"] = Encoding.UTF8.GetBytes(Readme(modName, data, built, requirements, embedded, worn.Count, isFollower)),
+            [$"{modName} README.txt"] = Encoding.UTF8.GetBytes(Readme(modName, data, built, requirements, embedded, worn.Count, isFollower, family == true ? familyRole : null)),
         };
         if (!dryRun)
         {
@@ -154,7 +185,7 @@ public partial class CharacterTools
         return new
         {
             dryRun, character = data["name"]?.ToString(), plugin, masters = built.Masters, light = (built.Flags & 0x200) != 0,
-            follower = isFollower, marryable = marry, outfitItems = worn.Count,
+            follower = isFollower, marryable = marry, family = family == true ? $"{familyRole} (rank {familyRank}, needs SkyLink AI)" : null, outfitItems = worn.Count,
             placedAt = new { place = markers?["cell"]?.ToString(), reference = homeRef, what = choices.FirstOrDefault(m => m["stableId"]?.ToString() == homeRef)?["what"]?.ToString() },
             homeChoices = choices.Take(6),
             files = files.Select(f => new { file = f.Key, kb = f.Value.Length / 1024 }),
@@ -176,11 +207,14 @@ public partial class CharacterTools
             .Select(f => (object)new { part = f["editorId"]?.ToString(), plugin = f["plugin"]?.ToString() }).ToList();
     }
 
-    private static string Readme(string modName, JsonNode data, BuiltPlugin built, JsonObject requirements, List<object> embedded, int wornItems, bool isFollower)
+    private static string Readme(string modName, JsonNode data, BuiltPlugin built, JsonObject requirements, List<object> embedded, int wornItems, bool isFollower, string? familyRole)
     {
         var t = new StringBuilder();
         t.AppendLine(modName).AppendLine(new string('=', modName.Length)).AppendLine();
-        t.AppendLine($"{data["name"]}: a standalone character{(isFollower ? " and follower" : "")} made with SkyLink AI. Neither SkyLink AI nor RaceMenu is needed to use it.").AppendLine();
+        t.AppendLine(familyRole == null
+            ? $"{data["name"]}: a standalone character{(isFollower ? " and follower" : "")} made with SkyLink AI. Neither SkyLink AI nor RaceMenu is needed to use it."
+            : $"{data["name"]}: the player's {familyRole.ToLowerInvariant()}{(isFollower ? " and follower" : "")}, made with SkyLink AI. SkyLink AI must be installed: " +
+              "the Player Family faction is in its plugin, SkyLinkAI.esp. RaceMenu isn't needed.").AppendLine();
         t.AppendLine("Required plugins (masters): " + string.Join(", ", built.Masters)).AppendLine();
         void List(string title, string key)
         {
