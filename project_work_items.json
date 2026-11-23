@@ -6228,6 +6228,24 @@
           ],
           "targetRelease": "",
           "dependsOn": []
+        },
+        {
+          "id": "FEAT-307",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "Homes: ask where a character lives, and family homes",
+          "description": "Every character made is asked for a home (here, the family home, a player house, a named place, or none). The home becomes the character's editor location (Actor::ForceEditorLocation): the spouse quest's house, vanilla 'near editor location' packages, and where SkyLink sends them; the slot record restores it after loads. The first Player Family role asks for a family home (SetFamilyHome, per player character, more than one allowed); relatives are offered it first. Export's home defaults to it. See docs/1.6-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-23T14:40",
+              "note": "Found at the GOG wedding: the spouse's house was The Bannered Mare, where the Stepbrother was spawned (his editor location). Cory: ask about the home for every NPC, and designate at least one family home once the family features are used."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-306"
+          ]
         }
       ]
     },
