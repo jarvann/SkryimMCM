@@ -132,11 +132,14 @@ public sealed class NifDocument
         for (var k = 0; k < Int(node, at); k++) if (Int(node, at + 4 + 4 * k) is >= 0 and var c) yield return c;
     }
 
-    public void AddChild(int node, int child)
+    /// <summary>Adds a child at the end, or before the child named by <paramref name="before"/> when it is one.</summary>
+    public void AddChild(int node, int child, int before = -1)
     {
         var at = AfterAvObject(node);
         var count = Int(node, at);
         var end = at + 4 + 4 * count;
+        for (var k = 0; k < count; k++)
+            if (Int(node, at + 4 + 4 * k) == before) { end = at + 4 + 4 * k; break; }
         var b = Blocks[node];
         Blocks[node] = [.. b[..at], .. BitConverter.GetBytes(count + 1), .. b[(at + 4)..end], .. BitConverter.GetBytes(child), .. b[end..]];
     }

@@ -122,7 +122,7 @@ public static partial class HeadRepair
                     var bone = nif.Add(nif.BlockTypes[template], (byte[])nif.Blocks[template].Clone());
                     nif.SetInt(bone, 0, nif.AddString(own));
                     nif.SetTransform(bone, rest.Translation, rest.Rotation);
-                    nif.AddChild(0, bone);
+                    nif.AddChild(0, bone, faceNode);   // before the face node: it must stay the root's last child, or the game rejects the file
                     inFile.Add(own);
                     bones.Add($"{own} (added: no vertex uses it)");
                 }
