@@ -614,6 +614,13 @@ namespace SkyrimMCP::WorldManager {
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
         auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
         if (!ref || (ref->GetFormID() >> 24) != 0xFF || ref->Is(RE::FormType::ActorCharacter)) return {{"error", "Only objects placed at run time can be removed: " + refId}};
+        // A map marker is also on the player's list (add_map_marker): off it first, or the list keeps a dead handle.
+        if (auto* player = RE::PlayerCharacter::GetSingleton()) {
+            auto& markers = player->GetPlayerRuntimeData().currentMapMarkers;
+            for (std::uint32_t i = markers.size(); i-- > 0;) {
+                if (markers[i].get().get() == ref) markers.erase(markers.begin() + i);
+            }
+        }
         ref->Disable();
         ref->SetDelete(true);
         return {{"refId", refId}, {"removed", true}};
