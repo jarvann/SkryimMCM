@@ -95,11 +95,12 @@ public partial class RaceMenuTools
         "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "ExportCharacter makes it lasting in the player's own plugin. Remove it with RemoveSpawnedNpc. " +
         "ASK THE PLAYER whether it should be a follower and (unless its family role rules marriage out) whether it can be married, " +
-        "then pass follower and marryable: left out, nothing is spawned and the questions come back. attraction: who the character is attracted " +
+        "then pass follower and marryable: left out, nothing is spawned and the questions come back. home: where it lives (asked too): 'here', " +
+        "'family', one of the player's houses or a SkyLink home (SetHome lists them); a relative's first home becomes the family home. attraction: who the character is attracted " +
         "to (women, men, everyone, no one, or 'mods decide'), asked only when a mod that keeps it is installed (ORomance, OSL Aroused); the " +
         "questions say so. Same-sex marriage needs nothing: the game lets anyone marry anyone. dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, string? home = null, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -135,8 +136,12 @@ public partial class RaceMenuTools
         // Every new character: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
         if (CharacterChoices.Attraction(attraction) is { } badAttraction) return new { error = badAttraction };
         var attractionMods = await AttractionModNames();
+        var (homeChoices, homeCharacter, _) = await HomeChoices();
         if (CharacterChoices.Ask(name.Trim(), follower, marryable, roleMarryable ? null : familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
-            attractionMods: attractionMods, attraction: attraction) is { } ask) return ask;
+            attractionMods: attractionMods, attraction: attraction, homeOptions: HomeOptionNames(homeChoices, homeCharacter), home: home,
+            firstFamilyHome: familyRole != null && FamilyHomes.Of(homeCharacter).Count == 0) is { } ask) return ask;
+        if (home != null && !home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase) && ResolveHome(home, homeChoices, homeCharacter) == null)
+            return new { error = $"No home called {home}.", choices = HomeOptionNames(homeChoices, homeCharacter) };
 
         if (dryRun)
             return new
@@ -254,6 +259,7 @@ public partial class RaceMenuTools
         }
 
         object? attractionResult = null;
+        object? homeResult = null;
         if (attractionMods.Count > 0 && attraction != null && refId != null)
         {
             try { attractionResult = await SetAttractionIn(refId, attraction); }
@@ -327,6 +333,12 @@ public partial class RaceMenuTools
                 : (object)new { problem, note = "Until the face files exist, the face turns dark after the game restarts." };
         }
         else if (face == "player") ExportedHead(presetName);   // a preview keeps nothing
+        // The home last: the slot record exists by now, and a follower can't be given one once recruited (set_home refuses).
+        if (home != null && refId != null)
+        {
+            try { homeResult = await ApplyHome(refId, home, familyRole); }
+            catch (McpException ex) { homeResult = new { error = ex.Message, note = "Spawned, but not given its home." }; }
+        }
         await NotifyInGame($"{name.Trim()} spawned" + (inSlot ? "" : " (preview)"));
         return new
         {
@@ -336,6 +348,7 @@ public partial class RaceMenuTools
             family = familyResult,
             follower = followerResult,
             attraction = attractionResult,
+            home = homeResult,
             marriageVoice,
             outfit = outfitResult,
             slotFace,

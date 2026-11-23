@@ -23,6 +23,7 @@ namespace SkyrimMCP {
         json FindOpenSpace(float searchRadius, float size);
         json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround);
         json RemoveObject(const std::string& refId);
+        json OwnedHouses();
         json AddMapMarker(const std::string& atRef, const std::string& name, int type);
         // Objects placed at run time around a centre reference: base (stable ID), offset from the centre, angle; for home layouts.
         json PlacedObjects(const std::string& centerRef, float radius);

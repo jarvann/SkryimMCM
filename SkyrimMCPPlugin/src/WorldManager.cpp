@@ -618,6 +618,44 @@ namespace SkyrimMCP::WorldManager {
                 {"note", "Spike: check the world map, then save and reload to see whether it stays."}};
     }
 
+    // FEAT-307: the player's houses, for "where does this character live". A house is an interior cell whose location has the
+    // LocTypePlayerHouse keyword (Breezehome, Hearthfire's, Creation Club's and player-home mods that use it); it is the player's when
+    // the cell's owner is the player or the player's faction (the purchase scripts set that). Each comes with a reference inside to
+    // send a resident to: a heading marker, else the inside of the front door (persistent, so known even while the house isn't loaded).
+    json OwnedHouses() {
+        auto* data = RE::TESDataHandler::GetSingleton();
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* keyword = RE::TESForm::LookupByEditorID<RE::BGSKeyword>("LocTypePlayerHouse");
+        if (!keyword) keyword = RE::TESForm::LookupByID<RE::BGSKeyword>(0x000FC1A3);
+        if (!data || !player || !keyword) return {{"error", "The player-house keyword isn't in the game"}};
+        auto* playerBase = player->GetActorBase();
+        auto* playerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00000DB1);
+        json owned = json::array(), notOwned = json::array();
+        std::unordered_set<RE::FormID> seen;
+        for (auto* cell : data->interiorCells) {
+            auto* loc = cell ? cell->GetLocation() : nullptr;
+            if (!loc || !loc->HasKeyword(keyword)) continue;
+            auto* owner = cell->GetOwner();
+            const bool mine = owner && (owner == playerBase || owner == playerFaction);
+            RE::TESObjectREFR* inside = nullptr;
+            RE::TESObjectREFR* door = nullptr;
+            cell->ForEachReference([&](RE::TESObjectREFR* ref) {
+                auto* base = ref ? ref->GetBaseObject() : nullptr;
+                if (!base || ref->IsDisabled()) return RE::BSContainer::ForEachResult::kContinue;
+                if (base->GetFormID() == 0x00000034 && !inside) inside = ref;  // XMarkerHeading
+                if (base->Is(RE::FormType::Door) && !door && ref->extraList.GetByType<RE::ExtraTeleport>()) door = ref;
+                return RE::BSContainer::ForEachResult::kContinue;
+            });
+            if (!inside) inside = door;
+            const char* name = loc->GetFullName();
+            json entry = {{"name", name && *name ? name : cell->GetFullName()}, {"location", std::format("{:08X}", loc->GetFormID())},
+                          {"cell", std::format("{:08X}", cell->GetFormID())}, {"ref", inside ? json(std::format("{:08X}", inside->GetFormID())) : json(nullptr)}};
+            if (!seen.insert(cell->GetFormID()).second) continue;
+            (mine ? owned : notOwned).push_back(entry);
+        }
+        return {{"owned", owned}, {"notOwned", notOwned.size()}};
+    }
+
     json RemoveObject(const std::string& refId) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
