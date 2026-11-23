@@ -88,15 +88,18 @@ public partial class RaceMenuTools
         "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
         "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
-        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
+        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable: can be " +
         "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
         "without a role lists them), any race, adults only, never marryable. resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
         "face and hair colour take after the player's, in any race or sex. follower: can be recruited with the game's own dialogue (give it a voice " +
         "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
-        "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
-        "dryRun (default true) says what would be spawned.")]
+        "ExportCharacter makes it lasting in the player's own plugin. Remove it with RemoveSpawnedNpc. " +
+        "ASK THE PLAYER whether it should be a follower and (unless it has a family role, which is never marryable) whether it can be married, " +
+        "then pass follower and marryable: left out, nothing is spawned and the questions come back. attraction: who the character is attracted " +
+        "to (women, men, everyone, no one, or 'mods decide'), asked only when a mod that keeps it is installed (ORomance, OSL Aroused); the " +
+        "questions say so. Same-sex marriage needs nothing: the game lets anyone marry anyone. dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, string? family = null, double? resemblance = null, bool follower = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -127,6 +130,12 @@ public partial class RaceMenuTools
             marryable = false;
         }
 
+        // Every new character: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
+        if (CharacterChoices.Attraction(attraction) is { } badAttraction) return new { error = badAttraction };
+        var attractionMods = await AttractionModNames();
+        if (CharacterChoices.Ask(name.Trim(), follower, marryable, familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
+            attractionMods: attractionMods, attraction: attraction) is { } ask) return ask;
+
         if (dryRun)
             return new
             {
@@ -138,6 +147,9 @@ public partial class RaceMenuTools
                 sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
                 face = face == "player" ? "the player's current face (RaceMenu CharGen)" : "the template's own face",
+                follower,
+                marryable,
+                attraction = attractionMods.Count == 0 ? null : attraction,
                 lasting = false,
                 note = "Spawns next to the player as a preview for this session. Pass dryRun: false to spawn.",
             };
@@ -151,7 +163,7 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable == true };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
@@ -210,10 +222,17 @@ public partial class RaceMenuTools
         }
 
         object? followerResult = null;
-        if (follower && refId != null)
+        if (follower == true && refId != null)
         {
             try { followerResult = (await SetFollower(refId, true, chooseVoice: string.IsNullOrWhiteSpace(voice), spawned)).Reply; }
             catch (McpException ex) { followerResult = new { error = ex.Message, note = "Spawned, but not as a follower." }; }
+        }
+
+        object? attractionResult = null;
+        if (attractionMods.Count > 0 && attraction != null && refId != null)
+        {
+            try { attractionResult = await SetAttractionIn(refId, attraction); }
+            catch (McpException ex) { attractionResult = new { error = ex.Message, note = "Spawned, but the attraction wasn't set." }; }
         }
 
         object? outfitResult = null;
@@ -261,7 +280,7 @@ public partial class RaceMenuTools
             SlotRegistry.Reserve(slotIndex, new JsonObject
             {
                 ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
-                ["face"] = face, ["family"] = familyRole, ["template"] = spawned["template"]?.ToString(),
+                ["face"] = face, ["family"] = familyRole, ["attraction"] = attractionMods.Count > 0 ? attraction?.Trim().ToLowerInvariant() : null, ["template"] = spawned["template"]?.ToString(),
                 // What saves don't keep: the plugin puts it back at start-up and after loads (ReapplySlots).
                 ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
@@ -291,6 +310,7 @@ public partial class RaceMenuTools
             voice = voiceResult,
             family = familyResult,
             follower = followerResult,
+            attraction = attractionResult,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,
@@ -376,8 +396,29 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Make a spawned character recruitable with the game's own follower dialogue (FEAT-282), or not (follower false). Sets the follower " +
         "factions, ally of the player, brave and helpful, protected, level with the player, and checks that the voice has follower lines " +
-        "(followerVoices lists those that do). Follower frameworks such as Nether's pick it up when it's recruited. Adults only.")]
-    public async Task<object> MakeFollower(string refId, bool follower = true) => (await SetFollower(refId.Trim(), follower, chooseVoice: false)).Reply;
+        "(followerVoices lists those that do). voice: one to give it first (a voice type's editor ID or form ID); left out, a voice without " +
+        "follower lines becomes the even-toned one. Follower frameworks such as Nether's pick it up when it's recruited. Adults only.")]
+    public async Task<object> MakeFollower(string refId, bool follower = true, string? voice = null)
+    {
+        refId = refId.Trim();
+        // A slot character's voice is put back from SkyLink's record after every load, so a new one goes in there too.
+        var slot = SlotRegistry.SlotForRef(refId);
+        var entry = slot is int i ? SlotRegistry.Load()[i.ToString()]?.DeepClone() as JsonObject : null;
+        var holder = new JsonObject { ["faceData"] = entry?["faceData"]?.DeepClone() ?? new JsonObject() };
+        if (follower && !string.IsNullOrWhiteSpace(voice))
+        {
+            var set = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = voice.Trim() });
+            if (set?["error"] != null) return DeserializeResponse(set);
+            if (set?["voiceStableId"] is JsonNode stable) holder["faceData"]!["voice"] = stable.DeepClone();
+        }
+        var (ok, reply) = await SetFollower(refId, follower, chooseVoice: follower && string.IsNullOrWhiteSpace(voice), holder);
+        if (ok && entry != null && slot is int s2 && holder["faceData"]?["voice"]?.ToString() != entry["faceData"]?["voice"]?.ToString())
+        {
+            entry["faceData"] = holder["faceData"]!.DeepClone();
+            SlotRegistry.Reserve(s2, entry);
+        }
+        return reply;
+    }
 
     private async Task<(bool Ok, object Reply)> SetFamily(string refId, string role)
     {
@@ -395,6 +436,62 @@ public partial class RaceMenuTools
         }
         catch (McpException ex) { liking = "The relationship rank wasn't set: " + ex.Message; }
         return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
+    }
+
+    /// <summary>The loaded mods that keep whom an NPC is attracted to (FEAT-306); none when the plugin can't say.</summary>
+    private async Task<List<string>> AttractionModNames()
+    {
+        try { return ((await _pipe.SendRequestAsync("attraction_mods"))?["mods"] as JsonObject)?.Select(m => m.Key).ToList() ?? []; }
+        catch (McpException) { return []; }
+    }
+
+    /// <summary>Writes the attraction into each loaded mod that keeps it. 'no one' and 'mods decide' write nothing.</summary>
+    private async Task<object> SetAttractionIn(string refId, string attraction)
+    {
+        attraction = attraction.Trim().ToLowerInvariant();
+        if (attraction is "no one")
+            return new { attraction, note = "None of the installed mods has 'attracted to no one', so it's kept in SkyLink's record only and each mod uses its own default." };
+        if (attraction is "mods decide") return new { attraction, note = "Left to the mods: each picks its own." };
+        var set = await _pipe.SendRequestAsync("set_attraction", new JsonObject { ["refId"] = refId, ["attraction"] = attraction });
+        if (set?["error"] != null) return DeserializeResponse(set);
+        string? oromance = null;
+        if (set?["ORomance"] is JsonObject or)
+        {
+            // Seeded first: ORomance rolls every stat (orientation too) the first time it meets an NPC, over what's stored.
+            var call = (string fn, JsonArray args) => _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ORomanceScript", ["functionName"] = fn, ["target"] = or["quest"]!.ToString(), ["args"] = args,
+            });
+            try
+            {
+                await call("SeedIfNeeded", new JsonArray(refId));
+                await call("StoreSexuality", new JsonArray(refId, or["value"]!.GetValue<int>()));
+                oromance = or["sexualityOption"]?.GetValue<bool>() == true ? "set" :
+                    "set; ORomance's Sexuality option is off (its MCM), so for now it treats everyone as open to everyone";
+            }
+            catch (McpException ex) { oromance = "not set: " + ex.Message; }
+        }
+        return new { attraction, oslAroused = set?["OSL Aroused"] != null ? "set" : null, oromance };
+    }
+
+    [McpServerTool]
+    [Description("Who a character is attracted to (FEAT-306): women, men, everyone, no one, or 'mods decide', written into each installed mod " +
+        "that keeps it (ORomance, OSL Aroused). Without attraction: which of those mods are installed. Ask the player; never assume.")]
+    public async Task<object> SetAttraction(string? refId = null, string? attraction = null)
+    {
+        var mods = await AttractionModNames();
+        if (string.IsNullOrWhiteSpace(refId) || string.IsNullOrWhiteSpace(attraction))
+            return new { mods, note = mods.Count == 0 ? "No installed mod keeps whom an NPC is attracted to, so there is nothing to set." : null };
+        if (CharacterChoices.Attraction(attraction) is { } bad) return new { error = bad };
+        if (mods.Count == 0) return new { error = "No installed mod keeps whom an NPC is attracted to (ORomance, OSL Aroused), so there is nothing to set." };
+        var reply = await SetAttractionIn(refId.Trim(), attraction);
+        if (SlotRegistry.SlotForRef(refId.Trim()) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
+        {
+            var copy = entry.DeepClone().AsObject();
+            copy["attraction"] = attraction.Trim().ToLowerInvariant();
+            SlotRegistry.Reserve(slot, copy);
+        }
+        return reply;
     }
 
     [McpServerTool]

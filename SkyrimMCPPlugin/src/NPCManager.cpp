@@ -1068,6 +1068,24 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"ownFace", true}};
     }
 
+    // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows. {has, names of this sex}, or null.
+    json FollowerVoices(RE::TESNPC* npc) {
+        auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7);
+        if (!voices) return nullptr;
+        bool has = false;
+        json names = json::array();
+        const bool female = npc->GetSex() == RE::SEX::kFemale;
+        voices->ForEachForm([&](RE::TESForm* f) {
+            if (f == npc->voiceType) has = true;
+            if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
+                const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
+                if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
+            }
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        return {{"has", has}, {"names", names}};
+    }
+
     json SetFollower(const std::string& refId, bool follower) {
         RE::TESForm* form = nullptr;
         try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
@@ -1108,23 +1126,50 @@ namespace SkyrimMCP::NPCManager {
             npc->AddChange(CF::kFactions | CF::kAIData | CF::kBaseData);
         }
 
-        // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows.
         json result = {{"refId", refId}, {"follower", follower}};
-        if (auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7)) {
-            bool has = false;
-            json names = json::array();
-            const bool female = npc->GetSex() == RE::SEX::kFemale;
-            voices->ForEachForm([&](RE::TESForm* f) {
-                if (f == npc->voiceType) has = true;
-                if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
-                    const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
-                    if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
-                }
-                return RE::BSContainer::ForEachResult::kContinue;
-            });
-            result["voiceHasFollowerLines"] = has;
+        if (auto voices = FollowerVoices(npc); voices.is_object()) {
+            result["voiceHasFollowerLines"] = voices["has"];
             result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
-            result["followerVoices"] = names;
+            result["followerVoices"] = voices["names"];
+        }
+        return result;
+    }
+
+    // Mods that keep whom an NPC is attracted to (FEAT-306). Each may be missing; only those loaded are reported.
+    // ORomance: StorageUtil int "or_k_sexu" (0 opposite sex, 1 both, 2 same sex), used only while its global ORSexuality is 1.
+    // OSL Aroused (and SexLab Aroused): faction slaGenderPreference, rank 0 men, 1 women, 2 both.
+    json AttractionMods() {
+        auto* data = RE::TESDataHandler::GetSingleton();
+        json mods = json::object();
+        if (auto* quest = data ? data->LookupForm<RE::TESQuest>(0x800, "ORomance.esp") : nullptr) {
+            auto* on = data->LookupForm<RE::TESGlobal>(0x63A5, "ORomance.esp");
+            mods["ORomance"] = {{"quest", std::format("{:08X}", quest->GetFormID())}, {"sexualityOption", on && on->value >= 0.5f}};
+        }
+        if (auto* faction = data ? data->LookupForm<RE::TESFaction>(0x79A72, "SexLabAroused.esm") : nullptr)
+            mods["OSL Aroused"] = {{"faction", std::format("{:08X}", faction->GetFormID())}};
+        return {{"mods", mods}};
+    }
+
+    json SetAttraction(const std::string& refId, const std::string& attraction) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor || actor->IsPlayerRef()) return {{"error", "Not an NPC: " + refId}};
+        const bool women = attraction == "women", men = attraction == "men", everyone = attraction == "everyone";
+        if (!women && !men && !everyone) return {{"error", "attraction must be women, men or everyone"}};
+        auto* npc = actor->GetActorBase();
+        const bool female = npc && npc->GetSex() == RE::SEX::kFemale;
+        json result = {{"refId", refId}, {"attraction", attraction}};
+        auto mods = AttractionMods()["mods"];
+        if (mods.contains("OSL Aroused")) {
+            auto* faction = RE::TESForm::LookupByID<RE::TESFaction>(Helpers::ParseFormId(mods["OSL Aroused"]["faction"].get<std::string>()));
+            const std::int8_t rank = everyone ? 2 : women ? 1 : 0;
+            actor->AddToFaction(faction, rank);  // as Papyrus SetFactionRank: joins, or changes the rank
+            result["OSL Aroused"] = {{"genderPreference", rank}};
+        }
+        // ORomance's number is relative to the NPC's sex; the C# side stores it through ORomance's own script.
+        if (mods.contains("ORomance")) {
+            auto o = mods["ORomance"];
+            o["value"] = everyone ? 1 : (women == female) ? 2 : 0;
+            result["ORomance"] = o;
         }
         return result;
     }
@@ -1207,6 +1252,7 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
                 {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
                 {"faceData", FaceDataOf(npc)}, {"height", npc->GetHeight()}, {"level", actor->GetLevel()},
+                {"voiceHasFollowerLines", [&] { auto v = FollowerVoices(npc); return v.is_object() ? v["has"] : json(nullptr); }()},
                 {"essential", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)},
                 {"protected", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kProtected)}};
     }

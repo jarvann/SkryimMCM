@@ -53,6 +53,9 @@ namespace SkyrimMCP {
         // of the worn armour added and put on. Player-made enchantments and tempering aren't copied.
         json CopyOutfit(const std::string& refId);
         json SetSpawnedNpcEnabled(const std::string& refId, bool enable);
+        // FEAT-306: the loaded mods that keep whom an NPC is attracted to, and setting it in them (women, men or everyone).
+        json AttractionMods();
+        json SetAttraction(const std::string& refId, const std::string& attraction);
     }
 
 }

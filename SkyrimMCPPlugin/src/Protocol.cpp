@@ -284,6 +284,14 @@ namespace SkyrimMCP::Protocol {
             bool follower = params.value("follower", true);
             return GameThread(id, [ref, follower]() { return NPCManager::SetFollower(ref, follower); });
         };
+        registry["attraction_mods"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return NPCManager::AttractionMods(); });
+        };
+        registry["set_attraction"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string attraction = params.value("attraction", std::string());
+            return GameThread(id, [ref, attraction]() { return NPCManager::SetAttraction(ref, attraction); });
+        };
         formIdParam("home_markers", "refId", [](const std::string& r) { return NPCManager::HomeMarkers(r); });
         formIdParam("character_forms", "refId", [](const std::string& r) { return NPCManager::CharacterForms(r); });
         formIdParam("copy_outfit", "refId", [](const std::string& r) { return NPCManager::CopyOutfit(r); });
