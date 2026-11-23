@@ -1,5 +1,5 @@
 {
-  "note": "Player Family ranks (FEAT-304). Saves and dialogue conditions refer to the numbers: never change or reuse one once released; add new ones at the end.",
+  "note": "Player Family ranks (FEAT-304). Saves and dialogue conditions refer to the numbers: never change or reuse one once released; add new ones at the end. marryable: not kin by blood, so the role allows marriage (Cory, 2026-11-23: step-siblings); keep NPCManager.cpp kMarryableRanks the same.",
   "ranks": [
     { "rank": 0, "role": "Relative" },
     { "rank": 1, "role": "Father", "sex": "male" },
@@ -19,8 +19,8 @@
     { "rank": 15, "role": "Cousin" },
     { "rank": 16, "role": "Stepfather", "sex": "male" },
     { "rank": 17, "role": "Stepmother", "sex": "female" },
-    { "rank": 18, "role": "Stepbrother", "sex": "male" },
-    { "rank": 19, "role": "Stepsister", "sex": "female" },
+    { "rank": 18, "role": "Stepbrother", "sex": "male", "marryable": true },
+    { "rank": 19, "role": "Stepsister", "sex": "female", "marryable": true },
     { "rank": 20, "role": "Father-in-law", "sex": "male" },
     { "rank": 21, "role": "Mother-in-law", "sex": "female" },
     { "rank": 22, "role": "Brother-in-law", "sex": "male" },

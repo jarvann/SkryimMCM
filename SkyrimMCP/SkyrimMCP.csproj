@@ -33,6 +33,7 @@
     <None Include="Models\*.onnx;Models\*.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="SaveClean\SaveClean.class" CopyToOutputDirectory="PreserveNewest" />
     <None Include="NOTICE-ReSaver.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\plugin\home-layouts\*.json" LinkBase="HomeLayouts" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- ONNX Runtime's package ships .lib import libraries next to its DLLs: not needed at run time. -->

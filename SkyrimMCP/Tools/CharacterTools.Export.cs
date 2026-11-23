@@ -21,14 +21,14 @@ public partial class CharacterTools
     [Description("Export a spawned character as the player's own standalone mod (FEAT-283): a light plugin with the character, its face files, hair " +
         "colour, voice and outfit, placed in the world without scripts or cell edits, plus a README with the mods it needs, zipped. Needs neither " +
         "SkyLink nor RaceMenu afterwards. Written to SkyLink's Build folder, never into Data. modName: the plugin's name. outfit: 'worn' (what it " +
-        "wears now) or 'none'. follower: can be recruited (default: if it is one now). home: a reference from homeChoices (default the nearest " +
+        "wears now) or 'none'. follower: can be recruited; marryable: can be married (not with a kept family role that rules it out; step-siblings may). ASK THE PLAYER both " +
+        "(the question says what the character is now): left out, nothing is written and the questions come back. home: a reference from homeChoices (default the nearest " +
         "marker). textureSize: of the face's skin texture (1024 or 2048). author: shown in the plugin. dryRun (default true) says what would be made, " +
         "with the requirements and whose meshes the face file contains (permission to share those is theirs to give). family: for a character with a " +
-        "Player Family role, ASK THE PLAYER which they want, then pass it: true keeps the role (the faction is in SkyLinkAI.esp, so the mod then " +
-        "needs SkyLink AI installed, a master), false drops it (fully standalone). Left out for such a character, nothing is written and the " +
-        "question comes back. To see it: install it, remove the spawned one, start a save.")]
+        "Player Family role, ask the player too, then pass it: true keeps the role (the faction is in SkyLinkAI.esp, so the mod then " +
+        "needs SkyLink AI installed, a master), false drops it (fully standalone). To see it: install it, remove the spawned one, start a save.")]
     public async Task<object> ExportCharacter(string refId, string modName, string? author = null, string outfit = "worn", bool? follower = null,
-        string? home = null, int textureSize = 1024, bool? family = null, bool dryRun = true)
+        string? home = null, int textureSize = 1024, bool? family = null, bool? marryable = null, bool dryRun = true)
     {
         modName = (modName ?? "").Trim();
         if (modName.EndsWith(".esp", StringComparison.OrdinalIgnoreCase)) modName = modName[..^4];
@@ -50,30 +50,38 @@ public partial class CharacterTools
 
         var forms = (data["forms"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         string? One(string kind) => forms.FirstOrDefault(f => f["kind"]?.ToString() == kind)?["stableId"]?.ToString();
-        var isFollower = follower ?? forms.Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == "Skyrim.esm|05C84D");
-        var marry = forms.Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == "Skyrim.esm|019809") && entry["family"]?.GetValue<string?>() == null;
+        bool InFaction(string id) => forms.Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == id);
         // Player Family only when asked: its faction is SkyLinkAI.esp's, so the mod then depends on SkyLink AI (Cory, 2026-11-23).
         var familyRole = entry["family"]?.GetValue<string?>();
         int? familyRank = null;
-        if (familyRole != null && family == null)
-            return new
-            {
-                needsChoice = "family",
-                askThePlayer = $"{data["name"]} is the player's {familyRole} (Player Family). Keep that in the exported mod? Keeping it makes the mod " +
-                    "need SkyLink AI installed (the faction is in SkyLinkAI.esp); dropping it keeps the mod fully standalone.",
-                options = new[] { "family: true (keep the role, needs SkyLink AI)", "family: false (fully standalone)" },
-                note = "Nothing was written. Ask the player, then export again with family set.",
-            };
-        if (family == true)
+        var roleMarryable = false;
+        if (familyRole != null)
         {
-            if (familyRole == null) return new { error = "This character has no Player Family role (SetFamilyRole gives one), so family can't be kept." };
             JsonNode? roles;
             try { roles = await _pipe.SendRequestAsync("family_roles"); }
             catch (McpException ex) { return new { error = ex.Message }; }
-            familyRank = (roles?["roles"] as JsonArray ?? []).OfType<JsonObject>()
-                .FirstOrDefault(r => string.Equals(r["role"]?.ToString(), familyRole, StringComparison.OrdinalIgnoreCase))?["rank"]?.GetValue<int>();
+            var role = (roles?["roles"] as JsonArray ?? []).OfType<JsonObject>()
+                .FirstOrDefault(r => string.Equals(r["role"]?.ToString(), familyRole, StringComparison.OrdinalIgnoreCase));
+            familyRank = role?["rank"]?.GetValue<int>();
+            roleMarryable = role?["marryable"]?.GetValue<bool>() == true;
+        }
+        // Every character made: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
+        if (CharacterChoices.Ask(data["name"]?.ToString() ?? "The character", follower, marryable, familyRole,
+                "Nothing was written. Ask the player, then export again with them set.", askFamily: true, family: family,
+                current: (InFaction("Skyrim.esm|05C84D"), InFaction("Skyrim.esm|019809")), roleMarryable: roleMarryable) is { } ask)
+            return ask;
+        var isFollower = follower == true;
+        var marry = marryable == true && !(familyRole != null && family == true && !roleMarryable);
+        if (isFollower && data["voiceHasFollowerLines"]?.GetValue<bool>() == false)
+            return new { error = $"{data["name"]}'s voice has no follower lines, so the recruit dialogue wouldn't appear in the exported mod. Make them a follower in the game first (MakeFollower, which gives them a voice that has them), then export." };
+        if (marry && data["voiceHasMarriageLines"]?.GetValue<bool?>() == false)
+            return new { error = $"{data["name"]}'s voice has no marriage proposal lines, so the Amulet of Mara talk wouldn't appear in the exported mod. Give them an even-toned voice in the game first (MakeFollower with voice), or export with marryable false." };
+        if (family == true)
+        {
+            if (familyRole == null) return new { error = "This character has no Player Family role (SetFamilyRole gives one), so family can't be kept." };
             if (familyRank == null) return new { error = $"The role '{familyRole}' isn't in SkyLinkAI.esp's Player Family faction." };
         }
+        else familyRank = null;
         var choices = (markers?["markers"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         var homeRef = home?.Trim() ?? (choices.FirstOrDefault(m => m["marker"]?.GetValue<bool>() == true) ?? choices.FirstOrDefault())?["stableId"]?.ToString();
         if (homeRef == null) return new { error = "No lasting base game reference was found in this place to put the character at. Move it somewhere else (an inn, a town) and export again." };

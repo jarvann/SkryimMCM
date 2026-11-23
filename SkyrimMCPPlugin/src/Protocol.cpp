@@ -199,6 +199,11 @@ namespace SkyrimMCP::Protocol {
             return MakeResponse(id, true, result).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
         };
         // get_script_functions is registered below with other formIdParam entries
+        registry["alias_handle"] = [](const std::string& id, const json& params) {
+            std::string quest = params.value("quest", std::string());
+            std::string alias = params.value("alias", std::string());
+            return GameThread(id, [quest, alias]() { return PapyrusBridge::AliasHandle(quest, alias); });
+        };
         registry["call_papyrus_function"] = [](const std::string& id, const json& params) {
             std::string className = params.value("className", "");
             std::string functionName = params.value("functionName", "");
@@ -283,6 +288,44 @@ namespace SkyrimMCP::Protocol {
             std::string ref = params.value("refId", std::string());
             bool follower = params.value("follower", true);
             return GameThread(id, [ref, follower]() { return NPCManager::SetFollower(ref, follower); });
+        };
+        registry["set_home"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string at = params.value("at", std::string());
+            return GameThread(id, [ref, at]() { return NPCManager::SetHome(ref, at); });
+        };
+        registry["find_open_space"] = [](const std::string& id, const json& params) {
+            float radius = params.value("radius", 2000.0f), size = params.value("size", 1200.0f);
+            return GameThread(id, [radius, size]() { return WorldManager::FindOpenSpace(radius, size); });
+        };
+        registry["place_object"] = [](const std::string& id, const json& params) {
+            std::string base = params.value("base", std::string());
+            float x = params.value("x", 0.0f), y = params.value("y", 0.0f), z = params.value("z", 0.0f), a = params.value("angle", 0.0f);
+            bool ground = params.value("onGround", true);
+            return GameThread(id, [=]() { return WorldManager::PlaceObject(base, x, y, z, a, ground); });
+        };
+        registry["placed_objects"] = [](const std::string& id, const json& params) {
+            std::string center = params.value("center", std::string());
+            float radius = params.value("radius", 1500.0f);
+            return GameThread(id, [center, radius]() { return WorldManager::PlacedObjects(center, radius); });
+        };
+        registry["add_map_marker"] = [](const std::string& id, const json& params) {
+            std::string at = params.value("at", std::string());
+            std::string name = params.value("name", std::string("Homestead"));
+            int type = params.value("type", 13);  // Farm
+            return GameThread(id, [at, name, type]() { return WorldManager::AddMapMarker(at, name, type); });
+        };
+        registry["remove_object"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            return GameThread(id, [ref]() { return WorldManager::RemoveObject(ref); });
+        };
+        registry["attraction_mods"] = [](const std::string& id, const json&) {
+            return GameThread(id, []() { return NPCManager::AttractionMods(); });
+        };
+        registry["set_attraction"] = [](const std::string& id, const json& params) {
+            std::string ref = params.value("refId", std::string());
+            std::string attraction = params.value("attraction", std::string());
+            return GameThread(id, [ref, attraction]() { return NPCManager::SetAttraction(ref, attraction); });
         };
         formIdParam("home_markers", "refId", [](const std::string& r) { return NPCManager::HomeMarkers(r); });
         formIdParam("character_forms", "refId", [](const std::string& r) { return NPCManager::CharacterForms(r); });

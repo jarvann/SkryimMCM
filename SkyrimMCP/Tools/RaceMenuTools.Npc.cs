@@ -88,15 +88,18 @@ public partial class RaceMenuTools
         "essential: can't be killed. The character stays around where it stands and belongs to no faction; keepSchedule true keeps " +
         "the template's daily schedule, job, factions and temper (a court wizard walks home). voice: a voice type's editor ID or form ID (e.g. " +
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
-        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable (default true): can be " +
+        "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable: can be " +
         "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
-        "without a role lists them), any race, adults only, never marryable. resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
+        "without a role lists them), any race, adults only, marryable only in a role that allows it (step-siblings; family_roles says). resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
         "face and hair colour take after the player's, in any race or sex. follower: can be recruited with the game's own dialogue (give it a voice " +
         "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
-        "exporting the character into the player's own plugin (coming in 1.6) makes it lasting. Remove it with RemoveSpawnedNpc. " +
-        "dryRun (default true) says what would be spawned.")]
+        "ExportCharacter makes it lasting in the player's own plugin. Remove it with RemoveSpawnedNpc. " +
+        "ASK THE PLAYER whether it should be a follower and (unless its family role rules marriage out) whether it can be married, " +
+        "then pass follower and marryable: left out, nothing is spawned and the questions come back. attraction: who the character is attracted " +
+        "to (women, men, everyone, no one, or 'mods decide'), asked only when a mod that keeps it is installed (ORomance, OSL Aroused); the " +
+        "questions say so. Same-sex marriage needs nothing: the game lets anyone marry anyone. dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool marryable = true, string? family = null, double? resemblance = null, bool follower = false, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, bool dryRun = true)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -111,6 +114,7 @@ public partial class RaceMenuTools
 
         // A role such as Sister says the sex; the plugin checks it against the character's.
         string? familyRole = null;
+        var roleMarryable = false;
         if (!string.IsNullOrWhiteSpace(family))
         {
             JsonNode? roles;
@@ -124,8 +128,15 @@ public partial class RaceMenuTools
                 if (female is bool asked && asked != (roleSex == "female")) return new { error = $"{familyRole} is a {roleSex} role." };
                 female = roleSex == "female";
             }
-            marryable = false;
+            roleMarryable = match["marryable"]?.GetValue<bool>() == true;
+            if (!roleMarryable) marryable = false;
         }
+
+        // Every new character: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
+        if (CharacterChoices.Attraction(attraction) is { } badAttraction) return new { error = badAttraction };
+        var attractionMods = await AttractionModNames();
+        if (CharacterChoices.Ask(name.Trim(), follower, marryable, roleMarryable ? null : familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
+            attractionMods: attractionMods, attraction: attraction) is { } ask) return ask;
 
         if (dryRun)
             return new
@@ -138,6 +149,9 @@ public partial class RaceMenuTools
                 sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
                 face = face == "player" ? "the player's current face (RaceMenu CharGen)" : "the template's own face",
+                follower,
+                marryable,
+                attraction = attractionMods.Count == 0 ? null : attraction,
                 lasting = false,
                 note = "Spawns next to the player as a preview for this session. Pass dryRun: false to spawn.",
             };
@@ -151,7 +165,7 @@ public partial class RaceMenuTools
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
-        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable };
+        var p = new JsonObject { ["name"] = name.Trim(), ["face"] = face, ["essential"] = essential, ["keepSchedule"] = keepSchedule, ["marryable"] = marryable == true };
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
@@ -210,10 +224,40 @@ public partial class RaceMenuTools
         }
 
         object? followerResult = null;
-        if (follower && refId != null)
+        if (follower == true && refId != null)
         {
             try { followerResult = (await SetFollower(refId, true, chooseVoice: string.IsNullOrWhiteSpace(voice), spawned)).Reply; }
             catch (McpException ex) { followerResult = new { error = ex.Message, note = "Spawned, but not as a follower." }; }
+        }
+
+        // The proposal only shows for voices in the game's marriage voice lists (GOG, 2026-11-23): one without them gets the even-toned
+        // voice when none was asked for (it has follower lines too), else a note.
+        string? marriageVoice = null;
+        if (marryable == true && refId != null)
+        {
+            try
+            {
+                var forms = await _pipe.SendRequestAsync("character_forms", new JsonObject { ["refId"] = refId });
+                if (forms?["voiceHasMarriageLines"]?.GetValue<bool?>() == false)
+                {
+                    if (string.IsNullOrWhiteSpace(voice))
+                    {
+                        var isFemale = spawned?["female"]?.GetValue<bool>() ?? false;
+                        var changed = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = isFemale ? "00013ADD" : "00013AD2" });
+                        if (changed?["voiceStableId"] is JsonNode stable && spawned?["faceData"] is JsonObject fd) fd["voice"] = stable.DeepClone();
+                        marriageVoice = $"Its voice had no marriage proposal lines, so it now has {changed?["voice"]}.";
+                    }
+                    else marriageVoice = $"The voice {voice} has no marriage proposal lines, so the Amulet of Mara talk won't appear. Even-toned voices have them.";
+                }
+            }
+            catch (McpException) { }
+        }
+
+        object? attractionResult = null;
+        if (attractionMods.Count > 0 && attraction != null && refId != null)
+        {
+            try { attractionResult = await SetAttractionIn(refId, attraction); }
+            catch (McpException ex) { attractionResult = new { error = ex.Message, note = "Spawned, but the attraction wasn't set." }; }
         }
 
         object? outfitResult = null;
@@ -261,7 +305,7 @@ public partial class RaceMenuTools
             SlotRegistry.Reserve(slotIndex, new JsonObject
             {
                 ["name"] = name.Trim(), ["refId"] = refId, ["baseId"] = spawned["baseId"]?.ToString(), ["objectId"] = objectId,
-                ["face"] = face, ["family"] = familyRole, ["template"] = spawned["template"]?.ToString(),
+                ["face"] = face, ["family"] = familyRole, ["attraction"] = attractionMods.Count > 0 ? attraction?.Trim().ToLowerInvariant() : null, ["template"] = spawned["template"]?.ToString(),
                 // What saves don't keep: the plugin puts it back at start-up and after loads (ReapplySlots).
                 ["raceId"] = spawned["raceId"]?.DeepClone(), ["faceData"] = spawned["faceData"]?.DeepClone(), ["preset"] = face == "player" ? presetName : null, ["characterId"] = characterId,
                 ["created"] = DateTime.Now.ToString("s"), ["files"] = new JsonArray(files.Select(f => (JsonNode)f).ToArray()),
@@ -291,6 +335,8 @@ public partial class RaceMenuTools
             voice = voiceResult,
             family = familyResult,
             follower = followerResult,
+            attraction = attractionResult,
+            marriageVoice,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,
@@ -361,46 +407,226 @@ public partial class RaceMenuTools
             }
             else note = "This voice has no follower lines, so the recruit dialogue won't appear. Give it one of followerVoices.";
         }
+        if (follower && await SetRelationshipToPlayer(refId, 3) is string failed) note = (note + " The relationship rank wasn't set: " + failed).Trim();
+        return (true, new { result = DeserializeResponse(set), note });
+    }
+
+    /// <summary>
+    /// The character's relationship rank with the player (3 ally, 0 acquaintance). Null when set, else why not. A character spawned
+    /// moments ago isn't bound in the script engine yet, so Papyrus refuses it (seen on GOG, 2026-11-23); the console's
+    /// setrelationshiprank does the same and works at once.
+    /// </summary>
+    private async Task<string?> SetRelationshipToPlayer(string refId, int rank)
+    {
         try
         {
-            if (follower)
-                await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
-                {
-                    ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId, ["args"] = new JsonArray("00000014", 3),
-                });
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId, ["args"] = new JsonArray("00000014", rank),
+            });
+            return null;
         }
-        catch (McpException ex) { note = (note + " The relationship rank wasn't set: " + ex.Message).Trim(); }
-        return (true, new { result = DeserializeResponse(set), note });
+        catch (McpException) { }
+        try
+        {
+            var target = char.IsDigit(refId[0]) ? $"\"{refId}\"" : refId;
+            var run = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"{target}.setrelationshiprank player {rank}" });
+            return run?["error"]?.ToString();
+        }
+        catch (McpException ex) { return ex.Message; }
     }
 
     [McpServerTool]
     [Description("Make a spawned character recruitable with the game's own follower dialogue (FEAT-282), or not (follower false). Sets the follower " +
         "factions, ally of the player, brave and helpful, protected, level with the player, and checks that the voice has follower lines " +
-        "(followerVoices lists those that do). Follower frameworks such as Nether's pick it up when it's recruited. Adults only.")]
-    public async Task<object> MakeFollower(string refId, bool follower = true) => (await SetFollower(refId.Trim(), follower, chooseVoice: false)).Reply;
+        "(followerVoices lists those that do). voice: one to give it first (a voice type's editor ID or form ID); left out, a voice without " +
+        "follower lines becomes the even-toned one. Follower frameworks such as Nether's pick it up when it's recruited. Adults only.")]
+    public async Task<object> MakeFollower(string refId, bool follower = true, string? voice = null)
+    {
+        refId = refId.Trim();
+        // A slot character's voice is put back from SkyLink's record after every load, so a new one goes in there too.
+        var slot = SlotRegistry.SlotForRef(refId);
+        var entry = slot is int i ? SlotRegistry.Load()[i.ToString()]?.DeepClone() as JsonObject : null;
+        var holder = new JsonObject { ["faceData"] = entry?["faceData"]?.DeepClone() ?? new JsonObject() };
+        if (follower && !string.IsNullOrWhiteSpace(voice))
+        {
+            var set = await _pipe.SendRequestAsync("set_npc_voice", new JsonObject { ["refId"] = refId, ["voice"] = voice.Trim() });
+            if (set?["error"] != null) return DeserializeResponse(set);
+            if (set?["voiceStableId"] is JsonNode stable) holder["faceData"]!["voice"] = stable.DeepClone();
+        }
+        var (ok, reply) = await SetFollower(refId, follower, chooseVoice: follower && string.IsNullOrWhiteSpace(voice), holder);
+        if (ok && entry != null && slot is int s2 && holder["faceData"]?["voice"]?.ToString() != entry["faceData"]?["voice"]?.ToString())
+        {
+            entry["faceData"] = holder["faceData"]!.DeepClone();
+            SlotRegistry.Reserve(s2, entry);
+        }
+        return reply;
+    }
 
     private async Task<(bool Ok, object Reply)> SetFamily(string refId, string role)
     {
         var set = await _pipe.SendRequestAsync("set_family", new JsonObject { ["refId"] = refId, ["role"] = role });
         if (set?["error"] != null) return (false, DeserializeResponse(set));
-        string? liking = null;
+        // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
+        var failed = await SetRelationshipToPlayer(refId, set?["role"] is JsonValue ? 3 : 0);
+        var liking = failed == null ? null : "The relationship rank wasn't set: " + failed;
+        return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
+    }
+
+    /// <summary>The loaded mods that keep whom an NPC is attracted to (FEAT-306); none when the plugin can't say.</summary>
+    private async Task<List<string>> AttractionModNames()
+    {
+        try { return ((await _pipe.SendRequestAsync("attraction_mods"))?["mods"] as JsonObject)?.Select(m => m.Key).ToList() ?? []; }
+        catch (McpException) { return []; }
+    }
+
+    /// <summary>Writes the attraction into each loaded mod that keeps it. 'no one' and 'mods decide' write nothing.</summary>
+    private async Task<object> SetAttractionIn(string refId, string attraction)
+    {
+        attraction = attraction.Trim().ToLowerInvariant();
+        if (attraction is "no one")
+            return new { attraction, note = "None of the installed mods has 'attracted to no one', so it's kept in SkyLink's record only and each mod uses its own default." };
+        if (attraction is "mods decide") return new { attraction, note = "Left to the mods: each picks its own." };
+        var set = await _pipe.SendRequestAsync("set_attraction", new JsonObject { ["refId"] = refId, ["attraction"] = attraction });
+        if (set?["error"] != null) return DeserializeResponse(set);
+        string? oromance = null;
+        if (set?["ORomance"] is JsonObject or)
+        {
+            // Seeded first: ORomance rolls every stat (orientation too) the first time it meets an NPC, over what's stored.
+            var call = (string fn, JsonArray args) => _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ORomanceScript", ["functionName"] = fn, ["target"] = or["quest"]!.ToString(), ["args"] = args,
+            });
+            try
+            {
+                await call("SeedIfNeeded", new JsonArray(refId));
+                await call("StoreSexuality", new JsonArray(refId, or["value"]!.GetValue<int>()));
+                oromance = or["sexualityOption"]?.GetValue<bool>() == true ? "set" :
+                    "set; ORomance's Sexuality option is off (its MCM), so for now it treats everyone as open to everyone";
+            }
+            catch (McpException ex) { oromance = "not set: " + ex.Message; }
+        }
+        return new { attraction, oslAroused = set?["OSL Aroused"] != null ? "set" : null, oromance };
+    }
+
+    [McpServerTool]
+    [Description("Who a character is attracted to (FEAT-306): women, men, everyone, no one, or 'mods decide', written into each installed mod " +
+        "that keeps it (ORomance, OSL Aroused). Without attraction: which of those mods are installed. Ask the player; never assume.")]
+    public async Task<object> SetAttraction(string? refId = null, string? attraction = null)
+    {
+        var mods = await AttractionModNames();
+        if (string.IsNullOrWhiteSpace(refId) || string.IsNullOrWhiteSpace(attraction))
+            return new { mods, note = mods.Count == 0 ? "No installed mod keeps whom an NPC is attracted to, so there is nothing to set." : null };
+        if (CharacterChoices.Attraction(attraction) is { } bad) return new { error = bad };
+        if (mods.Count == 0) return new { error = "No installed mod keeps whom an NPC is attracted to (ORomance, OSL Aroused), so there is nothing to set." };
+        var reply = await SetAttractionIn(refId.Trim(), attraction);
+        if (SlotRegistry.SlotForRef(refId.Trim()) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
+        {
+            var copy = entry.DeepClone().AsObject();
+            copy["attraction"] = attraction.Trim().ToLowerInvariant();
+            SlotRegistry.Reserve(slot, copy);
+        }
+        return reply;
+    }
+
+    // The game's marriage quest after the wedding (RelationshipMarriageFIN) and its house numbers (RelationshipMarriageSpouseHouseScript).
+    private const string SpouseQuest = "00021382";
+    private static readonly (int Number, string Alias, string[] Names)[] PlayerHouses =
+    [
+        (1, "SolitudeHouse", ["solitude", "proudspire", "proudspire manor"]),
+        (2, "WindhelmHouse", ["windhelm", "hjerim"]),
+        (3, "MarkarthHouse", ["markarth", "vlindrel", "vlindrel hall"]),
+        (4, "RiftenHouse", ["riften", "honeyside"]),
+        (5, "WhiterunHouse", ["whiterun", "breezehome"]),
+        (6, "FalkreathHouse", ["falkreath", "lakeview", "lakeview manor"]),
+        (7, "HjaalmarchHouse", ["hjaalmarch", "morthal", "windstad", "windstad manor"]),
+        (8, "PaleHouse", ["pale", "dawnstar", "heljarchen", "heljarchen hall"]),
+    ];
+
+    /// <summary>Calls a ReferenceAlias function on one of the marriage quest's aliases.</summary>
+    private async Task<JsonNode?> SpouseAlias(string alias, string function, params JsonNode?[] args)
+    {
+        var h = await _pipe.SendRequestAsync("alias_handle", new JsonObject { ["quest"] = SpouseQuest, ["alias"] = alias });
+        if (h?["error"] != null) throw new McpException(h["error"]!.ToString());
+        return await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+        {
+            ["className"] = h!["type"]!.ToString(), ["functionName"] = function, ["target"] = h["handle"]!.ToString(), ["args"] = new JsonArray(args),
+        });
+    }
+
+    [McpServerTool]
+    [Description("Move or reset where the player's spouse lives, after the wedding (FEAT-307), for any spouse (a SkyLink character or the " +
+        "game's own). home: one of the player's houses (Breezehome/Whiterun, Honeyside/Riften, Proudspire/Solitude, Hjerim/Windhelm, " +
+        "Vlindrel Hall/Markarth, Lakeview/Falkreath, Windstad/Hjaalmarch, Heljarchen/Pale), moved the way the game's own 'live in my house' " +
+        "talk does; or 'skylink' with at: a reference (a SkyLink home's marker) for a spawned spouse, who then lives there and the quest's " +
+        "'Visit your spouse's house' marker points to it. completeVisit: mark that objective done. Ask the player which home first.")]
+    public async Task<object> SetSpouseHome(string home, string? at = null, bool completeVisit = false)
+    {
+        string? spouse;
+        try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); }
+        catch (McpException ex) { return new { error = ex.Message }; }
+        if (string.IsNullOrEmpty(spouse)) return new { error = "The player isn't married (the marriage quest has no spouse)." };
+        var key = home.Trim().ToLowerInvariant();
+        var steps = new List<string>();
         try
         {
-            // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
-            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            if (PlayerHouses.FirstOrDefault(h => h.Names.Contains(key) || h.Alias.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase)) is { Alias: not null } house)
             {
-                ["className"] = "Actor", ["functionName"] = "SetRelationshipRank", ["target"] = refId,
-                ["args"] = new JsonArray("00000014", set?["role"] is JsonValue ? 3 : 0),
-            });
+                // The game's own move: clears every house alias and puts the spouse in this one, whose package keeps them there.
+                var moved = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = "RelationshipMarriageSpouseHouseScript", ["functionName"] = "MoveSpouseAdoption", ["target"] = SpouseQuest,
+                    ["args"] = new JsonArray(spouse, house.Number),
+                });
+                if (moved?["error"] != null) return DeserializeResponse(moved);
+                steps.Add($"moved to {house.Alias} (the game's own move)");
+                completeVisit = true;  // the spouse's own house no longer matters
+            }
+            else if (key == "skylink")
+            {
+                if (string.IsNullOrWhiteSpace(at)) return new { error = "at: the home's marker reference is needed with home 'skylink'." };
+                foreach (var h in PlayerHouses) await SpouseAlias(h.Alias, "Clear");
+                for (var i = 1; i <= 20; i++) { try { await SpouseAlias($"CCHouse{i:00}", "Clear"); } catch (McpException) { } }
+                // SpouseHouse has no package of its own: the spouse keeps their own AI, which SkyLink's home gives them.
+                await SpouseAlias("SpouseHouse", "ForceRefTo", spouse);
+                var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = at.Trim() });
+                if (set?["error"] != null) return DeserializeResponse(set);
+                await SpouseAlias("HouseCenter", "ForceRefTo", at.Trim());
+                // The map follows the alias at once; the compass keeps its old target until the objective is shown again (GOG, 2026-11-23).
+                foreach (var shown in new[] { "[10, false, false]", "[10, true, true]" })
+                {
+                    await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "Quest", ["functionName"] = "SetObjectiveDisplayed", ["target"] = SpouseQuest, ["args"] = JsonNode.Parse(shown),
+                    });
+                }
+                steps.Add("lives at the SkyLink home; the quest's house marker (map and compass) points there");
+                if (SlotRegistry.SlotForRef(spouse) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
+                {
+                    var copy = entry.DeepClone().AsObject();
+                    copy["home"] = at.Trim();
+                    SlotRegistry.Reserve(slot, copy);
+                }
+            }
+            else return new { error = "home: one of the player's houses (Breezehome, Honeyside, Proudspire, Hjerim, Vlindrel Hall, Lakeview, Windstad, Heljarchen) or 'skylink' with at." };
+            if (completeVisit)
+            {
+                var stage = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"GetStage {SpouseQuest}" });
+                if ((stage?["output"]?.ToString() ?? "").Contains(">> 20") || (stage?["output"]?.ToString() ?? "").Contains(">> 20.00"))
+                {
+                    await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"SetStage {SpouseQuest} 25" });
+                    steps.Add("'Visit your spouse's house' completed");
+                }
+            }
         }
-        catch (McpException ex) { liking = "The relationship rank wasn't set: " + ex.Message; }
-        return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
+        catch (McpException ex) { return new { error = ex.Message, done = steps }; }
+        return new { spouse, home, done = steps };
     }
 
     [McpServerTool]
     [Description("Player Family (FEAT-304): give a spawned character a role in the player's family (a rank of the Player Family faction in " +
         "SkyLinkAI.esp), so dialogue and other mods can ask for it. Without role: the list of roles (Father, Mother, Brother, Sister, Son, " +
-        "Daughter, Cousin, step and in-law roles and more). role 'none' takes the character out. Any race, adults only; family members can't be married.")]
+        "Daughter, Cousin, step and in-law roles and more). role 'none' takes the character out. Any race, adults only; only roles that aren't kin by blood (step-siblings) can be married.")]
     public async Task<object> SetFamilyRole(string? refId = null, string? role = null)
     {
         if (string.IsNullOrWhiteSpace(role) || string.IsNullOrWhiteSpace(refId)) return DeserializeResponse(await _pipe.SendRequestAsync("family_roles"));

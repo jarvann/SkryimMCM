@@ -986,6 +986,9 @@ namespace SkyrimMCP::NPCManager {
     namespace {
         constexpr RE::FormID kFamilyFaction = 0xA00;
         constexpr RE::FormID kMarriageFaction = 0x00019809;  // PotentialMarriageFaction
+        // Roles that aren't kin by blood and allow marriage (plugin/family-ranks.json "marryable"): Stepbrother, Stepsister.
+        constexpr std::array kMarryableRanks{ 18, 19 };
+        bool MarryableRank(int rank) { return std::ranges::find(kMarryableRanks, rank) != kMarryableRanks.end(); }
 
         RE::TESFaction* FamilyFaction() {
             auto* data = RE::TESDataHandler::GetSingleton();
@@ -1011,8 +1014,9 @@ namespace SkyrimMCP::NPCManager {
         json roles = json::array();
         int rank = 0;
         for (const auto& [male, female] : FamilyTitles(faction)) {
-            roles.push_back({{"rank", rank++}, {"role", male.empty() ? female : male},
-                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}});
+            roles.push_back({{"rank", rank}, {"role", male.empty() ? female : male},
+                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}, {"marryable", MarryableRank(rank)}});
+            ++rank;
         }
         return {{"faction", std::format("{:08X}", faction->GetFormID())}, {"roles", roles}};
     }
@@ -1042,10 +1046,11 @@ namespace SkyrimMCP::NPCManager {
             }
             if (rank < 0) return {{"error", "No family role called '" + role + "' (family_roles lists them)"}};
         }
-        auto* marriage = RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
+        // A role that allows marriage leaves the character's marriage faction as it is; the others take it away.
+        auto* marriage = none || MarryableRank(rank) ? nullptr : RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
         auto& list = npc->factions;
         for (std::uint32_t i = list.size(); i-- > 0;) {
-            if (list[i].faction == faction || (!none && list[i].faction == marriage)) list.erase(list.begin() + i);
+            if (list[i].faction == faction || (marriage && list[i].faction == marriage)) list.erase(list.begin() + i);
         }
         if (none) {
             actor->RemoveFromFaction(faction);
@@ -1055,7 +1060,8 @@ namespace SkyrimMCP::NPCManager {
             actor->AddToFaction(faction, static_cast<std::int8_t>(rank));
         }
         if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFactions);
-        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)}, {"marryable", false}};
+        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)},
+                {"marryableRole", !none && MarryableRank(rank)}};
     }
 
     json UseOwnFace(const std::string& refId) {
@@ -1066,6 +1072,39 @@ namespace SkyrimMCP::NPCManager {
         if (!npc || SlotIndex(npc) < 0) return {{"error", "Not a character in one of SkyLink's slots: " + refId}};
         npc->faceNPC = nullptr;
         return {{"refId", refId}, {"ownFace", true}};
+    }
+
+    // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows. {has, names of this sex}, or null.
+    // The marriage proposal ("Interested in me, are you?") has one line per voice group (Skyrim.esm, RelationshipMarriage):
+    // VoicesMarriageNeutral, Arrogant, Rough, Nord, Orc, Argonian, and MaleDrunk alone. Mods that add voices add them to these lists.
+    // Null when none of the lists is in the game.
+    json VoiceHasMarriageLines(RE::TESNPC* npc) {
+        if (!npc || !npc->voiceType) return nullptr;
+        bool any = false, has = npc->voiceType->GetFormID() == 0x00013AD4;
+        for (RE::FormID id : { 0x000CCD78u, 0x000CCE3Fu, 0x000CCE4Du, 0x000CCE4Eu, 0x000CCE4Fu, 0x000CCE50u }) {
+            auto* list = RE::TESForm::LookupByID<RE::BGSListForm>(id);
+            if (!list) continue;
+            any = true;
+            if (list->HasForm(npc->voiceType)) has = true;
+        }
+        return any ? json(has) : json(nullptr);
+    }
+
+    json FollowerVoices(RE::TESNPC* npc) {
+        auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7);
+        if (!voices) return nullptr;
+        bool has = false;
+        json names = json::array();
+        const bool female = npc->GetSex() == RE::SEX::kFemale;
+        voices->ForEachForm([&](RE::TESForm* f) {
+            if (f == npc->voiceType) has = true;
+            if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
+                const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
+                if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
+            }
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        return {{"has", has}, {"names", names}};
     }
 
     json SetFollower(const std::string& refId, bool follower) {
@@ -1108,23 +1147,75 @@ namespace SkyrimMCP::NPCManager {
             npc->AddChange(CF::kFactions | CF::kAIData | CF::kBaseData);
         }
 
-        // Voices with follower lines (VoicesFollowerAll); without one the recruit line never shows.
         json result = {{"refId", refId}, {"follower", follower}};
-        if (auto* voices = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7)) {
-            bool has = false;
-            json names = json::array();
-            const bool female = npc->GetSex() == RE::SEX::kFemale;
-            voices->ForEachForm([&](RE::TESForm* f) {
-                if (f == npc->voiceType) has = true;
-                if (auto* v = f ? f->As<RE::BGSVoiceType>() : nullptr) {
-                    const bool isFemale = v->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale);
-                    if (isFemale == female) names.push_back(v->GetFormEditorID() && v->GetFormEditorID()[0] ? v->GetFormEditorID() : std::format("{:08X}", v->GetFormID()));
-                }
-                return RE::BSContainer::ForEachResult::kContinue;
-            });
-            result["voiceHasFollowerLines"] = has;
+        if (auto voices = FollowerVoices(npc); voices.is_object()) {
+            result["voiceHasFollowerLines"] = voices["has"];
             result["voice"] = npc->voiceType && npc->voiceType->GetFormEditorID() ? json(npc->voiceType->GetFormEditorID()) : json(nullptr);
-            result["followerVoices"] = names;
+            result["followerVoices"] = voices["names"];
+        }
+        return result;
+    }
+
+    json SetHome(const std::string& refId, const std::string& atRefId) {
+        RE::TESForm* form = nullptr;
+        RE::TESForm* atForm = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        try { atForm = RE::TESForm::LookupByID(Helpers::ParseFormId(atRefId)); } catch (...) {}
+        auto* actor = form ? form->As<RE::Actor>() : nullptr;
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        auto* at = atForm ? atForm->As<RE::TESObjectREFR>() : nullptr;
+        if (!npc || ((npc->GetFormID() >> 24) != 0xFF && SlotIndex(npc) < 0)) return {{"error", "Not a spawned NPC: " + refId}};
+        if (!at) return {{"error", "Not a reference: " + atRefId}};
+        if (actor->IsPlayerTeammate()) return {{"error", "This character is following the player: dismiss them first, then give them a home"}};
+        auto* location = at->GetCurrentLocation();
+        actor->ForceEditorLocation(location);
+        if (auto* start = actor->extraList.GetByType<RE::ExtraStartingPosition>()) {
+            start->startPosition.pos = at->GetPosition();
+            start->location = location;
+        }
+        actor->MoveTo(at);
+        MakeStayPut(npc);  // sandboxes where they stand: at home
+        if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kAIData | RE::TESNPC::ChangeFlags::kFactions);
+        actor->EvaluatePackage(true, false);
+        return {{"refId", refId}, {"home", atRefId}, {"location", location && location->GetName() ? json(location->GetName()) : json(nullptr)},
+                {"editorLocation", actor->GetEditorLocation1() && actor->GetEditorLocation1()->GetName() ? json(actor->GetEditorLocation1()->GetName()) : json(nullptr)}};
+    }
+
+    // Mods that keep whom an NPC is attracted to (FEAT-306). Each may be missing; only those loaded are reported.
+    // ORomance: StorageUtil int "or_k_sexu" (0 opposite sex, 1 both, 2 same sex), used only while its global ORSexuality is 1.
+    // OSL Aroused (and SexLab Aroused): faction slaGenderPreference, rank 0 men, 1 women, 2 both.
+    json AttractionMods() {
+        auto* data = RE::TESDataHandler::GetSingleton();
+        json mods = json::object();
+        if (auto* quest = data ? data->LookupForm<RE::TESQuest>(0x800, "ORomance.esp") : nullptr) {
+            auto* on = data->LookupForm<RE::TESGlobal>(0x63A5, "ORomance.esp");
+            mods["ORomance"] = {{"quest", std::format("{:08X}", quest->GetFormID())}, {"sexualityOption", on && on->value >= 0.5f}};
+        }
+        if (auto* faction = data ? data->LookupForm<RE::TESFaction>(0x79A72, "SexLabAroused.esm") : nullptr)
+            mods["OSL Aroused"] = {{"faction", std::format("{:08X}", faction->GetFormID())}};
+        return {{"mods", mods}};
+    }
+
+    json SetAttraction(const std::string& refId, const std::string& attraction) {
+        auto* actor = Helpers::ResolveActor(refId);
+        if (!actor || actor->IsPlayerRef()) return {{"error", "Not an NPC: " + refId}};
+        const bool women = attraction == "women", men = attraction == "men", everyone = attraction == "everyone";
+        if (!women && !men && !everyone) return {{"error", "attraction must be women, men or everyone"}};
+        auto* npc = actor->GetActorBase();
+        const bool female = npc && npc->GetSex() == RE::SEX::kFemale;
+        json result = {{"refId", refId}, {"attraction", attraction}};
+        auto mods = AttractionMods()["mods"];
+        if (mods.contains("OSL Aroused")) {
+            auto* faction = RE::TESForm::LookupByID<RE::TESFaction>(Helpers::ParseFormId(mods["OSL Aroused"]["faction"].get<std::string>()));
+            const std::int8_t rank = everyone ? 2 : women ? 1 : 0;
+            actor->AddToFaction(faction, rank);  // as Papyrus SetFactionRank: joins, or changes the rank
+            result["OSL Aroused"] = {{"genderPreference", rank}};
+        }
+        // ORomance's number is relative to the NPC's sex; the C# side stores it through ORomance's own script.
+        if (mods.contains("ORomance")) {
+            auto o = mods["ORomance"];
+            o["value"] = everyone ? 1 : (women == female) ? 2 : 0;
+            result["ORomance"] = o;
         }
         return result;
     }
@@ -1207,6 +1298,8 @@ namespace SkyrimMCP::NPCManager {
         return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
                 {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
                 {"faceData", FaceDataOf(npc)}, {"height", npc->GetHeight()}, {"level", actor->GetLevel()},
+                {"voiceHasFollowerLines", [&] { auto v = FollowerVoices(npc); return v.is_object() ? v["has"] : json(nullptr); }()},
+                {"voiceHasMarriageLines", VoiceHasMarriageLines(npc)},
                 {"essential", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kEssential)},
                 {"protected", npc->actorData.actorBaseFlags.any(RE::ACTOR_BASE_DATA::Flag::kProtected)}};
     }
