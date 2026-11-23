@@ -69,8 +69,10 @@ public static partial class HeadRepair
         }
 
         // 3. Physics markers: a hair's mesh names its physics file in an "HDT Skinned Mesh Physics Object" string on its root, and the
-        //    export leaves it out, so FSMP gave a clone's KS hair no physics (BUG-107, GOG 2026-11-23). Copied onto the face file's root.
-        var root = faceNode >= 0 ? faceNode : 0;
+        //    export leaves it out, so FSMP gave a clone's KS hair no physics (BUG-107, GOG 2026-11-23). Copied onto the face file's root
+        //    block (its BSFadeNode): for an NPC with a face file FSMP loads that file and reads the string from the root only (FSMP
+        //    ActorManager::Skeleton::processGeometry, scanBBP on the loaded root). On BSFaceGenNiNodeSkinned it was never found.
+        const int root = 0;
         var have = nif.ExtraData(root).Select(nif.StringExtraData).OfType<(string Name, string Text)>().ToHashSet();
         foreach (var (editorId, model) in models)
         {
