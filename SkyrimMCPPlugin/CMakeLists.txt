@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     SkyrimMCPPlugin
-    VERSION 1.5.0
+    VERSION 1.6.0
     LANGUAGES CXX
 )
 
