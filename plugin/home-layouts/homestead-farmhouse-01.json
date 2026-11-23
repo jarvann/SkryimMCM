@@ -1,0 +1,266 @@
+{
+  "name": "Homestead: farmhouse 01",
+  "note": "Built by hand in game on GOG, 2026-11-23 (saved SkyLink_Homestead). Offsets are world units from the center marker, unrotated (the layout as placed, facing angle 340 from the marker to the house). Pieces are placed exactly (onGround false) at center + offset; rotate every offset and angle together to face another way. The house shell sat on a 290-unit slope: the foundation and footing walls hide the drop at the back.",
+  "world": {
+    "worldspace": "Tamriel",
+    "cell": [
+      2,
+      -2
+    ],
+    "center": [
+      9323.0,
+      -5877.0,
+      -4543.31
+    ]
+  },
+  "pieces": [
+    {
+      "role": "center",
+      "base": "Skyrim.esm|00003B",
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "angle": 340,
+      "what": "XMarker: the home marker (set_home, SetSpouseHome)",
+      "placedRef": "FF000E89"
+    },
+    {
+      "role": "house",
+      "base": "Skyrim.esm|0B11AC",
+      "offset": [
+        -245.0,
+        656.0,
+        15.3
+      ],
+      "angle": 160,
+      "what": "SFarmhouse01 (shell, no interior)",
+      "placedRef": "FF000E8B"
+    },
+    {
+      "role": "foundation",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -194.0,
+        975.0,
+        -244.7
+      ],
+      "angle": 160,
+      "what": "StonewallTerraceLong01FieldGrass01, back, left",
+      "placedRef": "FF000FBB"
+    },
+    {
+      "role": "foundation",
+      "base": "Skyrim.esm|093085",
+      "offset": [
+        -423.0,
+        894.0,
+        -244.7
+      ],
+      "angle": 160,
+      "what": "StonewallTerraceCorner01FieldGrass, back right corner",
+      "placedRef": "FF00102C"
+    },
+    {
+      "role": "foundation",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -427.0,
+        899.0,
+        -264.7
+      ],
+      "angle": 70,
+      "what": "StonewallTerraceLong01FieldGrass01, right side, back half",
+      "placedRef": "FF000FD6"
+    },
+    {
+      "role": "foundation",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -262.0,
+        960.0,
+        -264.7
+      ],
+      "angle": 250,
+      "what": "StonewallTerraceLong01FieldGrass01, left side, back half",
+      "placedRef": "FF000FD7"
+    },
+    {
+      "role": "footing",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -199.0,
+        989.0,
+        -384.7
+      ],
+      "angle": 160,
+      "what": "lower course under the back left wall",
+      "placedRef": "FF000FF3"
+    },
+    {
+      "role": "footing",
+      "base": "Skyrim.esm|093085",
+      "offset": [
+        -428.0,
+        908.0,
+        -384.7
+      ],
+      "angle": 160,
+      "what": "lower course under the corner",
+      "placedRef": "FF00102A"
+    },
+    {
+      "role": "footing",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -441.0,
+        894.0,
+        -384.7
+      ],
+      "angle": 70,
+      "what": "lower course under the right side",
+      "placedRef": "FF000FFD"
+    },
+    {
+      "role": "footing",
+      "base": "Skyrim.esm|03ABF2",
+      "offset": [
+        -248.0,
+        965.0,
+        -384.7
+      ],
+      "angle": 250,
+      "what": "lower course under the left side",
+      "placedRef": "FF001002"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|0800DE",
+      "offset": [
+        -111.0,
+        -446.0,
+        -49.7
+      ],
+      "angle": 70,
+      "what": "NorTentLarge",
+      "placedRef": "FF000F9B"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|021376",
+      "offset": [
+        -111.0,
+        -446.0,
+        -27.9
+      ],
+      "angle": 70,
+      "what": "UpperBedDouble01 (in the tent)",
+      "placedRef": "FF000F9D"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|0F3923",
+      "offset": [
+        -322.0,
+        -365.0,
+        -22.8
+      ],
+      "angle": 70,
+      "what": "PlayerHouseChest (never resets)",
+      "placedRef": "FF000F9E"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|02F239",
+      "offset": [
+        193.0,
+        -88.0,
+        5.2
+      ],
+      "angle": 340,
+      "what": "CommonTableSquare01",
+      "placedRef": "FF000ED5"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|02EC1C",
+      "offset": [
+        109.0,
+        -119.0,
+        -1.9
+      ],
+      "angle": 70,
+      "what": "CommonChair01",
+      "placedRef": "FF000ED6"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|02EC1C",
+      "offset": [
+        277.0,
+        -56.0,
+        7.3
+      ],
+      "angle": 250,
+      "what": "CommonChair01",
+      "placedRef": "FF000EDD"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|101A51",
+      "offset": [
+        522.0,
+        88.0,
+        -8.3
+      ],
+      "angle": 340,
+      "what": "Campfire01LandBurningTundra01 (Survival heat source)",
+      "placedRef": "FF000EF1"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|1010B3",
+      "offset": [
+        522.0,
+        88.0,
+        21.5
+      ],
+      "angle": 340,
+      "what": "CraftingCookingPotSm",
+      "placedRef": "FF000EF2"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|07022E",
+      "offset": [
+        402.0,
+        524.0,
+        39.1
+      ],
+      "angle": 10,
+      "what": "WoodChoppingBlock",
+      "placedRef": "FF000EF3"
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|02E6CF",
+      "offset": [
+        -133.0,
+        356.0,
+        -0.7
+      ],
+      "angle": 160,
+      "what": "CommonBench01",
+      "placedRef": "FF000F92"
+    }
+  ],
+  "residents": [
+    {
+      "ref": "FF000E03",
+      "name": "GOG Stepbrother",
+      "home": "center",
+      "spouse": true
+    }
+  ]
+}
