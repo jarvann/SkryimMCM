@@ -11,6 +11,7 @@
 #include <cstring>
 #include <format>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace SkyrimMCP::WorldManager {
@@ -528,10 +529,13 @@ namespace SkyrimMCP::WorldManager {
         auto* tes = RE::TES::GetSingleton();
         if (!at || !tes) return {{"error", "Not a reference: " + centerRef}};
         const auto c = at->GetPosition();
+        radius = std::clamp(radius, 100.0f, 6000.0f);
         json pieces = json::array();
-        tes->ForEachReferenceInRange(at, std::clamp(radius, 100.0f, 6000.0f), [&](RE::TESObjectREFR* ref) {
+        std::unordered_set<RE::FormID> seen;
+        auto visit = [&](RE::TESObjectREFR* ref) {
             auto* base = ref ? ref->GetBaseObject() : nullptr;
             if (!base || ref == at || (ref->GetFormID() >> 24) != 0xFF || ref->IsDisabled() || ref->IsDeleted() || ref->Is(RE::FormType::ActorCharacter)) return RE::BSContainer::ForEachResult::kContinue;
+            if (ref->GetPosition().GetDistance(c) > radius || !seen.insert(ref->GetFormID()).second) return RE::BSContainer::ForEachResult::kContinue;
             const auto p = ref->GetPosition();
             const char* ed = base->GetFormEditorID();
             pieces.push_back({{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", StableIdOf(base)}, {"type", RE::FormTypeToString(base->GetFormType())},
@@ -539,7 +543,12 @@ namespace SkyrimMCP::WorldManager {
                               {"offset", { std::round((p.x - c.x) * 10) / 10, std::round((p.y - c.y) * 10) / 10, std::round((p.z - c.z) * 10) / 10 }},
                               {"angle", std::round(ref->GetAngleZ() * 57.2957795f * 10) / 10}, {"scale", ref->GetScale()}});
             return RE::BSContainer::ForEachResult::kContinue;
-        });
+        };
+        // Pieces are placed persistent: in an exterior they live in the worldspace's persistent cell, which is always in memory,
+        // while the range search only reaches loaded cells (the player 14000 units away found nothing, 2026-11-23).
+        if (auto* world = at->GetWorldspace(); world && world->persistentCell) world->persistentCell->ForEachReference(visit);
+        if (auto* cell = at->GetParentCell(); cell && cell->IsInteriorCell()) cell->ForEachReference(visit);
+        tes->ForEachReferenceInRange(at, radius, visit);
         return {{"center", { c.x, c.y, c.z }}, {"facing", at->GetAngleZ() * 57.2957795f}, {"pieces", pieces}};
     }
 
