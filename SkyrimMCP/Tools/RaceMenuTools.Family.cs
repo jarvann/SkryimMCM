@@ -95,7 +95,7 @@ public partial class RaceMenuTools
         }
         if (given.Values.Any(v => !string.IsNullOrWhiteSpace(v)))
         {
-            story["told"] = DateTime.Now.ToString("s");
+            story["updated"] = DateTime.Now.ToString("s");
             FamilyHomes.SetStory(cid, story);
         }
 
