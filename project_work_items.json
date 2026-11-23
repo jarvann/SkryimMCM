@@ -6232,7 +6232,7 @@
         {
           "id": "FEAT-307",
           "type": "",
-          "status": "not-started",
+          "status": "in-progress",
           "priority": "",
           "title": "Homes: ask where a character lives, and family homes",
           "description": "Every character made is asked for a home (here, the family home, a player house, a named place, or none). The home becomes the character's editor location (Actor::ForceEditorLocation): the spouse quest's house, vanilla 'near editor location' packages, and where SkyLink sends them; the slot record restores it after loads. The first Player Family role asks for a family home (SetFamilyHome, per player character, more than one allowed); relatives are offered it first. Export's home defaults to it. See docs/1.6-plan.md.",
@@ -6240,6 +6240,10 @@
             {
               "datetime": "2026-11-23T14:40",
               "note": "Found at the GOG wedding: the spouse's house was The Bannered Mare, where the Stepbrother was spawned (his editor location). Cory: ask about the home for every NPC, and designate at least one family home once the family features are used."
+            },
+            {
+              "datetime": "2026-11-23T15:10",
+              "note": "Prototype on GOG: find_open_space, place_object (persistent) and set_home built a homestead (farmhouse shell, tent, bed, chest, table, cooking fire) on the Whiterun plains; all 12 pieces and the spouse's home survived save and reload. SetSpouseHome re-points the marriage quest (spouse kept in SpouseHouse, HouseCenter at the home marker, objective re-shown so the compass follows: map and compass confirmed by Cory); player houses use the game's MoveSpouseAdoption (not yet tried). Found: the clutter check ignored big rocks (fixed: count by size); pieces sit at their centre's ground height, so slopes clip. Cory: keep it simple to start (no interior)."
             }
           ],
           "targetRelease": "1.6",

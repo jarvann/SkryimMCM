@@ -592,7 +592,15 @@ public partial class RaceMenuTools
                 var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = at.Trim() });
                 if (set?["error"] != null) return DeserializeResponse(set);
                 await SpouseAlias("HouseCenter", "ForceRefTo", at.Trim());
-                steps.Add("lives at the SkyLink home; the quest's house marker points there");
+                // The map follows the alias at once; the compass keeps its old target until the objective is shown again (GOG, 2026-11-23).
+                foreach (var shown in new[] { "[10, false, false]", "[10, true, true]" })
+                {
+                    await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "Quest", ["functionName"] = "SetObjectiveDisplayed", ["target"] = SpouseQuest, ["args"] = JsonNode.Parse(shown),
+                    });
+                }
+                steps.Add("lives at the SkyLink home; the quest's house marker (map and compass) points there");
                 if (SlotRegistry.SlotForRef(spouse) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
                 {
                     var copy = entry.DeepClone().AsObject();
@@ -604,7 +612,7 @@ public partial class RaceMenuTools
             if (completeVisit)
             {
                 var stage = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"GetStage {SpouseQuest}" });
-                if ((stage?["output"]?.ToString() ?? "").Contains(">> 20"))
+                if ((stage?["output"]?.ToString() ?? "").Contains(">> 20") || (stage?["output"]?.ToString() ?? "").Contains(">> 20.00"))
                 {
                     await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"SetStage {SpouseQuest} 25" });
                     steps.Add("'Visit your spouse's house' completed");
