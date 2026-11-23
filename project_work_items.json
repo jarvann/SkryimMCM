@@ -6276,6 +6276,24 @@
           "dependsOn": [
             "FEAT-307"
           ]
+        },
+        {
+          "id": "FEAT-309",
+          "type": "",
+          "status": "not-started",
+          "priority": "",
+          "title": "Home kits: CK-built exteriors with matching interiors, placed in game on request",
+          "description": "Several home styles built in the Creation Kit in SkyLinkAI.esp: a navmeshed, furnished interior cell each, and an exterior layout (building, foundation skirt, yard) the plugin places where the player asks, with the kit's persistent exterior door moved onto it and the interior door's exit rewritten. Spot search respects each kit's slope limit. Feeds the home question (FEAT-307) and the family story (FEAT-308). See docs/1.6-plan.md.",
+          "history": [
+            {
+              "datetime": "2026-11-23T15:55",
+              "note": "Cory: design several options for exteriors with matching interiors and load them dynamically in game when requested."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": [
+            "FEAT-307"
+          ]
         }
       ]
     },
