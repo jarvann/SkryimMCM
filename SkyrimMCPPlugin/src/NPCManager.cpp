@@ -986,6 +986,9 @@ namespace SkyrimMCP::NPCManager {
     namespace {
         constexpr RE::FormID kFamilyFaction = 0xA00;
         constexpr RE::FormID kMarriageFaction = 0x00019809;  // PotentialMarriageFaction
+        // Roles that aren't kin by blood and allow marriage (plugin/family-ranks.json "marryable"): Stepbrother, Stepsister.
+        constexpr std::array kMarryableRanks{ 18, 19 };
+        bool MarryableRank(int rank) { return std::ranges::find(kMarryableRanks, rank) != kMarryableRanks.end(); }
 
         RE::TESFaction* FamilyFaction() {
             auto* data = RE::TESDataHandler::GetSingleton();
@@ -1011,8 +1014,9 @@ namespace SkyrimMCP::NPCManager {
         json roles = json::array();
         int rank = 0;
         for (const auto& [male, female] : FamilyTitles(faction)) {
-            roles.push_back({{"rank", rank++}, {"role", male.empty() ? female : male},
-                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}});
+            roles.push_back({{"rank", rank}, {"role", male.empty() ? female : male},
+                             {"sex", male.empty() ? json("female") : female.empty() ? json("male") : json(nullptr)}, {"marryable", MarryableRank(rank)}});
+            ++rank;
         }
         return {{"faction", std::format("{:08X}", faction->GetFormID())}, {"roles", roles}};
     }
@@ -1042,10 +1046,11 @@ namespace SkyrimMCP::NPCManager {
             }
             if (rank < 0) return {{"error", "No family role called '" + role + "' (family_roles lists them)"}};
         }
-        auto* marriage = RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
+        // A role that allows marriage leaves the character's marriage faction as it is; the others take it away.
+        auto* marriage = none || MarryableRank(rank) ? nullptr : RE::TESForm::LookupByID<RE::TESFaction>(kMarriageFaction);
         auto& list = npc->factions;
         for (std::uint32_t i = list.size(); i-- > 0;) {
-            if (list[i].faction == faction || (!none && list[i].faction == marriage)) list.erase(list.begin() + i);
+            if (list[i].faction == faction || (marriage && list[i].faction == marriage)) list.erase(list.begin() + i);
         }
         if (none) {
             actor->RemoveFromFaction(faction);
@@ -1055,7 +1060,8 @@ namespace SkyrimMCP::NPCManager {
             actor->AddToFaction(faction, static_cast<std::int8_t>(rank));
         }
         if (SlotIndex(npc) >= 0) npc->AddChange(RE::TESNPC::ChangeFlags::kFactions);
-        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)}, {"marryable", false}};
+        return {{"refId", refId}, {"role", none ? json(nullptr) : json(role)}, {"rank", none ? json(nullptr) : json(rank)},
+                {"marryableRole", !none && MarryableRank(rank)}};
     }
 
     json UseOwnFace(const std::string& refId) {

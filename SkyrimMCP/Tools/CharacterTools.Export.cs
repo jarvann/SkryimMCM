@@ -21,7 +21,7 @@ public partial class CharacterTools
     [Description("Export a spawned character as the player's own standalone mod (FEAT-283): a light plugin with the character, its face files, hair " +
         "colour, voice and outfit, placed in the world without scripts or cell edits, plus a README with the mods it needs, zipped. Needs neither " +
         "SkyLink nor RaceMenu afterwards. Written to SkyLink's Build folder, never into Data. modName: the plugin's name. outfit: 'worn' (what it " +
-        "wears now) or 'none'. follower: can be recruited; marryable: can be married (never with a kept family role). ASK THE PLAYER both " +
+        "wears now) or 'none'. follower: can be recruited; marryable: can be married (not with a kept family role that rules it out; step-siblings may). ASK THE PLAYER both " +
         "(the question says what the character is now): left out, nothing is written and the questions come back. home: a reference from homeChoices (default the nearest " +
         "marker). textureSize: of the face's skin texture (1024 or 2048). author: shown in the plugin. dryRun (default true) says what would be made, " +
         "with the requirements and whose meshes the face file contains (permission to share those is theirs to give). family: for a character with a " +
@@ -54,25 +54,32 @@ public partial class CharacterTools
         // Player Family only when asked: its faction is SkyLinkAI.esp's, so the mod then depends on SkyLink AI (Cory, 2026-11-23).
         var familyRole = entry["family"]?.GetValue<string?>();
         int? familyRank = null;
+        var roleMarryable = false;
+        if (familyRole != null)
+        {
+            JsonNode? roles;
+            try { roles = await _pipe.SendRequestAsync("family_roles"); }
+            catch (McpException ex) { return new { error = ex.Message }; }
+            var role = (roles?["roles"] as JsonArray ?? []).OfType<JsonObject>()
+                .FirstOrDefault(r => string.Equals(r["role"]?.ToString(), familyRole, StringComparison.OrdinalIgnoreCase));
+            familyRank = role?["rank"]?.GetValue<int>();
+            roleMarryable = role?["marryable"]?.GetValue<bool>() == true;
+        }
         // Every character made: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
         if (CharacterChoices.Ask(data["name"]?.ToString() ?? "The character", follower, marryable, familyRole,
                 "Nothing was written. Ask the player, then export again with them set.", askFamily: true, family: family,
-                current: (InFaction("Skyrim.esm|05C84D"), InFaction("Skyrim.esm|019809") && familyRole == null)) is { } ask)
+                current: (InFaction("Skyrim.esm|05C84D"), InFaction("Skyrim.esm|019809")), roleMarryable: roleMarryable) is { } ask)
             return ask;
         var isFollower = follower == true;
-        var marry = marryable == true && !(familyRole != null && family == true);
+        var marry = marryable == true && !(familyRole != null && family == true && !roleMarryable);
         if (isFollower && data["voiceHasFollowerLines"]?.GetValue<bool>() == false)
             return new { error = $"{data["name"]}'s voice has no follower lines, so the recruit dialogue wouldn't appear in the exported mod. Make them a follower in the game first (MakeFollower, which gives them a voice that has them), then export." };
         if (family == true)
         {
             if (familyRole == null) return new { error = "This character has no Player Family role (SetFamilyRole gives one), so family can't be kept." };
-            JsonNode? roles;
-            try { roles = await _pipe.SendRequestAsync("family_roles"); }
-            catch (McpException ex) { return new { error = ex.Message }; }
-            familyRank = (roles?["roles"] as JsonArray ?? []).OfType<JsonObject>()
-                .FirstOrDefault(r => string.Equals(r["role"]?.ToString(), familyRole, StringComparison.OrdinalIgnoreCase))?["rank"]?.GetValue<int>();
             if (familyRank == null) return new { error = $"The role '{familyRole}' isn't in SkyLinkAI.esp's Player Family faction." };
         }
+        else familyRank = null;
         var choices = (markers?["markers"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         var homeRef = home?.Trim() ?? (choices.FirstOrDefault(m => m["marker"]?.GetValue<bool>() == true) ?? choices.FirstOrDefault())?["stableId"]?.ToString();
         if (homeRef == null) return new { error = "No lasting base game reference was found in this place to put the character at. Move it somewhere else (an inn, a town) and export again." };

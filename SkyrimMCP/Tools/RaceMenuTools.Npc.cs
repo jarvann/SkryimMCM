@@ -90,11 +90,11 @@ public partial class RaceMenuTools
         "FemaleYoungEager; SearchForms type voicetype lists them), default the template's. face 'player' also copies the player's OBody " +
         "preset. outfit: 'template' or 'player' (copies of what the player wears; default with face 'player'). marryable: can be " +
         "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
-        "without a role lists them), any race, adults only, never marryable. resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
+        "without a role lists them), any race, adults only, marryable only in a role that allows it (step-siblings; family_roles says). resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
         "face and hair colour take after the player's, in any race or sex. follower: can be recruited with the game's own dialogue (give it a voice " +
         "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
         "ExportCharacter makes it lasting in the player's own plugin. Remove it with RemoveSpawnedNpc. " +
-        "ASK THE PLAYER whether it should be a follower and (unless it has a family role, which is never marryable) whether it can be married, " +
+        "ASK THE PLAYER whether it should be a follower and (unless its family role rules marriage out) whether it can be married, " +
         "then pass follower and marryable: left out, nothing is spawned and the questions come back. attraction: who the character is attracted " +
         "to (women, men, everyone, no one, or 'mods decide'), asked only when a mod that keeps it is installed (ORomance, OSL Aroused); the " +
         "questions say so. Same-sex marriage needs nothing: the game lets anyone marry anyone. dryRun (default true) says what would be spawned.")]
@@ -114,6 +114,7 @@ public partial class RaceMenuTools
 
         // A role such as Sister says the sex; the plugin checks it against the character's.
         string? familyRole = null;
+        var roleMarryable = false;
         if (!string.IsNullOrWhiteSpace(family))
         {
             JsonNode? roles;
@@ -127,13 +128,14 @@ public partial class RaceMenuTools
                 if (female is bool asked && asked != (roleSex == "female")) return new { error = $"{familyRole} is a {roleSex} role." };
                 female = roleSex == "female";
             }
-            marryable = false;
+            roleMarryable = match["marryable"]?.GetValue<bool>() == true;
+            if (!roleMarryable) marryable = false;
         }
 
         // Every new character: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
         if (CharacterChoices.Attraction(attraction) is { } badAttraction) return new { error = badAttraction };
         var attractionMods = await AttractionModNames();
-        if (CharacterChoices.Ask(name.Trim(), follower, marryable, familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
+        if (CharacterChoices.Ask(name.Trim(), follower, marryable, roleMarryable ? null : familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
             attractionMods: attractionMods, attraction: attraction) is { } ask) return ask;
 
         if (dryRun)
@@ -497,7 +499,7 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Player Family (FEAT-304): give a spawned character a role in the player's family (a rank of the Player Family faction in " +
         "SkyLinkAI.esp), so dialogue and other mods can ask for it. Without role: the list of roles (Father, Mother, Brother, Sister, Son, " +
-        "Daughter, Cousin, step and in-law roles and more). role 'none' takes the character out. Any race, adults only; family members can't be married.")]
+        "Daughter, Cousin, step and in-law roles and more). role 'none' takes the character out. Any race, adults only; only roles that aren't kin by blood (step-siblings) can be married.")]
     public async Task<object> SetFamilyRole(string? refId = null, string? role = null)
     {
         if (string.IsNullOrWhiteSpace(role) || string.IsNullOrWhiteSpace(refId)) return DeserializeResponse(await _pipe.SendRequestAsync("family_roles"));

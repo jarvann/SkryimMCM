@@ -7,13 +7,13 @@ namespace SkyrimMCP.Tools;
 internal static class CharacterChoices
 {
     /// <summary>
-    /// The unanswered questions, or null when every one is answered. familyRole: a Player Family role, which is never marryable.
+    /// The unanswered questions, or null when every one is answered. familyRole: a Player Family role, never marryable unless roleMarryable.
     /// family: for an export of a relative, whether the role is kept (null: not yet asked). current: what the character is now, shown
     /// to the player as the likely answer.
     /// </summary>
     public static object? Ask(string name, bool? follower, bool? marryable, string? familyRole, string note,
         bool askFamily = false, bool? family = null, (bool follower, bool marryable)? current = null,
-        IReadOnlyList<string>? attractionMods = null, string? attraction = null)
+        IReadOnlyList<string>? attractionMods = null, string? attraction = null, bool roleMarryable = false)
     {
         var asked = new List<string>();
         var questions = new List<object>();
@@ -31,8 +31,8 @@ internal static class CharacterChoices
         if (follower == null)
             Add("follower", $"Should {name} be a follower, recruitable with the game's own dialogue?" + Now(current?.follower, "a follower"),
                 "follower: true", "follower: false");
-        // A relative is never marryable; once an export drops the role, the question stands again.
-        var relative = familyRole != null && !(askFamily && family == false);
+        // A relative is marryable only in a role that allows it (step-siblings); once an export drops the role, the question stands again.
+        var relative = familyRole != null && !roleMarryable && !(askFamily && family == false);
         if (marryable == null && (!relative || familyOpen))
             Add("marryable", (familyOpen ? "Only if family is false: c" : "C") + $"an {name} be married (the Amulet of Mara dialogue)? Adults only." +
                 Now(current?.marryable, "marryable"), "marryable: true", "marryable: false");
