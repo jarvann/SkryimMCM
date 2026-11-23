@@ -30,17 +30,40 @@ public partial class RaceMenuTools
         output != null && output.LastIndexOf(">>", StringComparison.Ordinal) is var i and >= 0 && double.TryParse(output[(i + 2)..].Trim().Split(' ')[0],
             System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
 
+    /// <summary>A home's own pieces: those given, else SkyLink's record of the home; null when neither exists.</summary>
+    private static HashSet<string>? OwnPieces(string center, string? given) =>
+        string.IsNullOrWhiteSpace(given)
+            ? HomeRegistry.Pieces(center)
+            : given.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim().ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private async Task<string?> CharacterId()
+    {
+        try { return (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (McpException) { return null; }
+    }
+
     [McpServerTool]
     [Description("Save a homestead built in game as a home layout (FEAT-307): every object placed at run time within radius of its centre " +
         "marker (center: that reference, e.g. the marker SetSpouseHome or set_home used), as base objects, offsets and angles, to " +
-        "Documents\\My Games\\...\\SkyLinkAI\\HomeLayouts. BuildHomeLayout builds it again, here or anywhere.")]
-    public async Task<object> SaveHomeLayout(string name, string center, double radius = 1500, bool overwrite = false)
+        "Documents\\My Games\\...\\SkyLinkAI\\HomeLayouts. Only the home's own pieces: those SkyLink built (it keeps a record), or pieces " +
+        "(reference IDs) for a home it didn't; never the game's own objects nearby. " +
+        "BuildHomeLayout builds it again, here or anywhere.")]
+    public async Task<object> SaveHomeLayout(string name, string center, double radius = 1500, bool overwrite = false, string? pieces = null)
     {
         if (string.IsNullOrWhiteSpace(name) || LayoutSlug(name).Length == 0) return new { error = "name is required" };
         var found = await _pipe.SendRequestAsync("placed_objects", new JsonObject { ["center"] = center.Trim(), ["radius"] = radius });
         if (found?["error"] != null) return DeserializeResponse(found);
-        var pieces = (found?["pieces"] as JsonArray ?? []).OfType<JsonObject>().ToList();
-        if (pieces.Count == 0) return new { error = "No objects placed at run time are within radius of that centre." };
+        var near = (found?["pieces"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+        var own = OwnPieces(center, pieces);
+        if (own == null)
+            return new
+            {
+                error = "SkyLink has no record of this home's pieces. Pass pieces (their reference IDs, comma-separated) from the list below; " +
+                    "the game places objects of its own nearby (critters and others), which aren't part of the home.",
+                placedNearby = near.Select(p => new { refId = p["refId"]?.ToString(), type = p["type"]?.ToString(), what = p["what"]?.ToString(), offset = p["offset"] }),
+            };
+        var chosen = near.Where(p => own.Contains(p["refId"]?.ToString() ?? "")).ToList();
+        if (chosen.Count == 0) return new { error = "None of the home's pieces are in this game (another save?)." };
+        if (pieces != null) HomeRegistry.Record(center.Trim(), name.Trim(), await CharacterId(), chosen.Select(p => p["refId"]!.ToString()));
         var file = Path.Combine(SavedLayouts, LayoutSlug(name) + ".json");
         if (File.Exists(file) && !overwrite) return new { error = $"A layout called {name} exists ({file}). Pass overwrite: true to replace it." };
         var layout = new JsonObject
@@ -50,7 +73,7 @@ public partial class RaceMenuTools
             ["saved"] = DateTime.Now.ToString("s"),
             ["facing"] = Math.Round(found!["facing"]?.GetValue<double>() ?? 0, 1),
             ["world"] = new JsonObject { ["center"] = found["center"]?.DeepClone() },
-            ["pieces"] = new JsonArray(pieces.Select(p => (JsonNode)new JsonObject
+            ["pieces"] = new JsonArray(chosen.Select(p => (JsonNode)new JsonObject
             {
                 ["role"] = "piece", ["base"] = p["base"]?.DeepClone(), ["offset"] = p["offset"]?.DeepClone(), ["angle"] = p["angle"]?.DeepClone(),
                 ["what"] = p["what"]?.DeepClone(), ["placedRef"] = p["refId"]?.DeepClone(),
@@ -58,7 +81,7 @@ public partial class RaceMenuTools
         };
         Directory.CreateDirectory(SavedLayouts);
         await File.WriteAllTextAsync(file, layout.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        return new { saved = file, pieces = pieces.Count, note = "The centre marker itself isn't a piece: BuildHomeLayout places a new one." };
+        return new { saved = file, pieces = chosen.Count, note = "The centre marker itself isn't a piece: BuildHomeLayout places a new one." };
     }
 
     [McpServerTool]
@@ -114,6 +137,7 @@ public partial class RaceMenuTools
         var markerRef = marker!["refId"]!.ToString();
         var groundZ = marker["z"]!.GetValue<double>();
         var placed = new List<object>();
+        var placedRefs = new List<string>();
         var failed = new List<object>();
         foreach (var p in pieces)
         {
@@ -128,8 +152,14 @@ public partial class RaceMenuTools
                 ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360, ["onGround"] = false,
             });
             if (res?["error"] != null) failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() });
-            else placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
+            else
+            {
+                placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
+                if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
+            }
         }
+
+        HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs);
 
         object? residentResult = null;
         if (!string.IsNullOrWhiteSpace(resident))
@@ -147,16 +177,20 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Take a home built in game away (FEAT-307): every object placed at run time within radius of its centre marker, and the " +
         "marker. Residents stay where they are; give them another home first. dryRun (default true) lists what would go.")]
-    public async Task<object> RemoveHomeLayout(string center, double radius = 1500, bool dryRun = true)
+    public async Task<object> RemoveHomeLayout(string center, double radius = 1500, bool dryRun = true, string? pieces = null)
     {
         var found = await _pipe.SendRequestAsync("placed_objects", new JsonObject { ["center"] = center.Trim(), ["radius"] = radius });
         if (found?["error"] != null) return DeserializeResponse(found);
-        var refs = (found?["pieces"] as JsonArray ?? []).OfType<JsonObject>().Select(p => (p["refId"]?.ToString(), p["what"]?.ToString())).ToList();
+        var own = OwnPieces(center, pieces);
+        if (own == null) return new { error = "SkyLink has no record of this home's pieces, so nothing was removed. Pass pieces (reference IDs, comma-separated)." };
+        var refs = (found?["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => own.Contains(p["refId"]?.ToString() ?? ""))
+            .Select(p => (p["refId"]?.ToString(), p["what"]?.ToString())).ToList();
         refs.Add((center.Trim(), "centre marker"));
         if (dryRun) return new { dryRun = true, wouldRemove = refs.Select(r => new { refId = r.Item1, what = r.Item2 }), note = "Pass dryRun: false to remove them." };
         var removed = 0;
         foreach (var (refId, _) in refs)
             if ((await _pipe.SendRequestAsync("remove_object", new JsonObject { ["refId"] = refId }))?["removed"]?.GetValue<bool>() == true) removed++;
+        if (removed == refs.Count) HomeRegistry.Forget(center);
         return new { removed, of = refs.Count };
     }
 }

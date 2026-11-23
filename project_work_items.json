@@ -6318,6 +6318,24 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-110",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "Home layouts took the game's own objects near a home as its pieces",
+          "description": "placed_objects lists every object created at run time near a centre: the game makes its own (12 bees, 2 butterflies, 22 copies of Skyrim.esm|0C2D47 around the GOG homestead), so SaveHomeLayout would have saved them and RemoveHomeLayout deleted them. Fix: HomeRegistry (homes.json) records each home's pieces (BuildHomeLayout records; pieces: reference IDs for a home SkyLink didn't build); save and remove touch only those.",
+          "history": [
+            {
+              "datetime": "2026-11-23T15:20",
+              "note": "Found in the GOG release test (1.6.0-test through MO2's FOMOD): placed_objects found 57 references around the homestead, 19 of them its own. Fixed; the hand-built homestead's 19 pieces recorded in GOG's homes.json."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-307"
+          ]
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "not-started",
