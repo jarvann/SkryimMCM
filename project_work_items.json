@@ -6220,6 +6220,10 @@
             {
               "datetime": "2026-11-23T13:20",
               "note": "Cory: \"when making any NPC of any type, the AI should confirm if it needs to be a follower\", \"and confirm if it's marryable\", sexual preferences where a mod uses them, \"overall LGTBQIA+ friendly\", and only when such a mod exists. Built: CharacterChoices questions, attraction_mods/set_attraction, SetAttraction tool, MakeFollower voice, export voice check. Not yet tested in game."
+            },
+            {
+              "datetime": "2026-11-23T14:05",
+              "note": "GOG test: spawn with nothing set asked follower + marryable and spawned nothing; Sister asked only follower; no attraction question (no such mod on GOG). Spawned Dunmer Stepbrother, Stepsister (marryable), Mother, Father, Stepfather (not): factions right. With RelationshipMarriage stage 10 done (5 isn't enough), both step-siblings offered the Amulet of Mara proposal and the Stepsister accepted (stage 20). Found and fixed: relationship rank refused by Papyrus for a fresh spawn (console fallback); a marryable voice must be in the VoicesMarriage lists (SpawnNpc switches it, export refuses). Both fixes not yet seen in game. Attraction untested (Steam only)."
             }
           ],
           "targetRelease": "",
