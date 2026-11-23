@@ -6060,7 +6060,7 @@
         {
           "id": "BUG-104",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "A spawned NPC could be copied from a Bethesda debug actor",
           "description": "FindTemplate chose \"Warehouse Traps Reset Test Guy\", a test-cell actor, as the template for an Argonian family member (GOG, 2026-11-23). Templates whose name or editor ID has Test or Dummy as a word or camel-case part are now skipped.",
@@ -6068,6 +6068,10 @@
             {
               "datetime": "2026-11-23T10:05",
               "note": "Found in the first GOG round; fixed, unit-checked on sample names."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG): Argonian, Khajiit and Orc spawns get ordinary templates."
             }
           ],
           "targetRelease": "",
@@ -6076,7 +6080,7 @@
         {
           "id": "BUG-105",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "A clone of a player with no skin-tone layers has a grey face",
           "description": "RaceMenu's ExportHead writes a flat mid-grey tint (127, no tint) for a player with no tint layers, e.g. a character started with coc. The clone's face was grey against a skin-coloured body (GOG, 2026-11-23). A flat export is now filled with the player's skin colour; the game's own NPC tints average close to their skin colour (measured on three family NPCs).",
@@ -6084,6 +6088,10 @@
             {
               "datetime": "2026-11-23T10:25",
               "note": "Found by Cory on the first GOG round; fixed."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG): a clone of a coc character has a skin-coloured face."
             }
           ],
           "targetRelease": "",
@@ -6092,7 +6100,7 @@
         {
           "id": "BUG-106",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "Under MO2 a clone of the player's face is purple until the game restarts",
           "description": "SkyLink copied RaceMenu's exported tint to Textures\\CharGen\\Exported for LoadCharacter. Under MO2 a file written by a process outside the game isn't seen by the running game, so the tint was missing and the face purple (GOG, 2026-11-23). ExportHead is now given a name that leads to Textures\\CharGen\\Exported, so the game writes the files there itself (proved: they land in overwrite and the game sees them).",
@@ -6100,6 +6108,10 @@
             {
               "datetime": "2026-11-23T10:40",
               "note": "Found by Cory on GOG; ExportHead path test passed; fixed."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG/MO2): a new clone has its face at once, no restart."
             }
           ],
           "targetRelease": "",
@@ -6108,7 +6120,7 @@
         {
           "id": "BUG-107",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "A clone's SMP hair has no physics once its face file is used",
           "description": "RaceMenu's ExportHead leaves out the hair mesh's NiStringExtraData 'HDT Skinned Mesh Physics Object' (the path of its physics XML), so FSMP gave the hair no physics after a restart, while the live (RaceMenu) clone's hair moved (GOG, KSSMP Honey, 2026-11-23). HeadRepair now copies each head part's HDT markers onto the face file's root.",
@@ -6120,6 +6132,10 @@
             {
               "datetime": "2026-11-23T10:36",
               "note": "In game: with the marker on the root the hair has physics (BUG-109 made it hang to the floor)."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG): Hair Clone with KSSMP Honey, hair physics from the face file."
             }
           ],
           "targetRelease": "",
@@ -6128,7 +6144,7 @@
         {
           "id": "BUG-108",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "Reusing a slot freed in the same game session crashes the game",
           "description": "RemoveSpawnedNpc deletes a slot's face files. The game lists face files at startup, so a new character put in that slot in the same session made the game load a face file that was gone: Marker_error, then an access violation in face-gen processing (GOG, crash-2026-11-23-10-20-53). Slots freed while the running game has been up are now kept out of use until the next game start (slots_freed.json).",
@@ -6136,6 +6152,10 @@
             {
               "datetime": "2026-11-23T10:45",
               "note": "Crash on GOG while respawning the Hair Clone into slot 51; fixed."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG): a respawn took slot 52, not the slot freed that session; no crash."
             }
           ],
           "targetRelease": "",
@@ -6144,7 +6164,7 @@
         {
           "id": "BUG-109",
           "type": "",
-          "status": "implemented-untested",
+          "status": "complete",
           "priority": "",
           "title": "A clone's SMP hair falls to the floor once its face file is used",
           "description": "RaceMenu's export keeps only the bones some vertex uses, so a hair chain's fixed top bones (KSSMP Honey: Honey Back 1, L1, R1) were missing. FSMP builds an NPC's hair physics from the face file, found no anchors, and the hair hung stretched to the floor (GOG, 2026-11-23). HeadRepair adds every non-skeleton node a part's mesh has below the head, at its place relative to the head.",
@@ -6152,6 +6172,10 @@
             {
               "datetime": "2026-11-23T10:40",
               "note": "Found by Cory on GOG after BUG-107 gave the hair physics; cause read in FSMP ActorManager::processGeometry; fixed."
+            },
+            {
+              "datetime": "2026-11-23T10:46",
+              "note": "In game (GOG): anchor bones added before the face node; face and hair right after a restart (Cory)."
             }
           ],
           "targetRelease": "",
