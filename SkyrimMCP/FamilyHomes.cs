@@ -47,6 +47,20 @@ public static class FamilyHomes
         Save(all);
     }
 
+    /// <summary>FEAT-308: the family story this player character told (homeland, standing, wealth...), empty when none yet.</summary>
+    public static JsonObject Story(string? characterId) =>
+        characterId != null && Load()[characterId]?["story"] is JsonObject s ? s.DeepClone().AsObject() : new JsonObject();
+
+    /// <summary>Replaces the family story (null clears it).</summary>
+    public static void SetStory(string characterId, JsonObject? story)
+    {
+        var all = Load();
+        var mine = all[characterId] as JsonObject ?? new JsonObject();
+        if (story == null) mine.Remove("story"); else mine["story"] = story;
+        all[characterId] = mine;
+        Save(all);
+    }
+
     public static bool Remove(string characterId, string refOrName)
     {
         var all = Load();

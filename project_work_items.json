@@ -6422,7 +6422,7 @@
         {
           "id": "FEAT-308",
           "type": "",
-          "status": "not-started",
+          "status": "implemented-untested",
           "priority": "",
           "title": "Family origin: the family story and a family home in the world",
           "description": "When the player starts the family, the MCP walks them through narrating the family's history (homeland, standing, wealth, the living and the lost), kept per player character, and suggests the relatives and a family home that fits: a home in the world near the border of their homeland, in a style for their standing (shack to manor). Either new homes in SkyLinkAI.esp (exterior edits, CK level design) or existing buildings claimed at run time (Cell.SetFactionOwner, no world edits). See docs/1.6-plan.md.",
@@ -6438,6 +6438,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "In 1.6 (Cory agreed 2026-11-23)."
+            },
+            {
+              "datetime": "2026-11-23T17:40",
+              "note": "FamilyStory tool: the questions in turn (homeland, arrival, standing, wealth, living, lost, rivalries, secrets) kept in family.json per characterId; when told, the region and home style, the homes usable now (houses, SkyLink homes, a homestead built in the region) and the relatives to make. Ready-made regional homes in the ESP stay with the home kits (FEAT-309)."
             }
           ],
           "targetRelease": "1.6",
