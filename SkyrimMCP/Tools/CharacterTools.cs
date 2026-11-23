@@ -8,7 +8,7 @@ namespace SkyrimMCP.Tools;
 
 /// <summary>Characters as mods (1.6): what a character is made of and which mods that needs (FEAT-296).</summary>
 [McpServerToolType]
-public class CharacterTools : ToolBase
+public partial class CharacterTools : ToolBase
 {
     public CharacterTools(IPipeClient pipe) : base(pipe) { }
 
