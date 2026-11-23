@@ -6122,6 +6122,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-108",
+          "type": "",
+          "status": "implemented-untested",
+          "priority": "",
+          "title": "Reusing a slot freed in the same game session crashes the game",
+          "description": "RemoveSpawnedNpc deletes a slot's face files. The game lists face files at startup, so a new character put in that slot in the same session made the game load a face file that was gone: Marker_error, then an access violation in face-gen processing (GOG, crash-2026-11-23-10-20-53). Slots freed while the running game has been up are now kept out of use until the next game start (slots_freed.json).",
+          "history": [
+            {
+              "datetime": "2026-11-23T10:45",
+              "note": "Crash on GOG while respawning the Hair Clone into slot 51; fixed."
+            }
+          ],
+          "targetRelease": "",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "not-started",

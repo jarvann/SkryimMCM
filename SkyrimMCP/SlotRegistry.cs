@@ -34,7 +34,53 @@ public static class SlotRegistry
         }
     }
 
-    public static int[] Reserved() => Load().Select(kv => int.TryParse(kv.Key, out var i) ? i : -1).Where(i => i >= 0).ToArray();
+    /// <summary>
+    /// Slots not to fill: those taken, and those freed while this game has been running. The game lists the face files it finds at
+    /// startup; a slot freed mid-session has had its files deleted, and a new character put in it straight away made the game load
+    /// a face file that was gone, which crashed it (BUG-108, GOG 2026-11-23). Such a slot is free again from the next game start.
+    /// </summary>
+    public static int[] Reserved()
+    {
+        var taken = Load().Select(kv => int.TryParse(kv.Key, out var i) ? i : -1).Where(i => i >= 0);
+        return taken.Concat(FreedThisSession()).Distinct().ToArray();
+    }
+
+    private static string FreedPath => Path.Combine(SkyLinkSettings.Folder, "slots_freed.json");
+
+    private static IEnumerable<int> FreedThisSession()
+    {
+        DateTime started;
+        try
+        {
+            using var game = System.Diagnostics.Process.GetProcessesByName("SkyrimSE").FirstOrDefault();
+            if (game == null) return [];
+            started = game.StartTime.ToUniversalTime();
+        }
+        catch (Exception) { return []; }
+        JsonObject freed;
+        lock (Gate)
+        {
+            try { freed = File.Exists(FreedPath) ? JsonNode.Parse(File.ReadAllText(FreedPath)) as JsonObject ?? new JsonObject() : new JsonObject(); }
+            catch (Exception) { return []; }
+        }
+        return freed.Where(kv => kv.Value is JsonValue v && v.TryGetValue<DateTime>(out var when) && when.ToUniversalTime() > started)
+            .Select(kv => int.TryParse(kv.Key, out var i) ? i : -1).Where(i => i >= 0).ToList();
+    }
+
+    private static void NoteFreed(int slot)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var freed = File.Exists(FreedPath) ? JsonNode.Parse(File.ReadAllText(FreedPath)) as JsonObject ?? new JsonObject() : new JsonObject();
+                freed[slot.ToString()] = DateTime.UtcNow;
+                Directory.CreateDirectory(SkyLinkSettings.Folder);
+                File.WriteAllText(FreedPath, freed.ToJsonString());
+            }
+            catch (Exception) { }
+        }
+    }
 
     public static void Reserve(int slot, JsonObject entry)
     {
@@ -55,6 +101,7 @@ public static class SlotRegistry
                     try { if (File.Exists(path)) { File.Delete(path); deleted++; } } catch (Exception) { }
             all.Remove(slot.ToString());
             Save(all);
+            NoteFreed(slot);
         }
         return deleted;
     }
