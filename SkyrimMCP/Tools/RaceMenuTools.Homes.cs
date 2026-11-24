@@ -197,9 +197,11 @@ public partial class RaceMenuTools
         "distance units in front of the player, turned to face the way the player looks, as when it was built) or 'original' (its " +
         "own spot), or a reference such as an old home's centre marker (rebuilt in the same place, turned the same way; build first, then RemoveHomeLayout the old one). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
         "The building and its foundation stand with the door at ground level; each yard piece stands on its own ground (the land only: rocks " +
-        "aren't seen, so check pieces near rocks). " +
-        "dryRun (default true) says what would be built. RemoveHomeLayout takes it away.")]
-    public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true)
+        "aren't seen, so check pieces near rocks). With where 'here' and fit (default true), SkyLink surveys the ground first and moves the " +
+        "home up to 300 units or turns it up to 30 degrees to keep pieces off rocks, trees and steep ground; site says what was found. " +
+        "dryRun (default true) says what would be built and where. RemoveHomeLayout takes it away.")]
+    public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true,
+        bool fit = true)
     {
         var files = LayoutFiles().ToList();
         if (string.IsNullOrWhiteSpace(name))
@@ -244,9 +246,20 @@ public partial class RaceMenuTools
         else return new { error = "where must be 'here', 'original' or a reference (a home's centre marker)" };
 
         var pieces = (layout["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => p["role"]?.ToString() != "center").ToList();
+        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here");
+        if (site.Error != null && where == "here") return new { error = site.Error };
+        if (site.Best is { } best) (cx, cy, turn) = (best.X, best.Y, best.Turn);
+        var siteReport = site.Best == null ? null : new
+        {
+            moved = Math.Round(site.Best.Shift), turnedMore = Math.Round(site.Best.ExtraTurn),
+            problems = site.Best.Problems.Count > 0 ? site.Best.Problems : null,
+            asked = site.Asked is { } a && a != site.Best ? new { problems = a.Problems } : null,
+            note = site.Best.Problems.Count == 0 ? "The ground is clear for every piece." :
+                site.Best.Score > 1500 ? "No good fit near here: try another spot (more open, flatter)." : "The best fit near here; check these pieces once built.",
+        };
         var t = turn * Math.PI / 180;
         if (dryRun)
-            return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, note = "Pass dryRun: false to build it." };
+            return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, site = siteReport, note = "Pass dryRun: false to build it." };
 
         // The centre marker on the ground first; every piece then sits where it did relative to it.
         var marker = await _pipe.SendRequestAsync("place_object", new JsonObject { ["base"] = XMarker, ["x"] = cx, ["y"] = cy, ["z"] = cz, ["angle"] = (facing + turn) % 360, ["onGround"] = true });
@@ -311,8 +324,83 @@ public partial class RaceMenuTools
                 ? await SetSpouseHome("skylink", markerRef)
                 : DeserializeResponse(await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = resident.Trim(), ["at"] = markerRef }));
         }
-        return new { built = layout["name"]?.ToString(), center = markerRef, placed = placed.Count, failed, resident = residentResult, pieces = placed,
+        return new { built = layout["name"]?.ToString(), center = markerRef, placed = placed.Count, failed, site = siteReport, resident = residentResult, pieces = placed,
             note = "The marker is the home's centre: set_home and SetSpouseHome take it, SaveHomeLayout and RemoveHomeLayout start from it." };
+    }
+
+    private sealed record SiteFit(double X, double Y, double Turn, double Shift, double ExtraTurn, double Score, List<string> Problems);
+
+    /// <summary>
+    /// FEAT-307: the ground under each piece where the home would go, and (fit) the best of that spot moved up to 300 units or turned up
+    /// to 30 degrees (Cory, 2026-11-24, after a Reach build had the tent in rocks and the door in the ground). Scored by objects in the
+    /// way and rise under each footprint; the building takes more slope than a yard piece (its foundation and footing hide a drop).
+    /// </summary>
+    private async Task<(SiteFit? Best, SiteFit? Asked, string? Error)> SurveySite(List<JsonObject> pieces, double cx, double cy, double turn, bool fit)
+    {
+        var candidates = new List<(double X, double Y, double Turn, double Shift, double ExtraTurn)> { (cx, cy, turn, 0, 0) };
+        if (fit)
+            foreach (var extra in new[] { 0.0, -30, 30, -15, 15 })
+                foreach (var r in new[] { 0.0, 150, 300 })
+                    for (var k = 0; k < (r == 0 ? 1 : 8); k++)
+                    {
+                        if (r == 0 && extra == 0) continue;
+                        var a = k * Math.PI / 4;
+                        candidates.Add((cx + r * Math.Sin(a), cy + r * Math.Cos(a), turn + extra, r, extra));
+                    }
+        var points = new JsonArray();
+        var placedPieces = pieces.Where(p => p["offset"] is JsonArray { Count: 3 }).ToList();
+        foreach (var c in candidates)
+        {
+            var t = c.Turn * Math.PI / 180;
+            foreach (var p in placedPieces)
+            {
+                var o = (JsonArray)p["offset"]!;
+                double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>();
+                points.Add(new JsonObject
+                {
+                    ["x"] = c.X + ox * Math.Cos(t) + oy * Math.Sin(t), ["y"] = c.Y - ox * Math.Sin(t) + oy * Math.Cos(t),
+                    ["base"] = p["base"]?.ToString(), ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + c.Turn + 360) % 360,
+                });
+            }
+        }
+        JsonNode? survey;
+        try { survey = await _pipe.SendRequestAsync("ground_survey", new JsonObject { ["points"] = points }); }
+        catch (McpException ex) { return (null, null, ex.Message); }
+        if (survey?["error"] != null) return (null, null, survey["error"]!.ToString());
+        var spots = survey?["spots"] as JsonArray ?? [];
+        SiteFit? best = null, asked = null;
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            var c = candidates[i];
+            double score = c.Shift * 0.3 + Math.Abs(c.ExtraTurn) * 2;
+            var problems = new List<string>();
+            // Stacked pieces (the bed in the tent, the pot over the fire) share their base's spot: count each spot once.
+            var seen = new HashSet<(long, long)>();
+            for (var j = 0; j < placedPieces.Count; j++)
+            {
+                var p = placedPieces[j];
+                var s = spots[i * placedPieces.Count + j] as JsonObject;
+                var what = p["what"]?.ToString() ?? p["base"]?.ToString() ?? "a piece";
+                var o = (JsonArray)p["offset"]!;
+                if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
+                if (s?["land"]?.GetValue<bool>() != true) { score += 10000; problems.Add($"{what}: no land under it"); continue; }
+                var built = p["role"]?.ToString() is "house" or "foundation" or "footing";
+                var rise = s["rise"]!.GetValue<double>();
+                var objects = s["objects"]!.GetValue<int>();
+                var allowed = built ? 120 : 40;
+                if (rise > allowed) { score += (rise - allowed) * (built ? 2 : 1.5); if (rise > allowed + 20) problems.Add($"{what}: ground rises {Math.Round(rise)} units under it"); }
+                if (objects > 0)
+                {
+                    score += objects * (built ? 400 : 150) + s["biggest"]!.GetValue<double>() * 0.5;
+                    var names = (s["what"] as JsonArray ?? []).Select(n => n?.ToString()).Distinct();
+                    problems.Add($"{what}: {objects} in the way ({string.Join(", ", names)})");
+                }
+            }
+            var result = new SiteFit(c.X, c.Y, c.Turn, c.Shift, c.ExtraTurn, Math.Round(score), problems);
+            if (i == 0) asked = result;
+            if (best == null || result.Score < best.Score) best = result;
+        }
+        return (best, asked, null);
     }
 
     [McpServerTool]

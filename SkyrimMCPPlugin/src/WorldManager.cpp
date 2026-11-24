@@ -600,6 +600,71 @@ namespace SkyrimMCP::WorldManager {
         return {{"heights", heights}};
     }
 
+    // FEAT-307: a site survey for a home layout, before anything is placed (Cory, 2026-11-24: "initial placement should be a bit
+    // more resilient to the terrain"). For each piece's spot (x, y, base, angle): the land's rise under its footprint and the objects
+    // in the way (rocks, trees, buildings: as FindOpenSpace counts them). Land only: a rock's top isn't ground here, it's in the way.
+    json GroundSurvey(const json& points) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* tes = RE::TES::GetSingleton();
+        if (!player || !tes) return {{"error", "No player in the world"}};
+        if (auto* cell = player->GetParentCell(); !cell || cell->IsInteriorCell()) return {{"error", "The player is indoors: go outside first"}};
+        const auto origin = player->GetPosition();
+        float reach = 0;
+        for (const auto& p : points)
+            if (p.is_object() && p.contains("x") && p.contains("y"))
+                reach = std::max(reach, std::hypot(p["x"].get<float>() - origin.x, p["y"].get<float>() - origin.y));
+        struct Blocker { RE::NiPoint3 at; float radius; std::string what; };
+        std::vector<Blocker> blockers;
+        tes->ForEachReferenceInRange(player, std::min(reach + 1500.0f, 8000.0f), [&](RE::TESObjectREFR* ref) {
+            if (Blocks(ref) && (ref->GetFormID() >> 24) != 0xFF) {  // SkyLink's own pieces (an old home being rebuilt) don't count
+                const auto span = ref->GetBoundMax() - ref->GetBoundMin();
+                auto* b = ref->GetBaseObject();
+                const char* name = b->GetName();
+                const char* ed = b->GetFormEditorID();
+                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale(),
+                                     name && *name ? name : ed && *ed ? ed : std::string(RE::FormTypeToString(b->GetFormType())) });
+            }
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        json out = json::array();
+        for (const auto& p : points) {
+            if (!p.is_object() || !p.contains("x") || !p.contains("y")) { out.push_back(nullptr); continue; }
+            const float x = p["x"].get<float>(), y = p["y"].get<float>();
+            const float a = p.value("angle", 0.0f) * 0.0174532925f;
+            auto* form = FormFromId(p.value("base", std::string()));
+            auto* base = form ? form->As<RE::TESBoundObject>() : nullptr;
+            float lx0 = -50, ly0 = -50, lx1 = 50, ly1 = 50;
+            if (base) {
+                lx0 = base->boundData.boundMin.x; ly0 = base->boundData.boundMin.y;
+                lx1 = base->boundData.boundMax.x; ly1 = base->boundData.boundMax.y;
+            }
+            const float radius = 0.5f * std::max(lx1 - lx0, ly1 - ly0);
+            float low = 1e9f, high = -1e9f, centre = 0;
+            bool land = true;
+            for (const auto& [lx, ly] : std::initializer_list<std::pair<float, float>>{ { lx0, ly0 }, { lx0, ly1 }, { lx1, ly0 }, { lx1, ly1 }, { 0, 0 } }) {
+                const float wx = x + lx * std::cos(a) + ly * std::sin(a), wy = y - lx * std::sin(a) + ly * std::cos(a);
+                float h = 0;
+                if (!tes->GetLandHeight({ wx, wy, 100000.0f }, h)) { land = false; break; }
+                low = std::min(low, h); high = std::max(high, h);
+                if (lx == 0 && ly == 0) centre = h;
+            }
+            if (!land) { out.push_back({{"land", false}}); continue; }
+            int objects = 0;
+            float biggest = 0;
+            json what = json::array();
+            for (const auto& b : blockers) {
+                // Overlapping footprints, a little forgiving: a rock's bounds are a box around an uneven shape.
+                if (std::hypot(b.at.x - x, b.at.y - y) < (radius + b.radius) * 0.8f) {
+                    ++objects;
+                    biggest = std::max(biggest, b.radius);
+                    if (what.size() < 3) what.push_back(b.what);
+                }
+            }
+            out.push_back({{"land", true}, {"ground", centre}, {"rise", high - low}, {"radius", radius}, {"objects", objects}, {"biggest", biggest}, {"what", what}});
+        }
+        return {{"spots", out}};
+    }
+
     // FEAT-307 spike: a map marker for a home placed in game. The game's MapMarker object, placed at the home, given marker data
     // (name, shown and fast travel, type). The data's TESFullName has a vtable, so it starts as a copy of a known marker's.
     json AddMapMarker(const std::string& atRef, const std::string& name, int type) {
