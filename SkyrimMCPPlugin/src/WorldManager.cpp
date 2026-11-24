@@ -617,12 +617,20 @@ namespace SkyrimMCP::WorldManager {
         std::vector<Blocker> blockers;
         tes->ForEachReferenceInRange(player, std::min(reach + 1500.0f, 8000.0f), [&](RE::TESObjectREFR* ref) {
             if (Blocks(ref) && (ref->GetFormID() >> 24) != 0xFF) {  // SkyLink's own pieces (an old home being rebuilt) don't count
-                const auto span = ref->GetBoundMax() - ref->GetBoundMin();
                 auto* b = ref->GetBaseObject();
+                // Nothing to see, nothing in the way: trigger boxes and other activators without a model.
+                auto* model = b->As<RE::TESModel>();
+                const char* path = model ? model->GetModel() : nullptr;
+                if (!path || !*path) return RE::BSContainer::ForEachResult::kContinue;
+                const auto span = ref->GetBoundMax() - ref->GetBoundMin();
+                // Rocks and most statics have no name and lose their editor IDs after loading: their model's file name says what they are.
                 const char* name = b->GetName();
-                const char* ed = b->GetFormEditorID();
-                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale(),
-                                     name && *name ? name : ed && *ed ? ed : std::string(RE::FormTypeToString(b->GetFormType())) });
+                std::string label = name && *name ? name : std::string(path);
+                if (!(name && *name)) {
+                    if (const auto slash = label.find_last_of("\\/"); slash != std::string::npos) label = label.substr(slash + 1);
+                    if (const auto dot = label.rfind('.'); dot != std::string::npos) label = label.substr(0, dot);
+                }
+                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale(), label });
             }
             return RE::BSContainer::ForEachResult::kContinue;
         });
