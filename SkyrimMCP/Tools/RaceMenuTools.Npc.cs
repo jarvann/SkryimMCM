@@ -140,7 +140,7 @@ public partial class RaceMenuTools
         var (homeChoices, homeCharacter, _) = await HomeChoices();
         if (CharacterChoices.Ask(name.Trim(), follower, marryable, roleMarryable ? null : familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
             attractionMods: attractionMods, attraction: attraction, homeOptions: HomeOptionNames(homeChoices, homeCharacter), home: home,
-            firstFamilyHome: familyRole != null && FamilyHomes.Of(homeCharacter).Count == 0) is { } ask) return ask;
+            firstFamilyHome: familyRole != null && FamilyHomeHere(homeChoices, homeCharacter) == null) is { } ask) return ask;
         if (home != null && !home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase) && ResolveHome(home, homeChoices, homeCharacter) == null)
             return new { error = $"No home called {home}.", choices = HomeOptionNames(homeChoices, homeCharacter) };
 

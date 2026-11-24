@@ -6469,6 +6469,22 @@
           "testNotes": "Steam 2026-11-24: race 'Nord' made a Nord (slot 51); an unknown race is refused with the names to use."
         },
         {
+          "id": "BUG-117",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Home choices offered SkyLink homes from other saves, and same-named homes picked the wrong one",
+          "description": "Steam, 2026-11-24: SetFamilyHome 'Homestead: farmhouse 01' took FF0014F9, built in a session that was never saved, so SetHome failed 'Not a reference'. homes.json (like family.json) spans saves. Fix: offer only SkyLink homes whose centre is in the loaded game (registry untouched); same-named homes get their reference in the label; the family home used is the first one in this game.",
+          "history": [
+            {
+              "datetime": "2026-11-24T14:55",
+              "note": "Found in the Steam run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",
