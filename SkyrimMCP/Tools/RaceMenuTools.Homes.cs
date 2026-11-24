@@ -317,7 +317,7 @@ public partial class RaceMenuTools
 
     [McpServerTool]
     [Description("Take a home built in game away (FEAT-307): every object placed at run time within radius of its centre marker, and the " +
-        "marker. Residents stay where they are; give them another home first. dryRun (default true) lists what would go.")]
+        "marker. Residents stay where they are (the result names them: give them another home); a family home stops being one. dryRun (default true) lists what would go.")]
     public async Task<object> RemoveHomeLayout(string center, double radius = 1500, bool dryRun = true, string? pieces = null)
     {
         var found = await _pipe.SendRequestAsync("placed_objects", new JsonObject { ["center"] = center.Trim(), ["radius"] = radius });
@@ -332,6 +332,17 @@ public partial class RaceMenuTools
         foreach (var (refId, _) in refs)
             if ((await _pipe.SendRequestAsync("remove_object", new JsonObject { ["refId"] = refId }))?["removed"]?.GetValue<bool>() == true) removed++;
         if (removed == refs.Count) HomeRegistry.Forget(center);
-        return new { removed, of = refs.Count };
+        // Steam, 2026-11-24: a removed homestead stayed the family home, pointing at a marker that was gone.
+        var familyLists = FamilyHomes.RemoveEverywhere(center.Trim());
+        var residents = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
+            .Where(e => string.Equals(e?["home"]?["ref"]?.ToString(), center.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(e => $"{e!["name"]} ({e["refId"]})").ToList();
+        return new
+        {
+            removed, of = refs.Count,
+            familyHome = familyLists > 0 ? "It was the family home and isn't any more: SetFamilyHome sets another." : null,
+            residents = residents.Count > 0 ? residents : null,
+            note = residents.Count > 0 ? "These lived there: give each another home (SetHome)." : null,
+        };
     }
 }

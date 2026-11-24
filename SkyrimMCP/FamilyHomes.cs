@@ -61,6 +61,24 @@ public static class FamilyHomes
         Save(all);
     }
 
+    /// <summary>Drops a home from every player character's family homes (it was taken away). Returns how many lists it was in.</summary>
+    public static int RemoveEverywhere(string reference)
+    {
+        var all = Load();
+        var count = 0;
+        foreach (var (_, mine) in all)
+        {
+            if (mine?["homes"] is not JsonArray homes) continue;
+            var keep = homes.OfType<JsonObject>().Where(h => !string.Equals(h["ref"]?.ToString(), reference, StringComparison.OrdinalIgnoreCase))
+                .Select(h => (JsonNode)h.DeepClone()).ToArray();
+            if (keep.Length == homes.Count) continue;
+            mine["homes"] = new JsonArray(keep);
+            count++;
+        }
+        if (count > 0) Save(all);
+        return count;
+    }
+
     public static bool Remove(string characterId, string refOrName)
     {
         var all = Load();
