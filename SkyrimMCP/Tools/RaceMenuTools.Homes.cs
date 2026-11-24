@@ -195,7 +195,7 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Build a saved home layout in the world (FEAT-307). Without name: the layouts there are. where: 'here' (default: centred " +
         "distance units in front of the player, turned to face the way the player looks, as when it was built) or 'original' (its " +
-        "own spot). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
+        "own spot), or a reference such as an old home's centre marker (rebuilt in the same place, turned the same way; build first, then RemoveHomeLayout the old one). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
         "The building and its foundation stand with the door at ground level; each yard piece stands on its own ground (the land only: rocks " +
         "aren't seen, so check pieces near rocks). " +
         "dryRun (default true) says what would be built. RemoveHomeLayout takes it away.")]
@@ -233,7 +233,15 @@ public partial class RaceMenuTools
             var h = heading.Value * Math.PI / 180;
             (cx, cy, cz, turn) = (px.Value + distance * Math.Sin(h), py.Value + distance * Math.Cos(h), pz.Value, heading.Value - facing);
         }
-        else return new { error = "where must be 'here' or 'original'" };
+        else if (System.Text.RegularExpressions.Regex.IsMatch(where, "^[0-9a-f]{8}$"))
+        {
+            // A home's centre marker (or any reference): rebuild in the same place, turned the same way.
+            var rx = Number(await Console1($"{where}.getpos x")); var ry = Number(await Console1($"{where}.getpos y"));
+            var rz = Number(await Console1($"{where}.getpos z")); var ra = Number(await Console1($"{where}.getangle z"));
+            if (rx == null || ry == null || rz == null || ra == null) return new { error = $"No reference {where} to build at." };
+            (cx, cy, cz, turn) = (rx.Value, ry.Value, rz.Value, ra.Value - facing);
+        }
+        else return new { error = "where must be 'here', 'original' or a reference (a home's centre marker)" };
 
         var pieces = (layout["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => p["role"]?.ToString() != "center").ToList();
         var t = turn * Math.PI / 180;
