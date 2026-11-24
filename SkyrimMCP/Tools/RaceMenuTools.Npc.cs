@@ -81,7 +81,7 @@ public partial class RaceMenuTools
     private static void TryDelete(string path) { try { File.Delete(path); } catch (Exception) { } }
 
     [McpServerTool]
-    [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: editor ID or form ID " +
+    [Description("Spawn a new NPC next to the player (FEAT-122, 1.6). name: what the game calls them. race: the name the game shows (Nord, High Elf...), editor ID or form ID " +
         "(default the template's, or the player's); female: true or false (likewise); template: an NPC to copy stats, " +
         "outfit and voice from (default: a plain NPC of that race and sex). face: 'template' (the template's own face, works " +
         "everywhere) or 'player' (the player's current face, e.g. one built with the face builder; needs RaceMenu). " +

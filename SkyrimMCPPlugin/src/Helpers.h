@@ -93,6 +93,24 @@ namespace SkyrimMCP::Helpers {
         return saves && saves->currentCharacterID == 0;
     }
 
+    // BUG-114: whether a piece of armour has a model for this actor's race and sex. An addon made for one race only (Deep Elf
+    // clothes on a Nord) is worn but shows nothing: the character looked unclothed (Steam, 2026-11-24). Armour without addons
+    // (nothing to draw) counts as showing.
+    inline bool ArmorShowsOn(RE::TESObjectARMO* armor, RE::Actor* actor) {
+        auto* npc = actor ? actor->GetActorBase() : nullptr;
+        auto* race = actor ? actor->GetRace() : nullptr;
+        if (!armor || !npc || !race || armor->armorAddons.empty()) return true;
+        const auto sex = npc->GetSex() == RE::SEX::kFemale ? RE::SEXES::kFemale : RE::SEXES::kMale;
+        for (auto* addon : armor->armorAddons) {
+            if (!addon) continue;
+            const bool fits = addon->IsValidRace(race) || (race->armorParentRace && addon->IsValidRace(race->armorParentRace));
+            const char* model = addon->bipedModels[sex].GetModel();
+            const char* other = addon->bipedModels[1 - sex].GetModel();
+            if (fits && ((model && *model) || (other && *other))) return true;
+        }
+        return false;
+    }
+
     inline RE::FormID ParseFormId(const std::string& text) {
         std::size_t start = text.find_first_not_of(" \t");
         std::size_t end = text.find_last_not_of(" \t");

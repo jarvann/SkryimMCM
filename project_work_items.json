@@ -6387,7 +6387,7 @@
         {
           "id": "BUG-113",
           "type": "bug",
-          "status": "open",
+          "status": "done",
           "priority": "medium",
           "title": "ExportCharacter's home choices near Karthwasten were a hidden marker and an ore vein",
           "description": "Steam, 2026-11-24, Test Aunt exported (dry run) from the Reach homestead: homeChoices were 'This should not be visible' (twice) and 'Iron Ore Vein', no map or heading markers. Leave out references whose base names say they're hidden and resources (ore veins, plants); prefer the nearest named place's marker; say when nothing good is near and suggest an inn or town.",
@@ -6395,15 +6395,20 @@
             {
               "datetime": "2026-11-24T13:20",
               "note": "Found in the Steam 1.6 run."
+            },
+            {
+              "datetime": "2026-11-24T14:40",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: near Karthwasten the choices are now base game markers ranked first (1.3-2.6k units), each with a place ('near Jhunal Pond', the nearest map marker, when no location covers it); no ore veins or hidden helpers."
         },
         {
           "id": "BUG-114",
           "type": "bug",
-          "status": "open",
+          "status": "done",
           "priority": "medium",
           "title": "A worn item with no model for the character's race showed it unclothed, and the export would keep it",
           "description": "Steam, 2026-11-24: Ancilla Dress A (Deep_Elf_Race.esm) equipped on a Nord (Test Aunt from Katria): the game counts it worn, Cory saw her without clothes. ExportCharacter put it in the outfit and made Deep_Elf_Race.esm a master. Check each worn armor has an ArmorAddon for the race (or its armor race) and sex; EquipItems and the export warn and leave out what wouldn't show.",
@@ -6411,15 +6416,20 @@
             {
               "datetime": "2026-11-24T13:55",
               "note": "Found in the Steam 1.6 run."
+            },
+            {
+              "datetime": "2026-11-24T14:40",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: Ancilla Dress A on a Nord: EquipItems warns (showsOnRace false); CharacterForms flags it; the export leaves it out (leftOutOfOutfit) and Deep_Elf_Race.esm is no longer a master; Elisif's Noble Dress kept."
         },
         {
           "id": "BUG-115",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "critical",
           "title": "A save holding a preview NPC (even removed) crashed on load",
           "description": "Steam, 2026-11-24 13:16: Autosave101 (12:56) crashed every load: Crash Logger shows LocationalEncounterZones.dll's GetEncounterZone hook calling GetName on Character FF0048C5, the preview Test Aunt made while BUG-112 was live (runtime TESNPC base FF0048C4, not kept by saves; on load that ID was another runtime form, 'Stormcloak Guard'). RemoveSpawnedNpc (Disable + SetDelete) didn't keep it out of the autosave while its cell stayed loaded. Fix: SpawnNpc makes no preview unless preview: true; the plugin refuses without allowPreview; the result warns not to save. To consider: purge previews before saves (host save listener).",
@@ -6427,11 +6437,36 @@
             {
               "datetime": "2026-11-24T13:25",
               "note": "Found in the Steam 1.6 run; crash-2026-11-24-13-16-37.log."
+            },
+            {
+              "datetime": "2026-11-24T14:40",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Save127 (12:41, before the preview existed) loads on the same game; the opt-in path itself is untested."
+          "testNotes": "Steam 2026-11-24: a slotless spawn without preview is refused and nothing is made; Save127 loads. The preview: true path itself wasn't exercised (it would put a preview into Cory's save line)."
+        },
+        {
+          "id": "BUG-116",
+          "type": "bug",
+          "status": "done",
+          "priority": "high",
+          "title": "SpawnNpc's race 'Nord' was ignored and the player's race used",
+          "description": "Steam, 2026-11-24: SpawnNpc race 'Nord' made a Breton (Arya's race). ResolveRace took only form IDs and editor IDs, and the game drops editor IDs after loading (and 'Nord' isn't one: NordRace is); an unresolved race silently fell back to the template's or player's. Earlier 'Breton' only seemed to work because the player is a Breton. Fix: by name too (the base game's ten playable races first, then any playable race), editor ID with 'Race' added, and an error for an unknown race.",
+          "history": [
+            {
+              "datetime": "2026-11-24T14:20",
+              "note": "Found in the Steam bug-fix run."
+            },
+            {
+              "datetime": "2026-11-24T14:40",
+              "note": "Proved on Steam."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: race 'Nord' made a Nord (slot 51); an unknown race is refused with the names to use."
         },
         {
           "id": "FEAT-305",

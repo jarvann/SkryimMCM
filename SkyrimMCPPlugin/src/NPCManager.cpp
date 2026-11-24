@@ -574,12 +574,28 @@ namespace SkyrimMCP::NPCManager {
 
 
     namespace {
+        // A form ID, an editor ID ("NordRace"), or the name the game shows ("Nord", "high elf"). The game drops most editor IDs after
+        // loading, so "Nord" wasn't found on Steam and the spawn quietly took the player's race (2026-11-24, BUG-116). By name, the base
+        // game's playable races come first (vampire and modded races share their names), then any other playable race.
         RE::TESRace* ResolveRace(const std::string& text) {
             if (text.empty()) return nullptr;
             RE::TESForm* form = nullptr;
             try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(text)); } catch (...) {}
             if (!form) form = RE::TESForm::LookupByEditorID(text);
-            return form ? form->As<RE::TESRace>() : nullptr;
+            if (!form) form = RE::TESForm::LookupByEditorID(text + "Race");
+            if (auto* race = form ? form->As<RE::TESRace>() : nullptr) return race;
+            auto same = [&](const char* name) {
+                if (!name) return false;
+                const std::string_view a(name), b(text);
+                return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) { return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y)); });
+            };
+            for (RE::FormID id = 0x13740; id <= 0x13749; ++id)
+                if (auto* race = RE::TESForm::LookupByID<RE::TESRace>(id); race && same(race->GetFullName())) return race;
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data) return nullptr;
+            for (auto* race : data->GetFormArray<RE::TESRace>())
+                if (race && race->GetPlayable() && same(race->GetFullName())) return race;
+            return nullptr;
         }
 
         // INFRA-024: SkyLinkAI.esp (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
@@ -1226,33 +1242,70 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    // BUG-113 (Steam, 2026-11-24): near Karthwasten the choices were a hidden helper object named "This should not be visible" and an
+    // iron ore vein. Outdoors a persistent reference lives in the world's persistent cell, not the grid cell the actor stands in, so
+    // the search covers the loaded area; and only places a person can be: markers first, then map markers, beds and seats, then doors.
     json HomeMarkers(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* cell = actor ? actor->GetParentCell() : nullptr;
         if (!cell) return {{"error", "Actor not found or in no cell: " + refId}};
         // An alias can only be given a reference that always exists (persistent), and one every player has (the base game's).
         static constexpr std::string_view kBase[] = { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm" };
-        struct Found { RE::TESObjectREFR* ref; float distance; };
+        struct Found { RE::TESObjectREFR* ref; float distance; int rank; const char* kind; };
         std::vector<Found> found;
-        cell->ForEachReference([&](RE::TESObjectREFR* ref) {
+        std::unordered_set<RE::FormID> seen;
+        const auto at = actor->GetPosition();
+        // Out in the wilds there's no location to name: the nearest map marker's name says where ("near Karthwasten").
+        std::string nearest;
+        float nearestDistance = 1e9f;
+        auto visit = [&](RE::TESObjectREFR* ref) {
             auto* base = ref ? ref->GetBaseObject() : nullptr;
             auto* file = ref ? ref->GetFile(0) : nullptr;
-            if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter)) return RE::BSContainer::ForEachResult::kContinue;
+            if (auto* map = ref ? ref->extraList.GetByType<RE::ExtraMapMarker>() : nullptr; map && map->mapData) {
+                const float d = ref->GetPosition().GetDistance(at);
+                const char* n = map->mapData->locationName.GetFullName();
+                if (n && *n && d < nearestDistance) { nearestDistance = d; nearest = n; }
+            }
+            if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter) || !seen.insert(ref->GetFormID()).second) return RE::BSContainer::ForEachResult::kContinue;
             if (!(ref->GetFormFlags() & RE::TESForm::RecordFlags::kPersistent)) return RE::BSContainer::ForEachResult::kContinue;
             if (std::find(std::begin(kBase), std::end(kBase), file->GetFilename()) == std::end(kBase)) return RE::BSContainer::ForEachResult::kContinue;
-            found.push_back({ ref, ref->GetPosition().GetDistance(actor->GetPosition()) });
+            int rank = -1;
+            const char* kind = nullptr;
+            if (base->GetFormID() == 0x34 || base->GetFormID() == 0x3B) { rank = 0; kind = "marker"; }        // XMarkerHeading, XMarker
+            else if (base->GetFormID() == 0x10) { rank = 1; kind = "map marker"; }                            // MapMarker
+            else if (base->Is(RE::FormType::Furniture)) { rank = 2; kind = "bed or seat"; }
+            else if (base->Is(RE::FormType::Door) && ref->extraList.GetByType<RE::ExtraTeleport>()) { rank = 3; kind = "door"; }
+            if (rank < 0) return RE::BSContainer::ForEachResult::kContinue;
+            found.push_back({ ref, ref->GetPosition().GetDistance(at), rank, kind });
             return RE::BSContainer::ForEachResult::kContinue;
+        };
+        if (cell->IsInteriorCell()) cell->ForEachReference(visit);
+        else if (auto* tes = RE::TES::GetSingleton()) tes->ForEachReferenceInRange(actor, 6000.0f, visit);
+        // A marker a little further off beats a door close by; past 4000 units it's somewhere else.
+        std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) {
+            const float sa = a.distance + a.rank * 1500.0f, sb = b.distance + b.rank * 1500.0f;
+            return sa < sb;
         });
-        std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.distance < b.distance; });
         json markers = json::array();
         for (const auto& f : found) {
             auto* base = f.ref->GetBaseObject();
-            const bool marker = base->GetFormID() == 0x3B || base->GetFormID() == 0x34;  // XMarker, XMarkerHeading
-            markers.push_back({{"stableId", StableId(f.ref)}, {"distance", f.distance}, {"marker", marker},
-                               {"what", marker ? json("marker") : json(base->GetName() && base->GetName()[0] ? base->GetName() : RE::FormTypeToString(base->GetFormType()).data())}});
+            const char* name = base->GetName();
+            // Outdoors a cell has no name: the location's ("Karthwasten") says where it is.
+            auto* where = f.ref->GetParentCell();
+            auto* location = f.ref->GetCurrentLocation();
+            if (!location && where) location = where->GetLocation();
+            const char* place = location && location->GetFullName() && *location->GetFullName() ? location->GetFullName()
+                              : where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
+            const std::string nearText = nearest.empty() ? std::string() : "near " + nearest;
+            markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
+                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : nearText.empty() ? json(nullptr) : json(nearText)}});
             if (markers.size() >= 25) break;
         }
-        return {{"cell", cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        auto* here = actor->GetCurrentLocation();
+        const char* hereName = here && here->GetFullName() && *here->GetFullName() ? here->GetFullName() : cell->GetFullName();
+        json result = {{"cell", hereName && *hereName ? json(hereName) : nearest.empty() ? json(cell->GetName()) : json("near " + nearest)}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        if (markers.empty()) result["note"] = "No base game marker, bed, seat or door nearby: move the character to an inn, a town or a camp and try again.";
+        return result;
     }
 
     json CharacterForms(const std::string& refId) {
@@ -1299,7 +1352,9 @@ namespace SkyrimMCP::NPCManager {
         for (auto& [item, entry] : actor->GetInventory()) {
             if (!item || entry.first <= 0) continue;
             const bool worn = entry.second && entry.second->IsWorn();
+            const auto before = forms.size();
             add(item, worn ? "worn" : "carried", worn ? "worn" : "carried");
+            if (forms.size() > before && worn && !Helpers::ArmorShowsOn(item->As<RE::TESObjectARMO>(), actor)) forms.back()["noModelForRace"] = true;
         }
         return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
                 {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
@@ -1358,7 +1413,9 @@ namespace SkyrimMCP::NPCManager {
             if (!asked) return {{"error", "Template isn't an NPC base: " + t}};
         }
         const auto* like = asked ? asked : playerBase;
-        auto* race = ResolveRace(params.value("race", std::string()));
+        const auto raceText = params.value("race", std::string());
+        auto* race = ResolveRace(raceText);
+        if (!race && !raceText.empty()) return {{"error", "No race called '" + raceText + "': give the name the game shows (Nord, High Elf, Khajiit...), an editor ID (NordRace) or a form ID."}};
         if (!race) race = like->race;
         const bool female = params.contains("female") && params["female"].is_boolean()
             ? params["female"].get<bool>() : like->GetSex() == RE::SEX::kFemale;

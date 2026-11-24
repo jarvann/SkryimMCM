@@ -147,6 +147,10 @@ namespace SkyrimMCP::InventoryManager {
                 equipManager->UnequipObject(actor, object, extra, equipCount, slot);
             } else {
                 equipManager->EquipObject(actor, object, extra, equipCount, slot);
+                if (!Helpers::ArmorShowsOn(form->As<RE::TESObjectARMO>(), actor)) {
+                    r["showsOnRace"] = false;
+                    r["warning"] = "Worn, but it has no model for this character's race and sex, so nothing shows (made for another race).";
+                }
             }
             r["ok"] = true;
             return r;

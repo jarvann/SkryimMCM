@@ -58,7 +58,9 @@ public partial class CharacterTools : ToolBase
             if (f["kind"]?.ToString() is "perk" or "spell" or "faction") { handedOut[plugin] = handedOut.GetValueOrDefault(plugin) + 1; continue; }
             if (IsCreation(plugin)) { creations.Add(plugin); continue; }
             var inRecord = f["need"]?.ToString() == "record";
-            Want(plugin, $"{f["kind"]}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", inRecord);
+            // BUG-114: worn but made for another race, so nothing shows; the export leaves it out.
+            var kind = f["noModelForRace"]?.GetValue<bool>() == true ? "worn but no model for this race (left out of an export)" : f["kind"]?.ToString();
+            Want(plugin, $"{kind}: {f["name"]?.ToString() ?? f["editorId"]?.ToString() ?? f["stableId"]?.ToString()}", inRecord);
         }
 
         // The face file's own textures, and the physics settings its hair names.
