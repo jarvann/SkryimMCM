@@ -1296,9 +1296,9 @@ namespace SkyrimMCP::NPCManager {
             if (!location && where) location = where->GetLocation();
             const char* place = location && location->GetFullName() && *location->GetFullName() ? location->GetFullName()
                               : where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
-            const std::string near = nearest.empty() ? std::string() : "near " + nearest;
+            const std::string nearText = nearest.empty() ? std::string() : "near " + nearest;
             markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
-                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : near.empty() ? json(nullptr) : json(near)}});
+                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : nearText.empty() ? json(nullptr) : json(nearText)}});
             if (markers.size() >= 25) break;
         }
         auto* here = actor->GetCurrentLocation();
