@@ -121,9 +121,12 @@ public static class SlotRegistry
             .Select(kv => int.TryParse(kv.Key, out var i) ? (int?)i : null).FirstOrDefault();
 
     /// <summary>Where a slot's face files go (the running game's Data, or MO2's overwrite).</summary>
-    public static (string mesh, string tint)? FaceFiles(string slotObjectId)
+    public static (string mesh, string tint)? FaceFiles(string slotObjectId) =>
+        SkyLinkSettings.WritableDataFolder() is string root ? FaceFiles(slotObjectId, root) : null;
+
+    /// <summary>The same, in a folder already found: finding it looks at the running processes, so a pass over many slots finds it once.</summary>
+    private static (string mesh, string tint) FaceFiles(string slotObjectId, string root)
     {
-        if (SkyLinkSettings.WritableDataFolder() is not string root) return null;
         return (Path.Combine(root, "meshes", "actors", "character", "facegendata", "facegeom", "SkyLinkAI.esp", slotObjectId + ".nif"),
                 Path.Combine(root, "textures", "actors", "character", "facegendata", "facetint", "SkyLinkAI.esp", slotObjectId + ".dds"));
     }
@@ -132,13 +135,15 @@ public static class SlotRegistry
     /// Whether the running game already knows this slot's face files: it lists the loose files as it starts, so ones added later aren't seen
     /// until the next start, but a file it knows can be replaced (both seen on Steam, 2026-11-22).
     /// </summary>
-    public static bool KnownToTheGame(string slotObjectId) => KnownToTheGame(slotObjectId, GameStarted());
+    public static bool KnownToTheGame(string slotObjectId) => KnownToTheGame(slotObjectId, GameStarted(), SkyLinkSettings.WritableDataFolder());
 
-    private static bool KnownToTheGame(string slotObjectId, DateTime? started)
+    private static bool KnownToTheGame(string slotObjectId, DateTime? started, string? root)
     {
         try
         {
-            if (started is not DateTime start || FaceFiles(slotObjectId) is not { } files || !File.Exists(files.mesh) || !File.Exists(files.tint)) return false;
+            if (started is not DateTime start || root == null) return false;
+            var files = FaceFiles(slotObjectId, root);
+            if (!File.Exists(files.mesh) || !File.Exists(files.tint)) return false;
             return File.GetCreationTime(files.mesh) < start && File.GetCreationTime(files.tint) < start;
         }
         catch (Exception) { return false; }
@@ -164,7 +169,7 @@ public static class SlotRegistry
     /// </summary>
     public static (int Written, string? Problem) PrepareFaces(int perBlock = 2)
     {
-        if (FaceFiles(SlotObjectId(0)) is null) return (0, "the game's Data folder wasn't found");
+        if (SkyLinkSettings.WritableDataFolder() is not string root) return (0, "the game's Data folder wasn't found");
         if (!SkyLinkSettings.GameFileFolders().Any(f => File.Exists(Path.Combine(f, "SkyLinkAI.esp")))) return (0, "SkyLinkAI.esp isn't installed");
         var taken = Reserved().ToHashSet();
         var written = 0;
@@ -177,7 +182,7 @@ public static class SlotRegistry
                 {
                     if (taken.Contains(slot)) continue;
                     ready++;
-                    var (mesh, tint) = FaceFiles(SlotObjectId(slot))!.Value;
+                    var (mesh, tint) = FaceFiles(SlotObjectId(slot), root);
                     foreach (var (path, bytes) in new[] { (mesh, (Func<byte[]>)PlaceholderFace.Mesh), (tint, PlaceholderFace.Tint) })
                     {
                         if (File.Exists(path)) continue;
@@ -195,9 +200,9 @@ public static class SlotRegistry
     /// <summary>Free slots whose face files the running game listed when it started: a character put in one shows its face at once.</summary>
     public static int[] KnownFreeSlots()
     {
-        if (GameStarted() is not DateTime started) return [];
+        if (GameStarted() is not DateTime started || SkyLinkSettings.WritableDataFolder() is not string root) return [];
         var taken = Reserved().ToHashSet();
-        return Enumerable.Range(0, SlotCount).Where(i => !taken.Contains(i) && KnownToTheGame(SlotObjectId(i), started)).ToArray();
+        return Enumerable.Range(0, SlotCount).Where(i => !taken.Contains(i) && KnownToTheGame(SlotObjectId(i), started, root)).ToArray();
     }
 
     /// <summary>Writes both files for a slot, or neither. Null when done, else why not.</summary>
