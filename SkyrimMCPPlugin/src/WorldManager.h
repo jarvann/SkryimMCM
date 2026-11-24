@@ -24,6 +24,7 @@ namespace SkyrimMCP {
         json PlaceObject(const std::string& baseId, float x, float y, float z, float angleZ, bool onGround);
         json GroundHeights(const json& points);  // FEAT-307: the land height under each [x, y]
         json GroundSurvey(const json& points);   // FEAT-307: rise and objects in the way under each piece of a layout
+        json SetRefsEnabled(const json& refs, bool enable);  // FEAT-311: clear land for a home, or put it back
         json RemoveObject(const std::string& refId);
         json OwnedHouses();
         json AddMapMarker(const std::string& atRef, const std::string& name, int type);

@@ -6619,7 +6619,7 @@
         {
           "id": "FEAT-311",
           "type": "feature",
-          "status": "open",
+          "status": "done",
           "priority": "medium",
           "title": "Clear the land for a home: disable what's in the way, restore it when the home goes",
           "description": "Cory, 2026-11-24: 'if you track the objects in the area, disable them and check if there are seams or bad terrain mismatches, I'm ok with restructuring and clearing land in order to make the location work.' BuildHomeLayout (clear: true) disables the base game rocks, trees and clutter the site survey finds in the footprint, records them on the home (homes.json), and RemoveHomeLayout enables them again; afterwards check for seams or holes where terrain-hiding rocks were (look before and after, and leave mountain trims that hide land seams).",
@@ -6627,12 +6627,17 @@
             {
               "datetime": "2026-11-24T15:10",
               "note": "Added from Cory's idea during the Steam run."
+            },
+            {
+              "datetime": "2026-11-24T15:30",
+              "note": "Built and proved on Steam."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-307"
-          ]
+          ],
+          "testNotes": "Steam 2026-11-24 at the GOG spot (fit off): PineShrub02 and a TreePineForest05 switched off and recorded on the home; DirtCliffs01SUM (radius over 600) left standing and named; no seam warnings (neither sunk deep); RemoveHomeLayout switched both back on (2 of 2) and forgot the home. Near Karthwasten only mountain pieces were in the way, so nothing was cleared, as intended."
         },
         {
           "id": "FEAT-308",

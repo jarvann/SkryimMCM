@@ -312,6 +312,11 @@ namespace SkyrimMCP::Protocol {
             json points = params.value("points", json::array());
             return GameThread(id, [points]() { return WorldManager::GroundSurvey(points); });
         };
+        registry["set_refs_enabled"] = [](const std::string& id, const json& params) {
+            json refs = params.value("refs", json::array());
+            bool enable = params.value("enabled", true);
+            return GameThread(id, [refs, enable]() { return WorldManager::SetRefsEnabled(refs, enable); });
+        };
         registry["placed_objects"] = [](const std::string& id, const json& params) {
             std::string center = params.value("center", std::string());
             float radius = params.value("radius", 1500.0f);

@@ -235,10 +235,14 @@ public partial class CharacterTools
         t.AppendLine("Required plugins (masters): " + string.Join(", ", built.Masters)).AppendLine();
         void List(string title, string key)
         {
-            if (requirements[key] is not JsonArray { Count: > 0 } mods) return;
+            if (requirements[key] is not JsonArray { Count: > 0 } all) return;
+            // What the export left out (made for another race) isn't in the mod, so it isn't listed.
+            static IEnumerable<string?> Kept(JsonObject m) => (m["why"] as JsonArray ?? []).Select(w => w?.ToString()).Where(w => w?.Contains("left out of an export") != true);
+            var mods = all.OfType<JsonObject>().Where(m => Kept(m).Any()).ToList();
+            if (mods.Count == 0) return;
             t.AppendLine(title);
-            foreach (var m in mods.OfType<JsonObject>())
-                t.AppendLine($"- {m["mod"]}{(m["link"] is JsonNode link ? " " + link : "")}: {string.Join("; ", (m["why"] as JsonArray ?? []).Take(3).Select(w => w?.ToString()))}");
+            foreach (var m in mods)
+                t.AppendLine($"- {m["mod"]}{(m["link"] is JsonNode link ? " " + link : "")}: {string.Join("; ", Kept(m).Take(3))}");
             t.AppendLine();
         }
         List("Needed mods:", "required");
