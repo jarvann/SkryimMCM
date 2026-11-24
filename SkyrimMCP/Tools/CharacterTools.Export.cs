@@ -83,7 +83,8 @@ public partial class CharacterTools
         }
         else familyRank = null;
         var choices = (markers?["markers"] as JsonArray ?? []).OfType<JsonObject>().ToList();
-        var homeRef = home?.Trim() ?? (choices.FirstOrDefault(m => m["marker"]?.GetValue<bool>() == true) ?? choices.FirstOrDefault())?["stableId"]?.ToString();
+        // The plugin ranks them: markers, then map markers, beds and seats, then doors (BUG-113).
+        var homeRef = home?.Trim() ?? choices.FirstOrDefault()?["stableId"]?.ToString();
         if (homeRef == null) return new { error = "No lasting base game reference was found in this place to put the character at. Move it somewhere else (an inn, a town) and export again." };
         if (home != null && choices.All(m => m["stableId"]?.ToString() != homeRef)) return new { error = "home isn't one of homeChoices.", homeChoices = choices };
 
@@ -96,7 +97,10 @@ public partial class CharacterTools
         if (isFollower) { factions.Add(("Skyrim.esm|0005C84D", 0)); factions.Add(("Skyrim.esm|0005C84E", -1)); }
         if (marry) factions.Add(("Skyrim.esm|00019809", 0));
         if (familyRank is int rank) factions.Add(("SkyLinkAI.esp|00000A00", (sbyte)rank));
-        var worn = outfit == "worn" ? forms.Where(f => f["kind"]?.ToString() == "worn").Select(f => f["stableId"]?.ToString()).OfType<string>().Distinct().ToList() : [];
+        // BUG-114: an item with no model for the character's race shows nothing; it stays out of the outfit (and isn't a master).
+        var wornForms = outfit == "worn" ? forms.Where(f => f["kind"]?.ToString() == "worn").ToList() : [];
+        var noModel = wornForms.Where(f => f["noModelForRace"]?.GetValue<bool>() == true).Select(f => f["name"]?.ToString() ?? f["stableId"]?.ToString()).ToList();
+        var worn = wornForms.Where(f => f["noModelForRace"]?.GetValue<bool>() != true).Select(f => f["stableId"]?.ToString()).OfType<string>().Distinct().ToList();
         var hair = Rgb("hairColor");
         records.Add(new NewNpc
         {
@@ -194,7 +198,12 @@ public partial class CharacterTools
         {
             dryRun, character = data["name"]?.ToString(), plugin, masters = built.Masters, light = (built.Flags & 0x200) != 0,
             follower = isFollower, marryable = marry, family = family == true ? $"{familyRole} (rank {familyRank}, needs SkyLink AI)" : null, outfitItems = worn.Count,
-            placedAt = new { place = markers?["cell"]?.ToString(), reference = homeRef, what = choices.FirstOrDefault(m => m["stableId"]?.ToString() == homeRef)?["what"]?.ToString() },
+            leftOutOfOutfit = noModel.Count > 0 ? new { items = noModel, why = "No model for this character's race and sex: worn, but nothing shows." } : null,
+            placedAt = new
+            {
+                place = choices.FirstOrDefault(m => m["stableId"]?.ToString() == homeRef)?["place"]?.ToString() ?? markers?["cell"]?.ToString(),
+                reference = homeRef, what = choices.FirstOrDefault(m => m["stableId"]?.ToString() == homeRef)?["what"]?.ToString(),
+            },
             homeChoices = choices.Take(6),
             files = files.Select(f => new { file = f.Key, kb = f.Value.Length / 1024 }),
             zip = dryRun ? null : Path.Combine(folder, modName + ".zip"),

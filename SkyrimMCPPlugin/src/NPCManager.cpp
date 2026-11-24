@@ -1226,33 +1226,55 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    // BUG-113 (Steam, 2026-11-24): near Karthwasten the choices were a hidden helper object named "This should not be visible" and an
+    // iron ore vein. Outdoors a persistent reference lives in the world's persistent cell, not the grid cell the actor stands in, so
+    // the search covers the loaded area; and only places a person can be: markers first, then map markers, beds and seats, then doors.
     json HomeMarkers(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* cell = actor ? actor->GetParentCell() : nullptr;
         if (!cell) return {{"error", "Actor not found or in no cell: " + refId}};
         // An alias can only be given a reference that always exists (persistent), and one every player has (the base game's).
         static constexpr std::string_view kBase[] = { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm" };
-        struct Found { RE::TESObjectREFR* ref; float distance; };
+        struct Found { RE::TESObjectREFR* ref; float distance; int rank; const char* kind; };
         std::vector<Found> found;
-        cell->ForEachReference([&](RE::TESObjectREFR* ref) {
+        std::unordered_set<RE::FormID> seen;
+        const auto at = actor->GetPosition();
+        auto visit = [&](RE::TESObjectREFR* ref) {
             auto* base = ref ? ref->GetBaseObject() : nullptr;
             auto* file = ref ? ref->GetFile(0) : nullptr;
-            if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter)) return RE::BSContainer::ForEachResult::kContinue;
+            if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter) || !seen.insert(ref->GetFormID()).second) return RE::BSContainer::ForEachResult::kContinue;
             if (!(ref->GetFormFlags() & RE::TESForm::RecordFlags::kPersistent)) return RE::BSContainer::ForEachResult::kContinue;
             if (std::find(std::begin(kBase), std::end(kBase), file->GetFilename()) == std::end(kBase)) return RE::BSContainer::ForEachResult::kContinue;
-            found.push_back({ ref, ref->GetPosition().GetDistance(actor->GetPosition()) });
+            int rank = -1;
+            const char* kind = nullptr;
+            if (base->GetFormID() == 0x34 || base->GetFormID() == 0x3B) { rank = 0; kind = "marker"; }        // XMarkerHeading, XMarker
+            else if (base->GetFormID() == 0x10) { rank = 1; kind = "map marker"; }                            // MapMarker
+            else if (base->Is(RE::FormType::Furniture)) { rank = 2; kind = "bed or seat"; }
+            else if (base->Is(RE::FormType::Door) && ref->extraList.GetByType<RE::ExtraTeleport>()) { rank = 3; kind = "door"; }
+            if (rank < 0) return RE::BSContainer::ForEachResult::kContinue;
+            found.push_back({ ref, ref->GetPosition().GetDistance(at), rank, kind });
             return RE::BSContainer::ForEachResult::kContinue;
+        };
+        if (cell->IsInteriorCell()) cell->ForEachReference(visit);
+        else if (auto* tes = RE::TES::GetSingleton()) tes->ForEachReferenceInRange(actor, 6000.0f, visit);
+        // A marker a little further off beats a door close by; past 4000 units it's somewhere else.
+        std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) {
+            const float sa = a.distance + a.rank * 1500.0f, sb = b.distance + b.rank * 1500.0f;
+            return sa < sb;
         });
-        std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.distance < b.distance; });
         json markers = json::array();
         for (const auto& f : found) {
             auto* base = f.ref->GetBaseObject();
-            const bool marker = base->GetFormID() == 0x3B || base->GetFormID() == 0x34;  // XMarker, XMarkerHeading
-            markers.push_back({{"stableId", StableId(f.ref)}, {"distance", f.distance}, {"marker", marker},
-                               {"what", marker ? json("marker") : json(base->GetName() && base->GetName()[0] ? base->GetName() : RE::FormTypeToString(base->GetFormType()).data())}});
+            const char* name = base->GetName();
+            auto* where = f.ref->GetParentCell();
+            const char* place = where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
+            markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
+                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : json(nullptr)}});
             if (markers.size() >= 25) break;
         }
-        return {{"cell", cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        json result = {{"cell", cell->GetFullName() && *cell->GetFullName() ? cell->GetFullName() : cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        if (markers.empty()) result["note"] = "No base game marker, bed, seat or door nearby: move the character to an inn, a town or a camp and try again.";
+        return result;
     }
 
     json CharacterForms(const std::string& refId) {
@@ -1299,7 +1321,9 @@ namespace SkyrimMCP::NPCManager {
         for (auto& [item, entry] : actor->GetInventory()) {
             if (!item || entry.first <= 0) continue;
             const bool worn = entry.second && entry.second->IsWorn();
+            const auto before = forms.size();
             add(item, worn ? "worn" : "carried", worn ? "worn" : "carried");
+            if (forms.size() > before && worn && !Helpers::ArmorShowsOn(item->As<RE::TESObjectARMO>(), actor)) forms.back()["noModelForRace"] = true;
         }
         return {{"refId", refId}, {"name", npc->GetName()}, {"sex", npc->GetSex() == RE::SEX::kFemale ? "female" : "male"}, {"forms", forms},
                 {"faceSource", FaceSource(npc)}, {"slot", SlotIndex(npc) >= 0 ? json(SlotIndex(npc)) : json(nullptr)},
