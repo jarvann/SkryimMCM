@@ -1273,8 +1273,15 @@ namespace SkyrimMCP::NPCManager {
             const char* kind = nullptr;
             if (base->GetFormID() == 0x34 || base->GetFormID() == 0x3B) { rank = 0; kind = "marker"; }        // XMarkerHeading, XMarker
             else if (base->GetFormID() == 0x10) { rank = 1; kind = "map marker"; }                            // MapMarker
-            else if (base->Is(RE::FormType::Furniture)) { rank = 2; kind = "bed or seat"; }
-            else if (base->Is(RE::FormType::Door) && ref->extraList.GetByType<RE::ExtraTeleport>()) { rank = 3; kind = "door"; }
+            else if (base->Is(RE::FormType::Furniture)) {
+                // The game's invisible idle spots (where NPCs sit, lean or eat) are furniture named "This should not be visible" (GOG,
+                // 2026-11-24): a fine place to stand someone, but after a real marker, a map marker or a visible bed or seat.
+                const char* fn = base->GetName();
+                const bool hidden = !fn || !*fn || std::string_view(fn).find("should not be visible") != std::string_view::npos;
+                rank = hidden ? 3 : 2;
+                kind = hidden ? "NPC idle spot" : "bed or seat";
+            }
+            else if (base->Is(RE::FormType::Door) && ref->extraList.GetByType<RE::ExtraTeleport>()) { rank = 4; kind = "door"; }
             if (rank < 0) return RE::BSContainer::ForEachResult::kContinue;
             found.push_back({ ref, ref->GetPosition().GetDistance(at), rank, kind });
             return RE::BSContainer::ForEachResult::kContinue;
@@ -1297,8 +1304,9 @@ namespace SkyrimMCP::NPCManager {
             const char* place = location && location->GetFullName() && *location->GetFullName() ? location->GetFullName()
                               : where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
             const std::string nearText = nearest.empty() ? std::string() : "near " + nearest;
+            const bool hiddenName = !name || !*name || std::string_view(name).find("should not be visible") != std::string_view::npos;
             markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
-                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : nearText.empty() ? json(nullptr) : json(nearText)}});
+                               {"what", hiddenName ? json(f.kind) : json(name)}, {"place", place ? json(place) : nearText.empty() ? json(nullptr) : json(nearText)}});
             if (markers.size() >= 25) break;
         }
         auto* here = actor->GetCurrentLocation();
