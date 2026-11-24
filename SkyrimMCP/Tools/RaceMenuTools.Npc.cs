@@ -140,7 +140,7 @@ public partial class RaceMenuTools
         var (homeChoices, homeCharacter, _) = await HomeChoices();
         if (CharacterChoices.Ask(name.Trim(), follower, marryable, roleMarryable ? null : familyRole, "Nothing was spawned. Ask the player, then call again with them set.",
             attractionMods: attractionMods, attraction: attraction, homeOptions: HomeOptionNames(homeChoices, homeCharacter), home: home,
-            firstFamilyHome: familyRole != null && FamilyHomes.Of(homeCharacter).Count == 0) is { } ask) return ask;
+            firstFamilyHome: familyRole != null && FamilyHomeHere(homeChoices, homeCharacter) == null) is { } ask) return ask;
         if (home != null && !home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase) && ResolveHome(home, homeChoices, homeCharacter) == null)
             return new { error = $"No home called {home}.", choices = HomeOptionNames(homeChoices, homeCharacter) };
 
@@ -513,14 +513,23 @@ public partial class RaceMenuTools
         if (set?["ORomance"] is JsonObject or)
         {
             // Seeded first: ORomance rolls every stat (orientation too) the first time it meets an NPC, over what's stored.
-            var call = (string fn, JsonArray args) => _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            var call = (string fn, JsonArray args, bool wait) => _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
             {
-                ["className"] = "ORomanceScript", ["functionName"] = fn, ["target"] = or["quest"]!.ToString(), ["args"] = args,
+                ["className"] = "ORomanceScript", ["functionName"] = fn, ["target"] = or["quest"]!.ToString(), ["args"] = args, ["wait"] = wait,
             });
             try
             {
-                await call("SeedIfNeeded", new JsonArray(refId));
-                await call("StoreSexuality", new JsonArray(refId, or["value"]!.GetValue<int>()));
+                // Seeding makes dozens of script calls and took over the 5 s a call waits with a large load order (Steam, 2026-11-24):
+                // start it, wait until ORomance says the NPC is seeded, then store the choice over what it rolled.
+                await call("SeedIfNeeded", new JsonArray(refId), false);
+                var seeded = false;
+                for (var i = 0; i < 30 && !seeded; i++)
+                {
+                    seeded = (await call("isSeeded", new JsonArray(refId), true))?["result"]?.ToString() is "true" or "True";
+                    if (!seeded) await Task.Delay(1000);
+                }
+                if (!seeded) throw new McpException("ORomance hadn't finished meeting this NPC after 30 seconds; try again in a minute");
+                await call("StoreSexuality", new JsonArray(refId, or["value"]!.GetValue<int>()), true);
                 oromance = or["sexualityOption"]?.GetValue<bool>() == true ? "set" :
                     "set; ORomance's Sexuality option is off (its MCM), so for now it treats everyone as open to everyone";
             }

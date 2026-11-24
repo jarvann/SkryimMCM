@@ -46,18 +46,35 @@ public partial class RaceMenuTools
                 if (h["ref"]?.ToString() is string r) homes.Add(new(h["name"]?.ToString() ?? r, "house", r, h["location"]?.ToString()));
         }
         catch (McpException ex) { error = ex.Message; }
+        // The registry keeps every save's homes; offer only the ones in this game (Steam, 2026-11-24: a homestead built in a session
+        // that was never saved was picked as the family home, "Not a reference").
         foreach (var (center, entry) in HomeRegistry.Load())
-            if (entry is JsonObject e && (e["characterId"]?.ToString() == cid || e["characterId"] == null))
+            if (entry is JsonObject e && (e["characterId"]?.ToString() == cid || e["characterId"] == null) && await InThisGame(center))
                 homes.Add(new(e["name"]?.ToString() ?? center, "skylink", center, null));
+        // Two homes built from one layout share its name: the reference tells them apart.
+        foreach (var same in homes.GroupBy(h => h.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).ToList())
+            foreach (var h in same.ToList())
+                homes[homes.IndexOf(h)] = h with { Name = $"{h.Name} ({h.Ref})" };
         return (homes, cid, error);
     }
+
+    /// <summary>Whether a reference exists in the game that's loaded (a home's centre marker).</summary>
+    private async Task<bool> InThisGame(string reference)
+    {
+        try { return Number(await Console1($"{reference}.getpos x")) != null; }
+        catch (McpException) { return false; }
+    }
+
+    /// <summary>The main family home if it's in this game: a SkyLink home must be among the homes found here.</summary>
+    private static JsonObject? FamilyHomeHere(List<HomeChoice> homes, string? characterId) =>
+        FamilyHomes.Of(characterId).FirstOrDefault(f => f["kind"]?.ToString() != "skylink" || homes.Any(h => h.Ref == f["ref"]?.ToString()));
 
     /// <summary>The home a choice names: "here", "family" (the main family home), a house or SkyLink home by name, or a reference.</summary>
     private static HomeChoice? ResolveHome(string home, List<HomeChoice> homes, string? characterId)
     {
         var key = home.Trim();
         if (key.StartsWith("family", StringComparison.OrdinalIgnoreCase))
-            return FamilyHomes.Of(characterId).FirstOrDefault() is { } f ? new(f["name"]!.ToString(), f["kind"]!.ToString(), f["ref"]!.ToString(), f["location"]?.ToString()) : null;
+            return FamilyHomeHere(homes, characterId) is { } f ? new(f["name"]!.ToString(), f["kind"]!.ToString(), f["ref"]!.ToString(), f["location"]?.ToString()) : null;
         key = key.Replace("(SkyLink home)", "", StringComparison.OrdinalIgnoreCase).Trim();
         return homes.FirstOrDefault(h => h.Name.Equals(key, StringComparison.OrdinalIgnoreCase) || h.Ref.Equals(key, StringComparison.OrdinalIgnoreCase))
             ?? homes.FirstOrDefault(h => h.Name.StartsWith(key, StringComparison.OrdinalIgnoreCase));
@@ -66,7 +83,7 @@ public partial class RaceMenuTools
     private static List<string> HomeOptionNames(List<HomeChoice> homes, string? characterId)
     {
         var names = new List<string> { "here (stays where it stands)" };
-        if (FamilyHomes.Of(characterId).FirstOrDefault() is { } f) names.Add($"family ({f["name"]})");
+        if (FamilyHomeHere(homes, characterId) is { } f) names.Add($"family ({f["name"]})");
         names.AddRange(homes.Select(h => h.Kind == "skylink" ? $"{h.Name} (SkyLink home)" : h.Name));
         return names.Distinct().ToList();
     }
@@ -93,7 +110,7 @@ public partial class RaceMenuTools
             if (set?["error"] != null) return applied;
         }
         string? family = null;
-        if (familyRole != null && cid != null && FamilyHomes.Of(cid).Count == 0)
+        if (familyRole != null && cid != null && FamilyHomeHere(homes, cid) == null)
         {
             FamilyHomes.Add(cid, new JsonObject { ["name"] = chosen.Name, ["kind"] = chosen.Kind, ["ref"] = chosen.Ref, ["location"] = chosen.Location }, main: true);
             family = $"{chosen.Name} is now the family home.";
