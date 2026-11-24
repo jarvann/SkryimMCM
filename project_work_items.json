@@ -6347,7 +6347,7 @@
         {
           "id": "FEAT-305",
           "type": "",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "",
           "title": "New slot faces seen at once",
           "description": "The game lists loose files as it starts: a face file added later isn't seen until the next start, one it already knows can be replaced. Ship or prepare small placeholder face files for the slots so a new character's face shows at once, with the player's faces kept safe from a reinstall.",
@@ -6363,10 +6363,16 @@
             {
               "datetime": "2026-11-23T18:40",
               "note": "Stand-in face files (332-byte NIF, 4x4 tint) for the first two free slots of each race and sex, written on connect and after each spawn into overwrite/Data (not the mod's files, so reinstalls keep faces); SpawnNpc prefers slots the game listed at start (preferSlots) and swaps the face in at once under MO2 too; freeing a slot writes stand-ins instead of deleting (BUG-108). To test on GOG: restart after the stand-ins exist, spawn, face at once."
+            },
+            {
+              "date": "2026-11-23",
+              "status": "done",
+              "note": "Proved on GOG; data folder found once per pass (9ed2e15)."
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Proved on GOG/MO2 2026-11-23: first launch wrote 40 stand-ins to MO2 overwrite (2 per race/sex block); after a restart, a template-face Nord (Hilde Test-Face, slot 51, Tova's face) showed her face at once, no dark face. RemoveSpawnedNpc put the stand-in back mid-session without a crash (BUG-108 path). Found and fixed: the data folder was looked up per slot (process scans), so preparing took minutes; now once per pass. Not yet checked: Steam, and the face after save + reload."
         },
         {
           "id": "FEAT-306",
