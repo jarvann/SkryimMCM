@@ -246,7 +246,10 @@ public partial class RaceMenuTools
         else return new { error = "where must be 'here', 'original' or a reference (a home's centre marker)" };
 
         var pieces = (layout["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => p["role"]?.ToString() != "center").ToList();
-        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here");
+        // The player stands where no piece may go (Steam, 2026-11-24: a fitted home put the tent over Arya).
+        (double X, double Y)? playerAt = null;
+        if (Number(await Console1("player.getpos x")) is double plx && Number(await Console1("player.getpos y")) is double ply) playerAt = (plx, ply);
+        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here", playerAt);
         if (site.Error != null && where == "here") return new { error = site.Error };
         if (site.Best is { } best) (cx, cy, turn) = (best.X, best.Y, best.Turn);
         var siteReport = site.Best == null ? null : new
@@ -335,7 +338,8 @@ public partial class RaceMenuTools
     /// to 30 degrees (Cory, 2026-11-24, after a Reach build had the tent in rocks and the door in the ground). Scored by objects in the
     /// way and rise under each footprint; the building takes more slope than a yard piece (its foundation and footing hide a drop).
     /// </summary>
-    private async Task<(SiteFit? Best, SiteFit? Asked, string? Error)> SurveySite(List<JsonObject> pieces, double cx, double cy, double turn, bool fit)
+    private async Task<(SiteFit? Best, SiteFit? Asked, string? Error)> SurveySite(List<JsonObject> pieces, double cx, double cy, double turn, bool fit,
+        (double X, double Y)? playerAt = null)
     {
         var candidates = new List<(double X, double Y, double Turn, double Shift, double ExtraTurn)> { (cx, cy, turn, 0, 0) };
         if (fit)
@@ -396,6 +400,12 @@ public partial class RaceMenuTools
                 var o = (JsonArray)p["offset"]!;
                 if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
                 if (s?["land"]?.GetValue<bool>() != true) { score += 10000; problems.Add($"{what}: no land under it"); continue; }
+                if (playerAt is { } pl && points[i * placedPieces.Count + j] is JsonObject pt &&
+                    Math.Sqrt(Math.Pow(pt["x"]!.GetValue<double>() - pl.X, 2) + Math.Pow(pt["y"]!.GetValue<double>() - pl.Y, 2)) < s["radius"]!.GetValue<double>() + 80)
+                {
+                    score += 5000;
+                    problems.Add($"{what}: where the player stands");
+                }
                 var role = p["role"]?.ToString();
                 var built = role is "house" or "foundation" or "footing";
                 var rise = s["rise"]!.GetValue<double>();
