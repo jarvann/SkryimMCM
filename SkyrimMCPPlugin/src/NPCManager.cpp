@@ -1255,9 +1255,17 @@ namespace SkyrimMCP::NPCManager {
         std::vector<Found> found;
         std::unordered_set<RE::FormID> seen;
         const auto at = actor->GetPosition();
+        // Out in the wilds there's no location to name: the nearest map marker's name says where ("near Karthwasten").
+        std::string nearest;
+        float nearestDistance = 1e9f;
         auto visit = [&](RE::TESObjectREFR* ref) {
             auto* base = ref ? ref->GetBaseObject() : nullptr;
             auto* file = ref ? ref->GetFile(0) : nullptr;
+            if (auto* map = ref ? ref->extraList.GetByType<RE::ExtraMapMarker>() : nullptr; map && map->mapData) {
+                const float d = ref->GetPosition().GetDistance(at);
+                const char* n = map->mapData->locationName.GetFullName();
+                if (n && *n && d < nearestDistance) { nearestDistance = d; nearest = n; }
+            }
             if (!base || !file || ref->IsDisabled() || ref->Is(RE::FormType::ActorCharacter) || !seen.insert(ref->GetFormID()).second) return RE::BSContainer::ForEachResult::kContinue;
             if (!(ref->GetFormFlags() & RE::TESForm::RecordFlags::kPersistent)) return RE::BSContainer::ForEachResult::kContinue;
             if (std::find(std::begin(kBase), std::end(kBase), file->GetFilename()) == std::end(kBase)) return RE::BSContainer::ForEachResult::kContinue;
@@ -1288,13 +1296,14 @@ namespace SkyrimMCP::NPCManager {
             if (!location && where) location = where->GetLocation();
             const char* place = location && location->GetFullName() && *location->GetFullName() ? location->GetFullName()
                               : where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
+            const std::string near = nearest.empty() ? std::string() : "near " + nearest;
             markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
-                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : json(nullptr)}});
+                               {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : near.empty() ? json(nullptr) : json(near)}});
             if (markers.size() >= 25) break;
         }
         auto* here = actor->GetCurrentLocation();
         const char* hereName = here && here->GetFullName() && *here->GetFullName() ? here->GetFullName() : cell->GetFullName();
-        json result = {{"cell", hereName && *hereName ? hereName : cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        json result = {{"cell", hereName && *hereName ? json(hereName) : nearest.empty() ? json(cell->GetName()) : json("near " + nearest)}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
         if (markers.empty()) result["note"] = "No base game marker, bed, seat or door nearby: move the character to an inn, a town or a camp and try again.";
         return result;
     }
