@@ -632,7 +632,10 @@ namespace SkyrimMCP::WorldManager {
                 }
                 const auto at = ref->GetPosition();
                 const float scale = ref->GetScale();
-                blockers.push_back({ at, 0.5f * std::max(span.x, span.y) * scale, label,
+                // A tree's bounds are its canopy; at ground level only the trunk is in the way.
+                float reachOut = 0.5f * std::max(span.x, span.y) * scale;
+                if (b->Is(RE::FormType::Tree)) reachOut = std::min(reachOut * 0.15f, 60.0f);
+                blockers.push_back({ at, reachOut, label,
                                      at.z + ref->GetBoundMax().z * scale, at.z + ref->GetBoundMin().z * scale });
             }
             return RE::BSContainer::ForEachResult::kContinue;
