@@ -92,15 +92,16 @@ public partial class RaceMenuTools
         "asked to marry, adults only. family: a role in the Player Family faction (Father, Mother, Brother, Sister, Cousin...; SetFamilyRole " +
         "without a role lists them), any race, adults only, marryable only in a role that allows it (step-siblings; family_roles says). resemblance 0-1 (default 0.5 with family, else 0; needs RaceMenu and face 'template'): how much the " +
         "face and hair colour take after the player's, in any race or sex. follower: can be recruited with the game's own dialogue (give it a voice " +
-        "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves; without it, a PREVIEW for this session: a runtime NPC isn't kept when the game saves and loads; " +
-        "ExportCharacter makes it lasting in the player's own plugin. Remove it with RemoveSpawnedNpc. " +
+        "that has follower lines, such as FemaleYoungEager, FemaleEvenToned or MaleEvenToned; without one it gets the even-toned voice). With SkyLinkAI.esp (25 slots of each race and sex) the character is kept by saves. With no free slot (or no SkyLinkAI.esp) nothing is " +
+        "spawned unless preview is true: a PREVIEW is a runtime NPC for this session only, and a save made while one is in a loaded cell (even " +
+        "after RemoveSpawnedNpc) can crash on load. Tell the player not to save until it's removed and they've left the area. Remove it with RemoveSpawnedNpc. " +
         "ASK THE PLAYER whether it should be a follower and (unless its family role rules marriage out) whether it can be married, " +
         "then pass follower and marryable: left out, nothing is spawned and the questions come back. home: where it lives (asked too): 'here', " +
         "'family', one of the player's houses or a SkyLink home (SetHome lists them); a relative's first home becomes the family home. attraction: who the character is attracted " +
         "to (women, men, everyone, no one, or 'mods decide'), asked only when a mod that keeps it is installed (ORomance, OSL Aroused); the " +
         "questions say so. Same-sex marriage needs nothing: the game lets anyone marry anyone. dryRun (default true) says what would be spawned.")]
     public async Task<object> SpawnNpc(string name, string? race = null, bool? female = null, string? template = null,
-        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, string? home = null, bool dryRun = true)
+        string face = "template", bool essential = false, bool keepSchedule = false, string? voice = null, string? outfit = null, bool? marryable = null, string? family = null, double? resemblance = null, bool? follower = null, string? attraction = null, string? home = null, bool dryRun = true, bool preview = false)
     {
         face = face.Trim().ToLowerInvariant();
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
@@ -157,8 +158,7 @@ public partial class RaceMenuTools
                 follower,
                 marryable,
                 attraction = attractionMods.Count == 0 ? null : attraction,
-                lasting = false,
-                note = "Spawns next to the player as a preview for this session. Pass dryRun: false to spawn.",
+                note = "Pass dryRun: false to spawn. It takes a free SkyLinkAI.esp slot and is kept by saves; with none free nothing is spawned (unless preview).",
             };
 
         // The face files first: if the export fails nothing has been spawned. SaveCharacter writes the preset (.jslot) but, seen
@@ -174,6 +174,7 @@ public partial class RaceMenuTools
         if (!string.IsNullOrWhiteSpace(race)) p["race"] = race.Trim();
         if (female is bool sex) p["female"] = sex;
         if (!string.IsNullOrWhiteSpace(template)) p["template"] = template.Trim();
+        p["allowPreview"] = preview;
         p["avoidSlots"] = new JsonArray(SlotRegistry.Reserved().Select(i => (JsonNode)i).ToArray());
         // FEAT-305: a slot whose face files the game listed at start shows the new face at once.
         p["preferSlots"] = new JsonArray(SlotRegistry.KnownFreeSlots().Select(i => (JsonNode)i).ToArray());
@@ -361,7 +362,7 @@ public partial class RaceMenuTools
             lasting = inSlot,
             note = inSlot
                 ? "Uses one of SkyLinkAI.esp's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
-                : "A preview for this session: it won't survive a save and load" +
+                : "A PREVIEW for this session: don't save while it's here. A save made while it (or its removed reference) is in a loaded cell can crash on load. RemoveSpawnedNpc it, leave the area, then save. It won't survive a save and load" +
                   (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esp is in use)." : " (SkyLinkAI.esp, the optional plugin with NPC slots, isn't in the load order).") +
                   " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
         };

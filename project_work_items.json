@@ -6417,6 +6417,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-115",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "critical",
+          "title": "A save holding a preview NPC (even removed) crashed on load",
+          "description": "Steam, 2026-11-24 13:16: Autosave101 (12:56) crashed every load: Crash Logger shows LocationalEncounterZones.dll's GetEncounterZone hook calling GetName on Character FF0048C5, the preview Test Aunt made while BUG-112 was live (runtime TESNPC base FF0048C4, not kept by saves; on load that ID was another runtime form, 'Stormcloak Guard'). RemoveSpawnedNpc (Disable + SetDelete) didn't keep it out of the autosave while its cell stayed loaded. Fix: SpawnNpc makes no preview unless preview: true; the plugin refuses without allowPreview; the result warns not to save. To consider: purge previews before saves (host save listener).",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:25",
+              "note": "Found in the Steam 1.6 run; crash-2026-11-24-13-16-37.log."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",
