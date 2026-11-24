@@ -101,6 +101,8 @@ public class PipeClient : IPipeClient
                     }
                     await LearnGameFolderAsync();
                     AlwaysActiveSetting();
+                    // FEAT-305: stand-in face files for the next free slots, listed by the game from its next start.
+                    _ = Task.Run(() => SlotRegistry.PrepareFaces());
                 }
 
                 try
