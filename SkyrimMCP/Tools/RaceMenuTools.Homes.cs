@@ -216,9 +216,11 @@ public partial class RaceMenuTools
         "The building and its foundation stand with the door at ground level; each yard piece stands on its own ground (the land only: rocks " +
         "aren't seen, so check pieces near rocks). With where 'here' and fit (default true), SkyLink surveys the ground first and moves the " +
         "home up to 300 units or turns it up to 30 degrees to keep pieces off rocks, trees and steep ground; site says what was found. " +
+        "clear (FEAT-311; ask the player first): switch off the rocks, trees and clutter in the way (not cliffs and mountain pieces, which " +
+        "hide the land's seams); RemoveHomeLayout switches them back on. Check the cleared spots afterwards (seams says which were sunk deep). " +
         "dryRun (default true) says what would be built and where. RemoveHomeLayout takes it away.")]
     public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true,
-        bool fit = true)
+        bool fit = true, bool clear = false)
     {
         var files = LayoutFiles().ToList();
         if (string.IsNullOrWhiteSpace(name))
@@ -266,12 +268,16 @@ public partial class RaceMenuTools
         // The player stands where no piece may go (Steam, 2026-11-24: a fitted home put the tent over Arya).
         (double X, double Y)? playerAt = null;
         if (Number(await Console1("player.getpos x")) is double plx && Number(await Console1("player.getpos y")) is double ply) playerAt = (plx, ply);
-        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here", playerAt);
+        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here", playerAt, clear);
         if (site.Error != null && where == "here") return new { error = site.Error };
         if (site.Best is { } best) (cx, cy, turn) = (best.X, best.Y, best.Turn);
+        var toClear = clear && site.Best != null ? site.Best.Clearable : [];
+        var seams = toClear.Where(c => c["sunk"]?.GetValue<double>() > 100 && c["radius"]?.GetValue<double>() > 150)
+            .Select(c => $"{c["what"]} ({c["ref"]}) was sunk {c["sunk"]} units into the land: look for a seam or hole where it was").ToList();
         var siteReport = site.Best == null ? null : new
         {
             moved = Math.Round(site.Best.Shift), turnedMore = Math.Round(site.Best.ExtraTurn),
+            clear = clear ? new { objects = toClear.Select(c => $"{c["what"]} ({c["ref"]})"), leftStanding = site.Best.TooBig.Count > 0 ? site.Best.TooBig : null, seams = seams.Count > 0 ? seams : null } : null,
             problems = site.Best.Problems.Count > 0 ? site.Best.Problems : null,
             asked = site.Asked is { } a && a != site.Best ? new { problems = a.Problems } : null,
             note = site.Best.Problems.Count == 0 ? "The ground is clear for every piece." :
@@ -280,6 +286,17 @@ public partial class RaceMenuTools
         var t = turn * Math.PI / 180;
         if (dryRun)
             return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, site = siteReport, note = "Pass dryRun: false to build it." };
+
+        // FEAT-311: room first. The cleared objects are recorded with the home so RemoveHomeLayout puts them back.
+        var clearedRefs = new List<string>();
+        if (toClear.Count > 0)
+        {
+            var off = await _pipe.SendRequestAsync("set_refs_enabled", new JsonObject
+            {
+                ["refs"] = new JsonArray(toClear.Select(c => (JsonNode)c["ref"]!.ToString()).Distinct().ToArray()), ["enabled"] = false,
+            });
+            clearedRefs = (off?["done"] as JsonArray ?? []).Select(r => r?.ToString()).OfType<string>().ToList();
+        }
 
         // The centre marker on the ground first; every piece then sits where it did relative to it.
         var marker = await _pipe.SendRequestAsync("place_object", new JsonObject { ["base"] = XMarker, ["x"] = cx, ["y"] = cy, ["z"] = cz, ["angle"] = (facing + turn) % 360, ["onGround"] = true });
@@ -333,7 +350,7 @@ public partial class RaceMenuTools
             if (!built && !stacked && res["z"]?.GetValue<double>() is double onGround) anchors[key] = (oz, onGround);
         }
 
-        HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs);
+        HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs, clearedRefs);
 
         object? residentResult = null;
         if (!string.IsNullOrWhiteSpace(resident))
@@ -348,7 +365,11 @@ public partial class RaceMenuTools
             note = "The marker is the home's centre: set_home and SetSpouseHome take it, SaveHomeLayout and RemoveHomeLayout start from it." };
     }
 
-    private sealed record SiteFit(double X, double Y, double Turn, double Shift, double ExtraTurn, double Score, List<string> Problems);
+    private sealed record SiteFit(double X, double Y, double Turn, double Shift, double ExtraTurn, double Score, List<string> Problems,
+        List<JsonObject> Clearable, List<string> TooBig);
+
+    /// <summary>FEAT-311: objects bigger than this (cliffs, mountain pieces) stay: they often hide the land's seams.</summary>
+    private const double ClearMaxRadius = 600;
 
     /// <summary>
     /// FEAT-307: the ground under each piece where the home would go, and (fit) the best of that spot moved up to 300 units or turned up
@@ -356,7 +377,7 @@ public partial class RaceMenuTools
     /// way and rise under each footprint; the building takes more slope than a yard piece (its foundation and footing hide a drop).
     /// </summary>
     private async Task<(SiteFit? Best, SiteFit? Asked, string? Error)> SurveySite(List<JsonObject> pieces, double cx, double cy, double turn, bool fit,
-        (double X, double Y)? playerAt = null)
+        (double X, double Y)? playerAt = null, bool clear = false)
     {
         var candidates = new List<(double X, double Y, double Turn, double Shift, double ExtraTurn)> { (cx, cy, turn, 0, 0) };
         if (fit)
@@ -395,6 +416,8 @@ public partial class RaceMenuTools
             var c = candidates[i];
             double score = c.Shift * 0.3 + Math.Abs(c.ExtraTurn) * 2;
             var problems = new List<string>();
+            var clearable = new Dictionary<string, JsonObject>();
+            var tooBig = new HashSet<string>();
             // The building: its foundation and footing hide a drop behind it down to the footing's depth, and the door stands at ground
             // level, so the slope that matters is ground behind the house higher than at the house (it buries the back wall) or lower than
             // the footing reaches (it floats). The GOG homestead stood on a 290-unit slope falling away behind it, as designed.
@@ -436,12 +459,22 @@ public partial class RaceMenuTools
                 }
                 if (objects > 0)
                 {
-                    score += objects * (built ? 400 : 150) + s["biggest"]!.GetValue<double>() * 0.5;
-                    var names = (s["what"] as JsonArray ?? []).Select(n => n?.ToString()).Distinct();
-                    problems.Add($"{what}: {objects} in the way ({string.Join(", ", names)})");
+                    var inWay = (s["refs"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+                    // With clear, what can be switched off costs little (a nearer, flatter spot still wins); cliffs stay and count.
+                    var staying = clear ? inWay.Where(r => r["radius"]!.GetValue<double>() > ClearMaxRadius).ToList() : inWay;
+                    if (clear)
+                    {
+                        foreach (var r in inWay.Where(r => r["radius"]!.GetValue<double>() <= ClearMaxRadius)) { clearable[r["ref"]!.ToString()] = r; score += 20; }
+                        foreach (var r in staying) tooBig.Add($"{r["what"]} ({r["ref"]})");
+                    }
+                    if (staying.Count > 0)
+                    {
+                        score += staying.Count * (built ? 400 : 150) + staying.Max(r => r["radius"]!.GetValue<double>()) * 0.5;
+                        problems.Add($"{what}: {staying.Count} in the way ({string.Join(", ", staying.Select(r => r["what"]?.ToString()).Distinct())})");
+                    }
                 }
             }
-            var result = new SiteFit(c.X, c.Y, c.Turn, c.Shift, c.ExtraTurn, Math.Round(score), problems);
+            var result = new SiteFit(c.X, c.Y, c.Turn, c.Shift, c.ExtraTurn, Math.Round(score), problems, clearable.Values.ToList(), tooBig.ToList());
             if (i == 0) asked = result;
             if (best == null || result.Score < best.Score) best = result;
         }
@@ -450,7 +483,8 @@ public partial class RaceMenuTools
 
     [McpServerTool]
     [Description("Take a home built in game away (FEAT-307): every object placed at run time within radius of its centre marker, and the " +
-        "marker. Residents stay where they are (the result names them: give them another home); a family home stops being one. dryRun (default true) lists what would go.")]
+        "marker. Residents stay where they are (the result names them: give them another home); a family home stops being one; what was cleared to " +
+        "make room (BuildHomeLayout clear) is switched back on. dryRun (default true) lists what would go.")]
     public async Task<object> RemoveHomeLayout(string center, double radius = 1500, bool dryRun = true, string? pieces = null)
     {
         var found = await _pipe.SendRequestAsync("placed_objects", new JsonObject { ["center"] = center.Trim(), ["radius"] = radius });
@@ -460,10 +494,18 @@ public partial class RaceMenuTools
         var refs = (found?["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => own.Contains(p["refId"]?.ToString() ?? ""))
             .Select(p => (p["refId"]?.ToString(), p["what"]?.ToString())).ToList();
         refs.Add((center.Trim(), "centre marker"));
-        if (dryRun) return new { dryRun = true, wouldRemove = refs.Select(r => new { refId = r.Item1, what = r.Item2 }), note = "Pass dryRun: false to remove them." };
+        if (dryRun) return new { dryRun = true, wouldRemove = refs.Select(r => new { refId = r.Item1, what = r.Item2 }), wouldRestore = HomeRegistry.Cleared(center).Count, note = "Pass dryRun: false to remove them." };
         var removed = 0;
         foreach (var (refId, _) in refs)
             if ((await _pipe.SendRequestAsync("remove_object", new JsonObject { ["refId"] = refId }))?["removed"]?.GetValue<bool>() == true) removed++;
+        // FEAT-311: what was cleared for the home comes back.
+        var cleared = HomeRegistry.Cleared(center);
+        object? restored = null;
+        if (cleared.Count > 0)
+        {
+            var on = await _pipe.SendRequestAsync("set_refs_enabled", new JsonObject { ["refs"] = new JsonArray(cleared.Select(r => (JsonNode)r).ToArray()), ["enabled"] = true });
+            restored = new { objects = (on?["done"] as JsonArray)?.Count ?? 0, of = cleared.Count };
+        }
         if (removed == refs.Count) HomeRegistry.Forget(center);
         // Steam, 2026-11-24: a removed homestead stayed the family home, pointing at a marker that was gone.
         var familyLists = FamilyHomes.RemoveEverywhere(center.Trim());
@@ -472,7 +514,7 @@ public partial class RaceMenuTools
             .Select(e => $"{e!["name"]} ({e["refId"]})").ToList();
         return new
         {
-            removed, of = refs.Count,
+            removed, of = refs.Count, restored,
             familyHome = familyLists > 0 ? "It was the family home and isn't any more: SetFamilyHome sets another." : null,
             residents = residents.Count > 0 ? residents : null,
             note = residents.Count > 0 ? "These lived there: give each another home (SetHome)." : null,

@@ -32,16 +32,22 @@ public static class HomeRegistry
         }
     }
 
-    public static void Record(string center, string name, string? characterId, IEnumerable<string> pieces)
+    public static void Record(string center, string name, string? characterId, IEnumerable<string> pieces, IEnumerable<string>? cleared = null)
     {
         var all = Load();
-        all[center.ToUpperInvariant()] = new JsonObject
+        var entry = new JsonObject
         {
             ["name"] = name, ["characterId"] = characterId, ["recorded"] = DateTime.Now.ToString("s"),
             ["pieces"] = new JsonArray(pieces.Select(p => (JsonNode)p.ToUpperInvariant()).Distinct().ToArray()),
         };
+        // FEAT-311: the world's own objects switched off to make room, switched back on when the home goes.
+        if (cleared?.Any() == true) entry["cleared"] = new JsonArray(cleared.Select(p => (JsonNode)p.ToUpperInvariant()).Distinct().ToArray());
+        all[center.ToUpperInvariant()] = entry;
         Save(all);
     }
+
+    public static List<string> Cleared(string center) =>
+        Load()[center.Trim().ToUpperInvariant()]?["cleared"] is JsonArray a ? a.Select(p => p?.ToString() ?? "").Where(p => p.Length > 0).ToList() : [];
 
     public static HashSet<string>? Pieces(string center) =>
         Load()[center.Trim().ToUpperInvariant()]?["pieces"] is JsonArray a

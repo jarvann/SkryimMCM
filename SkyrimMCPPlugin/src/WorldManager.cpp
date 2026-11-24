@@ -613,7 +613,7 @@ namespace SkyrimMCP::WorldManager {
         for (const auto& p : points)
             if (p.is_object() && p.contains("x") && p.contains("y"))
                 reach = std::max(reach, std::hypot(p["x"].get<float>() - origin.x, p["y"].get<float>() - origin.y));
-        struct Blocker { RE::NiPoint3 at; float radius; std::string what; float top, bottom; };
+        struct Blocker { RE::NiPoint3 at; float radius; std::string what; float top, bottom; RE::FormID id; };
         std::vector<Blocker> blockers;
         tes->ForEachReferenceInRange(player, std::min(reach + 1500.0f, 8000.0f), [&](RE::TESObjectREFR* ref) {
             if (Blocks(ref) && (ref->GetFormID() >> 24) != 0xFF) {  // SkyLink's own pieces (an old home being rebuilt) don't count
@@ -636,7 +636,7 @@ namespace SkyrimMCP::WorldManager {
                 float reachOut = 0.5f * std::max(span.x, span.y) * scale;
                 if (b->Is(RE::FormType::Tree)) reachOut = std::min(reachOut * 0.15f, 60.0f);
                 blockers.push_back({ at, reachOut, label,
-                                     at.z + ref->GetBoundMax().z * scale, at.z + ref->GetBoundMin().z * scale });
+                                     at.z + ref->GetBoundMax().z * scale, at.z + ref->GetBoundMin().z * scale, ref->GetFormID() });
             }
             return RE::BSContainer::ForEachResult::kContinue;
         });
@@ -666,6 +666,7 @@ namespace SkyrimMCP::WorldManager {
             int objects = 0;
             float biggest = 0;
             json what = json::array();
+            json refs = json::array();  // FEAT-311: what's in the way, to clear: the reference, its size and how deep it sits in the land
             for (const auto& b : blockers) {
                 // Overlapping footprints, a little forgiving: a rock's bounds are a box around an uneven shape.
                 // Mountain trims and big rocks are mostly sunk in the land, with bounds far wider than what shows: one whose top is
@@ -675,11 +676,31 @@ namespace SkyrimMCP::WorldManager {
                     ++objects;
                     biggest = std::max(biggest, b.radius);
                     if (what.size() < 3) what.push_back(b.what);
+                    float landThere = b.bottom;
+                    tes->GetLandHeight({ b.at.x, b.at.y, 100000.0f }, landThere);
+                    refs.push_back({{"ref", std::format("{:08X}", b.id)}, {"what", b.what}, {"radius", std::round(b.radius)},
+                                    {"sunk", std::round(landThere - b.bottom)}});
                 }
             }
-            out.push_back({{"land", true}, {"ground", centre}, {"rise", high - low}, {"radius", radius}, {"objects", objects}, {"biggest", biggest}, {"what", what}});
+            out.push_back({{"land", true}, {"ground", centre}, {"rise", high - low}, {"radius", radius}, {"objects", objects}, {"biggest", biggest}, {"what", what}, {"refs", refs}});
         }
         return {{"spots", out}};
+    }
+
+    // FEAT-311: switch world objects off (clearing land for a home) or back on (the home taken away). Not characters; the change is
+    // kept by saves like any other.
+    json SetRefsEnabled(const json& refs, bool enable) {
+        json done = json::array(), failed = json::array();
+        for (const auto& r : refs) {
+            if (!r.is_string()) continue;
+            RE::TESForm* form = nullptr;
+            try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(r.get<std::string>())); } catch (...) {}
+            auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+            if (!ref || ref->Is(RE::FormType::ActorCharacter) || ref->IsPlayerRef()) { failed.push_back(r); continue; }
+            if (enable) ref->Enable(false); else ref->Disable();
+            done.push_back(r);
+        }
+        return {{"enabled", enable}, {"done", done}, {"failed", failed}};
     }
 
     // FEAT-307 spike: a map marker for a home placed in game. The game's MapMarker object, placed at the home, given marker data
