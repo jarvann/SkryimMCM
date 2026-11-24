@@ -6401,6 +6401,22 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-114",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A worn item with no model for the character's race showed it unclothed, and the export would keep it",
+          "description": "Steam, 2026-11-24: Ancilla Dress A (Deep_Elf_Race.esm) equipped on a Nord (Test Aunt from Katria): the game counts it worn, Cory saw her without clothes. ExportCharacter put it in the outfit and made Deep_Elf_Race.esm a master. Check each worn armor has an ArmorAddon for the race (or its armor race) and sex; EquipItems and the export warn and leave out what wouldn't show.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:55",
+              "note": "Found in the Steam 1.6 run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",
