@@ -1,6 +1,6 @@
 {
   "name": "Homestead: farmhouse 01",
-  "note": "Built by hand in game on GOG, 2026-11-23 (saved SkyLink_Homestead). Offsets are world units from the center marker, unrotated (the layout as placed, facing angle 340 from the marker to the house). BuildHomeLayout places a new centre marker on the ground, then every piece exactly (onGround false) at center + offset; rotate every offset and angle together to face another way. The house shell sat on a 290-unit slope: the foundation and footing walls hide the drop at the back.",
+  "note": "Built by hand in game on GOG, 2026-11-23 (saved SkyLink_Homestead). Offsets are world units from the center marker, unrotated (the layout as placed, facing angle 340 from the marker to the house). BuildHomeLayout places a new centre marker on the ground, then the house, foundation and footing as one block with the door at ground level, and each yard piece on its own ground (a piece at the same spot as another keeps its height above it); offsets and angles turn together to face another way. The house shell sat on a 290-unit slope: the foundation and footing walls hide the drop at the back.",
   "world": {
     "worldspace": "Tamriel",
     "cell": [

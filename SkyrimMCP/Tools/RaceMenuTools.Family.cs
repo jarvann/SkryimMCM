@@ -138,6 +138,7 @@ public partial class RaceMenuTools
                 familyHomes,
                 canUseNow = homes.Select(h => h.Kind == "skylink" ? $"{h.Name} (SkyLink home)" : h.Name).ToList(),
                 houses = housesError,
+                housesNote = CharacterChoices.HouseNote,
                 howTo = "Offer the player: one of their own houses or a SkyLink home (SetFamilyHome), or a homestead built where they stand " +
                     "(travel to the region first, then BuildHomeLayout where 'here'). Ready-made homes in each region come with a later SkyLinkAI.esp.",
             },

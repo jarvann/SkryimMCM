@@ -80,7 +80,7 @@ public partial class RaceMenuTools
         if (home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase)) return new { home = "here", note = "Stays where it stands." };
         var (homes, cid, error) = await HomeChoices();
         if (ResolveHome(home, homes, cid) is not { } chosen)
-            return new { error = $"No home called {home}.", choices = HomeOptionNames(homes, cid), houses = error };
+            return new { error = $"No home called {home}.", choices = HomeOptionNames(homes, cid), houses = error, note = CharacterChoices.HouseNote };
         string? spouse = null;
         try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); } catch (McpException) { }
         object applied;
@@ -114,7 +114,7 @@ public partial class RaceMenuTools
     public async Task<object> SetHome(string refId, string? home = null)
     {
         var (homes, cid, error) = await HomeChoices();
-        if (string.IsNullOrWhiteSpace(home)) return new { choices = HomeOptionNames(homes, cid), houses = error };
+        if (string.IsNullOrWhiteSpace(home)) return new { choices = HomeOptionNames(homes, cid), houses = error, note = CharacterChoices.HouseNote };
         string? role = null;
         if (SlotRegistry.SlotForRef(refId.Trim()) is int slot) role = SlotRegistry.Load()[slot.ToString()]?["family"]?.GetValue<string?>();
         return await ApplyHome(refId.Trim(), home, role);
@@ -195,10 +195,13 @@ public partial class RaceMenuTools
     [McpServerTool]
     [Description("Build a saved home layout in the world (FEAT-307). Without name: the layouts there are. where: 'here' (default: centred " +
         "distance units in front of the player, turned to face the way the player looks, as when it was built) or 'original' (its " +
-        "own spot). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
-        "Ground differs from place to place: the foundation was made for the slope it was built on, so check it and adjust. " +
-        "dryRun (default true) says what would be built. RemoveHomeLayout takes it away.")]
-    public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true)
+        "own spot), or a reference such as an old home's centre marker (rebuilt in the same place, turned the same way; build first, then RemoveHomeLayout the old one). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
+        "The building and its foundation stand with the door at ground level; each yard piece stands on its own ground (the land only: rocks " +
+        "aren't seen, so check pieces near rocks). With where 'here' and fit (default true), SkyLink surveys the ground first and moves the " +
+        "home up to 300 units or turns it up to 30 degrees to keep pieces off rocks, trees and steep ground; site says what was found. " +
+        "dryRun (default true) says what would be built and where. RemoveHomeLayout takes it away.")]
+    public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true,
+        bool fit = true)
     {
         var files = LayoutFiles().ToList();
         if (string.IsNullOrWhiteSpace(name))
@@ -232,12 +235,34 @@ public partial class RaceMenuTools
             var h = heading.Value * Math.PI / 180;
             (cx, cy, cz, turn) = (px.Value + distance * Math.Sin(h), py.Value + distance * Math.Cos(h), pz.Value, heading.Value - facing);
         }
-        else return new { error = "where must be 'here' or 'original'" };
+        else if (System.Text.RegularExpressions.Regex.IsMatch(where, "^[0-9a-f]{8}$"))
+        {
+            // A home's centre marker (or any reference): rebuild in the same place, turned the same way.
+            var rx = Number(await Console1($"{where}.getpos x")); var ry = Number(await Console1($"{where}.getpos y"));
+            var rz = Number(await Console1($"{where}.getpos z")); var ra = Number(await Console1($"{where}.getangle z"));
+            if (rx == null || ry == null || rz == null || ra == null) return new { error = $"No reference {where} to build at." };
+            (cx, cy, cz, turn) = (rx.Value, ry.Value, rz.Value, ra.Value - facing);
+        }
+        else return new { error = "where must be 'here', 'original' or a reference (a home's centre marker)" };
 
         var pieces = (layout["pieces"] as JsonArray ?? []).OfType<JsonObject>().Where(p => p["role"]?.ToString() != "center").ToList();
+        // The player stands where no piece may go (Steam, 2026-11-24: a fitted home put the tent over Arya).
+        (double X, double Y)? playerAt = null;
+        if (Number(await Console1("player.getpos x")) is double plx && Number(await Console1("player.getpos y")) is double ply) playerAt = (plx, ply);
+        var site = await SurveySite(pieces, cx, cy, turn, fit && where == "here", playerAt);
+        if (site.Error != null && where == "here") return new { error = site.Error };
+        if (site.Best is { } best) (cx, cy, turn) = (best.X, best.Y, best.Turn);
+        var siteReport = site.Best == null ? null : new
+        {
+            moved = Math.Round(site.Best.Shift), turnedMore = Math.Round(site.Best.ExtraTurn),
+            problems = site.Best.Problems.Count > 0 ? site.Best.Problems : null,
+            asked = site.Asked is { } a && a != site.Best ? new { problems = a.Problems } : null,
+            note = site.Best.Problems.Count == 0 ? "The ground is clear for every piece." :
+                site.Best.Score > 1500 ? "No good fit near here: try another spot (more open, flatter)." : "The best fit near here; check these pieces once built.",
+        };
         var t = turn * Math.PI / 180;
         if (dryRun)
-            return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, note = "Pass dryRun: false to build it." };
+            return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, site = siteReport, note = "Pass dryRun: false to build it." };
 
         // The centre marker on the ground first; every piece then sits where it did relative to it.
         var marker = await _pipe.SendRequestAsync("place_object", new JsonObject { ["base"] = XMarker, ["x"] = cx, ["y"] = cy, ["z"] = cz, ["angle"] = (facing + turn) % 360, ["onGround"] = true });
@@ -247,24 +272,48 @@ public partial class RaceMenuTools
         var placed = new List<object>();
         var placedRefs = new List<string>();
         var failed = new List<object>();
+
+        // Where each piece goes, turned clockwise by `turn`, as Skyrim measures angles (0 north, 90 east).
+        var spots = new List<(JsonObject Piece, double X, double Y, double Oz)>();
         foreach (var p in pieces)
         {
             if (p["offset"] is not JsonArray { Count: 3 } o) continue;
-            double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>(), oz = o[2]!.GetValue<double>();
-            // Turned clockwise by `turn`, as Skyrim measures angles (0 north, 90 east).
-            var nx = ox * Math.Cos(t) + oy * Math.Sin(t);
-            var ny = -ox * Math.Sin(t) + oy * Math.Cos(t);
+            double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>();
+            spots.Add((p, cx + ox * Math.Cos(t) + oy * Math.Sin(t), cy - ox * Math.Sin(t) + oy * Math.Cos(t), o[2]!.GetValue<double>()));
+        }
+        // Steam, 2026-11-24: all at the marker's height plus the layout's offsets, a slope buried the uphill pieces (the door) and left
+        // the downhill ones in the air (table, chairs, the pot over the fire). Now the building and its foundation move as one, with
+        // the door at ground level (footing walls hide a drop behind, the hill takes a rise), and each yard piece stands on its own
+        // ground; a piece stacked on another (a bed in the tent, the pot over the fire) keeps its height above it.
+        var house = spots.FirstOrDefault(s => s.Piece["role"]?.ToString() == "house");
+        double? houseZ = null;
+        if (house.Piece != null)
+        {
+            var dx = cx - house.X; var dy = cy - house.Y; var len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+            var door = new JsonArray(house.X + dx / len * 250, house.Y + dy / len * 250);
+            var probe = await _pipe.SendRequestAsync("ground_heights", new JsonObject { ["points"] = new JsonArray(door) });
+            if ((probe?["heights"] as JsonArray)?.FirstOrDefault() is JsonValue h && h.TryGetValue<double>(out var doorGround)) houseZ = doorGround - 10;
+        }
+        var anchors = new Dictionary<(long, long), (double Oz, double Z)>();
+        foreach (var (p, x, y, oz) in spots.OrderBy(s => s.Oz))
+        {
+            var role = p["role"]?.ToString();
+            var built = role is "house" or "foundation" or "footing";
+            var key = ((long)Math.Round(x / 20), (long)Math.Round(y / 20));
+            var stacked = !built && anchors.ContainsKey(key);
+            double z = built && houseZ is double hz ? hz + oz - house.Oz
+                : stacked ? anchors[key].Z + oz - anchors[key].Oz
+                : groundZ + oz;
             var res = await _pipe.SendRequestAsync("place_object", new JsonObject
             {
-                ["base"] = p["base"]?.ToString(), ["x"] = cx + nx, ["y"] = cy + ny, ["z"] = groundZ + oz,
-                ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360, ["onGround"] = false,
+                ["base"] = p["base"]?.ToString(), ["x"] = x, ["y"] = y, ["z"] = z,
+                ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360,
+                ["onGround"] = !built && !stacked,
             });
-            if (res?["error"] != null) failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() });
-            else
-            {
-                placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
-                if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
-            }
+            if (res?["error"] != null) { failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() }); continue; }
+            placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
+            if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
+            if (!built && !stacked && res["z"]?.GetValue<double>() is double onGround) anchors[key] = (oz, onGround);
         }
 
         HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs);
@@ -278,13 +327,113 @@ public partial class RaceMenuTools
                 ? await SetSpouseHome("skylink", markerRef)
                 : DeserializeResponse(await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = resident.Trim(), ["at"] = markerRef }));
         }
-        return new { built = layout["name"]?.ToString(), center = markerRef, placed = placed.Count, failed, resident = residentResult, pieces = placed,
+        return new { built = layout["name"]?.ToString(), center = markerRef, placed = placed.Count, failed, site = siteReport, resident = residentResult, pieces = placed,
             note = "The marker is the home's centre: set_home and SetSpouseHome take it, SaveHomeLayout and RemoveHomeLayout start from it." };
+    }
+
+    private sealed record SiteFit(double X, double Y, double Turn, double Shift, double ExtraTurn, double Score, List<string> Problems);
+
+    /// <summary>
+    /// FEAT-307: the ground under each piece where the home would go, and (fit) the best of that spot moved up to 300 units or turned up
+    /// to 30 degrees (Cory, 2026-11-24, after a Reach build had the tent in rocks and the door in the ground). Scored by objects in the
+    /// way and rise under each footprint; the building takes more slope than a yard piece (its foundation and footing hide a drop).
+    /// </summary>
+    private async Task<(SiteFit? Best, SiteFit? Asked, string? Error)> SurveySite(List<JsonObject> pieces, double cx, double cy, double turn, bool fit,
+        (double X, double Y)? playerAt = null)
+    {
+        var candidates = new List<(double X, double Y, double Turn, double Shift, double ExtraTurn)> { (cx, cy, turn, 0, 0) };
+        if (fit)
+            foreach (var extra in new[] { 0.0, -30, 30, -15, 15 })
+                foreach (var r in new[] { 0.0, 150, 300 })
+                    for (var k = 0; k < (r == 0 ? 1 : 8); k++)
+                    {
+                        if (r == 0 && extra == 0) continue;
+                        var a = k * Math.PI / 4;
+                        candidates.Add((cx + r * Math.Sin(a), cy + r * Math.Cos(a), turn + extra, r, extra));
+                    }
+        var points = new JsonArray();
+        var placedPieces = pieces.Where(p => p["offset"] is JsonArray { Count: 3 }).ToList();
+        foreach (var c in candidates)
+        {
+            var t = c.Turn * Math.PI / 180;
+            foreach (var p in placedPieces)
+            {
+                var o = (JsonArray)p["offset"]!;
+                double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>();
+                points.Add(new JsonObject
+                {
+                    ["x"] = c.X + ox * Math.Cos(t) + oy * Math.Sin(t), ["y"] = c.Y - ox * Math.Sin(t) + oy * Math.Cos(t),
+                    ["base"] = p["base"]?.ToString(), ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + c.Turn + 360) % 360,
+                });
+            }
+        }
+        JsonNode? survey;
+        try { survey = await _pipe.SendRequestAsync("ground_survey", new JsonObject { ["points"] = points }); }
+        catch (McpException ex) { return (null, null, ex.Message); }
+        if (survey?["error"] != null) return (null, null, survey["error"]!.ToString());
+        var spots = survey?["spots"] as JsonArray ?? [];
+        SiteFit? best = null, asked = null;
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            var c = candidates[i];
+            double score = c.Shift * 0.3 + Math.Abs(c.ExtraTurn) * 2;
+            var problems = new List<string>();
+            // The building: its foundation and footing hide a drop behind it down to the footing's depth, and the door stands at ground
+            // level, so the slope that matters is ground behind the house higher than at the house (it buries the back wall) or lower than
+            // the footing reaches (it floats). The GOG homestead stood on a 290-unit slope falling away behind it, as designed.
+            double? houseGround = null, houseOz = null, footingDepth = null;
+            for (var j = 0; j < placedPieces.Count; j++)
+                if (placedPieces[j]["role"]?.ToString() == "house" && spots[i * placedPieces.Count + j]?["ground"] is JsonValue hg)
+                {
+                    houseGround = hg.GetValue<double>();
+                    houseOz = ((JsonArray)placedPieces[j]["offset"]!)[2]!.GetValue<double>();
+                }
+            var lowest = placedPieces.Where(p => p["role"]?.ToString() is "foundation" or "footing").Select(p => ((JsonArray)p["offset"]!)[2]!.GetValue<double>()).DefaultIfEmpty().Min();
+            if (houseOz is double ho) footingDepth = ho - lowest;
+            // Stacked pieces (the bed in the tent, the pot over the fire) share their base's spot: count each spot once.
+            var seen = new HashSet<(long, long)>();
+            for (var j = 0; j < placedPieces.Count; j++)
+            {
+                var p = placedPieces[j];
+                var s = spots[i * placedPieces.Count + j] as JsonObject;
+                var what = p["what"]?.ToString() ?? p["base"]?.ToString() ?? "a piece";
+                var o = (JsonArray)p["offset"]!;
+                if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
+                if (s?["land"]?.GetValue<bool>() != true) { score += 10000; problems.Add($"{what}: no land under it"); continue; }
+                if (playerAt is { } pl && points[i * placedPieces.Count + j] is JsonObject pt &&
+                    Math.Sqrt(Math.Pow(pt["x"]!.GetValue<double>() - pl.X, 2) + Math.Pow(pt["y"]!.GetValue<double>() - pl.Y, 2)) < s["radius"]!.GetValue<double>() + 80)
+                {
+                    score += 5000;
+                    problems.Add($"{what}: where the player stands");
+                }
+                var role = p["role"]?.ToString();
+                var built = role is "house" or "foundation" or "footing";
+                var rise = s["rise"]!.GetValue<double>();
+                var objects = s["objects"]!.GetValue<int>();
+                if (!built && rise > 40) { score += (rise - 40) * 1.5; if (rise > 60) problems.Add($"{what}: ground rises {Math.Round(rise)} units under it"); }
+                if (built && role != "house" && houseGround is double hg2 && s["ground"] is JsonValue g)
+                {
+                    var diff = g.GetValue<double>() - hg2;
+                    if (diff > 60) { score += (diff - 60) * 3; problems.Add($"{what}: the ground behind the house is {Math.Round(diff)} units higher (the back would be buried)"); }
+                    else if (footingDepth is double depth && -diff > depth - 40) { score += (-diff - depth + 40) * 3; problems.Add($"{what}: the ground drops {Math.Round(-diff)} units, below the footing"); }
+                }
+                if (objects > 0)
+                {
+                    score += objects * (built ? 400 : 150) + s["biggest"]!.GetValue<double>() * 0.5;
+                    var names = (s["what"] as JsonArray ?? []).Select(n => n?.ToString()).Distinct();
+                    problems.Add($"{what}: {objects} in the way ({string.Join(", ", names)})");
+                }
+            }
+            var result = new SiteFit(c.X, c.Y, c.Turn, c.Shift, c.ExtraTurn, Math.Round(score), problems);
+            if (i == 0) asked = result;
+            if (best == null || result.Score < best.Score) best = result;
+        }
+        return (best, asked, null);
     }
 
     [McpServerTool]
     [Description("Take a home built in game away (FEAT-307): every object placed at run time within radius of its centre marker, and the " +
-        "marker. Residents stay where they are; give them another home first. dryRun (default true) lists what would go.")]
+        "marker. Residents stay where they are (the result names them: give them another home); a family home stops being one. dryRun (default true) lists what would go.")]
     public async Task<object> RemoveHomeLayout(string center, double radius = 1500, bool dryRun = true, string? pieces = null)
     {
         var found = await _pipe.SendRequestAsync("placed_objects", new JsonObject { ["center"] = center.Trim(), ["radius"] = radius });
@@ -299,6 +448,17 @@ public partial class RaceMenuTools
         foreach (var (refId, _) in refs)
             if ((await _pipe.SendRequestAsync("remove_object", new JsonObject { ["refId"] = refId }))?["removed"]?.GetValue<bool>() == true) removed++;
         if (removed == refs.Count) HomeRegistry.Forget(center);
-        return new { removed, of = refs.Count };
+        // Steam, 2026-11-24: a removed homestead stayed the family home, pointing at a marker that was gone.
+        var familyLists = FamilyHomes.RemoveEverywhere(center.Trim());
+        var residents = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
+            .Where(e => string.Equals(e?["home"]?["ref"]?.ToString(), center.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Select(e => $"{e!["name"]} ({e["refId"]})").ToList();
+        return new
+        {
+            removed, of = refs.Count,
+            familyHome = familyLists > 0 ? "It was the family home and isn't any more: SetFamilyHome sets another." : null,
+            residents = residents.Count > 0 ? residents : null,
+            note = residents.Count > 0 ? "These lived there: give each another home (SetHome)." : null,
+        };
     }
 }

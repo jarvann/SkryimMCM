@@ -304,6 +304,14 @@ namespace SkyrimMCP::Protocol {
             bool ground = params.value("onGround", true);
             return GameThread(id, [=]() { return WorldManager::PlaceObject(base, x, y, z, a, ground); });
         };
+        registry["ground_heights"] = [](const std::string& id, const json& params) {
+            json points = params.value("points", json::array());
+            return GameThread(id, [points]() { return WorldManager::GroundHeights(points); });
+        };
+        registry["ground_survey"] = [](const std::string& id, const json& params) {
+            json points = params.value("points", json::array());
+            return GameThread(id, [points]() { return WorldManager::GroundSurvey(points); });
+        };
         registry["placed_objects"] = [](const std::string& id, const json& params) {
             std::string center = params.value("center", std::string());
             float radius = params.value("radius", 1500.0f);

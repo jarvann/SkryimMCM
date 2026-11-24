@@ -6345,6 +6345,95 @@
           "testNotes": "2026-11-23 GOG (SkyLink_HomeQuestion): RemoveHomeLayout dry run listed exactly the 19 recorded pieces plus the centre marker; SaveHomeLayout saved 19; no game objects."
         },
         {
+          "id": "BUG-111",
+          "type": "bug",
+          "status": "done",
+          "priority": "high",
+          "title": "Home choices listed every player-marked room of a big load order (63 on Steam)",
+          "description": "Steam, 4,341 plugins, 2026-11-24: FamilyStory's canUseNow listed 63 'owned houses' for a level-4 Arya: one per cell (Solstice Castle 6 times, Highreach Keep 4), Legacy of the Dragonborn's museum rooms, and Hearthfire and mod houses not bought (mods mark a house's cells as the player's from the start). Fix: one entry per house (cells of one location, child player-house locations roll up to the topmost), rooms counted, and a note everywhere homes are offered: offer only the houses the player says are theirs.",
+          "history": [
+            {
+              "datetime": "2026-11-24T10:00",
+              "note": "Found in the Steam 1.6 run with Cory's large load order."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: 63 entries became 40, one per house (Highreach Keep 23 rooms, Solstice Castle 6); the note shows with home choices. Legacy museum wings stay separate (their parent location has no player-house keyword)."
+        },
+        {
+          "id": "BUG-112",
+          "type": "bug",
+          "status": "done",
+          "priority": "critical",
+          "title": "No NPC slot was ever picked while no stand-in faces were known (FEAT-305 regression)",
+          "description": "Steam, 2026-11-24: SpawnNpc made Test Aunt (Breton) a preview only, 'every slot of that sex in use', with all 25 Breton F slots free. FreeSlot's preferred-only pass skipped every slot when prefer was empty, then 'if (prefer.empty()) break' ended the loop before the any-slot pass. GOG passed because its stand-ins were known. Hits every fresh install's first session. Fix: skip the preferred-only pass when prefer is empty.",
+          "history": [
+            {
+              "datetime": "2026-11-24T12:50",
+              "note": "Found in the Steam 1.6 run."
+            },
+            {
+              "datetime": "2026-11-24T13:20",
+              "note": "Proved on Steam."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-305"
+          ],
+          "testNotes": "Steam 2026-11-24 (no stand-ins known that session): Test Aunt (Breton F) took slot 0, lasting."
+        },
+        {
+          "id": "BUG-113",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "ExportCharacter's home choices near Karthwasten were a hidden marker and an ore vein",
+          "description": "Steam, 2026-11-24, Test Aunt exported (dry run) from the Reach homestead: homeChoices were 'This should not be visible' (twice) and 'Iron Ore Vein', no map or heading markers. Leave out references whose base names say they're hidden and resources (ore veins, plants); prefer the nearest named place's marker; say when nothing good is near and suggest an inn or town.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:20",
+              "note": "Found in the Steam 1.6 run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-114",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A worn item with no model for the character's race showed it unclothed, and the export would keep it",
+          "description": "Steam, 2026-11-24: Ancilla Dress A (Deep_Elf_Race.esm) equipped on a Nord (Test Aunt from Katria): the game counts it worn, Cory saw her without clothes. ExportCharacter put it in the outfit and made Deep_Elf_Race.esm a master. Check each worn armor has an ArmorAddon for the race (or its armor race) and sex; EquipItems and the export warn and leave out what wouldn't show.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:55",
+              "note": "Found in the Steam 1.6 run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-115",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "critical",
+          "title": "A save holding a preview NPC (even removed) crashed on load",
+          "description": "Steam, 2026-11-24 13:16: Autosave101 (12:56) crashed every load: Crash Logger shows LocationalEncounterZones.dll's GetEncounterZone hook calling GetName on Character FF0048C5, the preview Test Aunt made while BUG-112 was live (runtime TESNPC base FF0048C4, not kept by saves; on load that ID was another runtime form, 'Stormcloak Guard'). RemoveSpawnedNpc (Disable + SetDelete) didn't keep it out of the autosave while its cell stayed loaded. Fix: SpawnNpc makes no preview unless preview: true; the plugin refuses without allowPreview; the result warns not to save. To consider: purge previews before saves (host save listener).",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:25",
+              "note": "Found in the Steam 1.6 run; crash-2026-11-24-13-16-37.log."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [],
+          "testNotes": "Save127 (12:41, before the preview existed) loads on the same game; the opt-in path itself is untested."
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",
@@ -6368,11 +6457,15 @@
               "date": "2026-11-23",
               "status": "done",
               "note": "Proved on GOG; data folder found once per pass (9ed2e15)."
+            },
+            {
+              "datetime": "2026-11-24T13:40",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Proved on GOG/MO2 2026-11-23: first launch wrote 40 stand-ins to MO2 overwrite (2 per race/sex block); after a restart, a template-face Nord (Hilde Test-Face, slot 51, Tova's face) showed her face at once, no dark face. RemoveSpawnedNpc put the stand-in back mid-session without a crash (BUG-108 path). Found and fixed: the data folder was looked up per slot (process scans), so preparing took minutes; now once per pass. Not yet checked: Steam, and the face after save + reload."
+          "testNotes": "Proved on GOG/MO2 2026-11-23: first launch wrote 40 stand-ins to MO2 overwrite (2 per race/sex block); after a restart, a template-face Nord (Hilde Test-Face, slot 51, Tova's face) showed her face at once, no dark face. RemoveSpawnedNpc put the stand-in back mid-session without a crash (BUG-108 path). Found and fixed: the data folder was looked up per slot (process scans), so preparing took minutes; now once per pass. Not yet checked: Steam, and the face after save + reload. Proved on Steam 2026-11-24 too (4,341 plugins): 40 stand-ins in Data on first connect; after a restart Test Face Steam (Breton F, slot 0) showed her face at once (Cory: 'face looks good')."
         },
         {
           "id": "FEAT-306",
@@ -6421,6 +6514,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "Layout tools proved on GOG: SaveHomeLayout (19 pieces), BuildHomeLayout here (turned to the player, all placed), RemoveHomeLayout (20 removed), original intact; placed_objects searches the persistent cell (from 14000 units away it found nothing before). Runtime map markers don't fast travel: markers go in SkyLinkAI.esp (FEAT-309)."
+            },
+            {
+              "datetime": "2026-11-24T14:00",
+              "note": "Steam run (4,341 plugins): home question, SetHome (refuses NPCs SkyLink didn't make), family home all work. Builder fixed on a Reach slope: the house, foundation and footing as one block with the door at ground level, yard pieces each on their own ground, stacked pieces keep their height. New: where = an existing marker (rebuild in place); RemoveHomeLayout clears it as the family home and names its residents; site survey before building (rocks named by model, buried/overhead rocks and tree canopies left out, slope judged by direction for the building, never on the player) with best fit up to 300 units / 30 degrees. Built at the GOG spot on Steam with the fit: Cory 'it looks good'. Open: the cooking pot hangs in the air over the fire (check GOG; maybe add a cooking spit piece); the owned-house path; rocks aren't ground (a ray cast would let pieces stand on them)."
             }
           ],
           "targetRelease": "1.6",
@@ -6462,6 +6559,22 @@
           "dependsOn": [
             "FEAT-307"
           ]
+        },
+        {
+          "id": "FEAT-310",
+          "type": "feature",
+          "status": "open",
+          "priority": "medium",
+          "title": "Change a slot character's hair and head parts (rebuild its face file)",
+          "description": "Steam, 2026-11-24: SetHeadPart on Test Aunt (a slot character) was refused, rightly: the face file holds the head parts, so a changed record breaks the face after a restart. SkyLink owns a slot's face file, so it can change the part and rebuild the file (swap the hair shapes in the NIF from the new part's mesh, keep the tint), then refresh. Until then: wigs, or remake the character.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:45",
+              "note": "Found in the Steam 1.6 run (Cory: give her hair that creates dependencies)."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
         },
         {
           "id": "FEAT-309",

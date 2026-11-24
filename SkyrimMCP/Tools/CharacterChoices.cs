@@ -6,6 +6,9 @@ namespace SkyrimMCP.Tools;
 /// </summary>
 internal static class CharacterChoices
 {
+    /// <summary>BUG-111: the game counts a house as the player's when its cells are marked so, which many mods do before it's bought.</summary>
+    public const string HouseNote = "Houses listed are marked as the player's in the game; many mods (and Hearthfire) mark them before they're bought, so offer only the ones the player says are theirs.";
+
     /// <summary>
     /// The unanswered questions, or null when every one is answered. familyRole: a Player Family role, never marryable unless roleMarryable.
     /// family: for an export of a relative, whether the role is kept (null: not yet asked). current: what the character is now, shown
@@ -41,7 +44,7 @@ internal static class CharacterChoices
         if (homeOptions is { Count: > 0 } && home == null)
             Add("home", $"Where does {name} live?" + (firstFamilyHome
                     ? " They're family and no family home is set yet: the house chosen becomes the family home (it can be changed with SetFamilyHome)."
-                    : ""),
+                    : "") + " " + HouseNote,
                 homeOptions.Select(o => "home: " + o).ToArray());
         // Asked only when a mod uses it (Cory, 2026-11-23); open to every orientation, none assumed.
         if (attractionMods is { Count: > 0 } && attraction == null)

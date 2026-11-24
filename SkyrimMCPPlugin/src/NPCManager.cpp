@@ -645,6 +645,8 @@ namespace SkyrimMCP::NPCManager {
             const int first = raceBlock * 2 * kSlotsPerSex + (female ? 0 : kSlotsPerSex);
             auto listed = [](const std::vector<int>& list, int i) { return std::find(list.begin(), list.end(), i) != list.end(); };
             for (const bool preferredOnly : { true, false }) {
+                // BUG-112: with nothing preferred (no stand-ins known yet, a fresh install's first session) only the second pass runs.
+                if (preferredOnly && prefer.empty()) continue;
                 for (int i = first; i < first + kSlotsPerSex; ++i) {
                     // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
                     if (listed(avoid, i) || (preferredOnly && !listed(prefer, i))) continue;
@@ -654,7 +656,6 @@ namespace SkyrimMCP::NPCManager {
                         return npc;
                     }
                 }
-                if (prefer.empty()) break;
             }
             return nullptr;
         }
@@ -1382,6 +1383,14 @@ namespace SkyrimMCP::NPCManager {
         if (params.contains("preferSlots") && params["preferSlots"].is_array())
             for (const auto& a : params["preferSlots"]) if (a.is_number_integer()) prefer.push_back(a.get<int>());
         RE::TESNPC* npc = params.value("useSlot", true) ? FreeSlot(race, female, slotIndex, avoid, prefer) : nullptr;
+        // BUG-115: a preview's base isn't saved, so a save holding one (even removed, while its cell stays loaded) loads a character
+        // with a dangling base; Locational Encounter Zones read it and the load crashed (Steam, 2026-11-24). Only when asked for.
+        if (!npc && !params.value("allowPreview", false)) {
+            return {{"error", SlotPluginLoaded()
+                ? "Every slot of that race and sex in SkyLinkAI.esp is in use: free one (ListNpcSlots, RemoveSpawnedNpc) or ask for a preview."
+                : "SkyLinkAI.esp (the NPC slots) isn't in the load order, so the character can't be kept by saves."},
+                    {"slotPluginLoaded", SlotPluginLoaded()}};
+        }
         if (!npc) {
             auto* factory = RE::IFormFactory::GetConcreteFormFactoryByType<RE::TESNPC>();
             npc = factory ? factory->Create() : nullptr;

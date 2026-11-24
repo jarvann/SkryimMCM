@@ -586,6 +586,102 @@ namespace SkyrimMCP::WorldManager {
                 {"footprint", span}, {"groundRise", high - low}};
     }
 
+    // FEAT-307: the land's height under each point (the terrain only: rocks and other objects aren't counted), so a home layout
+    // can stand each piece on its own ground. Null where there's no land (out of the loaded area).
+    json GroundHeights(const json& points) {
+        auto* tes = RE::TES::GetSingleton();
+        json heights = json::array();
+        for (const auto& p : points) {
+            float h = 0;
+            if (tes && p.is_array() && p.size() >= 2 && p[0].is_number() && p[1].is_number() &&
+                tes->GetLandHeight({ p[0].get<float>(), p[1].get<float>(), 100000.0f }, h)) heights.push_back(h);
+            else heights.push_back(nullptr);
+        }
+        return {{"heights", heights}};
+    }
+
+    // FEAT-307: a site survey for a home layout, before anything is placed (Cory, 2026-11-24: "initial placement should be a bit
+    // more resilient to the terrain"). For each piece's spot (x, y, base, angle): the land's rise under its footprint and the objects
+    // in the way (rocks, trees, buildings: as FindOpenSpace counts them). Land only: a rock's top isn't ground here, it's in the way.
+    json GroundSurvey(const json& points) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* tes = RE::TES::GetSingleton();
+        if (!player || !tes) return {{"error", "No player in the world"}};
+        if (auto* cell = player->GetParentCell(); !cell || cell->IsInteriorCell()) return {{"error", "The player is indoors: go outside first"}};
+        const auto origin = player->GetPosition();
+        float reach = 0;
+        for (const auto& p : points)
+            if (p.is_object() && p.contains("x") && p.contains("y"))
+                reach = std::max(reach, std::hypot(p["x"].get<float>() - origin.x, p["y"].get<float>() - origin.y));
+        struct Blocker { RE::NiPoint3 at; float radius; std::string what; float top, bottom; };
+        std::vector<Blocker> blockers;
+        tes->ForEachReferenceInRange(player, std::min(reach + 1500.0f, 8000.0f), [&](RE::TESObjectREFR* ref) {
+            if (Blocks(ref) && (ref->GetFormID() >> 24) != 0xFF) {  // SkyLink's own pieces (an old home being rebuilt) don't count
+                auto* b = ref->GetBaseObject();
+                // Nothing to see, nothing in the way: trigger boxes and other activators without a model.
+                auto* model = b->As<RE::TESModel>();
+                const char* path = model ? model->GetModel() : nullptr;
+                if (!path || !*path) return RE::BSContainer::ForEachResult::kContinue;
+                const auto span = ref->GetBoundMax() - ref->GetBoundMin();
+                // Rocks and most statics have no name and lose their editor IDs after loading: their model's file name says what they are.
+                const char* name = b->GetName();
+                std::string label = name && *name ? name : std::string(path);
+                if (!(name && *name)) {
+                    if (const auto slash = label.find_last_of("\\/"); slash != std::string::npos) label = label.substr(slash + 1);
+                    if (const auto dot = label.rfind('.'); dot != std::string::npos) label = label.substr(0, dot);
+                }
+                const auto at = ref->GetPosition();
+                const float scale = ref->GetScale();
+                // A tree's bounds are its canopy; at ground level only the trunk is in the way.
+                float reachOut = 0.5f * std::max(span.x, span.y) * scale;
+                if (b->Is(RE::FormType::Tree)) reachOut = std::min(reachOut * 0.15f, 60.0f);
+                blockers.push_back({ at, reachOut, label,
+                                     at.z + ref->GetBoundMax().z * scale, at.z + ref->GetBoundMin().z * scale });
+            }
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+        json out = json::array();
+        for (const auto& p : points) {
+            if (!p.is_object() || !p.contains("x") || !p.contains("y")) { out.push_back(nullptr); continue; }
+            const float x = p["x"].get<float>(), y = p["y"].get<float>();
+            const float a = p.value("angle", 0.0f) * 0.0174532925f;
+            auto* form = FormFromId(p.value("base", std::string()));
+            auto* base = form ? form->As<RE::TESBoundObject>() : nullptr;
+            float lx0 = -50, ly0 = -50, lx1 = 50, ly1 = 50;
+            if (base) {
+                lx0 = base->boundData.boundMin.x; ly0 = base->boundData.boundMin.y;
+                lx1 = base->boundData.boundMax.x; ly1 = base->boundData.boundMax.y;
+            }
+            const float radius = 0.5f * std::max(lx1 - lx0, ly1 - ly0);
+            float low = 1e9f, high = -1e9f, centre = 0;
+            bool land = true;
+            for (const auto& [lx, ly] : std::initializer_list<std::pair<float, float>>{ { lx0, ly0 }, { lx0, ly1 }, { lx1, ly0 }, { lx1, ly1 }, { 0, 0 } }) {
+                const float wx = x + lx * std::cos(a) + ly * std::sin(a), wy = y - lx * std::sin(a) + ly * std::cos(a);
+                float h = 0;
+                if (!tes->GetLandHeight({ wx, wy, 100000.0f }, h)) { land = false; break; }
+                low = std::min(low, h); high = std::max(high, h);
+                if (lx == 0 && ly == 0) centre = h;
+            }
+            if (!land) { out.push_back({{"land", false}}); continue; }
+            int objects = 0;
+            float biggest = 0;
+            json what = json::array();
+            for (const auto& b : blockers) {
+                // Overlapping footprints, a little forgiving: a rock's bounds are a box around an uneven shape.
+                // Mountain trims and big rocks are mostly sunk in the land, with bounds far wider than what shows: one whose top is
+                // below the ground here is buried, and one that starts well above it is overhead (Steam, 2026-11-24).
+                if (b.top < centre + 15.0f || b.bottom > high + 250.0f) continue;
+                if (std::hypot(b.at.x - x, b.at.y - y) < (radius + b.radius) * 0.8f) {
+                    ++objects;
+                    biggest = std::max(biggest, b.radius);
+                    if (what.size() < 3) what.push_back(b.what);
+                }
+            }
+            out.push_back({{"land", true}, {"ground", centre}, {"rise", high - low}, {"radius", radius}, {"objects", objects}, {"biggest", biggest}, {"what", what}});
+        }
+        return {{"spots", out}};
+    }
+
     // FEAT-307 spike: a map marker for a home placed in game. The game's MapMarker object, placed at the home, given marker data
     // (name, shown and fast travel, type). The data's TESFullName has a vtable, so it starts as a copy of a known marker's.
     json AddMapMarker(const std::string& atRef, const std::string& name, int type) {
@@ -622,6 +718,9 @@ namespace SkyrimMCP::WorldManager {
     // LocTypePlayerHouse keyword (Breezehome, Hearthfire's, Creation Club's and player-home mods that use it); it is the player's when
     // the cell's owner is the player or the player's faction (the purchase scripts set that). Each comes with a reference inside to
     // send a resident to: a heading marker, else the inside of the front door (persistent, so known even while the house isn't loaded).
+    // BUG-111 (Steam, 4,341 plugins): one entry per house, not per cell. A house's rooms are cells of one location, or of child
+    // locations that are player houses too (a museum's wings): they roll up to the topmost one. Mods often give the player a house's
+    // cells before it's bought (Hearthfire's, most home mods), so "owned" means marked as the player's, not bought.
     json OwnedHouses() {
         auto* data = RE::TESDataHandler::GetSingleton();
         auto* player = RE::PlayerCharacter::GetSingleton();
@@ -630,30 +729,55 @@ namespace SkyrimMCP::WorldManager {
         if (!data || !player || !keyword) return {{"error", "The player-house keyword isn't in the game"}};
         auto* playerBase = player->GetActorBase();
         auto* playerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00000DB1);
-        json owned = json::array(), notOwned = json::array();
-        std::unordered_set<RE::FormID> seen;
+        struct House {
+            RE::BGSLocation* loc = nullptr;
+            RE::TESObjectCELL* cell = nullptr;
+            RE::TESObjectREFR* inside = nullptr;
+            bool marker = false, mine = false;
+            int cells = 0;
+        };
+        std::vector<House> houses;
+        std::unordered_map<RE::FormID, std::size_t> byLocation;
         for (auto* cell : data->interiorCells) {
             auto* loc = cell ? cell->GetLocation() : nullptr;
             if (!loc || !loc->HasKeyword(keyword)) continue;
+            auto* top = loc;
+            for (int depth = 0; depth < 8 && top->parentLoc && top->parentLoc->HasKeyword(keyword); ++depth) top = top->parentLoc;
             auto* owner = cell->GetOwner();
             const bool mine = owner && (owner == playerBase || owner == playerFaction);
-            RE::TESObjectREFR* inside = nullptr;
+            RE::TESObjectREFR* marker = nullptr;
             RE::TESObjectREFR* door = nullptr;
             cell->ForEachReference([&](RE::TESObjectREFR* ref) {
                 auto* base = ref ? ref->GetBaseObject() : nullptr;
                 if (!base || ref->IsDisabled()) return RE::BSContainer::ForEachResult::kContinue;
-                if (base->GetFormID() == 0x00000034 && !inside) inside = ref;  // XMarkerHeading
+                if (base->GetFormID() == 0x00000034 && !marker) marker = ref;  // XMarkerHeading
                 if (base->Is(RE::FormType::Door) && !door && ref->extraList.GetByType<RE::ExtraTeleport>()) door = ref;
                 return RE::BSContainer::ForEachResult::kContinue;
             });
-            if (!inside) inside = door;
-            const char* name = loc->GetFullName();
-            json entry = {{"name", name && *name ? name : cell->GetFullName()}, {"location", std::format("{:08X}", loc->GetFormID())},
-                          {"cell", std::format("{:08X}", cell->GetFormID())}, {"ref", inside ? json(std::format("{:08X}", inside->GetFormID())) : json(nullptr)}};
-            if (!seen.insert(cell->GetFormID()).second) continue;
-            (mine ? owned : notOwned).push_back(entry);
+            auto [it, added] = byLocation.try_emplace(top->GetFormID(), houses.size());
+            if (added) houses.push_back({top});
+            auto& h = houses[it->second];
+            ++h.cells;
+            h.mine = h.mine || mine;
+            // The room to send a resident to: one with a heading marker, else one with a door out.
+            if ((marker && !h.marker) || (!h.inside && door)) {
+                h.inside = marker ? marker : door;
+                h.marker = marker != nullptr;
+                h.cell = cell;
+            }
+            if (!h.cell) h.cell = cell;
         }
-        return {{"owned", owned}, {"notOwned", notOwned.size()}};
+        json owned = json::array();
+        int notOwned = 0;
+        for (const auto& h : houses) {
+            if (!h.mine) { ++notOwned; continue; }
+            const char* name = h.loc->GetFullName();
+            owned.push_back({{"name", name && *name ? name : h.cell->GetFullName()}, {"location", std::format("{:08X}", h.loc->GetFormID())},
+                             {"cell", std::format("{:08X}", h.cell->GetFormID())}, {"rooms", h.cells},
+                             {"ref", h.inside ? json(std::format("{:08X}", h.inside->GetFormID())) : json(nullptr)}});
+        }
+        return {{"owned", owned}, {"notOwned", notOwned},
+                {"note", "Marked as the player's in the game. Many mods (and Hearthfire) mark a house as the player's before it's bought: ask the player which are really theirs."}};
     }
 
     json RemoveObject(const std::string& refId) {
