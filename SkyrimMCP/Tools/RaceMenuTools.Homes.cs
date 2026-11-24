@@ -374,6 +374,18 @@ public partial class RaceMenuTools
             var c = candidates[i];
             double score = c.Shift * 0.3 + Math.Abs(c.ExtraTurn) * 2;
             var problems = new List<string>();
+            // The building: its foundation and footing hide a drop behind it down to the footing's depth, and the door stands at ground
+            // level, so the slope that matters is ground behind the house higher than at the house (it buries the back wall) or lower than
+            // the footing reaches (it floats). The GOG homestead stood on a 290-unit slope falling away behind it, as designed.
+            double? houseGround = null, houseOz = null, footingDepth = null;
+            for (var j = 0; j < placedPieces.Count; j++)
+                if (placedPieces[j]["role"]?.ToString() == "house" && spots[i * placedPieces.Count + j]?["ground"] is JsonValue hg)
+                {
+                    houseGround = hg.GetValue<double>();
+                    houseOz = ((JsonArray)placedPieces[j]["offset"]!)[2]!.GetValue<double>();
+                }
+            var lowest = placedPieces.Where(p => p["role"]?.ToString() is "foundation" or "footing").Select(p => ((JsonArray)p["offset"]!)[2]!.GetValue<double>()).DefaultIfEmpty().Min();
+            if (houseOz is double ho) footingDepth = ho - lowest;
             // Stacked pieces (the bed in the tent, the pot over the fire) share their base's spot: count each spot once.
             var seen = new HashSet<(long, long)>();
             for (var j = 0; j < placedPieces.Count; j++)
@@ -384,11 +396,17 @@ public partial class RaceMenuTools
                 var o = (JsonArray)p["offset"]!;
                 if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
                 if (s?["land"]?.GetValue<bool>() != true) { score += 10000; problems.Add($"{what}: no land under it"); continue; }
-                var built = p["role"]?.ToString() is "house" or "foundation" or "footing";
+                var role = p["role"]?.ToString();
+                var built = role is "house" or "foundation" or "footing";
                 var rise = s["rise"]!.GetValue<double>();
                 var objects = s["objects"]!.GetValue<int>();
-                var allowed = built ? 120 : 40;
-                if (rise > allowed) { score += (rise - allowed) * (built ? 2 : 1.5); if (rise > allowed + 20) problems.Add($"{what}: ground rises {Math.Round(rise)} units under it"); }
+                if (!built && rise > 40) { score += (rise - 40) * 1.5; if (rise > 60) problems.Add($"{what}: ground rises {Math.Round(rise)} units under it"); }
+                if (built && role != "house" && houseGround is double hg2 && s["ground"] is JsonValue g)
+                {
+                    var diff = g.GetValue<double>() - hg2;
+                    if (diff > 60) { score += (diff - 60) * 3; problems.Add($"{what}: the ground behind the house is {Math.Round(diff)} units higher (the back would be buried)"); }
+                    else if (footingDepth is double depth && -diff > depth - 40) { score += (-diff - depth + 40) * 3; problems.Add($"{what}: the ground drops {Math.Round(-diff)} units, below the footing"); }
+                }
                 if (objects > 0)
                 {
                     score += objects * (built ? 400 : 150) + s["biggest"]!.GetValue<double>() * 0.5;
