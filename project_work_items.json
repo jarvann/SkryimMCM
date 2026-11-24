@@ -6430,7 +6430,8 @@
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Save127 (12:41, before the preview existed) loads on the same game; the opt-in path itself is untested."
         },
         {
           "id": "FEAT-305",
@@ -6456,11 +6457,15 @@
               "date": "2026-11-23",
               "status": "done",
               "note": "Proved on GOG; data folder found once per pass (9ed2e15)."
+            },
+            {
+              "datetime": "2026-11-24T13:40",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Proved on GOG/MO2 2026-11-23: first launch wrote 40 stand-ins to MO2 overwrite (2 per race/sex block); after a restart, a template-face Nord (Hilde Test-Face, slot 51, Tova's face) showed her face at once, no dark face. RemoveSpawnedNpc put the stand-in back mid-session without a crash (BUG-108 path). Found and fixed: the data folder was looked up per slot (process scans), so preparing took minutes; now once per pass. Not yet checked: Steam, and the face after save + reload."
+          "testNotes": "Proved on GOG/MO2 2026-11-23: first launch wrote 40 stand-ins to MO2 overwrite (2 per race/sex block); after a restart, a template-face Nord (Hilde Test-Face, slot 51, Tova's face) showed her face at once, no dark face. RemoveSpawnedNpc put the stand-in back mid-session without a crash (BUG-108 path). Found and fixed: the data folder was looked up per slot (process scans), so preparing took minutes; now once per pass. Not yet checked: Steam, and the face after save + reload. Proved on Steam 2026-11-24 too (4,341 plugins): 40 stand-ins in Data on first connect; after a restart Test Face Steam (Breton F, slot 0) showed her face at once (Cory: 'face looks good')."
         },
         {
           "id": "FEAT-306",
