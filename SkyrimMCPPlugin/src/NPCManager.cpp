@@ -1282,13 +1282,19 @@ namespace SkyrimMCP::NPCManager {
         for (const auto& f : found) {
             auto* base = f.ref->GetBaseObject();
             const char* name = base->GetName();
+            // Outdoors a cell has no name: the location's ("Karthwasten") says where it is.
             auto* where = f.ref->GetParentCell();
-            const char* place = where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
+            auto* location = f.ref->GetCurrentLocation();
+            if (!location && where) location = where->GetLocation();
+            const char* place = location && location->GetFullName() && *location->GetFullName() ? location->GetFullName()
+                              : where && where->GetFullName() && *where->GetFullName() ? where->GetFullName() : nullptr;
             markers.push_back({{"stableId", StableId(f.ref)}, {"distance", std::round(f.distance)}, {"marker", f.rank == 0}, {"kind", f.kind},
                                {"what", name && *name ? json(name) : json(f.kind)}, {"place", place ? json(place) : json(nullptr)}});
             if (markers.size() >= 25) break;
         }
-        json result = {{"cell", cell->GetFullName() && *cell->GetFullName() ? cell->GetFullName() : cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
+        auto* here = actor->GetCurrentLocation();
+        const char* hereName = here && here->GetFullName() && *here->GetFullName() ? here->GetFullName() : cell->GetFullName();
+        json result = {{"cell", hereName && *hereName ? hereName : cell->GetName()}, {"interior", cell->IsInteriorCell()}, {"markers", markers}};
         if (markers.empty()) result["note"] = "No base game marker, bed, seat or door nearby: move the character to an inn, a town or a camp and try again.";
         return result;
     }
