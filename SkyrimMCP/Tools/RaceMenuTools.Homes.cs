@@ -196,7 +196,8 @@ public partial class RaceMenuTools
     [Description("Build a saved home layout in the world (FEAT-307). Without name: the layouts there are. where: 'here' (default: centred " +
         "distance units in front of the player, turned to face the way the player looks, as when it was built) or 'original' (its " +
         "own spot). resident: a spawned NPC who lives there (a spouse also moves the marriage quest's house, as SetSpouseHome does). " +
-        "Ground differs from place to place: the foundation was made for the slope it was built on, so check it and adjust. " +
+        "The building and its foundation stand with the door at ground level; each yard piece stands on its own ground (the land only: rocks " +
+        "aren't seen, so check pieces near rocks). " +
         "dryRun (default true) says what would be built. RemoveHomeLayout takes it away.")]
     public async Task<object> BuildHomeLayout(string? name = null, string where = "here", double distance = 700, string? resident = null, bool dryRun = true)
     {
@@ -247,24 +248,48 @@ public partial class RaceMenuTools
         var placed = new List<object>();
         var placedRefs = new List<string>();
         var failed = new List<object>();
+
+        // Where each piece goes, turned clockwise by `turn`, as Skyrim measures angles (0 north, 90 east).
+        var spots = new List<(JsonObject Piece, double X, double Y, double Oz)>();
         foreach (var p in pieces)
         {
             if (p["offset"] is not JsonArray { Count: 3 } o) continue;
-            double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>(), oz = o[2]!.GetValue<double>();
-            // Turned clockwise by `turn`, as Skyrim measures angles (0 north, 90 east).
-            var nx = ox * Math.Cos(t) + oy * Math.Sin(t);
-            var ny = -ox * Math.Sin(t) + oy * Math.Cos(t);
+            double ox = o[0]!.GetValue<double>(), oy = o[1]!.GetValue<double>();
+            spots.Add((p, cx + ox * Math.Cos(t) + oy * Math.Sin(t), cy - ox * Math.Sin(t) + oy * Math.Cos(t), o[2]!.GetValue<double>()));
+        }
+        // Steam, 2026-11-24: all at the marker's height plus the layout's offsets, a slope buried the uphill pieces (the door) and left
+        // the downhill ones in the air (table, chairs, the pot over the fire). Now the building and its foundation move as one, with
+        // the door at ground level (footing walls hide a drop behind, the hill takes a rise), and each yard piece stands on its own
+        // ground; a piece stacked on another (a bed in the tent, the pot over the fire) keeps its height above it.
+        var house = spots.FirstOrDefault(s => s.Piece["role"]?.ToString() == "house");
+        double? houseZ = null;
+        if (house.Piece != null)
+        {
+            var dx = cx - house.X; var dy = cy - house.Y; var len = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+            var door = new JsonArray(house.X + dx / len * 250, house.Y + dy / len * 250);
+            var probe = await _pipe.SendRequestAsync("ground_heights", new JsonObject { ["points"] = new JsonArray(door) });
+            if ((probe?["heights"] as JsonArray)?.FirstOrDefault() is JsonValue h && h.TryGetValue<double>(out var doorGround)) houseZ = doorGround - 10;
+        }
+        var anchors = new Dictionary<(long, long), (double Oz, double Z)>();
+        foreach (var (p, x, y, oz) in spots.OrderBy(s => s.Oz))
+        {
+            var role = p["role"]?.ToString();
+            var built = role is "house" or "foundation" or "footing";
+            var key = ((long)Math.Round(x / 20), (long)Math.Round(y / 20));
+            var stacked = !built && anchors.ContainsKey(key);
+            double z = built && houseZ is double hz ? hz + oz - house.Oz
+                : stacked ? anchors[key].Z + oz - anchors[key].Oz
+                : groundZ + oz;
             var res = await _pipe.SendRequestAsync("place_object", new JsonObject
             {
-                ["base"] = p["base"]?.ToString(), ["x"] = cx + nx, ["y"] = cy + ny, ["z"] = groundZ + oz,
-                ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360, ["onGround"] = false,
+                ["base"] = p["base"]?.ToString(), ["x"] = x, ["y"] = y, ["z"] = z,
+                ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360,
+                ["onGround"] = !built && !stacked,
             });
-            if (res?["error"] != null) failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() });
-            else
-            {
-                placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
-                if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
-            }
+            if (res?["error"] != null) { failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() }); continue; }
+            placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
+            if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
+            if (!built && !stacked && res["z"]?.GetValue<double>() is double onGround) anchors[key] = (oz, onGround);
         }
 
         HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs);

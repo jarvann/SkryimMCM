@@ -586,6 +586,20 @@ namespace SkyrimMCP::WorldManager {
                 {"footprint", span}, {"groundRise", high - low}};
     }
 
+    // FEAT-307: the land's height under each point (the terrain only: rocks and other objects aren't counted), so a home layout
+    // can stand each piece on its own ground. Null where there's no land (out of the loaded area).
+    json GroundHeights(const json& points) {
+        auto* tes = RE::TES::GetSingleton();
+        json heights = json::array();
+        for (const auto& p : points) {
+            float h = 0;
+            if (tes && p.is_array() && p.size() >= 2 && p[0].is_number() && p[1].is_number() &&
+                tes->GetLandHeight({ p[0].get<float>(), p[1].get<float>(), 100000.0f }, h)) heights.push_back(h);
+            else heights.push_back(nullptr);
+        }
+        return {{"heights", heights}};
+    }
+
     // FEAT-307 spike: a map marker for a home placed in game. The game's MapMarker object, placed at the home, given marker data
     // (name, shown and fast travel, type). The data's TESFullName has a vtable, so it starts as a copy of a known marker's.
     json AddMapMarker(const std::string& atRef, const std::string& name, int type) {
