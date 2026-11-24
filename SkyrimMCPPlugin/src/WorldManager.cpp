@@ -613,7 +613,7 @@ namespace SkyrimMCP::WorldManager {
         for (const auto& p : points)
             if (p.is_object() && p.contains("x") && p.contains("y"))
                 reach = std::max(reach, std::hypot(p["x"].get<float>() - origin.x, p["y"].get<float>() - origin.y));
-        struct Blocker { RE::NiPoint3 at; float radius; std::string what; };
+        struct Blocker { RE::NiPoint3 at; float radius; std::string what; float top, bottom; };
         std::vector<Blocker> blockers;
         tes->ForEachReferenceInRange(player, std::min(reach + 1500.0f, 8000.0f), [&](RE::TESObjectREFR* ref) {
             if (Blocks(ref) && (ref->GetFormID() >> 24) != 0xFF) {  // SkyLink's own pieces (an old home being rebuilt) don't count
@@ -630,7 +630,10 @@ namespace SkyrimMCP::WorldManager {
                     if (const auto slash = label.find_last_of("\\/"); slash != std::string::npos) label = label.substr(slash + 1);
                     if (const auto dot = label.rfind('.'); dot != std::string::npos) label = label.substr(0, dot);
                 }
-                blockers.push_back({ ref->GetPosition(), 0.5f * std::max(span.x, span.y) * ref->GetScale(), label });
+                const auto at = ref->GetPosition();
+                const float scale = ref->GetScale();
+                blockers.push_back({ at, 0.5f * std::max(span.x, span.y) * scale, label,
+                                     at.z + ref->GetBoundMax().z * scale, at.z + ref->GetBoundMin().z * scale });
             }
             return RE::BSContainer::ForEachResult::kContinue;
         });
@@ -662,6 +665,9 @@ namespace SkyrimMCP::WorldManager {
             json what = json::array();
             for (const auto& b : blockers) {
                 // Overlapping footprints, a little forgiving: a rock's bounds are a box around an uneven shape.
+                // Mountain trims and big rocks are mostly sunk in the land, with bounds far wider than what shows: one whose top is
+                // below the ground here is buried, and one that starts well above it is overhead (Steam, 2026-11-24).
+                if (b.top < centre + 15.0f || b.bottom > high + 250.0f) continue;
                 if (std::hypot(b.at.x - x, b.at.y - y) < (radius + b.radius) * 0.8f) {
                     ++objects;
                     biggest = std::max(biggest, b.radius);
