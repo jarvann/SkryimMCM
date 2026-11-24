@@ -6368,11 +6368,15 @@
             {
               "datetime": "2026-11-24T10:00",
               "note": "Found in the Steam 1.6 run with Cory's large load order."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Steam 2026-11-24: 63 entries became 40, one per house (Highreach Keep 23 rooms, Solstice Castle 6); the note shows with home choices. Legacy museum wings stay separate (their parent location has no player-house keyword)."
+          "testNotes": "Steam 2026-11-24: 63 entries became 40, one per house (Highreach Keep 23 rooms, Solstice Castle 6); the note shows with home choices. Legacy museum wings stay separate (their parent location has no player-house keyword). GOG 2026-11-24: no houses owned, 17 listed as not owned (vanilla load order)."
         },
         {
           "id": "BUG-112",
@@ -6389,13 +6393,17 @@
             {
               "datetime": "2026-11-24T13:20",
               "note": "Proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-305"
           ],
-          "testNotes": "Steam 2026-11-24 (no stand-ins known that session): Test Aunt (Breton F) took slot 0, lasting."
+          "testNotes": "Steam 2026-11-24 (no stand-ins known that session): Test Aunt (Breton F) took slot 0, lasting. GOG 2026-11-24: Dark Elf took slot 250 (a known stand-in), face seen at once."
         },
         {
           "id": "BUG-113",
@@ -6412,11 +6420,15 @@
             {
               "datetime": "2026-11-24T14:40",
               "note": "Proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Steam 2026-11-24: near Karthwasten the choices are now base game markers ranked first (1.3-2.6k units), each with a place ('near Jhunal Pond', the nearest map marker, when no location covers it); no ore veins or hidden helpers."
+          "testNotes": "Steam 2026-11-24: near Karthwasten the choices are now base game markers ranked first (1.3-2.6k units), each with a place ('near Jhunal Pond', the nearest map marker, when no location covers it); no ore veins or hidden helpers. GOG 2026-11-24: the first choice was an invisible idle spot named 'This should not be visible' (furniture); now named 'NPC idle spot' and ranked after markers, beds and seats; default became a Whiterun marker."
         },
         {
           "id": "BUG-114",
@@ -6454,11 +6466,15 @@
             {
               "datetime": "2026-11-24T14:40",
               "note": "Proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Steam 2026-11-24: a slotless spawn without preview is refused and nothing is made; Save127 loads. The preview: true path itself wasn't exercised (it would put a preview into Cory's save line)."
+          "testNotes": "Steam 2026-11-24: a slotless spawn without preview is refused and nothing is made; Save127 loads. The preview: true path itself wasn't exercised (it would put a preview into Cory's save line). GOG 2026-11-24: slotless spawn refused."
         },
         {
           "id": "BUG-116",
@@ -6475,11 +6491,15 @@
             {
               "datetime": "2026-11-24T14:40",
               "note": "Proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Steam 2026-11-24: race 'Nord' made a Nord (slot 51); an unknown race is refused with the names to use."
+          "testNotes": "Steam 2026-11-24: race 'Nord' made a Nord (slot 51); an unknown race is refused with the names to use. GOG 2026-11-24: race 'Dark Elf' (a name with a space) resolved."
         },
         {
           "id": "BUG-117",
@@ -6496,11 +6516,15 @@
             {
               "datetime": "2026-11-24T15:10",
               "note": "Proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [],
-          "testNotes": "Steam 2026-11-24: only the homestead in this game offered; family home, SetHome, RemoveHomeLayout (cleared the family home, named Test Dress as resident) all work."
+          "testNotes": "Steam 2026-11-24: only the homestead in this game offered; family home, SetHome, RemoveHomeLayout (cleared the family home, named Test Dress as resident) all work. GOG 2026-11-24: the homestead in this save offered."
         },
         {
           "id": "BUG-118",
@@ -6631,13 +6655,17 @@
             {
               "datetime": "2026-11-24T15:30",
               "note": "Built and proved on Steam."
+            },
+            {
+              "datetime": "2026-11-24T16:10",
+              "note": "Checked on GOG."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-307"
           ],
-          "testNotes": "Steam 2026-11-24 at the GOG spot (fit off): PineShrub02 and a TreePineForest05 switched off and recorded on the home; DirtCliffs01SUM (radius over 600) left standing and named; no seam warnings (neither sunk deep); RemoveHomeLayout switched both back on (2 of 2) and forgot the home. Near Karthwasten only mountain pieces were in the way, so nothing was cleared, as intended."
+          "testNotes": "Steam 2026-11-24 at the GOG spot (fit off): PineShrub02 and a TreePineForest05 switched off and recorded on the home; DirtCliffs01SUM (radius over 600) left standing and named; no seam warnings (neither sunk deep); RemoveHomeLayout switched both back on (2 of 2) and forgot the home. Near Karthwasten only mountain pieces were in the way, so nothing was cleared, as intended. GOG 2026-11-24 (dry run at the homestead): 7 shrubs, trees and a log to clear, the dirt cliff left standing, a seam warning for the log sunk 107 units."
         },
         {
           "id": "FEAT-308",
