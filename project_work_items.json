@@ -6347,7 +6347,7 @@
         {
           "id": "BUG-111",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "high",
           "title": "Home choices listed every player-marked room of a big load order (63 on Steam)",
           "description": "Steam, 4,341 plugins, 2026-11-24: FamilyStory's canUseNow listed 63 'owned houses' for a level-4 Arya: one per cell (Solstice Castle 6 times, Highreach Keep 4), Legacy of the Dragonborn's museum rooms, and Hearthfire and mod houses not bought (mods mark a house's cells as the player's from the start). Fix: one entry per house (cells of one location, child player-house locations roll up to the topmost), rooms counted, and a note everywhere homes are offered: offer only the houses the player says are theirs.",
@@ -6514,6 +6514,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "Layout tools proved on GOG: SaveHomeLayout (19 pieces), BuildHomeLayout here (turned to the player, all placed), RemoveHomeLayout (20 removed), original intact; placed_objects searches the persistent cell (from 14000 units away it found nothing before). Runtime map markers don't fast travel: markers go in SkyLinkAI.esp (FEAT-309)."
+            },
+            {
+              "datetime": "2026-11-24T14:00",
+              "note": "Steam run (4,341 plugins): home question, SetHome (refuses NPCs SkyLink didn't make), family home all work. Builder fixed on a Reach slope: the house, foundation and footing as one block with the door at ground level, yard pieces each on their own ground, stacked pieces keep their height. New: where = an existing marker (rebuild in place); RemoveHomeLayout clears it as the family home and names its residents; site survey before building (rocks named by model, buried/overhead rocks and tree canopies left out, slope judged by direction for the building, never on the player) with best fit up to 300 units / 30 degrees. Built at the GOG spot on Steam with the fit: Cory 'it looks good'. Open: the cooking pot hangs in the air over the fire (check GOG; maybe add a cooking spit piece); the owned-house path; rocks aren't ground (a ray cast would let pieces stand on them)."
             }
           ],
           "targetRelease": "1.6",
