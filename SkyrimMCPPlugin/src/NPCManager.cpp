@@ -645,6 +645,8 @@ namespace SkyrimMCP::NPCManager {
             const int first = raceBlock * 2 * kSlotsPerSex + (female ? 0 : kSlotsPerSex);
             auto listed = [](const std::vector<int>& list, int i) { return std::find(list.begin(), list.end(), i) != list.end(); };
             for (const bool preferredOnly : { true, false }) {
+                // BUG-112: with nothing preferred (no stand-ins known yet, a fresh install's first session) only the second pass runs.
+                if (preferredOnly && prefer.empty()) continue;
                 for (int i = first; i < first + kSlotsPerSex; ++i) {
                     // Reserved in SkyLink's registry: the slot's face files belong to a character in some save.
                     if (listed(avoid, i) || (preferredOnly && !listed(prefer, i))) continue;
@@ -654,7 +656,6 @@ namespace SkyrimMCP::NPCManager {
                         return npc;
                     }
                 }
-                if (prefer.empty()) break;
             }
             return nullptr;
         }

@@ -6361,6 +6361,24 @@
           "dependsOn": []
         },
         {
+          "id": "BUG-112",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "critical",
+          "title": "No NPC slot was ever picked while no stand-in faces were known (FEAT-305 regression)",
+          "description": "Steam, 2026-11-24: SpawnNpc made Test Aunt (Breton) a preview only, 'every slot of that sex in use', with all 25 Breton F slots free. FreeSlot's preferred-only pass skipped every slot when prefer was empty, then 'if (prefer.empty()) break' ended the loop before the any-slot pass. GOG passed because its stand-ins were known. Hits every fresh install's first session. Fix: skip the preferred-only pass when prefer is empty.",
+          "history": [
+            {
+              "datetime": "2026-11-24T12:50",
+              "note": "Found in the Steam 1.6 run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-305"
+          ]
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",
