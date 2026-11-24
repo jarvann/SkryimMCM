@@ -5572,6 +5572,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "Proved on GOG: followers recruited with the game's dialogue; MakeFollower takes a voice; rank fallback for fresh spawns (Test Suitor: Ally)."
+            },
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Steam: MakeFollower on Test Lock: PotentialFollowerFaction, FemaleNord voice with follower lines."
             }
           ],
           "targetRelease": "1.6",
@@ -5610,6 +5614,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "1.6 scope done: export proved end to end on GOG (SMP hair, High Poly Head, family). Face-builder dependencies moved out of 1.6."
+            },
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Steam: real export of Test Lock (follower) written: light plugin with NPC_, QUST, RELA, OTFT, CLFM; masters Skyrim.esm, BecomeKingofSkyrimTNG.esp, NorthernWomen.esp; face files; README with Nexus links and the permissions note. Polish: the README still lists the left-out race-mismatched item."
             }
           ],
           "targetRelease": "1.6",
@@ -5726,10 +5734,15 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "GOG test round: LoadSave of Prisoner's quicksave while Adventurer plays refused with the reason and the safer way."
+            },
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Proved on Steam: an Adventurer save over Arya's game is refused with the safer route; nothing loaded."
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: refused, game unchanged."
         },
         {
           "id": "FEAT-291",
@@ -6471,13 +6484,34 @@
         {
           "id": "BUG-117",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "high",
           "title": "Home choices offered SkyLink homes from other saves, and same-named homes picked the wrong one",
           "description": "Steam, 2026-11-24: SetFamilyHome 'Homestead: farmhouse 01' took FF0014F9, built in a session that was never saved, so SetHome failed 'Not a reference'. homes.json (like family.json) spans saves. Fix: offer only SkyLink homes whose centre is in the loaded game (registry untouched); same-named homes get their reference in the label; the family home used is the first one in this game.",
           "history": [
             {
               "datetime": "2026-11-24T14:55",
+              "note": "Found in the Steam run."
+            },
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Proved on Steam."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: only the homestead in this game offered; family home, SetHome, RemoveHomeLayout (cleared the family home, named Test Dress as resident) all work."
+        },
+        {
+          "id": "BUG-118",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "Every script call on one spawned character (Test Dress) waited forever",
+          "description": "Steam, 2026-11-24: on Test Dress (FF0049BE, slot 51) every Papyrus call waited 'on other stack for call': ORomance's SeedStats at npc.GetActorBase(), another mod's active effect (A0_Transcend), a crosshair script, and a plain Actor.GetActorBase from SkyLink. Test Sister and a fresh character (Test Lock) answered at once. Her steps (spawn, race-mismatched dress equips, export reads, home build/set/remove, a failed SetHome at a missing marker) repeated on Test Lock didn't reproduce it. dps showed no stack running on her. Possibly another mod's script; watch for it.",
+          "history": [
+            {
+              "datetime": "2026-11-24T15:10",
               "note": "Found in the Steam run."
             }
           ],
@@ -6537,10 +6571,15 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "Proved on GOG: questions asked before spawn/export; step-siblings proposed, wedding with Maramal; marriage voice switch (Khajiit got FemaleEvenToned); rank fallback."
+            },
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Steam: ORomance path tested for the first time. SeedIfNeeded ran longer than a call's 5 s; now started without waiting, polled with isSeeded (30 s), then StoreSexuality. Fresh character: 'women' stored (2) in 3 s; OSL Aroused set."
             }
           ],
           "targetRelease": "",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: ORomance and OSL Aroused both set on a fresh character."
         },
         {
           "id": "FEAT-307",
@@ -6576,6 +6615,24 @@
             "FEAT-306"
           ],
           "testNotes": "2026-11-23 GOG (SkyLink_HomeQuestion): SpawnNpc asks home (marryable skipped for an aunt); spawned into the homestead, which became the family home; SetHome moved GOG Mother to the family home, refused a follower; SetFamilyHome remove/add; homes kept through save and reload. Homestead bench turned to 340 (seated actors faced the house). Still to test: a save that owns a player house (owned_houses)."
+        },
+        {
+          "id": "FEAT-311",
+          "type": "feature",
+          "status": "open",
+          "priority": "medium",
+          "title": "Clear the land for a home: disable what's in the way, restore it when the home goes",
+          "description": "Cory, 2026-11-24: 'if you track the objects in the area, disable them and check if there are seams or bad terrain mismatches, I'm ok with restructuring and clearing land in order to make the location work.' BuildHomeLayout (clear: true) disables the base game rocks, trees and clutter the site survey finds in the footprint, records them on the home (homes.json), and RemoveHomeLayout enables them again; afterwards check for seams or holes where terrain-hiding rocks were (look before and after, and leave mountain trims that hide land seams).",
+          "history": [
+            {
+              "datetime": "2026-11-24T15:10",
+              "note": "Added from Cory's idea during the Steam run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": [
+            "FEAT-307"
+          ]
         },
         {
           "id": "FEAT-308",
