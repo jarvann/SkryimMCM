@@ -6358,12 +6358,13 @@
             }
           ],
           "targetRelease": "1.6",
-          "dependsOn": []
+          "dependsOn": [],
+          "testNotes": "Steam 2026-11-24: 63 entries became 40, one per house (Highreach Keep 23 rooms, Solstice Castle 6); the note shows with home choices. Legacy museum wings stay separate (their parent location has no player-house keyword)."
         },
         {
           "id": "BUG-112",
           "type": "bug",
-          "status": "implemented-untested",
+          "status": "done",
           "priority": "critical",
           "title": "No NPC slot was ever picked while no stand-in faces were known (FEAT-305 regression)",
           "description": "Steam, 2026-11-24: SpawnNpc made Test Aunt (Breton) a preview only, 'every slot of that sex in use', with all 25 Breton F slots free. FreeSlot's preferred-only pass skipped every slot when prefer was empty, then 'if (prefer.empty()) break' ended the loop before the any-slot pass. GOG passed because its stand-ins were known. Hits every fresh install's first session. Fix: skip the preferred-only pass when prefer is empty.",
@@ -6371,12 +6372,33 @@
             {
               "datetime": "2026-11-24T12:50",
               "note": "Found in the Steam 1.6 run."
+            },
+            {
+              "datetime": "2026-11-24T13:20",
+              "note": "Proved on Steam."
             }
           ],
           "targetRelease": "1.6",
           "dependsOn": [
             "FEAT-305"
-          ]
+          ],
+          "testNotes": "Steam 2026-11-24 (no stand-ins known that session): Test Aunt (Breton F) took slot 0, lasting."
+        },
+        {
+          "id": "BUG-113",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "ExportCharacter's home choices near Karthwasten were a hidden marker and an ore vein",
+          "description": "Steam, 2026-11-24, Test Aunt exported (dry run) from the Reach homestead: homeChoices were 'This should not be visible' (twice) and 'Iron Ore Vein', no map or heading markers. Leave out references whose base names say they're hidden and resources (ore veins, plants); prefer the nearest named place's marker; say when nothing good is near and suggest an inn or town.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:20",
+              "note": "Found in the Steam 1.6 run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         },
         {
           "id": "FEAT-305",
