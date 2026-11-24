@@ -6434,6 +6434,22 @@
           "testNotes": "Save127 (12:41, before the preview existed) loads on the same game; the opt-in path itself is untested."
         },
         {
+          "id": "BUG-116",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "SpawnNpc's race 'Nord' was ignored and the player's race used",
+          "description": "Steam, 2026-11-24: SpawnNpc race 'Nord' made a Breton (Arya's race). ResolveRace took only form IDs and editor IDs, and the game drops editor IDs after loading (and 'Nord' isn't one: NordRace is); an unresolved race silently fell back to the template's or player's. Earlier 'Breton' only seemed to work because the player is a Breton. Fix: by name too (the base game's ten playable races first, then any playable race), editor ID with 'Race' added, and an error for an unknown race.",
+          "history": [
+            {
+              "datetime": "2026-11-24T14:20",
+              "note": "Found in the Steam bug-fix run."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",

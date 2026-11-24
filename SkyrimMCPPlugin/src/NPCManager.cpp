@@ -574,12 +574,28 @@ namespace SkyrimMCP::NPCManager {
 
 
     namespace {
+        // A form ID, an editor ID ("NordRace"), or the name the game shows ("Nord", "high elf"). The game drops most editor IDs after
+        // loading, so "Nord" wasn't found on Steam and the spawn quietly took the player's race (2026-11-24, BUG-116). By name, the base
+        // game's playable races come first (vampire and modded races share their names), then any other playable race.
         RE::TESRace* ResolveRace(const std::string& text) {
             if (text.empty()) return nullptr;
             RE::TESForm* form = nullptr;
             try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(text)); } catch (...) {}
             if (!form) form = RE::TESForm::LookupByEditorID(text);
-            return form ? form->As<RE::TESRace>() : nullptr;
+            if (!form) form = RE::TESForm::LookupByEditorID(text + "Race");
+            if (auto* race = form ? form->As<RE::TESRace>() : nullptr) return race;
+            auto same = [&](const char* name) {
+                if (!name) return false;
+                const std::string_view a(name), b(text);
+                return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) { return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y)); });
+            };
+            for (RE::FormID id = 0x13740; id <= 0x13749; ++id)
+                if (auto* race = RE::TESForm::LookupByID<RE::TESRace>(id); race && same(race->GetFullName())) return race;
+            auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data) return nullptr;
+            for (auto* race : data->GetFormArray<RE::TESRace>())
+                if (race && race->GetPlayable() && same(race->GetFullName())) return race;
+            return nullptr;
         }
 
         // INFRA-024: SkyLinkAI.esp (optional) holds ten NPC slots of each sex, object IDs 0x800-0x809 female and 0x80A-0x813 male.
@@ -1382,7 +1398,9 @@ namespace SkyrimMCP::NPCManager {
             if (!asked) return {{"error", "Template isn't an NPC base: " + t}};
         }
         const auto* like = asked ? asked : playerBase;
-        auto* race = ResolveRace(params.value("race", std::string()));
+        const auto raceText = params.value("race", std::string());
+        auto* race = ResolveRace(raceText);
+        if (!race && !raceText.empty()) return {{"error", "No race called '" + raceText + "': give the name the game shows (Nord, High Elf, Khajiit...), an editor ID (NordRace) or a form ID."}};
         if (!race) race = like->race;
         const bool female = params.contains("female") && params["female"].is_boolean()
             ? params["female"].get<bool>() : like->GetSex() == RE::SEX::kFemale;
