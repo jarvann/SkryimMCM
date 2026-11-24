@@ -6345,6 +6345,22 @@
           "testNotes": "2026-11-23 GOG (SkyLink_HomeQuestion): RemoveHomeLayout dry run listed exactly the 19 recorded pieces plus the centre marker; SaveHomeLayout saved 19; no game objects."
         },
         {
+          "id": "BUG-111",
+          "type": "bug",
+          "status": "implemented-untested",
+          "priority": "high",
+          "title": "Home choices listed every player-marked room of a big load order (63 on Steam)",
+          "description": "Steam, 4,341 plugins, 2026-11-24: FamilyStory's canUseNow listed 63 'owned houses' for a level-4 Arya: one per cell (Solstice Castle 6 times, Highreach Keep 4), Legacy of the Dragonborn's museum rooms, and Hearthfire and mod houses not bought (mods mark a house's cells as the player's from the start). Fix: one entry per house (cells of one location, child player-house locations roll up to the topmost), rooms counted, and a note everywhere homes are offered: offer only the houses the player says are theirs.",
+          "history": [
+            {
+              "datetime": "2026-11-24T10:00",
+              "note": "Found in the Steam 1.6 run with Cory's large load order."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
           "id": "FEAT-305",
           "type": "",
           "status": "done",

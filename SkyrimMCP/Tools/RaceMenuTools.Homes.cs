@@ -80,7 +80,7 @@ public partial class RaceMenuTools
         if (home.Trim().StartsWith("here", StringComparison.OrdinalIgnoreCase)) return new { home = "here", note = "Stays where it stands." };
         var (homes, cid, error) = await HomeChoices();
         if (ResolveHome(home, homes, cid) is not { } chosen)
-            return new { error = $"No home called {home}.", choices = HomeOptionNames(homes, cid), houses = error };
+            return new { error = $"No home called {home}.", choices = HomeOptionNames(homes, cid), houses = error, note = CharacterChoices.HouseNote };
         string? spouse = null;
         try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); } catch (McpException) { }
         object applied;
@@ -114,7 +114,7 @@ public partial class RaceMenuTools
     public async Task<object> SetHome(string refId, string? home = null)
     {
         var (homes, cid, error) = await HomeChoices();
-        if (string.IsNullOrWhiteSpace(home)) return new { choices = HomeOptionNames(homes, cid), houses = error };
+        if (string.IsNullOrWhiteSpace(home)) return new { choices = HomeOptionNames(homes, cid), houses = error, note = CharacterChoices.HouseNote };
         string? role = null;
         if (SlotRegistry.SlotForRef(refId.Trim()) is int slot) role = SlotRegistry.Load()[slot.ToString()]?["family"]?.GetValue<string?>();
         return await ApplyHome(refId.Trim(), home, role);

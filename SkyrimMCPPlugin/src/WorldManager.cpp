@@ -622,6 +622,9 @@ namespace SkyrimMCP::WorldManager {
     // LocTypePlayerHouse keyword (Breezehome, Hearthfire's, Creation Club's and player-home mods that use it); it is the player's when
     // the cell's owner is the player or the player's faction (the purchase scripts set that). Each comes with a reference inside to
     // send a resident to: a heading marker, else the inside of the front door (persistent, so known even while the house isn't loaded).
+    // BUG-111 (Steam, 4,341 plugins): one entry per house, not per cell. A house's rooms are cells of one location, or of child
+    // locations that are player houses too (a museum's wings): they roll up to the topmost one. Mods often give the player a house's
+    // cells before it's bought (Hearthfire's, most home mods), so "owned" means marked as the player's, not bought.
     json OwnedHouses() {
         auto* data = RE::TESDataHandler::GetSingleton();
         auto* player = RE::PlayerCharacter::GetSingleton();
@@ -630,30 +633,55 @@ namespace SkyrimMCP::WorldManager {
         if (!data || !player || !keyword) return {{"error", "The player-house keyword isn't in the game"}};
         auto* playerBase = player->GetActorBase();
         auto* playerFaction = RE::TESForm::LookupByID<RE::TESFaction>(0x00000DB1);
-        json owned = json::array(), notOwned = json::array();
-        std::unordered_set<RE::FormID> seen;
+        struct House {
+            RE::BGSLocation* loc = nullptr;
+            RE::TESObjectCELL* cell = nullptr;
+            RE::TESObjectREFR* inside = nullptr;
+            bool marker = false, mine = false;
+            int cells = 0;
+        };
+        std::vector<House> houses;
+        std::unordered_map<RE::FormID, std::size_t> byLocation;
         for (auto* cell : data->interiorCells) {
             auto* loc = cell ? cell->GetLocation() : nullptr;
             if (!loc || !loc->HasKeyword(keyword)) continue;
+            auto* top = loc;
+            for (int depth = 0; depth < 8 && top->parentLoc && top->parentLoc->HasKeyword(keyword); ++depth) top = top->parentLoc;
             auto* owner = cell->GetOwner();
             const bool mine = owner && (owner == playerBase || owner == playerFaction);
-            RE::TESObjectREFR* inside = nullptr;
+            RE::TESObjectREFR* marker = nullptr;
             RE::TESObjectREFR* door = nullptr;
             cell->ForEachReference([&](RE::TESObjectREFR* ref) {
                 auto* base = ref ? ref->GetBaseObject() : nullptr;
                 if (!base || ref->IsDisabled()) return RE::BSContainer::ForEachResult::kContinue;
-                if (base->GetFormID() == 0x00000034 && !inside) inside = ref;  // XMarkerHeading
+                if (base->GetFormID() == 0x00000034 && !marker) marker = ref;  // XMarkerHeading
                 if (base->Is(RE::FormType::Door) && !door && ref->extraList.GetByType<RE::ExtraTeleport>()) door = ref;
                 return RE::BSContainer::ForEachResult::kContinue;
             });
-            if (!inside) inside = door;
-            const char* name = loc->GetFullName();
-            json entry = {{"name", name && *name ? name : cell->GetFullName()}, {"location", std::format("{:08X}", loc->GetFormID())},
-                          {"cell", std::format("{:08X}", cell->GetFormID())}, {"ref", inside ? json(std::format("{:08X}", inside->GetFormID())) : json(nullptr)}};
-            if (!seen.insert(cell->GetFormID()).second) continue;
-            (mine ? owned : notOwned).push_back(entry);
+            auto [it, added] = byLocation.try_emplace(top->GetFormID(), houses.size());
+            if (added) houses.push_back({top});
+            auto& h = houses[it->second];
+            ++h.cells;
+            h.mine = h.mine || mine;
+            // The room to send a resident to: one with a heading marker, else one with a door out.
+            if ((marker && !h.marker) || (!h.inside && door)) {
+                h.inside = marker ? marker : door;
+                h.marker = marker != nullptr;
+                h.cell = cell;
+            }
+            if (!h.cell) h.cell = cell;
         }
-        return {{"owned", owned}, {"notOwned", notOwned.size()}};
+        json owned = json::array();
+        int notOwned = 0;
+        for (const auto& h : houses) {
+            if (!h.mine) { ++notOwned; continue; }
+            const char* name = h.loc->GetFullName();
+            owned.push_back({{"name", name && *name ? name : h.cell->GetFullName()}, {"location", std::format("{:08X}", h.loc->GetFormID())},
+                             {"cell", std::format("{:08X}", h.cell->GetFormID())}, {"rooms", h.cells},
+                             {"ref", h.inside ? json(std::format("{:08X}", h.inside->GetFormID())) : json(nullptr)}});
+        }
+        return {{"owned", owned}, {"notOwned", notOwned},
+                {"note", "Marked as the player's in the game. Many mods (and Hearthfire) mark a house as the player's before it's bought: ask the player which are really theirs."}};
     }
 
     json RemoveObject(const std::string& refId) {
