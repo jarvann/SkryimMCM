@@ -6521,6 +6521,22 @@
         },
         {
           "id": "FEAT-309",
+          "type": "feature",
+          "status": "open",
+          "priority": "medium",
+          "title": "Change a slot character's hair and head parts (rebuild its face file)",
+          "description": "Steam, 2026-11-24: SetHeadPart on Test Aunt (a slot character) was refused, rightly: the face file holds the head parts, so a changed record breaks the face after a restart. SkyLink owns a slot's face file, so it can change the part and rebuild the file (swap the hair shapes in the NIF from the new part's mesh, keep the tint), then refresh. Until then: wigs, or remake the character.",
+          "history": [
+            {
+              "datetime": "2026-11-24T13:45",
+              "note": "Found in the Steam 1.6 run (Cory: give her hair that creates dependencies)."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-309",
           "type": "",
           "status": "not-started",
           "priority": "",
