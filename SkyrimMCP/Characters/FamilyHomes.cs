@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace SkyrimMCP;
+namespace SkyrimMCP.Characters;
 
 /// <summary>
 /// FEAT-307: the family's homes, per player character (characterId): the player's own houses or SkyLink homes. Cory, 2026-11-23:

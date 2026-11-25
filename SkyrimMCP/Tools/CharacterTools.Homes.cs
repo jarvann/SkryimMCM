@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -10,7 +11,7 @@ namespace SkyrimMCP.Tools;
 /// FEAT-307: home layouts. A homestead built in game (place_object) is saved as JSON (base objects, offsets from its centre
 /// marker, angles) and built again anywhere: at its own spot, or in front of the player turned the way they look.
 /// </summary>
-public partial class RaceMenuTools
+public partial class CharacterTools
 {
     private const string XMarker = "Skyrim.esm|00003B";
     private static string ShippedLayouts => Path.Combine(AppContext.BaseDirectory, "HomeLayouts");

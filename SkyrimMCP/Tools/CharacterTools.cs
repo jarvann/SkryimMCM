@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
@@ -6,11 +7,18 @@ using SkyrimMCP.Face;
 
 namespace SkyrimMCP.Tools;
 
-/// <summary>Characters as mods (1.6): what a character is made of and which mods that needs (FEAT-296).</summary>
+/// <summary>
+/// Characters (1.6): making them (CharacterTools.Npc), their homes and home layouts (.Homes), the family story (.Family), what a
+/// character is made of and which mods that needs (FEAT-296, here), and exporting it as its own mod (.Export). RaceMenu is used
+/// only where a face goes through it (SpawnNpc's face from the player or a preset), through <see cref="RaceMenu"/>.
+/// </summary>
 [McpServerToolType]
 public partial class CharacterTools : ToolBase
 {
     public CharacterTools(IPipeClient pipe) : base(pipe) { }
+
+    /// <summary>RaceMenu's Papyrus calls and checks, for the faces made through it.</summary>
+    private RaceMenuTools RaceMenu => new(_pipe);
 
     private static readonly string[] BaseGame = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
     private static bool IsCreation(string plugin) => System.Text.RegularExpressions.Regex.IsMatch(plugin, @"^cc[a-z]{3}sse\d{3}-", System.Text.RegularExpressions.RegexOptions.IgnoreCase);

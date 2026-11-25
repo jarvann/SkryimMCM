@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Server;
@@ -9,7 +10,7 @@ namespace SkyrimMCP.Tools;
 /// the family's history, and the family home fits their homeland ("near the border of their home land"), standing and wealth.
 /// The story is kept per player character (family.json) for the AI and later dialogue.
 /// </summary>
-public partial class RaceMenuTools
+public partial class CharacterTools
 {
     /// <summary>The story's questions in the order they're asked: key, question, options (empty: the player's own words).</summary>
     private static readonly (string Key, string Question, string[] Options)[] StoryQuestions =

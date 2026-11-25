@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
@@ -13,7 +14,7 @@ namespace SkyrimMCP.Tools;
 /// built with the face builder becomes an NPC. Runtime forms aren't kept by saves: without SkyLink's NPC slot plugin a
 /// spawn is a preview for this session, and the lasting result is the player's own plugin (FEAT-283).
 /// </summary>
-public partial class RaceMenuTools
+public partial class CharacterTools
 {
     // refId -> preset, so removing a spawned NPC removes the face files made for it. Kept in a file: the spike's server restarted
     // between calls and left the files behind.
@@ -39,7 +40,7 @@ public partial class RaceMenuTools
     private async Task<string?> ExportTintFor(string preset)
     {
         foreach (var file in ExportedFiles(preset)) { TryDelete(file.dds); TryDelete(file.nif); }   // never take an old export
-        await Papyrus("CharGen", "ExportHead", @"..\..\..\Textures\CharGen\Exported\" + preset);
+        await RaceMenu.Papyrus("CharGen", "ExportHead", @"..\..\..\Textures\CharGen\Exported\" + preset);
         long last = -1;
         for (var i = 0; i < 60; i++)
         {
@@ -107,7 +108,7 @@ public partial class RaceMenuTools
         if (face is not ("template" or "player")) return new { error = "face must be 'template' or 'player'" };
         if (string.IsNullOrWhiteSpace(name)) return new { error = "name is required" };
         if (await SafetyBlock("move") is string blocked) return new { error = "Not now: " + blocked };
-        if (face == "player" && await RaceMenuOpenError() is string open) return new { error = open };
+        if (face == "player" && await RaceMenu.RaceMenuOpenError() is string open) return new { error = open };
         var likeness = (float)Math.Clamp(resemblance ?? (string.IsNullOrWhiteSpace(family) || face == "player" ? 0 : 0.5), 0, 1);
         var likenessNote = face == "player" && resemblance > 0 ? "resemblance isn't used with face 'player': it is the player's face" : null;
         if (face == "player") likeness = 0;
@@ -166,7 +167,7 @@ public partial class RaceMenuTools
         var presetName = "SkyLink_" + new string(name.Trim().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
         if (face == "player")
         {
-            await Papyrus("CharGen", "SaveCharacter", presetName);
+            await RaceMenu.Papyrus("CharGen", "SaveCharacter", presetName);
             if (await ExportTintFor(presetName) is string tintError) return new { error = tintError };
         }
 
@@ -203,7 +204,7 @@ public partial class RaceMenuTools
         {
             try
             {
-                var loaded = await Papyrus("CharGen", "LoadCharacter", refId, spawned?["race"]?.ToString(), presetName);
+                var loaded = await RaceMenu.Papyrus("CharGen", "LoadCharacter", refId, spawned?["race"]?.ToString(), presetName);
                 // The 3D is rebuilt from the changed base: off, then on again a moment later.
                 await _pipe.SendRequestAsync("set_spawned_npc_enabled", new JsonObject { ["refId"] = refId, ["enable"] = false });
                 await Task.Delay(1500);
@@ -215,8 +216,8 @@ public partial class RaceMenuTools
                 string? body = null;
                 try
                 {
-                    body = (await Papyrus("OBodyNative", "GetPresetAssignedToActor", "00000014"))?.ToString();
-                    if (!string.IsNullOrEmpty(body)) await Papyrus("OBodyNative", "ApplyPresetByName", refId, body);
+                    body = (await RaceMenu.Papyrus("OBodyNative", "GetPresetAssignedToActor", "00000014"))?.ToString();
+                    if (!string.IsNullOrEmpty(body)) await RaceMenu.Papyrus("OBodyNative", "ApplyPresetByName", refId, body);
                 }
                 catch (McpException) { body = null; }
                 faceResult = new { bodyPreset = string.IsNullOrEmpty(body) ? "none (OBody isn't installed, or gave none)" : body, preset = presetName, loaded = loaded?.ToString(), hairColor = "the player's", bodyTone = "the player's" };
@@ -374,7 +375,7 @@ public partial class RaceMenuTools
         const string export = "SkyLink_FamilyHead";
         try
         {
-            if (await RaceMenuOpenError() is string open) return (mesh, new { problem = open + " The relative has their own face." });
+            if (await RaceMenu.RaceMenuOpenError() is string open) return (mesh, new { problem = open + " The relative has their own face." });
             if (await ExportTintFor(export) is string exportError) return (mesh, new { problem = exportError });
             var head = ExportedHead(export);
             foreach (var (dds, _) in ExportedFiles(export)) TryDelete(dds);   // the tint is for LoadCharacter, not used here

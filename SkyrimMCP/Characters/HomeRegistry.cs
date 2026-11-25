@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace SkyrimMCP;
+namespace SkyrimMCP.Characters;
 
 /// <summary>
 /// FEAT-307: the pieces of each home SkyLink built, by its centre marker. Saving or removing a home uses this list, never "anything

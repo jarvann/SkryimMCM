@@ -31,7 +31,7 @@ public partial class RaceMenuTools : ToolBase
         ["face"] = ("Face", "GetNumFaceOverlays"),
     };
 
-    private async Task<JsonNode?> Papyrus(string className, string function, params JsonNode?[] args)
+    internal async Task<JsonNode?> Papyrus(string className, string function, params JsonNode?[] args)
     {
         JsonNode? data;
         try

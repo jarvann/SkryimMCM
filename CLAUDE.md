@@ -60,6 +60,12 @@ Uses CommonLibSSE-NG (alandtse fork `alandtse/CommonLibVR`, branch `ng`, tag v16
 - **Tools/CombatTools.cs** — 3 tools: combat state, damage stats, threats
 - **Tools/UtilityTools.cs** — 12 tools: console commands, notifications, search, load order, save/load, events, menu state, game safety
 - **Tools/PapyrusTools.cs** — 4 tools: catalog, function lookup, VM call, rescan
+- **Tools/RaceMenuTools*.cs** — RaceMenu only (needs skee64): face presets and sliders, sculpt, body morphs, overlays, presets
+- **Tools/CharacterTools*.cs** — Characters (1.6): `.Npc` spawn, follower, attraction, family role, NPC slots; `.Homes` homes and
+  home layouts (survey, clear land, build, remove), spouse home; `.Family` family story; `.Export` standalone mod; base file:
+  requirements. Uses RaceMenu only through a `RaceMenuTools` instance, for faces made with it
+- **Characters/** (`SkyrimMCP.Characters`) — the registries behind them: SlotRegistry (slots.json), HomeRegistry (homes.json),
+  FamilyHomes (family homes per player character)
 
 ## Build Commands
 
