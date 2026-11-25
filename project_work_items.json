@@ -6006,7 +6006,7 @@
           "id": "FEAT-301",
           "title": "Finalize a character: live or standalone, the player chooses",
           "description": "Cory, 2026-11-22: work both routes and let the user choose how to finalize. Live: SkyLink puts the face back through RaceMenu after loads (needs SkyLink and RaceMenu; keeps RaceMenu-only looks). Standalone: the face is baked into the player's own plugin with its own files, no SkyLink needed (the export, FEAT-283). The choice explains what each needs and loses.",
-          "status": "not-started",
+          "status": "complete",
           "history": [
             {
               "datetime": "2026-11-22T13:40",
@@ -6015,6 +6015,10 @@
             {
               "datetime": "2026-11-23T16:50",
               "note": "In 1.6 (Cory agreed 2026-11-23)."
+            },
+            {
+              "datetime": "2026-11-25T13:30",
+              "note": "FinalizeCharacter proved on GOG (SkyLink_FamilyStory): without how it listed, for the married Stepbrother, what each route needs, keeps and loses (marriage lost in a standalone copy, SkyLink-built home only in this save, 26 body morphs on the Aunt need RaceMenu live); live recorded with the missing home to decide (Cousin); standalone recorded with the steps (export, install, RemoveSpawnedNpc); a bad how and a non-slot actor refused. Found: a second registry write a second after the first failed while OneDrive held slots.json (fixed: retry)."
             }
           ],
           "type": "",
@@ -6608,7 +6612,7 @@
         {
           "id": "FEAT-307",
           "type": "",
-          "status": "in-progress",
+          "status": "complete",
           "priority": "",
           "title": "Homes: ask where a character lives, and family homes",
           "description": "Every character made is asked for a home (here, the family home, a player house, a named place, or none). The home becomes the character's editor location (Actor::ForceEditorLocation): the spouse quest's house, vanilla 'near editor location' packages, and where SkyLink sends them; the slot record restores it after loads. The first Player Family role asks for a family home (SetFamilyHome, per player character, more than one allowed); relatives are offered it first. Export's home defaults to it. See docs/1.6-plan.md.",
@@ -6632,6 +6636,10 @@
             {
               "datetime": "2026-11-24T14:00",
               "note": "Steam run (4,341 plugins): home question, SetHome (refuses NPCs SkyLink didn't make), family home all work. Builder fixed on a Reach slope: the house, foundation and footing as one block with the door at ground level, yard pieces each on their own ground, stacked pieces keep their height. New: where = an existing marker (rebuild in place); RemoveHomeLayout clears it as the family home and names its residents; site survey before building (rocks named by model, buried/overhead rocks and tree canopies left out, slope judged by direction for the building, never on the player) with best fit up to 300 units / 30 degrees. Built at the GOG spot on Steam with the fit: Cory 'it looks good'. Open: the cooking pot hangs in the air over the fire (check GOG; maybe add a cooking spit piece); the owned-house path; rocks aren't ground (a ray cast would let pieces stand on them)."
+            },
+            {
+              "datetime": "2026-11-25T13:30",
+              "note": "Owned-house path proved on GOG: Breezehome marked the player's (Cell.SetActorOwner, test only) was listed and offered; SetHome gave the Cousin Breezehome (editor location); SetSpouseHome breezehome moved the spouse with the game's MoveSpouseAdoption (WhiterunHouse alias filled, SpouseHouse cleared). Fixed: the spouse's editor location and SkyLink's record stayed at the SkyLink homestead; now Breezehome. Campfire pot: Cory saw it hang mid-air on GOG too; vanilla hangs it from CookingSpitSm01 over the fire. Layout pieces gain aboveGround and hangsFrom; a test build put the spit 11 above the land and the pot 14 below it (Cory: 'better')."
             }
           ],
           "targetRelease": "1.6",

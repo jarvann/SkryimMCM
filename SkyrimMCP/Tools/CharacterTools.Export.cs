@@ -195,6 +195,13 @@ public partial class CharacterTools
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new { error = "Couldn't write the mod: " + ex.Message }; }
         }
+        if (!dryRun)
+        {
+            // FEAT-301: the slot record says which mod the character became.
+            var copy = entry.DeepClone().AsObject();
+            copy["exported"] = new JsonObject { ["mod"] = modName, ["zip"] = Path.Combine(folder, modName + ".zip"), ["at"] = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss") };
+            SlotRegistry.Reserve(slot.GetValue<int>(), copy);
+        }
         return new
         {
             dryRun, character = data["name"]?.ToString(), plugin, masters = built.Masters, light = (built.Flags & 0x200) != 0,

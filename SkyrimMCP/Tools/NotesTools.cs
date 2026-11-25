@@ -162,7 +162,7 @@ public class NotesTools : ToolBase
             var doc = new JsonObject { ["character"] = character, ["notes"] = notes.DeepClone() };
             var temp = file + ".tmp";
             await File.WriteAllTextAsync(temp, doc.ToJsonString(Indented));
-            File.Move(temp, file, overwrite: true);
+            SkyLinkSettings.ReplaceFile(temp, file);
             return true;
         }
         finally { FileLock.Release(); }

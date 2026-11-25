@@ -330,25 +330,42 @@ public partial class CharacterTools
             if ((probe?["heights"] as JsonArray)?.FirstOrDefault() is JsonValue h && h.TryGetValue<double>(out var doorGround)) houseZ = doorGround - 10;
         }
         var anchors = new Dictionary<(long, long), (double Oz, double Z)>();
-        foreach (var (p, x, y, oz) in spots.OrderBy(s => s.Oz))
+        // GOG, 2026-11-25: the pot hung in the air over the fire. Vanilla hangs it from a small cooking spit that stands over the fire
+        // (Skyrim.esm, 55 pairs): a piece with aboveGround stands that far above the land at its own spot (the campfire's own height
+        // isn't the ground: it sat 30 units under it), and a piece with hangsFrom keeps its height against the piece it names.
+        var hung = new Dictionary<string, (double Oz, double Z)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (p, x, y, oz) in spots.OrderBy(s => s.Piece["hangsFrom"] != null ? 1 : 0).ThenBy(s => s.Oz))
         {
             var role = p["role"]?.ToString();
             var built = role is "house" or "foundation" or "footing";
             var key = ((long)Math.Round(x / 20), (long)Math.Round(y / 20));
-            var stacked = !built && anchors.ContainsKey(key);
-            double z = built && houseZ is double hz ? hz + oz - house.Oz
+            var hangsFrom = p["hangsFrom"]?.ToString();
+            var aboveGround = p["aboveGround"]?.GetValue<double>();
+            double? landZ = null;
+            if (aboveGround != null)
+            {
+                var probe = await _pipe.SendRequestAsync("ground_heights", new JsonObject { ["points"] = new JsonArray(new JsonArray(x, y)) });
+                if ((probe?["heights"] as JsonArray)?.FirstOrDefault() is JsonValue g && g.TryGetValue<double>(out var land)) landZ = land;
+            }
+            var fixedHeight = hangsFrom != null && hung.ContainsKey(hangsFrom) || landZ != null;
+            var stacked = !built && !fixedHeight && anchors.ContainsKey(key);
+            double z = hangsFrom != null && hung.TryGetValue(hangsFrom, out var from) ? from.Z + oz - from.Oz
+                : landZ is double lz ? lz + aboveGround!.Value
+                : built && houseZ is double hz ? hz + oz - house.Oz
                 : stacked ? anchors[key].Z + oz - anchors[key].Oz
                 : groundZ + oz;
             var res = await _pipe.SendRequestAsync("place_object", new JsonObject
             {
                 ["base"] = p["base"]?.ToString(), ["x"] = x, ["y"] = y, ["z"] = z,
                 ["angle"] = ((p["angle"]?.GetValue<double>() ?? 0) + turn + 360) % 360,
-                ["onGround"] = !built && !stacked,
+                ["onGround"] = !built && !stacked && !fixedHeight,
             });
             if (res?["error"] != null) { failed.Add(new { what = p["what"]?.ToString(), error = res["error"]!.ToString() }); continue; }
             placed.Add(new { what = p["what"]?.ToString(), refId = res!["refId"]?.ToString() });
             if (res["refId"]?.ToString() is string placedRef) placedRefs.Add(placedRef);
-            if (!built && !stacked && res["z"]?.GetValue<double>() is double onGround) anchors[key] = (oz, onGround);
+            var placedZ = res["z"]?.GetValue<double>() ?? z;
+            if (p["what"]?.ToString() is string what) hung[what] = (oz, placedZ);
+            if (!built && !stacked && !fixedHeight) anchors[key] = (oz, placedZ);
         }
 
         HomeRegistry.Record(markerRef, layout["name"]?.ToString() ?? name, await CharacterId(), placedRefs, clearedRefs);
@@ -439,6 +456,7 @@ public partial class CharacterTools
                 var s = spots[i * placedPieces.Count + j] as JsonObject;
                 var what = p["what"]?.ToString() ?? p["base"]?.ToString() ?? "a piece";
                 var o = (JsonArray)p["offset"]!;
+                if (p["hangsFrom"] != null) continue;   // hangs from another piece (the pot from the spit), off the ground
                 if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
                 if (s?["land"]?.GetValue<bool>() != true) { score += 10000; problems.Add($"{what}: no land under it"); continue; }
                 if (playerAt is { } pl && points[i * placedPieces.Count + j] is JsonObject pt &&
@@ -574,6 +592,21 @@ public partial class CharacterTools
                 if (moved?["error"] != null) return DeserializeResponse(moved);
                 steps.Add($"moved to {house.Alias} (the game's own move)");
                 completeVisit = true;  // the spouse's own house no longer matters
+                // GOG, 2026-11-25: the game's move left the editor location (and SkyLink's record) at the SkyLink home the spouse had
+                // before. The house becomes their place too, so packages "near editor location" and FinalizeCharacter agree.
+                var owned = await _pipe.SendRequestAsync("owned_houses");
+                if ((owned?["owned"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(o =>
+                        house.Names.Contains(o["name"]?.ToString()?.ToLowerInvariant() ?? "")) is { } houseInfo && houseInfo["ref"]?.ToString() is string houseRef)
+                {
+                    var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = houseRef });
+                    if (set?["error"] == null) steps.Add($"{houseInfo["name"]} is their place (editor location)");
+                    if (SlotRegistry.SlotForRef(spouse) is int houseSlot && SlotRegistry.Load()[houseSlot.ToString()] is JsonObject houseEntry)
+                    {
+                        var copy = houseEntry.DeepClone().AsObject();
+                        copy["home"] = new JsonObject { ["name"] = houseInfo["name"]?.ToString(), ["kind"] = "house", ["ref"] = houseRef };
+                        SlotRegistry.Reserve(houseSlot, copy);
+                    }
+                }
             }
             else if (key == "skylink")
             {

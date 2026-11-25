@@ -290,7 +290,7 @@ public class GuidebookTools : ToolBase
             var path = CacheFile(url);
             var temp = path + ".tmp";
             File.WriteAllText(temp, body);
-            File.Move(temp, path, overwrite: true);
+            SkyLinkSettings.ReplaceFile(temp, path);
         }
         catch { /* the disk cache is optional */ }
     }
