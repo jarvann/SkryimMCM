@@ -6978,6 +6978,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-131",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "The home site survey counts ground mist (FX effects) as obstacles",
+          "description": "Desktop 1.6 test, below Solitude: BuildHomeLayout's dry run listed FXMistLow01LongHalfVis as 'in the way' on 13 of 15 problem lines and found no good fit; clearing would switch the mist off too. GroundSurvey's Blocks() takes any static or movable static wider than 40 units: effects have no collision. Fix: leave out models under Effects\\ (and FX-named ones), in the survey and in what clearing switches off.",
+          "history": [
+            {
+              "datetime": "2026-11-25T16:40",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
