@@ -7234,6 +7234,38 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-142",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A follower far away can't be removed or dismissed by tool",
+          "description": "Desktop 1.6 test (BUG T): RemoveSpawnedNpc refused 'This character is following the player. Dismiss them first' for followers out of talking range; the tester cleared the teammate flag by console. Add a dismiss option: the game's DismissFollower when the vanilla follower alias holds them, else teammate off and CurrentFollowerFaction -1.",
+          "history": [
+            {
+              "datetime": "2026-11-25T18:00",
+              "note": "From the Desktop 1.6 final report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-143",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "StartNewGame's direct-cell start leaves start-up quests unstarted, with no warning",
+          "description": "Desktop 1.6 test: after a coc start the house-buying quest was stopped with empty aliases, the marriage quest needed its stage set by hand, and guards in Solitude and Markarth were hostile with no bounty. Likely one cause (the opening never ran). StartNewGame's note should say so (an alternate-start mod or the normal opening avoids it).",
+          "history": [
+            {
+              "datetime": "2026-11-25T18:00",
+              "note": "From the Desktop 1.6 final report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
