@@ -7378,6 +7378,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-146",
+          "type": "bug",
+          "status": "fixed",
+          "priority": "high",
+          "title": "Under MO2 every face edit is refused (LoadCharacterPreset returned false)",
+          "description": "GOG/MO2, 2026-11-25 (Desktop face work): SetFaceSliders, ResetFace, SetFaceTint and SetFace all failed with 'CharGen.LoadCharacterPreset returned false: the face is unchanged', while the game's own _current preset loaded. _edit.jslot was first created by SkyLink (18:34:50) after the game started (18:16): under MO2 the game doesn't see a file another program creates (as BUG-106 for face files). Proved: a byte-for-byte copy of a game-saved preset, created from outside, loaded false. Fixed: under MO2 the game saves _edit itself first, then SkyLink rewrites its contents and loads it.",
+          "history": [
+            {
+              "datetime": "2026-11-25T18:45",
+              "note": "Found in Desktop's face session on GOG; cause proved with a probe copy; fixed on bugfix/BUG-146-mo2-face-edit."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
