@@ -1425,8 +1425,10 @@ namespace SkyrimMCP::NPCManager {
         json items = json::array();
         for (auto* armor : worn) {
             actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
-            // Not forced: a forced item can't be taken off again by trading or by a follower mod's outfits.
-            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, false, false);
+            // BUG-140 (GOG, 2026-11-25): equipped normally, the copies came off at every cell change (the record has no outfit, so the
+            // game dresses the character from nothing). Forced: they stay on; trading still takes them, a follower mod's outfit
+            // replaces them.
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);
             items.push_back(armor->GetName() ? armor->GetName() : "");
         }
         return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
@@ -1596,8 +1598,9 @@ namespace SkyrimMCP::NPCManager {
             return {{"error", "Not a spawned NPC: " + refId + " is one of the game's levelled characters (its run-time base comes from a levelled list)."}};
         if (auto* follower = ref->As<RE::Actor>(); follower && follower->IsPlayerTeammate())
             return {{"error", "This character is following the player. Dismiss them first (a follower mod would keep an empty place for them)."}};
+        // BUG-144 (GOG, 2026-11-25): deleted in the same instant, the game was still moving the character on a job thread and
+        // crashed (MovementControllerNPC, 270 ms later). Switched off here; DeleteSpawnedNpc deletes it once the game has let go.
         ref->Disable();
-        ref->SetDelete(true);
         if (slot >= 0) {
             // The slot is free again once it has its own name back.
             if (auto* npc = base->As<RE::TESNPC>()) {
@@ -1605,6 +1608,20 @@ namespace SkyrimMCP::NPCManager {
                 npc->AddChange(RE::TESNPC::ChangeFlags::kFullName);
             }
         }
-        return {{"removed", true}, {"refId", refId}};
+        return {{"removed", true}, {"refId", refId}, {"deleteNext", true}};
+    }
+
+    json DeleteSpawnedNpc(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+        if (!ref) return {{"error", "Reference not found: " + refId}};
+        auto* base = ref->GetBaseObject();
+        const int slot = SlotIndex(base);
+        if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0) || (slot < 0 && ref->extraList.HasType(RE::ExtraDataType::kLeveledCreature)))
+            return {{"error", "Not a spawned NPC: " + refId}};
+        if (!ref->IsDisabled()) return {{"error", "Still enabled: remove it first (RemoveSpawnedNpc)."}};
+        ref->SetDelete(true);
+        return {{"deleted", true}, {"refId", refId}};
     }
 }

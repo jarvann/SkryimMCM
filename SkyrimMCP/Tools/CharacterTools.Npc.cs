@@ -710,8 +710,26 @@ public partial class CharacterTools
         }
         if (r?["error"] == null && SlotRegistry.SlotForRef(id) is int slotIndex) SlotRegistry.Release(slotIndex);
         if (dismissed != null && r is JsonObject reply) reply["dismissed"] = dismissed;
+        // BUG-144 (GOG, 2026-11-25): deleted in the same instant the game was still moving the character, and crashed. Switched off
+        // first; deleted once the game has let go of it (a few seconds, and the next removal waits behind this one).
+        if (r?["error"] == null && r?["deleteNext"]?.GetValue<bool>() == true && r is JsonObject removedReply)
+        {
+            await RemovalGate.WaitAsync();
+            try
+            {
+                await Task.Delay(3000);
+                var deleted = await _pipe.SendRequestAsync("delete_spawned_npc", new JsonObject { ["refId"] = id });
+                removedReply.Remove("deleteNext");
+                removedReply["deleted"] = deleted?["deleted"]?.GetValue<bool>() == true;
+            }
+            catch (McpException ex) { removedReply["deleted"] = false; removedReply["deleteError"] = ex.Message; }
+            finally { RemovalGate.Release(); }
+        }
         return DeserializeResponse(r);
     }
+
+    // One removal's delete at a time, so a batch of removals doesn't delete characters back to back while the game moves them.
+    private static readonly SemaphoreSlim RemovalGate = new(1, 1);
 
     /// <summary>
     /// Ends following without a conversation: the game's own DismissFollower when its follower alias holds the character (so its

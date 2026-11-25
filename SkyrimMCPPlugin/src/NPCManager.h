@@ -26,6 +26,8 @@ namespace SkyrimMCP {
         // aren't kept by saves: without SkyLink's NPC slot plugin the spawn is a preview for this session.
         json SpawnNpc(const json& params);
         json RemoveSpawnedNpc(const std::string& refId);
+        // BUG-144: the second half of a removal, a few seconds after RemoveSpawnedNpc switched the character off.
+        json DeleteSpawnedNpc(const std::string& refId);
         json SpawnedNpcStay(const std::string& refId);
         // Every shape on the actor's loaded head: its material, the textures the game really loaded and the tint colours.
         json HeadMaterials(const std::string& refId);

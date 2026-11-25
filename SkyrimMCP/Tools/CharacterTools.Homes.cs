@@ -587,6 +587,21 @@ public partial class CharacterTools
         // script error. Married means a real reference.
         if (!uint.TryParse(spouse?.Trim(), System.Globalization.NumberStyles.HexNumber, null, out var spouseId) || spouseId == 0)
             return new { error = "The player isn't married (the marriage quest has no spouse). Nothing was changed." };
+        // GOG retest, 2026-11-25: the quest still named a spouse removed with RemoveSpawnedNpc, and was "moved".
+        try
+        {
+            var gone = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ObjectReference", ["functionName"] = "IsDeleted", ["target"] = spouse!.Trim(), ["args"] = new JsonArray(),
+            });
+            var disabled = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "ObjectReference", ["functionName"] = "IsDisabled", ["target"] = spouse.Trim(), ["args"] = new JsonArray(),
+            });
+            if (gone?["result"]?.GetValue<bool?>() == true || disabled?["result"]?.GetValue<bool?>() == true)
+                return new { error = $"The marriage quest still names {spouse}, who has been removed from the game. Nothing was changed.", spouse };
+        }
+        catch (McpException) { }
         var key = home.Trim().ToLowerInvariant();
         var steps = new List<string>();
         try
