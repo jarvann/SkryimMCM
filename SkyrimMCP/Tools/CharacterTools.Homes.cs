@@ -284,6 +284,11 @@ public partial class CharacterTools
             note = site.Best.Problems.Count == 0 ? "The ground is clear for every piece." :
                 site.Best.Score > 1500 ? "No good fit near here: try another spot (more open, flatter)." : "The best fit near here; check these pieces once built.",
         };
+        // BUG-134 (GOG, 2026-11-25): rebuilt in place (where a reference) with the player standing in it, pieces went on top of her.
+        // Only 'here' can move the home away from her; elsewhere she steps aside first.
+        var onPlayer = (site.Best?.Problems ?? []).Where(pr => pr.EndsWith("where the player stands", StringComparison.Ordinal)).ToList();
+        if (!dryRun && onPlayer.Count > 0 && !(fit && where == "here"))
+            return new { error = "The player is standing where the home goes. Nothing was built: step away from the site (a few metres out), then build again.", pieces = onPlayer };
         var t = turn * Math.PI / 180;
         if (dryRun)
             return new { dryRun = true, layout = layout["name"]?.ToString(), center = new[] { Math.Round(cx), Math.Round(cy) }, turned = Math.Round(turn, 1), pieces = pieces.Count, site = siteReport, note = "Pass dryRun: false to build it." };
@@ -373,11 +378,10 @@ public partial class CharacterTools
         object? residentResult = null;
         if (!string.IsNullOrWhiteSpace(resident))
         {
-            string? spouse = null;
-            try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); } catch (McpException) { }
-            residentResult = string.Equals(spouse, resident.Trim(), StringComparison.OrdinalIgnoreCase)
-                ? await SetSpouseHome("skylink", markerRef)
-                : DeserializeResponse(await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = resident.Trim(), ["at"] = markerRef }));
+            // BUG-136 (GOG, 2026-11-25): a relative living here didn't make it the family home, and wasn't recorded as living here.
+            // The same path as SetHome: the spouse through the marriage quest, a relative's first home becomes the family home.
+            var role = SlotRegistry.SlotForRef(resident.Trim()) is int rs ? SlotRegistry.Load()[rs.ToString()]?["family"]?.ToString() : null;
+            residentResult = await ApplyHome(resident.Trim(), markerRef, role);
         }
         return new { built = layout["name"]?.ToString(), center = markerRef, placed = placed.Count, failed, site = siteReport, resident = residentResult, pieces = placed,
             note = "The marker is the home's centre: set_home and SetSpouseHome take it, SaveHomeLayout and RemoveHomeLayout start from it." };
@@ -454,7 +458,7 @@ public partial class CharacterTools
             {
                 var p = placedPieces[j];
                 var s = spots[i * placedPieces.Count + j] as JsonObject;
-                var what = p["what"]?.ToString() ?? p["base"]?.ToString() ?? "a piece";
+                var what = p["what"]?.ToString() is { Length: > 0 } named ? named : p["base"]?.ToString() ?? "a piece";
                 var o = (JsonArray)p["offset"]!;
                 if (p["hangsFrom"] != null) continue;   // hangs from another piece (the pot from the spit), off the ground
                 if (!seen.Add(((long)Math.Round(o[0]!.GetValue<double>() / 20), (long)Math.Round(o[1]!.GetValue<double>() / 20)))) continue;
@@ -529,7 +533,10 @@ public partial class CharacterTools
         // Steam, 2026-11-24: a removed homestead stayed the family home, pointing at a marker that was gone.
         var familyLists = FamilyHomes.RemoveEverywhere(center.Trim());
         var residents = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
-            .Where(e => string.Equals(e?["home"]?["ref"]?.ToString(), center.Trim(), StringComparison.OrdinalIgnoreCase))
+            // BUG-133 (GOG, 2026-11-25): a spouse's home was kept as a bare reference, and reading ["ref"] of it threw after the
+            // home was already gone, so the reply was a bare error and named no one. Both forms are read now.
+            .Where(e => string.Equals(e?["home"] switch { JsonObject h => h["ref"]?.ToString(), JsonValue v => v.ToString(), _ => null },
+                center.Trim(), StringComparison.OrdinalIgnoreCase))
             .Select(e => $"{e!["name"]} ({e["refId"]})").ToList();
         return new
         {
@@ -641,7 +648,10 @@ public partial class CharacterTools
                 if (SlotRegistry.SlotForRef(spouse) is int slot && SlotRegistry.Load()[slot.ToString()] is JsonObject entry)
                 {
                     var copy = entry.DeepClone().AsObject();
-                    copy["home"] = at.Trim();
+                    copy["home"] = new JsonObject
+                    {
+                        ["name"] = HomeRegistry.Load()[at.Trim()]?["name"]?.ToString() ?? "SkyLink home", ["kind"] = "skylink", ["ref"] = at.Trim(),
+                    };
                     SlotRegistry.Reserve(slot, copy);
                 }
             }

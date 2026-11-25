@@ -449,8 +449,17 @@ namespace SkyrimMCP::WorldManager {
             if (!base || ref->IsDisabled() || ref->IsDeleted() || ref->Is(RE::FormType::ActorCharacter)) return false;
             switch (base->GetFormType()) {
             case RE::FormType::Static: case RE::FormType::MovableStatic: case RE::FormType::Tree: case RE::FormType::Furniture:
-            case RE::FormType::Container: case RE::FormType::Door: case RE::FormType::Activator: case RE::FormType::Flora:
+            case RE::FormType::Container: case RE::FormType::Door: case RE::FormType::Activator: case RE::FormType::Flora: {
+                // BUG-131 (GOG, 2026-11-25): ground mist (FXMistLow01LongHalfVis) was counted in the way, and would have been
+                // cleared. Effects have nothing to bump into: their meshes live under Effects\ and their names start with FX.
+                auto* model = base->As<RE::TESModel>();
+                const std::string path = model && model->GetModel() ? model->GetModel() : "";
+                std::string lower(path.size(), '\0');
+                std::transform(path.begin(), path.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                const auto file = lower.substr(lower.find_last_of("\\/") == std::string::npos ? 0 : lower.find_last_of("\\/") + 1);
+                if (lower.starts_with("effects\\") || lower.starts_with("meshes\\effects\\") || file.starts_with("fx")) return false;
                 return ref->GetBoundMax().x - ref->GetBoundMin().x > 40.0f;  // markers and pebbles don't count
+            }
             default:
                 return false;
             }
@@ -538,8 +547,18 @@ namespace SkyrimMCP::WorldManager {
             if (ref->GetPosition().GetDistance(c) > radius || !seen.insert(ref->GetFormID()).second) return RE::BSContainer::ForEachResult::kContinue;
             const auto p = ref->GetPosition();
             const char* ed = base->GetFormEditorID();
+            // BUG-137: statics have no name and no editor ID after loading, so a saved layout's pieces were nameless; the model's
+            // file name says what they are.
+            std::string what = ed && *ed ? ed : base->GetName() && *base->GetName() ? base->GetName() : "";
+            if (what.empty()) {
+                if (auto* model = base->As<RE::TESModel>(); model && model->GetModel() && *model->GetModel()) {
+                    what = model->GetModel();
+                    if (const auto slash = what.find_last_of("\\/"); slash != std::string::npos) what = what.substr(slash + 1);
+                    if (const auto dot = what.rfind('.'); dot != std::string::npos) what = what.substr(0, dot);
+                }
+            }
             pieces.push_back({{"refId", std::format("{:08X}", ref->GetFormID())}, {"base", StableIdOf(base)}, {"type", RE::FormTypeToString(base->GetFormType())},
-                              {"what", ed && *ed ? json(ed) : json(base->GetName() && *base->GetName() ? base->GetName() : "")},
+                              {"what", what},
                               {"offset", { std::round((p.x - c.x) * 10) / 10, std::round((p.y - c.y) * 10) / 10, std::round((p.z - c.z) * 10) / 10 }},
                               {"angle", std::round(ref->GetAngleZ() * 57.2957795f * 10) / 10}, {"scale", ref->GetScale()}});
             return RE::BSContainer::ForEachResult::kContinue;
