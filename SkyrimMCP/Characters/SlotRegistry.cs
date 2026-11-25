@@ -164,10 +164,16 @@ public static class SlotRegistry
     public static string SlotObjectId(int slot) => (0x800 + slot).ToString("X8");
 
     /// <summary>
+    /// Stand-ins kept ready per race and sex. Two let only two new characters of a kind show their faces at once in a session: the
+    /// third (a family of three Nord women) waited for a restart (BUG-124, GOG 2026-11-25). Five files of each kind are a few KB.
+    /// </summary>
+    public const int StandInsPerBlock = 5;
+
+    /// <summary>
     /// FEAT-305: makes sure the first few free slots of each race and sex have face files, stand-ins where none exist, so that from
     /// the next game start a new character's face shows at once. Returns the files written, or why none could be.
     /// </summary>
-    public static (int Written, string? Problem) PrepareFaces(int perBlock = 2)
+    public static (int Written, string? Problem) PrepareFaces(int perBlock = StandInsPerBlock)
     {
         if (SkyLinkSettings.WritableDataFolder() is not string root) return (0, "the game's Data folder wasn't found");
         if (!SkyLinkSettings.GameFileFolders().Any(f => File.Exists(Path.Combine(f, "SkyLinkAI.esp")))) return (0, "SkyLinkAI.esp isn't installed");

@@ -132,7 +132,38 @@ public partial class CharacterTools
                 female = roleSex == "female";
             }
             roleMarryable = match["marryable"]?.GetValue<bool>() == true;
+            // BUG-120: asked for as marryable in a blood role, it was quietly made not marryable.
+            if (!roleMarryable && marryable == true)
+                return new { error = $"A {familyRole} is kin by blood, so can't be married (only step roles can). Nothing was spawned: ask again with marryable false, or a step role." };
             if (!roleMarryable) marryable = false;
+        }
+
+        // BUG-119: the dry run echoed any race text; the race is checked before anything else now.
+        string? raceName = null;
+        if (!string.IsNullOrWhiteSpace(race))
+        {
+            JsonNode? found;
+            try { found = await _pipe.SendRequestAsync("resolve_race", new JsonObject { ["race"] = race.Trim() }); }
+            catch (McpException ex) { return new { error = ex.Message }; }
+            if (found?["error"] != null) return DeserializeResponse(found);
+            raceName = found?["name"]?.ToString();
+        }
+        // BUG-123: a named voice without follower lines kept, and the follower couldn't be recruited. The two answers conflict: ask.
+        if (!string.IsNullOrWhiteSpace(voice))
+        {
+            JsonNode? info;
+            try { info = await _pipe.SendRequestAsync("voice_info", new JsonObject { ["voice"] = voice.Trim() }); }
+            catch (McpException ex) { return new { error = ex.Message }; }
+            if (info?["error"] != null) return DeserializeResponse(info);
+            var lacks = new List<string>();
+            if (follower == true && info?["followerLines"]?.GetValue<bool?>() == false) lacks.Add("follower lines (the recruit dialogue)");
+            if (marryable == true && info?["marriageLines"]?.GetValue<bool?>() == false) lacks.Add("marriage proposal lines");
+            if (lacks.Count > 0)
+                return new
+                {
+                    error = $"The voice {info!["voice"]} has no {string.Join(" or ", lacks)}, so that part wouldn't work. Nothing was spawned: ask the player for another voice " +
+                            "(the even-toned voices have both), or leave voice out and SkyLink picks one that has them.",
+                };
         }
 
         // Every new character: the player says whether it follows and whether it can be married (Cory, 2026-11-23).
@@ -152,7 +183,7 @@ public partial class CharacterTools
                 name,
                 family = familyRole,
                 resemblance = likeness,
-                race = race ?? (template != null ? "the template's race" : "the player's race"),
+                race = raceName ?? (template != null ? "the template's race" : "the player's race"),
                 sex = female is bool f ? (f ? "female" : "male") : template != null ? "the template's sex" : "the player's sex",
                 template = template ?? "a plain NPC of that race and sex",
                 face = face == "player" ? "the player's current face (RaceMenu CharGen)" : "the template's own face",
@@ -237,6 +268,26 @@ public partial class CharacterTools
         {
             try { followerResult = (await SetFollower(refId, true, chooseVoice: string.IsNullOrWhiteSpace(voice), spawned)).Reply; }
             catch (McpException ex) { followerResult = new { error = ex.Message, note = "Spawned, but not as a follower." }; }
+        }
+
+        // BUG-128 (GOG, 2026-11-25): the proposal needs the character to like the player (Friend or better); a follower is an ally
+        // already, anyone else marryable started as an acquaintance and had no proposal line.
+        string? friendNote = null;
+        if (marryable == true && follower != true && familyRole == null && refId != null && await SetRelationshipToPlayer(refId, 1) is string notFriend)
+            friendNote = "The relationship rank (Friend, which the proposal needs) wasn't set: " + notFriend;
+        // BUG-129: on a game that never met Maramal (a direct-cell start) no proposal line shows until The Bonds of Matrimony has
+        // started; say so rather than set the quest.
+        string? marriageQuestNote = null;
+        if (marryable == true && refId != null)
+        {
+            try
+            {
+                var stage = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = "GetStage 00074793" });
+                if (System.Text.RegularExpressions.Regex.Match(stage?["output"]?.ToString() ?? "", @">>\s*([0-9.]+)") is { Success: true } sm &&
+                    double.TryParse(sm.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var st) && st < 10)
+                    marriageQuestNote = "No one can be proposed to yet in this game: The Bonds of Matrimony hasn't started. Maramal in Riften's Temple of Mara (or The Bee and Barb early on) starts it.";
+            }
+            catch (McpException) { }
         }
 
         // The proposal only shows for voices in the game's marriage voice lists (GOG, 2026-11-23): one without them gets the even-toned
@@ -358,6 +409,8 @@ public partial class CharacterTools
             attraction = attractionResult,
             home = homeResult,
             marriageVoice,
+            friendship = friendNote,
+            marriageQuest = marriageQuestNote,
             outfit = outfitResult,
             slotFace,
             lasting = inSlot,
@@ -489,10 +542,18 @@ public partial class CharacterTools
     {
         var set = await _pipe.SendRequestAsync("set_family", new JsonObject { ["refId"] = refId, ["role"] = role });
         if (set?["error"] != null) return (false, DeserializeResponse(set));
-        // Ally (3) for family, acquaintance (0) when taken out: how the game decides whether someone likes the player.
-        var failed = await SetRelationshipToPlayer(refId, set?["role"] is JsonValue ? 3 : 0);
+        // Ally (3) for family. Taken out: ally still for a follower, Friend for someone marryable (the proposal needs it), else
+        // acquaintance (BUG-135: a follower dropped to acquaintance, which ended the following and the proposal).
+        var rank = 3;
+        if (set?["role"] is not JsonValue)
+        {
+            var forms = await _pipe.SendRequestAsync("character_forms", new JsonObject { ["refId"] = refId });
+            bool In(string id) => (forms?["forms"] as JsonArray ?? []).OfType<JsonObject>().Any(f => f["kind"]?.ToString() == "faction" && f["stableId"]?.ToString() == id);
+            rank = In("Skyrim.esm|05C84D") ? 3 : In("Skyrim.esm|019809") ? 1 : 0;
+        }
+        var failed = await SetRelationshipToPlayer(refId, rank);
         var liking = failed == null ? null : "The relationship rank wasn't set: " + failed;
-        return (true, new { member = DeserializeResponse(set), relationship = liking ?? (set?["role"] is JsonValue ? "ally" : "acquaintance") });
+        return (true, new { member = DeserializeResponse(set), relationship = liking ?? rank switch { 3 => "ally", 1 => "friend", _ => "acquaintance" } });
     }
 
     /// <summary>The loaded mods that keep whom an NPC is attracted to (FEAT-306); none when the plugin can't say.</summary>
@@ -603,7 +664,12 @@ public partial class CharacterTools
         if (freeSlot is int f)
         {
             if (SlotRegistry.Load()[f.ToString()] == null) return new { error = $"Slot {f} isn't reserved." };
-            return new { freed = f, filesCleared = SlotRegistry.Release(f), note = "If a save still holds this character it keeps its place, with a blank stand-in for a face." };
+            return new
+            {
+                freed = f, filesCleared = SlotRegistry.Release(f),
+                note = "If a save still holds this character it keeps its place, with a blank stand-in for a face. The slot takes a new character " +
+                       "from the next game start (a slot freed in the same session crashed the game when reused, BUG-108).",
+            };
         }
         JsonNode? state = null;
         try { state = await _pipe.SendRequestAsync("get_session_state"); } catch (Exception) { }
@@ -622,11 +688,18 @@ public partial class CharacterTools
 
     [McpServerTool]
     [Description("Remove an NPC spawned with SpawnNpc (FEAT-122): disables and deletes the reference. Only works on SkyLink's " +
-        "spawned NPCs (runtime bases), never on the game's own characters.")]
-    public async Task<object> RemoveSpawnedNpc(string refId)
+        "spawned NPCs (runtime bases), never on the game's own characters. dismiss: true for a follower too far away to dismiss in conversation (the game's own dismissal, or the follower flags cleared), then removed.")]
+    public async Task<object> RemoveSpawnedNpc(string refId, bool dismiss = false)
     {
         var id = refId.Trim();
         var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+        // BUG-142 (GOG, 2026-11-25): a follower far away couldn't be dismissed in conversation, so couldn't be removed.
+        string? dismissed = null;
+        if (dismiss && r?["error"]?.ToString() is string err && err.Contains("following the player", StringComparison.Ordinal))
+        {
+            dismissed = await DismissFollower(id);
+            r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+        }
         var spawns = LoadSpawns();
         if (r?["error"] == null && spawns[id]?.ToString() is string preset && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
         {
@@ -641,6 +714,67 @@ public partial class CharacterTools
             }
         }
         if (r?["error"] == null && SlotRegistry.SlotForRef(id) is int slotIndex) SlotRegistry.Release(slotIndex);
+        if (dismissed != null && r is JsonObject reply) reply["dismissed"] = dismissed;
+        // BUG-144 (GOG, 2026-11-25): deleted in the same instant the game was still moving the character, and crashed. Switched off
+        // first; deleted once the game has let go of it (a few seconds, and the next removal waits behind this one).
+        if (r?["error"] == null && r?["deleteNext"]?.GetValue<bool>() == true && r is JsonObject removedReply)
+        {
+            await RemovalGate.WaitAsync();
+            try
+            {
+                await Task.Delay(3000);
+                var deleted = await _pipe.SendRequestAsync("delete_spawned_npc", new JsonObject { ["refId"] = id });
+                removedReply.Remove("deleteNext");
+                removedReply["deleted"] = deleted?["deleted"]?.GetValue<bool>() == true;
+            }
+            catch (McpException ex) { removedReply["deleted"] = false; removedReply["deleteError"] = ex.Message; }
+            finally { RemovalGate.Release(); }
+        }
         return DeserializeResponse(r);
+    }
+
+    // One removal's delete at a time, so a batch of removals doesn't delete characters back to back while the game moves them.
+    private static readonly SemaphoreSlim RemovalGate = new(1, 1);
+
+    /// <summary>
+    /// Ends following without a conversation: the game's own DismissFollower when its follower alias holds the character (so its
+    /// quest is left tidy), else the teammate flag off and the follower faction rank back to -1.
+    /// </summary>
+    private async Task<string> DismissFollower(string refId)
+    {
+        const string FollowerQuest = "000750BA";   // DialogueFollower
+        try
+        {
+            var h = await _pipe.SendRequestAsync("alias_handle", new JsonObject { ["quest"] = FollowerQuest, ["alias"] = "Follower" });
+            if (h?["error"] == null)
+            {
+                var held = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = h!["type"]!.ToString(), ["functionName"] = "GetActorRef", ["target"] = h["handle"]!.ToString(), ["args"] = new JsonArray(),
+                });
+                if (string.Equals(held?["result"]?.ToString(), refId, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "DialogueFollowerScript", ["functionName"] = "DismissFollower", ["target"] = FollowerQuest, ["args"] = new JsonArray(0, 0),
+                    });
+                    return "dismissed the game's way (DialogueFollower)";
+                }
+            }
+        }
+        catch (McpException) { }
+        try
+        {
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetPlayerTeammate", ["target"] = refId, ["args"] = new JsonArray(false, true),
+            });
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetFactionRank", ["target"] = refId, ["args"] = new JsonArray("0005C84E", -1),
+            });
+            return "follower flags cleared (a follower mod may still list them until its own menu forgets them)";
+        }
+        catch (McpException ex) { return "couldn't dismiss: " + ex.Message; }
     }
 }

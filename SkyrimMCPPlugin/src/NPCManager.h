@@ -26,6 +26,8 @@ namespace SkyrimMCP {
         // aren't kept by saves: without SkyLink's NPC slot plugin the spawn is a preview for this session.
         json SpawnNpc(const json& params);
         json RemoveSpawnedNpc(const std::string& refId);
+        // BUG-144: the second half of a removal, a few seconds after RemoveSpawnedNpc switched the character off.
+        json DeleteSpawnedNpc(const std::string& refId);
         json SpawnedNpcStay(const std::string& refId);
         // Every shape on the actor's loaded head: its material, the textures the game really loaded and the tint colours.
         json HeadMaterials(const std::string& refId);
@@ -48,6 +50,10 @@ namespace SkyrimMCP {
         // FEAT-304: the Player Family faction's roles (its rank titles), and giving one to a spawned NPC ("none" takes it away).
         // Family members aren't marryable. Adults only.
         json FamilyRoles();
+        // BUG-119: the race a SpawnNpc race text names (as SpawnNpc resolves it), for its dry run.
+        json ResolveRaceText(const std::string& text);
+        // BUG-123: whether a voice type (editor ID or form ID) has follower and marriage proposal lines, before spawning with it.
+        json VoiceInfo(const std::string& voice);
         json SetFamily(const std::string& refId, const std::string& role);
         // A spawned NPC takes what the player wears: its own outfit removed (and its default outfit, or it comes back on load), copies
         // of the worn armour added and put on. Player-made enchantments and tempering aren't copied.

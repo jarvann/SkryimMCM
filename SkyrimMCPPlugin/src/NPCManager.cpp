@@ -1316,6 +1316,27 @@ namespace SkyrimMCP::NPCManager {
         return result;
     }
 
+    json ResolveRaceText(const std::string& text) {
+        auto* race = ResolveRace(text);
+        if (!race) return {{"error", "No race called '" + text + "': give the name the game shows (Nord, High Elf, Khajiit...), an editor ID (NordRace) or a form ID."}};
+        return {{"race", std::format("{:08X}", race->GetFormID())}, {"name", race->GetName()}, {"raceId", StableId(race)},
+                {"child", race->IsChildRace()}};
+    }
+
+    json VoiceInfo(const std::string& voice) {
+        RE::TESForm* v = RE::TESForm::LookupByEditorID(voice);
+        if (!v) try { v = RE::TESForm::LookupByID(Helpers::ParseFormId(voice)); } catch (...) {}
+        auto* type = v ? v->As<RE::BGSVoiceType>() : nullptr;
+        if (!type) return {{"error", "Not a voice type: " + voice}};
+        auto* followerList = RE::TESForm::LookupByID<RE::BGSListForm>(0x000C78E7);
+        bool marriage = type->GetFormID() == 0x00013AD4;
+        for (RE::FormID id : { 0x000CCD78u, 0x000CCE3Fu, 0x000CCE4Du, 0x000CCE4Eu, 0x000CCE4Fu, 0x000CCE50u })
+            if (auto* list = RE::TESForm::LookupByID<RE::BGSListForm>(id); list && list->HasForm(type)) marriage = true;
+        return {{"voice", type->GetFormEditorID() && type->GetFormEditorID()[0] ? json(type->GetFormEditorID()) : json(std::format("{:08X}", type->GetFormID()))},
+                {"female", type->data.flags.any(RE::VOICE_TYPE_DATA::Flag::kFemale)},
+                {"followerLines", followerList ? json(followerList->HasForm(type)) : json(nullptr)}, {"marriageLines", marriage}};
+    }
+
     json CharacterForms(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         auto* npc = actor ? actor->GetActorBase() : nullptr;
@@ -1351,7 +1372,12 @@ namespace SkyrimMCP::NPCManager {
                 add(part->textureSet, "head part textures", "record");
             }
         }
-        for (const auto& f : npc->factions) add(f.faction, "faction", "record");
+        // BUG-127 (GOG, 2026-11-25): after a load a faction the character was taken out of stays on the record at rank -1 (a
+        // relative's marriage faction), and was read as membership. Only factions they're in count.
+        for (const auto& f : npc->factions) {
+            if (!f.faction || actor->GetFactionRank(f.faction, false) < 0) continue;
+            add(f.faction, "faction", "record");
+        }
         for (auto* package : npc->aiPackages.packages) add(package, "package", "record");
         if (auto* spells = npc->GetSpellList()) {
             for (std::uint32_t i = 0; spells->spells && i < spells->numSpells; ++i) add(spells->spells[i], "spell", "record");
@@ -1399,8 +1425,10 @@ namespace SkyrimMCP::NPCManager {
         json items = json::array();
         for (auto* armor : worn) {
             actor->AddObjectToContainer(armor, nullptr, 1, nullptr);
-            // Not forced: a forced item can't be taken off again by trading or by a follower mod's outfits.
-            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, false, false);
+            // BUG-140 (GOG, 2026-11-25): equipped normally, the copies came off at every cell change (the record has no outfit, so the
+            // game dresses the character from nothing). Forced: they stay on; trading still takes them, a follower mod's outfit
+            // replaces them.
+            equip->EquipObject(actor, armor, nullptr, 1, nullptr, true, true, false);
             items.push_back(armor->GetName() ? armor->GetName() : "");
         }
         return {{"refId", refId}, {"items", items}, {"count", worn.size()}};
@@ -1489,7 +1517,9 @@ namespace SkyrimMCP::NPCManager {
         // follower mods keep per-follower settings only for unique NPCs (Nether's Follower Framework asks IsUnique before it does).
         if (slotIndex >= 0) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kUnique);
         else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        // BUG-130: a copy of an essential NPC (the game's Ancano) came out essential though it wasn't asked for.
         if (params.value("essential", false)) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kEssential);
+        else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kEssential);
 
         // The face: the template's own FaceGen (it has a file), or none, for RaceMenu's CharGen to build one.
         const auto face = params.value("face", std::string("template"));
@@ -1563,10 +1593,14 @@ namespace SkyrimMCP::NPCManager {
         // Only what SkyLink made: a runtime base (FF...) or one of its slots.
         const int slot = SlotIndex(base);
         if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0)) return {{"error", "Not a spawned NPC (its base isn't SkyLink's): " + refId}};
+        // BUG-132 (GOG, 2026-11-25): a levelled NPC (a city guard) also has a run-time base, and was deleted. The game marks those.
+        if (slot < 0 && ref->extraList.HasType(RE::ExtraDataType::kLeveledCreature))
+            return {{"error", "Not a spawned NPC: " + refId + " is one of the game's levelled characters (its run-time base comes from a levelled list)."}};
         if (auto* follower = ref->As<RE::Actor>(); follower && follower->IsPlayerTeammate())
             return {{"error", "This character is following the player. Dismiss them first (a follower mod would keep an empty place for them)."}};
+        // BUG-144 (GOG, 2026-11-25): deleted in the same instant, the game was still moving the character on a job thread and
+        // crashed (MovementControllerNPC, 270 ms later). Switched off here; DeleteSpawnedNpc deletes it once the game has let go.
         ref->Disable();
-        ref->SetDelete(true);
         if (slot >= 0) {
             // The slot is free again once it has its own name back.
             if (auto* npc = base->As<RE::TESNPC>()) {
@@ -1574,6 +1608,20 @@ namespace SkyrimMCP::NPCManager {
                 npc->AddChange(RE::TESNPC::ChangeFlags::kFullName);
             }
         }
-        return {{"removed", true}, {"refId", refId}};
+        return {{"removed", true}, {"refId", refId}, {"deleteNext", true}};
+    }
+
+    json DeleteSpawnedNpc(const std::string& refId) {
+        RE::TESForm* form = nullptr;
+        try { form = RE::TESForm::LookupByID(Helpers::ParseFormId(refId)); } catch (...) {}
+        auto* ref = form ? form->As<RE::TESObjectREFR>() : nullptr;
+        if (!ref) return {{"error", "Reference not found: " + refId}};
+        auto* base = ref->GetBaseObject();
+        const int slot = SlotIndex(base);
+        if (!base || ((base->GetFormID() >> 24) != 0xFF && slot < 0) || (slot < 0 && ref->extraList.HasType(RE::ExtraDataType::kLeveledCreature)))
+            return {{"error", "Not a spawned NPC: " + refId}};
+        if (!ref->IsDisabled()) return {{"error", "Still enabled: remove it first (RemoveSpawnedNpc)."}};
+        ref->SetDelete(true);
+        return {{"deleted", true}, {"refId", refId}};
     }
 }

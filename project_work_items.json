@@ -6754,7 +6754,7 @@
         {
           "id": "BUG-119",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "SpawnNpc's dry run doesn't check the race",
           "description": "Desktop 1.6 test, GOG 2026-11-25: a dry run with race 'Klingon' echoed it back as if fine (High Elf, DarkElfRace and 00013748 came back the same way), so a dry run can't show whether a race resolves. The real spawn refuses an unknown race (BUG-116). Fix: resolve the race in the dry run and report the race found, or the refusal.",
@@ -6762,6 +6762,14 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6770,7 +6778,7 @@
         {
           "id": "BUG-120",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "SpawnNpc's dry run turns marryable off for a blood relative without saying so",
           "description": "Desktop 1.6 test: family 'Sister' with marryable true came back marryable false in the dry run, no explanation. Expected a refusal or a note that blood relatives can't marry (only step roles can).",
@@ -6778,6 +6786,14 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6786,7 +6802,7 @@
         {
           "id": "BUG-121",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "LoadSave let another character's save load when both are named the same",
           "description": "Desktop 1.6 test: LoadSave(SkyLink_FamilyStory2) while the new character 0698A672 played loaded the old one (B043B8D2) with no refusal. CharacterOf reads the ID from the file name; SkyLink's saves have none, so it fell back to the player name, and both are 'Adventurer'. Fix: read the ID from the co-save's SKLK/CHID record when the name has none.",
@@ -6794,6 +6810,14 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6818,7 +6842,7 @@
         {
           "id": "BUG-123",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "A follower spawned with a named voice that has no follower lines keeps it and can't be recruited",
           "description": "Desktop 1.6 test: SpawnNpc(Elvyra Hlaalu, voice FemaleShrill, follower true) spawned her with the voice and a note that the recruit dialogue won't appear. Unnamed voices are replaced (Eilonwy got FemaleEvenToned). The player's two answers conflict: refuse before spawning and ask (another voice, or not a follower).",
@@ -6826,6 +6850,14 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6834,7 +6866,7 @@
         {
           "id": "BUG-124",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "The third character of a race and sex in a session shows the template's face until a restart",
           "description": "Desktop 1.6 test, GOG 2026-11-25: Roggvir Jr (third High Elf man) and Ysolda (third Nord woman) came back 'own face after the next game start'; the first two of each were seen at once. By design so far: stand-ins are written for only the first two free slots of each race and sex (PrepareFaces perBlock 2), and the game only knows files that existed at its start. Proposed: 5 per race and sex (about 200 tiny files), so a family made in one session shows at once.",
@@ -6842,6 +6874,14 @@
             {
               "datetime": "2026-11-25T15:00",
               "note": "From the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6850,7 +6890,7 @@
         {
           "id": "BUG-125",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "low",
           "title": "FamilyStory's 'relatives to make' still lists relatives already made",
           "description": "Desktop 1.6 test: after Eilonwy (Sister) was made, she was listed as made and still in the 'to make' text (the player's living list repeated as written).",
@@ -6858,6 +6898,10 @@
             {
               "datetime": "2026-11-25T15:00",
               "note": "From the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
             }
           ],
           "targetRelease": "1.6",
@@ -6898,7 +6942,7 @@
         {
           "id": "BUG-126",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "high",
           "title": "RestartGame under MO2 said 'launched' but no game came back, then couldn't find MO2",
           "description": "Desktop 1.6 test, GOG 2026-11-25: RestartGame quit the game and replied launched through MO2, but no game started; a second call said MO2's program wasn't found. MO2 had been started with a moshortcut (it runs headless and exits when the game exits): the relaunch most likely went to that instance while it was closing, and once it was gone FindLauncher only looked for a running ModOrganizer.exe or one in the instance folder, which a global instance (AppData\\Local\\ModOrganizer\\<game>) doesn't have. Fix: remember MO2's exe whenever it's seen running (settings), wait for a closing MO2 to exit before relaunching, and check that SkyrimSE starts before saying launched.",
@@ -6906,6 +6950,10 @@
             {
               "datetime": "2026-11-25T15:30",
               "note": "From the Desktop 1.6 test round; Claude Code started the game by hand from C:\\Modding\\MO2."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
             }
           ],
           "targetRelease": "1.6",
@@ -6914,7 +6962,7 @@
         {
           "id": "BUG-127",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "character_forms counts a faction at rank -1 as membership, so relatives read as marryable",
           "description": "Desktop 1.6 test, GOG 2026-11-25 (BUG F): FinalizeCharacter and ExportCharacter report Siggurd (Mother) and Eilonwy (Sister) marryable though spawned marryable false. Live check after the restart: all eight of the new cast have PotentialMarriageFaction (Skyrim.esm 019809) on their base, the relatives with it listed after Player Family, so it was added after set_family took it away. SkyLink adds it only at spawn when marryable is true; SkyLinkAI.esp's slot records have no factions or template; no SPID or marriage mod in the GOG profile. Not yet known: when it comes back (at spawn, at save, at load) and whether the Amulet of Mara line then shows for a relative. Fix after finding where it comes from; FinalizeCharacter/Export read the base list, so they report what the game holds.",
@@ -6926,6 +6974,14 @@
             {
               "datetime": "2026-11-25T16:20",
               "note": "Cause found: in game Siggurd and Eilonwy have PotentialMarriageFaction at rank -1 (GetFactionRank -1, GetInFaction 0), which is not a member, and Desktop saw no marriage line for them. The base list keeps the entry at -1 after a load; character_forms lists it without the rank, so FinalizeCharacter and ExportCharacter's current state say marryable. Fix: only rank >= 0 counts."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6934,7 +6990,7 @@
         {
           "id": "BUG-128",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "high",
           "title": "A marryable character who isn't a follower can't be proposed to",
           "description": "Desktop 1.6 test: Ancano (follower false, marryable true) had no marriage line at relationship rank 0 (Acquaintance); after setrelationshiprank player 1 it appeared. Followers work because they're made allies. The game's proposal needs at least Friend (1): SpawnNpc should set it for a marryable character, and ExportCharacter write the relationship for marryable too (now only follower or family).",
@@ -6942,6 +6998,10 @@
             {
               "datetime": "2026-11-25T16:20",
               "note": "From the Desktop 1.6 test round status report."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
             }
           ],
           "targetRelease": "1.6",
@@ -6950,7 +7010,7 @@
         {
           "id": "BUG-129",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "low",
           "title": "No hint that the Amulet of Mara talk needs The Bonds of Matrimony started",
           "description": "Desktop 1.6 test: on a direct-cell start no proposal line appeared until RelationshipMarriage was set to stage 10 by hand (normally Maramal in Riften starts it). SpawnNpc's marryable reply could say when the quest hasn't reached stage 10 (talk to Maramal first) rather than set it.",
@@ -6958,6 +7018,10 @@
             {
               "datetime": "2026-11-25T16:20",
               "note": "From the Desktop 1.6 test round status report."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
             }
           ],
           "targetRelease": "1.6",
@@ -6966,7 +7030,7 @@
         {
           "id": "BUG-130",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "low",
           "title": "SpawnNpc keeps the template's essential flag though essential wasn't asked",
           "description": "Desktop 1.6 test: Ancano spawned from the game's Ancano came out essential; essential defaults to false. Clear it unless asked (or say it came from the template).",
@@ -6974,6 +7038,14 @@
             {
               "datetime": "2026-11-25T16:20",
               "note": "From the Desktop 1.6 test round status report."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6982,7 +7054,7 @@
         {
           "id": "BUG-131",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "The home site survey counts ground mist (FX effects) as obstacles",
           "description": "Desktop 1.6 test, below Solitude: BuildHomeLayout's dry run listed FXMistLow01LongHalfVis as 'in the way' on 13 of 15 problem lines and found no good fit; clearing would switch the mist off too. GroundSurvey's Blocks() takes any static or movable static wider than 40 units: effects have no collision. Fix: leave out models under Effects\\ (and FX-named ones), in the survey and in what clearing switches off.",
@@ -6990,6 +7062,14 @@
             {
               "datetime": "2026-11-25T16:40",
               "note": "From the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6998,7 +7078,7 @@
         {
           "id": "BUG-132",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "high",
           "title": "RemoveSpawnedNpc deleted one of the game's own guards (a levelled NPC)",
           "description": "Desktop 1.6 test (BUG O): RemoveSpawnedNpc(0002E1D1) replied removed:true for a Solitude guard; his base is FF000CB8 because levelled NPCs get run-time bases, so 'base is FF' passed him as spawned. Undone by loading SkyLink_16_Home2. Fix: only SkyLink's characters (a slot record or the spawned registry), never by base prefix alone.",
@@ -7006,6 +7086,14 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7014,7 +7102,7 @@
         {
           "id": "BUG-133",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "RemoveHomeLayout replied with a bare error though it removed the home, and named no residents",
           "description": "Desktop 1.6 test (BUG M): the real RemoveHomeLayout returned only \"An error occurred invoking 'remove_home_layout'\" yet removed the pieces, restored the cleared land and dropped the family home; residents were never named. An exception after the work (likely the residents/registry part).",
@@ -7022,6 +7110,14 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7030,7 +7126,7 @@
         {
           "id": "BUG-134",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "BuildHomeLayout at a reference placed pieces where the player stood",
           "description": "Desktop 1.6 test (BUG L): building in place of an existing home (where = a reference) reported ': where the player stands', 'Chair: where the player stands' among problems though placed 20. The player-spot check uses the player's position instead of the reference's site, or the pieces really went to the player.",
@@ -7038,6 +7134,18 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Retest: built with the player 1.35 units from the centre marker, no refusal. Expected: the centre is an open yard spot with no piece over it; the refusal is for a piece's footprint over her. To retest standing inside the house or tent."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7046,7 +7154,7 @@
         {
           "id": "BUG-135",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "SetFamilyRole none drops the standing to Acquaintance, even for a marryable follower",
           "description": "Desktop 1.6 test (BUG N): removing a role set relationship rank 0 for Sigrun and Elvyra (followers, marryable), which breaks the follower and the proposal. Keep Ally for followers and at least Friend for marryable characters.",
@@ -7054,6 +7162,14 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7062,7 +7178,7 @@
         {
           "id": "BUG-136",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "A relative made resident at build time doesn't make the family home",
           "description": "Desktop 1.6 test (BUG J): BuildHomeLayout with resident Eilonwy (Sister) left no family home; ApplyHome does it for SetHome, the builder's resident path doesn't.",
@@ -7070,6 +7186,14 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7078,7 +7202,7 @@
         {
           "id": "BUG-137",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "low",
           "title": "A layout saved with SaveHomeLayout loses its piece names",
           "description": "Desktop 1.6 test (BUG K): survey lines for a saved layout read ': ground rises 100 units under it' with no name. SaveHomeLayout should keep 'what' (model file name or the base's name), as the shipped layout has.",
@@ -7086,6 +7210,14 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7094,7 +7226,7 @@
         {
           "id": "BUG-138",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "low",
           "title": "SetSpouseHome with no spouse gives a raw script error",
           "description": "Desktop 1.6 test (BUG P): before any wedding, SetSpouseHome replied \"Argument 'param1': no form with ID object...\" instead of 'the player isn't married'. The empty LoveInterest alias comes back as something not empty.",
@@ -7102,6 +7234,10 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
             }
           ],
           "targetRelease": "1.6",
@@ -7110,7 +7246,7 @@
         {
           "id": "BUG-139",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "high",
           "title": "SetSpouseHome moves the spouse into a house the player doesn't own",
           "description": "Desktop 1.6 test (BUG R): SetSpouseHome('Breezehome') with no house owned ran MoveSpouseAdoption and completed 'Visit your spouse's house'. Refuse unless the house is in owned_houses (as SetHome's choices already are).",
@@ -7118,6 +7254,126 @@
             {
               "datetime": "2026-11-25T17:30",
               "note": "From the Desktop 1.6 test round (full sequence report)."
+            },
+            {
+              "datetime": "2026-11-25T18:30",
+              "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Confirmed by the Desktop retest on GOG."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-140",
+          "type": "bug",
+          "status": "complete",
+          "priority": "medium",
+          "title": "A character made with the player's outfit ends up undressed",
+          "description": "Desktop 1.6 test (BUG Q): a character spawned with outfit 'player' (copies of what the player wears) was undressed. Details to collect in the retest.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:25",
+              "note": "From the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "Retest found when: the copies come off at every cell change (the record has no outfit). Fixed: CopyOutfit force-equips them. To retest across cell changes and a save and reload."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-141",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "For an owned house, SetSpouseHome doesn't move the quest marker, and completeVisit does nothing",
+          "description": "Desktop 1.6 test (BUG S), after buying Vlindrel Hall: the spouse moved through MoveSpouseAdoption but the 'Visit your spouse's house' marker didn't follow; completeVisit replied completed yet the quest stayed at stage 25 with the objective open (also seen on the earlier Breezehome call). Setting stage 25 isn't what closes the objective: show it done (SetObjectiveCompleted) and point HouseCenter or the objective at the house.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:25",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-142",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A follower far away can't be removed or dismissed by tool",
+          "description": "Desktop 1.6 test (BUG T): RemoveSpawnedNpc refused 'This character is following the player. Dismiss them first' for followers out of talking range; the tester cleared the teammate flag by console. Add a dismiss option: the game's DismissFollower when the vanilla follower alias holds them, else teammate off and CurrentFollowerFaction -1.",
+          "history": [
+            {
+              "datetime": "2026-11-25T18:00",
+              "note": "From the Desktop 1.6 final report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-143",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "StartNewGame's direct-cell start leaves start-up quests unstarted, with no warning",
+          "description": "Desktop 1.6 test: after a coc start the house-buying quest was stopped with empty aliases, the marriage quest needed its stage set by hand, and guards in Solitude and Markarth were hostile with no bounty. Likely one cause (the opening never ran). StartNewGame's note should say so (an alternate-start mod or the normal opening avoids it).",
+          "history": [
+            {
+              "datetime": "2026-11-25T18:00",
+              "note": "From the Desktop 1.6 final report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-144",
+          "type": "bug",
+          "status": "complete",
+          "priority": "high",
+          "title": "Removing spawned characters back to back crashed the game",
+          "description": "GOG retest, 2026-11-25 17:36: remove_spawned_npc on the preview, then 270 ms later on a slot character; EXCEPTION_ACCESS_VIOLATION at SkyrimSE.exe+0785872 with the deleted 'Retest Preview' on a job thread's MovementControllerNPC. Disable and SetDelete in the same instant. Fixed: RemoveSpawnedNpc switches the character off, then deletes it 3 s later (delete_spawned_npc), one delete at a time.",
+          "history": [
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "From the Desktop 1.6 retest; fixed on bugfix/1.6-test-round."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-145",
+          "type": "bug",
+          "status": "complete",
+          "priority": "low",
+          "title": "SetSpouseHome acted on a spouse who had been removed",
+          "description": "GOG retest: the marriage quest still named FF000931 after RemoveSpawnedNpc, and SetSpouseHome 'moved' him. Fixed: refused when the spouse is deleted or disabled.",
+          "history": [
+            {
+              "datetime": "2026-11-25T19:00",
+              "note": "From the Desktop 1.6 retest; fixed on bugfix/1.6-test-round."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
