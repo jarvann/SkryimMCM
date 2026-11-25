@@ -664,7 +664,12 @@ public partial class CharacterTools
         if (freeSlot is int f)
         {
             if (SlotRegistry.Load()[f.ToString()] == null) return new { error = $"Slot {f} isn't reserved." };
-            return new { freed = f, filesCleared = SlotRegistry.Release(f), note = "If a save still holds this character it keeps its place, with a blank stand-in for a face." };
+            return new
+            {
+                freed = f, filesCleared = SlotRegistry.Release(f),
+                note = "If a save still holds this character it keeps its place, with a blank stand-in for a face. The slot takes a new character " +
+                       "from the next game start (a slot freed in the same session crashed the game when reused, BUG-108).",
+            };
         }
         JsonNode? state = null;
         try { state = await _pipe.SendRequestAsync("get_session_state"); } catch (Exception) { }

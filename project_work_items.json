@@ -7126,7 +7126,7 @@
         {
           "id": "BUG-134",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "medium",
           "title": "BuildHomeLayout at a reference placed pieces where the player stood",
           "description": "Desktop 1.6 test (BUG L): building in place of an existing home (where = a reference) reported ': where the player stands', 'Chair: where the player stands' among problems though placed 20. The player-spot check uses the player's position instead of the reference's site, or the pieces really went to the player.",
@@ -7142,6 +7142,10 @@
             {
               "datetime": "2026-11-25T19:00",
               "note": "Retest: built with the player 1.35 units from the centre marker, no refusal. Expected: the centre is an open yard spot with no piece over it; the refusal is for a piece's footprint over her. To retest standing inside the house or tent."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7266,7 +7270,7 @@
         {
           "id": "BUG-140",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "medium",
           "title": "A character made with the player's outfit ends up undressed",
           "description": "Desktop 1.6 test (BUG Q): a character spawned with outfit 'player' (copies of what the player wears) was undressed. Details to collect in the retest.",
@@ -7278,6 +7282,10 @@
             {
               "datetime": "2026-11-25T19:00",
               "note": "Retest found when: the copies come off at every cell change (the record has no outfit). Fixed: CopyOutfit force-equips them. To retest across cell changes and a save and reload."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7334,7 +7342,7 @@
         {
           "id": "BUG-144",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "high",
           "title": "Removing spawned characters back to back crashed the game",
           "description": "GOG retest, 2026-11-25 17:36: remove_spawned_npc on the preview, then 270 ms later on a slot character; EXCEPTION_ACCESS_VIOLATION at SkyrimSE.exe+0785872 with the deleted 'Retest Preview' on a job thread's MovementControllerNPC. Disable and SetDelete in the same instant. Fixed: RemoveSpawnedNpc switches the character off, then deletes it 3 s later (delete_spawned_npc), one delete at a time.",
@@ -7342,6 +7350,10 @@
             {
               "datetime": "2026-11-25T19:00",
               "note": "From the Desktop 1.6 retest; fixed on bugfix/1.6-test-round."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7350,7 +7362,7 @@
         {
           "id": "BUG-145",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "low",
           "title": "SetSpouseHome acted on a spouse who had been removed",
           "description": "GOG retest: the marriage quest still named FF000931 after RemoveSpawnedNpc, and SetSpouseHome 'moved' him. Fixed: refused when the spouse is deleted or disabled.",
@@ -7358,6 +7370,10 @@
             {
               "datetime": "2026-11-25T19:00",
               "note": "From the Desktop 1.6 retest; fixed on bugfix/1.6-test-round."
+            },
+            {
+              "datetime": "2026-11-25T19:40",
+              "note": "Confirmed by the Desktop retest on GOG."
             }
           ],
           "targetRelease": "1.6",
