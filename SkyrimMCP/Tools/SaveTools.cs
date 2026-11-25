@@ -22,10 +22,46 @@ public class SaveTools : ToolBase
     /// <summary>The character a save belongs to: the ID in a game-made name, else the header's player name.</summary>
     internal static (string? Id, string? Name) CharacterOf(string path)
     {
-        var id = CharacterIdInName.Match(Path.GetFileName(path)) is { Success: true } m ? m.Groups[1].Value.ToUpperInvariant() : null;
+        // BUG-121 (GOG, 2026-11-25): SkyLink's saves have plain names, so two characters both called Adventurer looked alike and
+        // the other one's save loaded. Their character ID is in SkyLink's co-save record.
+        var id = CharacterIdInName.Match(Path.GetFileName(path)) is { Success: true } m ? m.Groups[1].Value.ToUpperInvariant() : CoSaveCharacterId(path);
         string? name = null;
         try { name = EssScanner.ReadHeader(path).PlayerName; } catch (Exception) { }
         return (id, name);
+    }
+
+    /// <summary>
+    /// The character ID SkyLink keeps in a save's SKSE co-save (plugin 'SKLK', record 'CHID', BUG-091), or null. The co-save is the
+    /// SKSE header (signature, format, SKSE and runtime versions, plugin count), then per plugin its ID, chunk count and length,
+    /// then its chunks (type, version, length, data).
+    /// </summary>
+    internal static string? CoSaveCharacterId(string essPath)
+    {
+        var cosave = Path.ChangeExtension(essPath, ".skse");
+        const uint Uid = 0x534B4C4B, Record = 0x43484944;   // 'SKLK', 'CHID' as MSVC writes them
+        try
+        {
+            if (!File.Exists(cosave)) return null;
+            using var r = new BinaryReader(File.OpenRead(cosave));
+            if (r.ReadUInt32() != 0x45534B53) return null;   // "SKSE" as bytes
+            r.ReadUInt32(); r.ReadUInt32(); r.ReadUInt32();
+            var plugins = r.ReadUInt32();
+            for (var p = 0; p < plugins && r.BaseStream.Position + 12 <= r.BaseStream.Length; p++)
+            {
+                var uid = r.ReadUInt32(); var chunks = r.ReadUInt32(); var length = r.ReadUInt32();
+                var end = r.BaseStream.Position + length;
+                if (uid == Uid)
+                    for (var c = 0; c < chunks && r.BaseStream.Position + 12 <= end; c++)
+                    {
+                        var type = r.ReadUInt32(); r.ReadUInt32(); var size = r.ReadUInt32();
+                        if (type == Record && size == 4) { var id = r.ReadUInt32(); return id == 0 ? null : id.ToString("X8"); }
+                        r.BaseStream.Seek(size, SeekOrigin.Current);
+                    }
+                r.BaseStream.Seek(end, SeekOrigin.Begin);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or EndOfStreamException) { }
+        return null;
     }
 
     static bool IsSkyLinkSave(string file) =>

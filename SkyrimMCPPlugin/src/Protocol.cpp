@@ -278,6 +278,14 @@ namespace SkyrimMCP::Protocol {
         registry["family_roles"] = [](const std::string& id, const json&) {
             return GameThread(id, []() { return NPCManager::FamilyRoles(); });
         };
+        registry["voice_info"] = [](const std::string& id, const json& params) {
+            std::string voice = params.value("voice", std::string());
+            return GameThread(id, [voice]() { return NPCManager::VoiceInfo(voice); });
+        };
+        registry["resolve_race"] = [](const std::string& id, const json& params) {
+            std::string text = params.value("race", std::string());
+            return GameThread(id, [text]() { return NPCManager::ResolveRaceText(text); });
+        };
         registry["set_family"] = [](const std::string& id, const json& params) {
             std::string ref = params.value("refId", std::string());
             std::string role = params.value("role", std::string());

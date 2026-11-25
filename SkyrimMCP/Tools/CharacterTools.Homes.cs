@@ -576,13 +576,26 @@ public partial class CharacterTools
         string? spouse;
         try { spouse = (await SpouseAlias("LoveInterest", "GetActorRef"))?["result"]?.ToString(); }
         catch (McpException ex) { return new { error = ex.Message }; }
-        if (string.IsNullOrEmpty(spouse)) return new { error = "The player isn't married (the marriage quest has no spouse)." };
+        // BUG-138: before any wedding the empty alias came back as something that isn't a reference, and the move failed with a raw
+        // script error. Married means a real reference.
+        if (!uint.TryParse(spouse?.Trim(), System.Globalization.NumberStyles.HexNumber, null, out var spouseId) || spouseId == 0)
+            return new { error = "The player isn't married (the marriage quest has no spouse). Nothing was changed." };
         var key = home.Trim().ToLowerInvariant();
         var steps = new List<string>();
         try
         {
             if (PlayerHouses.FirstOrDefault(h => h.Names.Contains(key) || h.Alias.Equals(home.Trim(), StringComparison.OrdinalIgnoreCase)) is { Alias: not null } house)
             {
+                // BUG-139 (GOG, 2026-11-25): Breezehome was given to the spouse though the player owned no house. Only her own houses.
+                var owned = await _pipe.SendRequestAsync("owned_houses");
+                var ownedList = (owned?["owned"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+                if (ownedList.FirstOrDefault(o => house.Names.Contains(o["name"]?.ToString()?.ToLowerInvariant() ?? "")) is not { } houseInfo)
+                    return new
+                    {
+                        error = $"The player doesn't own {home.Trim()}, so the spouse can't move there. Nothing was changed.",
+                        ownedHouses = ownedList.Select(o => o["name"]?.ToString()).ToList(),
+                        note = ownedList.Count == 0 ? "She owns no house yet: a SkyLink home ('skylink' with at) is the other way." : null,
+                    };
                 // The game's own move: clears every house alias and puts the spouse in this one, whose package keeps them there.
                 var moved = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
                 {
@@ -594,9 +607,7 @@ public partial class CharacterTools
                 completeVisit = true;  // the spouse's own house no longer matters
                 // GOG, 2026-11-25: the game's move left the editor location (and SkyLink's record) at the SkyLink home the spouse had
                 // before. The house becomes their place too, so packages "near editor location" and FinalizeCharacter agree.
-                var owned = await _pipe.SendRequestAsync("owned_houses");
-                if ((owned?["owned"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(o =>
-                        house.Names.Contains(o["name"]?.ToString()?.ToLowerInvariant() ?? "")) is { } houseInfo && houseInfo["ref"]?.ToString() is string houseRef)
+                if (houseInfo["ref"]?.ToString() is string houseRef)
                 {
                     var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = houseRef });
                     if (set?["error"] == null) steps.Add($"{houseInfo["name"]} is their place (editor location)");
