@@ -71,6 +71,11 @@ public class SessionTools : ToolBase
             if (!closed)
                 return new { error = "Skyrim is still running 90 seconds after the quit request (a mod may hold it, or it hung). Close it by hand, then call RestartGame again with saveFirst=false.", savedAs };
             await Task.Delay(3000);   // let SKSE and the mod manager let go of their files
+            // BUG-126: an MO2 started just for the game closes after it; a launch handed to it meanwhile was lost. Wait for it to go
+            // (an MO2 window the player keeps open stays, and takes the launch).
+            if (launch.how.StartsWith("through MO2", StringComparison.Ordinal))
+                for (var waited = 0; waited < 15_000 && Process.GetProcessesByName("ModOrganizer").Length > 0; waited += 500)
+                    await Task.Delay(500);
         }
 
         if (launch.exe == null) return new { launched = false, savedAs, reason = launch.how };
@@ -84,6 +89,15 @@ public class SessionTools : ToolBase
             Process.Start(new ProcessStartInfo(launch.exe, launch.args) { WorkingDirectory = launch.dir, UseShellExecute = true });
         }
         catch (Exception ex) { return new { launched = false, savedAs, reason = $"Couldn't start {launch.exe}: {ex.Message}" }; }
+        // BUG-126: "launched" only once the game itself has started.
+        var started = false;
+        for (var waited = 0; waited < 90_000 && !started; waited += 1000)
+        {
+            await Task.Delay(1000);
+            started = Process.GetProcessesByName("SkyrimSE").Length > 0;
+        }
+        if (!started)
+            return new { launched = false, savedAs, how = launch.how, reason = $"{launch.exe} was started but no Skyrim appeared within 90 seconds. Ask the player to start the game the way they usually do." };
         return new
         {
             launched = true,
@@ -189,7 +203,13 @@ public class SessionTools : ToolBase
         {
             // MO2 has to start the game itself (its virtual Data folder), through the executable entry for SKSE.
             var title = Mo2SkseTitle(mo2);
-            var exe = RunningMo2Exe() ?? (File.Exists(Path.Combine(mo2, "ModOrganizer.exe")) ? Path.Combine(mo2, "ModOrganizer.exe") : null);
+            // BUG-126 (GOG, 2026-11-25): a global instance (AppData\Local\ModOrganizer\<game>) has no ModOrganizer.exe, and an MO2
+            // started only to launch the game quits with it: the program's path is remembered whenever MO2 is seen running.
+            var running = RunningMo2Exe();
+            if (running != null) RememberMo2Exe(running);
+            var remembered = SkyLinkSettings.Load()["mo2Exe"]?.ToString();
+            var exe = running ?? (File.Exists(Path.Combine(mo2, "ModOrganizer.exe")) ? Path.Combine(mo2, "ModOrganizer.exe")
+                : remembered != null && File.Exists(remembered) ? remembered : null);
             var globalRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ModOrganizer");
             var instance = mo2.StartsWith(globalRoot, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(mo2.TrimEnd('\\')) : "";
             if (exe != null && title != null)
@@ -201,6 +221,18 @@ public class SessionTools : ToolBase
         if (game != null && File.Exists(Path.Combine(game, "skse64_loader.exe")))
             return new(Path.Combine(game, "skse64_loader.exe"), "", game, "with skse64_loader.exe");
         return new(null, null, null, "skse64_loader.exe wasn't found in the game folder: ask the player to start the game the way they usually do.");
+    }
+
+    static void RememberMo2Exe(string exe)
+    {
+        try
+        {
+            var settings = SkyLinkSettings.Load();
+            if (string.Equals(settings["mo2Exe"]?.ToString(), exe, StringComparison.OrdinalIgnoreCase)) return;
+            settings["mo2Exe"] = exe;
+            SkyLinkSettings.Save(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     static string? RunningMo2Exe()
