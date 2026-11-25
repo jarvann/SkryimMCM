@@ -6830,6 +6830,70 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-124",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "The third character of a race and sex in a session shows the template's face until a restart",
+          "description": "Desktop 1.6 test, GOG 2026-11-25: Roggvir Jr (third High Elf man) and Ysolda (third Nord woman) came back 'own face after the next game start'; the first two of each were seen at once. By design so far: stand-ins are written for only the first two free slots of each race and sex (PrepareFaces perBlock 2), and the game only knows files that existed at its start. Proposed: 5 per race and sex (about 200 tiny files), so a family made in one session shows at once.",
+          "history": [
+            {
+              "datetime": "2026-11-25T15:00",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-125",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "FamilyStory's 'relatives to make' still lists relatives already made",
+          "description": "Desktop 1.6 test: after Eilonwy (Sister) was made, she was listed as made and still in the 'to make' text (the player's living list repeated as written).",
+          "history": [
+            {
+              "datetime": "2026-11-25T15:00",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-312",
+          "type": "feature",
+          "status": "open",
+          "priority": "low",
+          "title": "Ask through the client's multiple-choice tool when a reply gives options",
+          "description": "Desktop 1.6 test (Cory tried Claude Desktop's survey cards): fixed-choice questions (standing, wealth, follower, marryable, home, race, finalize route) map onto a card; free-text ones (arrival, living, lost, rivalries, secrets) don't. Replies with askThePlayer and options could add: use a multiple-choice question tool if the client has one, the player can always type their own answer, ask in conversation when there are no options. The card's 'assume an answer when skipped' conflicts with never picking for the player.",
+          "history": [
+            {
+              "datetime": "2026-11-25T15:00",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-313",
+          "type": "feature",
+          "status": "open",
+          "priority": "low",
+          "title": "Relatives look their age and not alike: template by age, varied faces",
+          "description": "Desktop 1.6 test: Roggvir and Roggvir Jr came from the same template with the same resemblance (likely the same face); the grandmother used the same young template as the other Nord women. SpawnNpc could take an age (young, adult, old: elder templates and head parts) and vary the template or face between relatives of one family.",
+          "history": [
+            {
+              "datetime": "2026-11-25T15:00",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.7",
+          "dependsOn": []
         }
       ]
     },
