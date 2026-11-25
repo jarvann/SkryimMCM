@@ -6750,6 +6750,86 @@
           "dependsOn": [
             "FEAT-307"
           ]
+        },
+        {
+          "id": "BUG-119",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "SpawnNpc's dry run doesn't check the race",
+          "description": "Desktop 1.6 test, GOG 2026-11-25: a dry run with race 'Klingon' echoed it back as if fine (High Elf, DarkElfRace and 00013748 came back the same way), so a dry run can't show whether a race resolves. The real spawn refuses an unknown race (BUG-116). Fix: resolve the race in the dry run and report the race found, or the refusal.",
+          "history": [
+            {
+              "datetime": "2026-11-25T14:30",
+              "note": "Found in the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-120",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "SpawnNpc's dry run turns marryable off for a blood relative without saying so",
+          "description": "Desktop 1.6 test: family 'Sister' with marryable true came back marryable false in the dry run, no explanation. Expected a refusal or a note that blood relatives can't marry (only step roles can).",
+          "history": [
+            {
+              "datetime": "2026-11-25T14:30",
+              "note": "Found in the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-121",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "LoadSave let another character's save load when both are named the same",
+          "description": "Desktop 1.6 test: LoadSave(SkyLink_FamilyStory2) while the new character 0698A672 played loaded the old one (B043B8D2) with no refusal. CharacterOf reads the ID from the file name; SkyLink's saves have none, so it fell back to the player name, and both are 'Adventurer'. Fix: read the ID from the co-save's SKLK/CHID record when the name has none.",
+          "history": [
+            {
+              "datetime": "2026-11-25T14:30",
+              "note": "Found in the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-122",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "SkyLink saves don't show in the game's Load menu under their character",
+          "description": "Cory, 2026-11-25: SkyLink_16_Start wasn't in the Load menu. The game takes a save's character ID from its file name (the .ess header has none); SkyLink saves are plain labels. Proposed: name them in the game's pattern with the current character's ID, every field built fresh, the label in the location field; check the menu lists them and ListSaves still shows the label.",
+          "history": [
+            {
+              "datetime": "2026-11-25T14:30",
+              "note": "Found in the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-123",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A follower spawned with a named voice that has no follower lines keeps it and can't be recruited",
+          "description": "Desktop 1.6 test: SpawnNpc(Elvyra Hlaalu, voice FemaleShrill, follower true) spawned her with the voice and a note that the recruit dialogue won't appear. Unnamed voices are replaced (Eilonwy got FemaleEvenToned). The player's two answers conflict: refuse before spawning and ask (another voice, or not a follower).",
+          "history": [
+            {
+              "datetime": "2026-11-25T14:30",
+              "note": "Found in the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
