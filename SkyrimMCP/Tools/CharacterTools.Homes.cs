@@ -618,6 +618,9 @@ public partial class CharacterTools
                 {
                     var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = houseRef });
                     if (set?["error"] == null) steps.Add($"{houseInfo["name"]} is their place (editor location)");
+                    // BUG-141: the quest's house marker stayed at the SkyLink home they had before. It points at the house now.
+                    try { await SpouseAlias("HouseCenter", "ForceRefTo", houseRef); steps.Add("the quest's house marker points to it"); }
+                    catch (McpException) { }
                     if (SlotRegistry.SlotForRef(spouse) is int houseSlot && SlotRegistry.Load()[houseSlot.ToString()] is JsonObject houseEntry)
                     {
                         var copy = houseEntry.DeepClone().AsObject();
@@ -658,12 +661,17 @@ public partial class CharacterTools
             else return new { error = "home: one of the player's houses (Breezehome, Honeyside, Proudspire, Hjerim, Vlindrel Hall, Lakeview, Windstad, Heljarchen) or 'skylink' with at." };
             if (completeVisit)
             {
-                var stage = await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"GetStage {SpouseQuest}" });
-                if ((stage?["output"]?.ToString() ?? "").Contains(">> 20") || (stage?["output"]?.ToString() ?? "").Contains(">> 20.00"))
+                // BUG-141 (GOG, 2026-11-25): setting stage 25 left 'Visit your spouse's house' open on the journal, though the reply said
+                // completed. The objective itself is marked done now, and read back.
+                await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
                 {
-                    await _pipe.SendRequestAsync("execute_command", new JsonObject { ["command"] = $"SetStage {SpouseQuest} 25" });
-                    steps.Add("'Visit your spouse's house' completed");
-                }
+                    ["className"] = "Quest", ["functionName"] = "SetObjectiveCompleted", ["target"] = SpouseQuest, ["args"] = new JsonArray(10, true),
+                });
+                var done = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = "Quest", ["functionName"] = "IsObjectiveCompleted", ["target"] = SpouseQuest, ["args"] = new JsonArray(10),
+                });
+                steps.Add(done?["result"]?.GetValue<bool?>() == true ? "'Visit your spouse's house' completed" : "'Visit your spouse's house' couldn't be marked done");
             }
         }
         catch (McpException ex) { return new { error = ex.Message, done = steps }; }

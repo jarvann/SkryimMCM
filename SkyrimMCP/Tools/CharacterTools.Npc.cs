@@ -683,11 +683,18 @@ public partial class CharacterTools
 
     [McpServerTool]
     [Description("Remove an NPC spawned with SpawnNpc (FEAT-122): disables and deletes the reference. Only works on SkyLink's " +
-        "spawned NPCs (runtime bases), never on the game's own characters.")]
-    public async Task<object> RemoveSpawnedNpc(string refId)
+        "spawned NPCs (runtime bases), never on the game's own characters. dismiss: true for a follower too far away to dismiss in conversation (the game's own dismissal, or the follower flags cleared), then removed.")]
+    public async Task<object> RemoveSpawnedNpc(string refId, bool dismiss = false)
     {
         var id = refId.Trim();
         var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+        // BUG-142 (GOG, 2026-11-25): a follower far away couldn't be dismissed in conversation, so couldn't be removed.
+        string? dismissed = null;
+        if (dismiss && r?["error"]?.ToString() is string err && err.Contains("following the player", StringComparison.Ordinal))
+        {
+            dismissed = await DismissFollower(id);
+            r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+        }
         var spawns = LoadSpawns();
         if (r?["error"] == null && spawns[id]?.ToString() is string preset && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
         {
@@ -702,6 +709,49 @@ public partial class CharacterTools
             }
         }
         if (r?["error"] == null && SlotRegistry.SlotForRef(id) is int slotIndex) SlotRegistry.Release(slotIndex);
+        if (dismissed != null && r is JsonObject reply) reply["dismissed"] = dismissed;
         return DeserializeResponse(r);
+    }
+
+    /// <summary>
+    /// Ends following without a conversation: the game's own DismissFollower when its follower alias holds the character (so its
+    /// quest is left tidy), else the teammate flag off and the follower faction rank back to -1.
+    /// </summary>
+    private async Task<string> DismissFollower(string refId)
+    {
+        const string FollowerQuest = "000750BA";   // DialogueFollower
+        try
+        {
+            var h = await _pipe.SendRequestAsync("alias_handle", new JsonObject { ["quest"] = FollowerQuest, ["alias"] = "Follower" });
+            if (h?["error"] == null)
+            {
+                var held = await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                {
+                    ["className"] = h!["type"]!.ToString(), ["functionName"] = "GetActorRef", ["target"] = h["handle"]!.ToString(), ["args"] = new JsonArray(),
+                });
+                if (string.Equals(held?["result"]?.ToString(), refId, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+                    {
+                        ["className"] = "DialogueFollowerScript", ["functionName"] = "DismissFollower", ["target"] = FollowerQuest, ["args"] = new JsonArray(0, 0),
+                    });
+                    return "dismissed the game's way (DialogueFollower)";
+                }
+            }
+        }
+        catch (McpException) { }
+        try
+        {
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetPlayerTeammate", ["target"] = refId, ["args"] = new JsonArray(false, true),
+            });
+            await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
+            {
+                ["className"] = "Actor", ["functionName"] = "SetFactionRank", ["target"] = refId, ["args"] = new JsonArray("0005C84E", -1),
+            });
+            return "follower flags cleared (a follower mod may still list them until its own menu forgets them)";
+        }
+        catch (McpException ex) { return "couldn't dismiss: " + ex.Message; }
     }
 }
