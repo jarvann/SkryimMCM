@@ -362,7 +362,8 @@ public partial class CharacterTools
             slotFace,
             lasting = inSlot,
             note = inSlot
-                ? "Uses one of SkyLinkAI.esp's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot."
+                ? "Uses one of SkyLinkAI.esp's slots, so the game keeps this character in saves. RemoveSpawnedNpc removes it and frees the slot. " +
+                  "When the player is happy with them: FinalizeCharacter (live in this save, or their own mod)."
                 : "A PREVIEW for this session: don't save while it's here. A save made while it (or its removed reference) is in a loaded cell can crash on load. RemoveSpawnedNpc it, leave the area, then save. It won't survive a save and load" +
                   (spawned?["slotPluginLoaded"]?.GetValue<bool>() == true ? " (every slot of that sex in SkyLinkAI.esp is in use)." : " (SkyLinkAI.esp, the optional plugin with NPC slots, isn't in the load order).") +
                   " GetNPCDetailedInfo(refId) shows it; RemoveSpawnedNpc removes it.",
@@ -612,7 +613,7 @@ public partial class CharacterTools
             registry = all.Select(kv => new
             {
                 slot = kv.Key, name = kv.Value?["name"]?.ToString(), family = kv.Value?["family"]?.ToString(), face = kv.Value?["face"]?.ToString(), characterId = kv.Value?["characterId"]?.ToString(),
-                created = kv.Value?["created"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
+                created = kv.Value?["created"]?.ToString(), finalized = kv.Value?["finalized"]?["how"]?.ToString(), filesInPlace = (kv.Value?["files"] as JsonArray)?.All(x => File.Exists(x?.ToString() ?? "")),
             }),
             taken = all.Count,
             note = all.Count == 0 ? "No slots taken." : "25 slots of each race and sex; a free slot is needed for a lasting character.",
