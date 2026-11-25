@@ -692,13 +692,22 @@ public partial class CharacterTools
     public async Task<object> RemoveSpawnedNpc(string refId, bool dismiss = false)
     {
         var id = refId.Trim();
-        var r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
-        // BUG-142 (GOG, 2026-11-25): a follower far away couldn't be dismissed in conversation, so couldn't be removed.
+        // BUG-142 (GOG, 2026-11-25): a follower far away couldn't be dismissed in conversation, so couldn't be removed. The plugin's
+        // refusal comes back as an exception (a failed request), not as a reply with an error: the first fix looked for the reply
+        // and never dismissed anyone (retest, 2026-11-25).
+        JsonNode? r;
         string? dismissed = null;
-        if (dismiss && r?["error"]?.ToString() is string err && err.Contains("following the player", StringComparison.Ordinal))
+        try { r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id }); }
+        catch (McpException ex) when (dismiss && ex.Message.Contains("following the player", StringComparison.Ordinal))
         {
             dismissed = await DismissFollower(id);
-            r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+            try { r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id }); }
+            catch (McpException again) when (again.Message.Contains("following the player", StringComparison.Ordinal))
+            {
+                // The game's dismissal didn't take (or not yet): the follower flags themselves.
+                dismissed = await ClearFollowerFlags(id);
+                r = await _pipe.SendRequestAsync("remove_spawned_npc", new JsonObject { ["refId"] = id });
+            }
         }
         var spawns = LoadSpawns();
         if (r?["error"] == null && spawns[id]?.ToString() is string preset && preset.StartsWith("SkyLink_", StringComparison.Ordinal))
@@ -763,6 +772,12 @@ public partial class CharacterTools
             }
         }
         catch (McpException) { }
+        return await ClearFollowerFlags(refId);
+    }
+
+    /// <summary>The teammate flag off and CurrentFollowerFaction back to -1: following ends without the follower quest.</summary>
+    private async Task<string> ClearFollowerFlags(string refId)
+    {
         try
         {
             await _pipe.SendRequestAsync("call_papyrus_function", new JsonObject
