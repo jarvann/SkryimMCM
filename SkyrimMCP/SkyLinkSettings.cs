@@ -87,7 +87,21 @@ public static class SkyLinkSettings
         Directory.CreateDirectory(Folder);
         var temp = FilePath + ".tmp";
         File.WriteAllText(temp, settings.ToJsonString(Indented));
-        File.Move(temp, FilePath, overwrite: true);
+        ReplaceFile(temp, FilePath);
+    }
+
+    /// <summary>
+    /// Moves a freshly written temp file over the real one. SkyLink's files sit in Documents, which OneDrive syncs: just after a
+    /// write it holds the file for a moment, and a second write a second later failed with an IOException and left the .tmp behind
+    /// (GOG, 2026-11-25: FinalizeCharacter on a second character). Retries for about two seconds before giving up.
+    /// </summary>
+    public static void ReplaceFile(string temp, string path)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try { File.Move(temp, path, overwrite: true); return; }
+            catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException) && attempt < 20) { Thread.Sleep(100); }
+        }
     }
 
     private static string? Str(JsonObject s, string key) =>

@@ -50,7 +50,8 @@ public partial class CharacterTools
         var home = entry["home"] switch
         {
             JsonObject h => new { name = h["name"]?.ToString(), kind = h["kind"]?.ToString(), reference = h["ref"]?.ToString() },
-            JsonValue v => new { name = (string?)"the spouse's home", kind = (string?)"skylink", reference = v.ToString() },
+            // SetSpouseHome keeps only the home's reference.
+            JsonValue v => new { name = HomeRegistry.Load()[v.ToString()]?["name"]?.ToString() ?? "the spouse's home", kind = (string?)"skylink", reference = v.ToString() },
             _ => null,
         };
         var spouse = await IsSpouse(refId);

@@ -30,7 +30,7 @@ public static class SlotRegistry
             Directory.CreateDirectory(SkyLinkSettings.Folder);
             var temp = FilePath + ".tmp";
             File.WriteAllText(temp, all.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temp, FilePath, overwrite: true);
+            SkyLinkSettings.ReplaceFile(temp, FilePath);
         }
     }
 
