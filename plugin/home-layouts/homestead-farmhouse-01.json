@@ -208,15 +208,27 @@
     },
     {
       "role": "yard",
-      "base": "Skyrim.esm|1010B3",
+      "base": "Skyrim.esm|1018E3",
       "offset": [
         522.0,
         88.0,
-        21.5
+        32.5
+      ],
+      "angle": 340,
+      "what": "CookingSpitSm01",
+      "aboveGround": 11
+    },
+    {
+      "role": "yard",
+      "base": "Skyrim.esm|1010B3",
+      "offset": [
+        537.4,
+        45.7,
+        18.5
       ],
       "angle": 340,
       "what": "CraftingCookingPotSm",
-      "placedRef": "FF000EF2"
+      "hangsFrom": "CookingSpitSm01"
     },
     {
       "role": "yard",
