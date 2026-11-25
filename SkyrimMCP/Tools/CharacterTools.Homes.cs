@@ -592,6 +592,21 @@ public partial class CharacterTools
                 if (moved?["error"] != null) return DeserializeResponse(moved);
                 steps.Add($"moved to {house.Alias} (the game's own move)");
                 completeVisit = true;  // the spouse's own house no longer matters
+                // GOG, 2026-11-25: the game's move left the editor location (and SkyLink's record) at the SkyLink home the spouse had
+                // before. The house becomes their place too, so packages "near editor location" and FinalizeCharacter agree.
+                var owned = await _pipe.SendRequestAsync("owned_houses");
+                if ((owned?["owned"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(o =>
+                        house.Names.Contains(o["name"]?.ToString()?.ToLowerInvariant() ?? "")) is { } houseInfo && houseInfo["ref"]?.ToString() is string houseRef)
+                {
+                    var set = await _pipe.SendRequestAsync("set_home", new JsonObject { ["refId"] = spouse, ["at"] = houseRef });
+                    if (set?["error"] == null) steps.Add($"{houseInfo["name"]} is their place (editor location)");
+                    if (SlotRegistry.SlotForRef(spouse) is int houseSlot && SlotRegistry.Load()[houseSlot.ToString()] is JsonObject houseEntry)
+                    {
+                        var copy = houseEntry.DeepClone().AsObject();
+                        copy["home"] = new JsonObject { ["name"] = houseInfo["name"]?.ToString(), ["kind"] = "house", ["ref"] = houseRef };
+                        SlotRegistry.Reserve(houseSlot, copy);
+                    }
+                }
             }
             else if (key == "skylink")
             {
