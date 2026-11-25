@@ -6910,6 +6910,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-127",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "Every spawned character is in the marriage faction after a restart, blood relatives included",
+          "description": "Desktop 1.6 test, GOG 2026-11-25 (BUG F): FinalizeCharacter and ExportCharacter report Siggurd (Mother) and Eilonwy (Sister) marryable though spawned marryable false. Live check after the restart: all eight of the new cast have PotentialMarriageFaction (Skyrim.esm 019809) on their base, the relatives with it listed after Player Family, so it was added after set_family took it away. SkyLink adds it only at spawn when marryable is true; SkyLinkAI.esp's slot records have no factions or template; no SPID or marriage mod in the GOG profile. Not yet known: when it comes back (at spawn, at save, at load) and whether the Amulet of Mara line then shows for a relative. Fix after finding where it comes from; FinalizeCharacter/Export read the base list, so they report what the game holds.",
+          "history": [
+            {
+              "datetime": "2026-11-25T16:00",
+              "note": "From the Desktop 1.6 test round; faction lists read live through character_forms."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
