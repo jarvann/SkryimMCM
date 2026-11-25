@@ -7202,6 +7202,38 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-140",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A character made with the player's outfit ends up undressed",
+          "description": "Desktop 1.6 test (BUG Q): a character spawned with outfit 'player' (copies of what the player wears) was undressed. Details to collect in the retest.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:25",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-141",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "For an owned house, SetSpouseHome doesn't move the quest marker, and completeVisit does nothing",
+          "description": "Desktop 1.6 test (BUG S), after buying Vlindrel Hall: the spouse moved through MoveSpouseAdoption but the 'Visit your spouse's house' marker didn't follow; completeVisit replied completed yet the quest stayed at stage 25 with the objective open (also seen on the earlier Breezehome call). Setting stage 25 isn't what closes the objective: show it done (SetObjectiveCompleted) and point HouseCenter or the objective at the house.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:25",
+              "note": "From the Desktop 1.6 test round."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
