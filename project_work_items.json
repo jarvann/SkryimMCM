@@ -6894,6 +6894,22 @@
           ],
           "targetRelease": "1.7",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-126",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "RestartGame under MO2 said 'launched' but no game came back, then couldn't find MO2",
+          "description": "Desktop 1.6 test, GOG 2026-11-25: RestartGame quit the game and replied launched through MO2, but no game started; a second call said MO2's program wasn't found. MO2 had been started with a moshortcut (it runs headless and exits when the game exits): the relaunch most likely went to that instance while it was closing, and once it was gone FindLauncher only looked for a running ModOrganizer.exe or one in the instance folder, which a global instance (AppData\\Local\\ModOrganizer\\<game>) doesn't have. Fix: remember MO2's exe whenever it's seen running (settings), wait for a closing MO2 to exit before relaunching, and check that SkyrimSE starts before saying launched.",
+          "history": [
+            {
+              "datetime": "2026-11-25T15:30",
+              "note": "From the Desktop 1.6 test round; Claude Code started the game by hand from C:\\Modding\\MO2."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
