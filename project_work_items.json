@@ -6915,13 +6915,65 @@
           "id": "BUG-127",
           "type": "bug",
           "status": "open",
-          "priority": "high",
-          "title": "Every spawned character is in the marriage faction after a restart, blood relatives included",
+          "priority": "medium",
+          "title": "character_forms counts a faction at rank -1 as membership, so relatives read as marryable",
           "description": "Desktop 1.6 test, GOG 2026-11-25 (BUG F): FinalizeCharacter and ExportCharacter report Siggurd (Mother) and Eilonwy (Sister) marryable though spawned marryable false. Live check after the restart: all eight of the new cast have PotentialMarriageFaction (Skyrim.esm 019809) on their base, the relatives with it listed after Player Family, so it was added after set_family took it away. SkyLink adds it only at spawn when marryable is true; SkyLinkAI.esp's slot records have no factions or template; no SPID or marriage mod in the GOG profile. Not yet known: when it comes back (at spawn, at save, at load) and whether the Amulet of Mara line then shows for a relative. Fix after finding where it comes from; FinalizeCharacter/Export read the base list, so they report what the game holds.",
           "history": [
             {
               "datetime": "2026-11-25T16:00",
               "note": "From the Desktop 1.6 test round; faction lists read live through character_forms."
+            },
+            {
+              "datetime": "2026-11-25T16:20",
+              "note": "Cause found: in game Siggurd and Eilonwy have PotentialMarriageFaction at rank -1 (GetFactionRank -1, GetInFaction 0), which is not a member, and Desktop saw no marriage line for them. The base list keeps the entry at -1 after a load; character_forms lists it without the rank, so FinalizeCharacter and ExportCharacter's current state say marryable. Fix: only rank >= 0 counts."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-128",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "A marryable character who isn't a follower can't be proposed to",
+          "description": "Desktop 1.6 test: Ancano (follower false, marryable true) had no marriage line at relationship rank 0 (Acquaintance); after setrelationshiprank player 1 it appeared. Followers work because they're made allies. The game's proposal needs at least Friend (1): SpawnNpc should set it for a marryable character, and ExportCharacter write the relationship for marryable too (now only follower or family).",
+          "history": [
+            {
+              "datetime": "2026-11-25T16:20",
+              "note": "From the Desktop 1.6 test round status report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-129",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "No hint that the Amulet of Mara talk needs The Bonds of Matrimony started",
+          "description": "Desktop 1.6 test: on a direct-cell start no proposal line appeared until RelationshipMarriage was set to stage 10 by hand (normally Maramal in Riften starts it). SpawnNpc's marryable reply could say when the quest hasn't reached stage 10 (talk to Maramal first) rather than set it.",
+          "history": [
+            {
+              "datetime": "2026-11-25T16:20",
+              "note": "From the Desktop 1.6 test round status report."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-130",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "SpawnNpc keeps the template's essential flag though essential wasn't asked",
+          "description": "Desktop 1.6 test: Ancano spawned from the game's Ancano came out essential; essential defaults to false. Clear it unless asked (or say it came from the template).",
+          "history": [
+            {
+              "datetime": "2026-11-25T16:20",
+              "note": "From the Desktop 1.6 test round status report."
             }
           ],
           "targetRelease": "1.6",
