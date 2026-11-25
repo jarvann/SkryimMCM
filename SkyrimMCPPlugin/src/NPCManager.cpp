@@ -1515,7 +1515,9 @@ namespace SkyrimMCP::NPCManager {
         // follower mods keep per-follower settings only for unique NPCs (Nether's Follower Framework asks IsUnique before it does).
         if (slotIndex >= 0) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kUnique);
         else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kUnique);
+        // BUG-130: a copy of an essential NPC (the game's Ancano) came out essential though it wasn't asked for.
         if (params.value("essential", false)) npc->actorData.actorBaseFlags.set(RE::ACTOR_BASE_DATA::Flag::kEssential);
+        else npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kEssential);
 
         // The face: the template's own FaceGen (it has a file), or none, for RaceMenu's CharGen to build one.
         const auto face = params.value("face", std::string("template"));

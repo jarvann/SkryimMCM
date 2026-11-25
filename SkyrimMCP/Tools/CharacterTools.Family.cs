@@ -124,9 +124,16 @@ public partial class CharacterTools
             : new { region = "wherever the player chooses", why = $"{land} has no border with Skyrim SkyLink knows" };
         var (homes, _, housesError) = await HomeChoices();
         var familyHomes = FamilyHomes.Of(cid).Select(h => h["name"]?.ToString()).ToList();
-        var made = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
-            .Where(e => e?["characterId"]?.ToString() == cid && e?["family"] != null)
-            .Select(e => $"{e!["name"]} ({e["family"]})").ToList();
+        var madeEntries = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
+            .Where(e => e?["characterId"]?.ToString() == cid && e?["family"] != null).Select(e => e!).ToList();
+        var made = madeEntries.Select(e => $"{e["name"]} ({e["family"]})").ToList();
+        // BUG-125: the living list as told still named relatives already made. Those parts of it are left out here.
+        var madeNames = madeEntries.Select(e => e["name"]?.ToString()).OfType<string>().ToList();
+        var stillToMake = System.Text.RegularExpressions.Regex.Split(story["living"]?.ToString() ?? "", @"[;,\n]|\band\b")
+            .Select(part => part.Trim()).Where(part => part.Length > 0 && !part.Equals("none", StringComparison.OrdinalIgnoreCase))
+            .Where(part => !madeNames.Any(n => part.Contains(n, StringComparison.OrdinalIgnoreCase) ||
+                                               part.Contains(n.Split(' ')[0], StringComparison.OrdinalIgnoreCase)))
+            .ToList();
         return new
         {
             story,
@@ -146,7 +153,8 @@ public partial class CharacterTools
             relatives = new
             {
                 made,
-                toMake = story["living"]?.ToString(),
+                livingAsTold = story["living"]?.ToString(),
+                stillToMake = stillToMake.Count > 0 ? stillToMake : null,
                 howTo = "For each living relative the player named who isn't made yet, offer to make them: SpawnNpc with family set to their role " +
                     "(the roles: SetFamilyRole without arguments) and a race that fits the story. SpawnNpc still asks follower, marriage, attraction " +
                     "and home for each; the first home given becomes the family home.",
