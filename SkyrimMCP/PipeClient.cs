@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.IO.Pipes;
 using System.Text.Json;
 using System.Text.Json.Nodes;

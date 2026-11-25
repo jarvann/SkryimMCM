@@ -1,3 +1,4 @@
+using SkyrimMCP.Characters;
 using System.ComponentModel;
 using System.IO.Compression;
 using System.Text;

@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using SkyrimMCP.Face;
 
-namespace SkyrimMCP;
+namespace SkyrimMCP.Characters;
 
 /// <summary>
 /// INFRA-024: SkyLinkAI.esp's NPC slots are shared by every save of a game, because a slot's face files sit in the game's folders.

@@ -42,7 +42,7 @@ public partial class RaceMenuTools
 
     private static string PapyrusPresetName(string clean) => clean.Replace('/', '\\');
 
-    private async Task<string?> RaceMenuOpenError()
+    internal async Task<string?> RaceMenuOpenError()
     {
         var menus = await _pipe.SendRequestAsync("get_menu_state");
         return (menus?["allOpenMenus"]?.ToJsonString() ?? "").Contains("RaceSex Menu", StringComparison.OrdinalIgnoreCase)
