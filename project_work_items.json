@@ -6994,6 +6994,134 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-132",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "RemoveSpawnedNpc deleted one of the game's own guards (a levelled NPC)",
+          "description": "Desktop 1.6 test (BUG O): RemoveSpawnedNpc(0002E1D1) replied removed:true for a Solitude guard; his base is FF000CB8 because levelled NPCs get run-time bases, so 'base is FF' passed him as spawned. Undone by loading SkyLink_16_Home2. Fix: only SkyLink's characters (a slot record or the spawned registry), never by base prefix alone.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-133",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "RemoveHomeLayout replied with a bare error though it removed the home, and named no residents",
+          "description": "Desktop 1.6 test (BUG M): the real RemoveHomeLayout returned only \"An error occurred invoking 'remove_home_layout'\" yet removed the pieces, restored the cleared land and dropped the family home; residents were never named. An exception after the work (likely the residents/registry part).",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-134",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "BuildHomeLayout at a reference placed pieces where the player stood",
+          "description": "Desktop 1.6 test (BUG L): building in place of an existing home (where = a reference) reported ': where the player stands', 'Chair: where the player stands' among problems though placed 20. The player-spot check uses the player's position instead of the reference's site, or the pieces really went to the player.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-135",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "SetFamilyRole none drops the standing to Acquaintance, even for a marryable follower",
+          "description": "Desktop 1.6 test (BUG N): removing a role set relationship rank 0 for Sigrun and Elvyra (followers, marryable), which breaks the follower and the proposal. Keep Ally for followers and at least Friend for marryable characters.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-136",
+          "type": "bug",
+          "status": "open",
+          "priority": "medium",
+          "title": "A relative made resident at build time doesn't make the family home",
+          "description": "Desktop 1.6 test (BUG J): BuildHomeLayout with resident Eilonwy (Sister) left no family home; ApplyHome does it for SetHome, the builder's resident path doesn't.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-137",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "A layout saved with SaveHomeLayout loses its piece names",
+          "description": "Desktop 1.6 test (BUG K): survey lines for a saved layout read ': ground rises 100 units under it' with no name. SaveHomeLayout should keep 'what' (model file name or the base's name), as the shipped layout has.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-138",
+          "type": "bug",
+          "status": "open",
+          "priority": "low",
+          "title": "SetSpouseHome with no spouse gives a raw script error",
+          "description": "Desktop 1.6 test (BUG P): before any wedding, SetSpouseHome replied \"Argument 'param1': no form with ID object...\" instead of 'the player isn't married'. The empty LoveInterest alias comes back as something not empty.",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-139",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "SetSpouseHome moves the spouse into a house the player doesn't own",
+          "description": "Desktop 1.6 test (BUG R): SetSpouseHome('Breezehome') with no house owned ran MoveSpouseAdoption and completed 'Visit your spouse's house'. Refuse unless the house is in owned_houses (as SetHome's choices already are).",
+          "history": [
+            {
+              "datetime": "2026-11-25T17:30",
+              "note": "From the Desktop 1.6 test round (full sequence report)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
