@@ -121,7 +121,7 @@ and earlier.
 3. Ask Claude to interact with your game!
 
 ## Features
-- About 180 MCP tools for reading and changing game state
+- About 200 MCP tools for reading and changing game state
 - Player stats, inventory, spells, perks, shouts, appearance
 - Quests, NPCs, followers, weather, world objects, containers, teleport
 - Combat analysis, event system, crash log
@@ -132,6 +132,9 @@ and earlier.
   gold, skills, level, perks, spells, shouts); quest replay
 - Save health: live script pile-ups by mod, save check and clean
   (cleaning needs ReSaver), old saves against a changed load order
+- Characters (new in 1.6): lasting relatives, followers and people to marry
+  (the optional NPC slots keep them in saves), the family story, homes and
+  homesteads, a character exported as their own mod
 - Mod building (new in 1.5): patch a mod's script as a small override mod
   (needs the free Creation Kit's compiler), write small plugins, check masters,
   install into Vortex or MO2 and sort with LOOT, plugin limits

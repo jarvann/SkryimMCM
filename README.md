@@ -1,6 +1,6 @@
 # SkyLink AI
 
-A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. About 180 tools for reading and changing game state in real time: player stats, inventory, quests, NPCs, world, combat, building and matching a character's face (experimental), save health (finding what slows a game down, cleaning saves, checking old saves against a changed load order), and (new in 1.5) mod building and crash care: patching a mod's script, writing small plugins, installing and sorting them, reading crash logs against known patterns, and stopping a runaway script loop.
+A Model Context Protocol (MCP) server that lets AI assistants (Claude, etc.) interact directly with Skyrim SE/AE's runtime engine. About 200 tools for reading and changing game state in real time: player stats, inventory, quests, NPCs, world, combat, building and matching a character's face (experimental), save health, mod building and crash care, and (new in 1.6) characters: relatives, followers and people to marry who stay in your game, the family's story, homes and homesteads, and exporting a character as their own mod.
 
 ## Architecture
 
@@ -26,6 +26,7 @@ Claude Desktop <--stdio--> SkyLinkLauncher <--stdio/MCP--> C# MCP Server <--name
 | **Hair and body** *(experimental)* | Hair picker by shape (contact sheets, no in-game cycling), body proportions, RaceMenu body morphs and overlays (OBody-aware) |
 | **Utility** | Console commands with output, form search, load order, volume (with snapshot and restore), screenshots, crash log and SkyLink's crash recorder, Skyrim guidebook (UESP), notes and goals |
 | **Save health** | StackReport (live script pile-ups by mod), CheckSave and ListSaves (SkyLink's own save reader), CleanSave and CleanAndReload (through ReSaver), CompareSaveToLoadOrder (removed, renamed and changed mods, changed scripts), ArchiveSaves, RepairCharacterId |
+| **Characters** *(new in 1.6)* | Lasting characters (SpawnNpc) with the player's face or a template's, follower, marriage and attraction asked first; NPC slots kept by saves (optional `SkyLinkAI.esp`); Player Family roles; the family story; homes, the family home and the spouse's home; homestead layouts built, saved and removed (site survey, land clearing); requirements, standalone export and finalizing; message boxes |
 | **Mod building** *(new in 1.5)* | Creation Kit detection, Papyrus compiling with imports resolved (MO2- and BSA-aware), a mod's script source (loose or from its BSA), override mods packaged for Vortex or MO2, small plugins (ESP or light ESPFE) written from scratch, masters and dependency checks, install into the load order with a LOOT sort, plugin limits and light-flag eligibility |
 | **Crash and runaway care** *(new in 1.5)* | Known crash patterns with the likely mod and fix, Windows crash dumps for crashes Crash Logger misses, LOOT's notes on your plugins (dirty, incompatible, missing requirements), cleaning dirty plugins with SSEEdit, StopRunaway (ends a runaway update loop for the session), the restart cycle (save, quit, relaunch through SKSE or MO2) and new games from the main menu |
 | **Papyrus** | Function catalog, function lookup, VM call bridge, MCM Recorder playback |
@@ -105,7 +106,7 @@ The launcher runs the MCP server (`SkyLinkAI_Server\SkyrimMCP.dll`) and restarts
 "What Papyrus functions does the Experience mod expose?"
 ```
 
-With about 180 tools covering player state, inventory, quests, NPCs, world interaction, combat, economy, magic, events, mod building, crash care, and a Papyrus VM bridge to 3,000+ mod functions — if Skyrim can do it, Claude can probably help.
+With about 200 tools covering player state, inventory, quests, NPCs, world interaction, combat, economy, magic, events, mod building, crash care, and a Papyrus VM bridge to 3,000+ mod functions — if Skyrim can do it, Claude can probably help.
 
 See **[USAGE.md](USAGE.md)** for the full tool reference and advanced features.
 
@@ -128,7 +129,7 @@ dotnet build SkyrimMCP
 dotnet build SkyLinkLauncher
 
 # Or build release package
-.\build_release.ps1 -Version "1.5.0"
+.\build_release.ps1 -Version "1.6.0"
 ```
 
 ## Project Structure
