@@ -1,6 +1,6 @@
 {
   "projectName": "Skyrim MCP",
-  "lastUpdated": "2026-11-21",
+  "lastUpdated": "2026-11-26",
   "nextTestSession": {
     "label": "Unlimited Args + Muted Events + SearchForms Expanded (needs game restart)",
     "requiresGameRestart": [
@@ -8403,6 +8403,11 @@
       "version": "1.5.0",
       "date": "2026-11-21",
       "notes": "Mod building (Creation Kit compile, override mods, small plugins, masters check, install with LOOT sort, plugin limits), crash care (crash patterns, Windows dumps, LOOT notes, SSEEdit cleaning), StopRunaway, restart cycle and new games, GetJournal, BSA meshes. Tested on Steam 1.7.104 and GOG 1.6.1179 (MO2). GitHub v1.5.0 (SkyLinkAI-v1.5.0.zip, sha256 8b2d9a2f...19ded); Nexus file updated to 1.5.0, summary, description and sticky updated."
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-11-26",
+      "notes": "Characters: SpawnNpc (lasting characters, NPC slots in the optional SkyLinkAI.esp), followers, marriage, attraction, Player Family, FamilyStory, homes and homestead layouts, CharacterRequirements, ExportCharacter, FinalizeCharacter, ListFaceSliders, message boxes, GetGameEnvironment; saves listed under the character in the Load menu; one character across race-menu IDs. Tested on Steam 1.7.104 and GOG 1.6.1179 (MO2), last pass by the overnight self-test. GitHub v1.6.0 (SkyLinkAI-v1.6.0.zip, 21.8 MB). Nexus upload pending: Chrome tabs unavailable overnight (standalone sidebar mode); text in docs/nexus-1.6.0.md, zip in Downloads."
     }
   ],
   "releasePlan": {
