@@ -125,7 +125,7 @@ public partial class CharacterTools
         var (homes, _, housesError) = await HomeChoices();
         var familyHomes = FamilyHomes.Of(cid).Select(h => h["name"]?.ToString()).ToList();
         var madeEntries = SlotRegistry.Load().Select(kv => kv.Value as JsonObject)
-            .Where(e => e?["characterId"]?.ToString() == cid && e?["family"] != null).Select(e => e!).ToList();
+            .Where(e => CharacterIds.Same(e?["characterId"]?.ToString(), cid) && e?["family"] != null).Select(e => e!).ToList();
         var made = madeEntries.Select(e => $"{e["name"]} ({e["family"]})").ToList();
         // BUG-125: the living list as told still named relatives already made. Those parts of it are left out here.
         var madeNames = madeEntries.Select(e => e["name"]?.ToString()).OfType<string>().ToList();

@@ -50,7 +50,7 @@ public partial class CharacterTools
         // The registry keeps every save's homes; offer only the ones in this game (Steam, 2026-11-24: a homestead built in a session
         // that was never saved was picked as the family home, "Not a reference").
         foreach (var (center, entry) in HomeRegistry.Load())
-            if (entry is JsonObject e && (e["characterId"]?.ToString() == cid || e["characterId"] == null) && await InThisGame(center))
+            if (entry is JsonObject e && (CharacterIds.Same(e["characterId"]?.ToString(), cid) || e["characterId"] == null) && await InThisGame(center))
                 homes.Add(new(e["name"]?.ToString() ?? center, "skylink", center, null));
         // Two homes built from one layout share its name: the reference tells them apart.
         foreach (var same in homes.GroupBy(h => h.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).ToList())

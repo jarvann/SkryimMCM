@@ -338,21 +338,45 @@ public class UtilityTools : ToolBase
     [McpServerTool]
     [Description("Save the game (with no name: SkyLink_<date-time>), .ess plus the .skse co-save; waits until the file exists. " +
         "This is the console save: the game itself doesn't keep the character ID in such a save, so SkyLink stores it in its " +
-        "co-save record and puts it back on load (BUG-091). An existing save is never replaced unless overwrite is true. For a save to keep with no mods involved, save from the game menu. " +
+        "co-save record and puts it back on load (BUG-091). The file is named the game's way (Save<n>_<character ID>_..._<saveName>_...) " +
+        "so the game's Load menu lists it under the character, shown there by location and date; SkyLink's tools (LoadSave, ListSaves, " +
+        "CheckSave) take saveName as the label (BUG-122). An existing save is never replaced unless overwrite is true. For a save to keep with no mods involved, save from the game menu. " +
         "CAUTION: Always save before performing risky operations like quest stage manipulation or teleporting.")]
     public async Task<object> SaveGame(string? saveName = null, bool overwrite = false)
     {
         if (string.IsNullOrWhiteSpace(saveName)) saveName = $"SkyLink_{DateTime.Now:yyyyMMdd-HHmmss}";
         saveName = string.Join("_", saveName.Split(Path.GetInvalidFileNameChars()));
-        if (!overwrite && File.Exists(Path.Combine(SaveTools.SaveFolder(), saveName + ".ess")))
-            return new { success = false, error = $"A save called {saveName} already exists. Use another name, or overwrite: true to replace it (with the player's agreement)." };
+        string? myId = null;
+        try { myId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+        var existing = SaveTools.FileForLabel(SaveTools.SaveFolder(), saveName, myId);
+        if (!overwrite && existing != null)
+            return new { success = false, error = $"A save called {saveName} already exists ({Path.GetFileNameWithoutExtension(existing)}). Use another name, or overwrite: true to replace it (with the player's agreement)." };
 
         var (notStarted, sheathed) = await SaveTools.RequestSaveEx(_pipe, saveName);
         if (notStarted != null) return new { success = false, error = notStarted };
+        // BUG-122: each save gets a new game-style file name, so replacing one means removing the one it replaces.
+        var written = SaveTools.SavedFile(saveName);
+        string? replaced = null;
+        if (overwrite && existing != null && !string.Equals(existing, written, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                File.Delete(existing);
+                var cosave = Path.ChangeExtension(existing, ".skse");
+                if (File.Exists(cosave)) File.Delete(cosave);
+                replaced = Path.GetFileNameWithoutExtension(existing);
+            }
+            catch (IOException) { }
+        }
         return new
         {
             success = true,
             message = $"Game saved as: {saveName} (the game finishes writing it in the background).",
+            file = Path.GetFileNameWithoutExtension(written),
+            replaced,
+            loadMenu = Path.GetFileName(written).StartsWith("Save", StringComparison.OrdinalIgnoreCase)
+                ? "Listed under this character in the game's Load menu, shown by location and date (BUG-122); SkyLink's tools take the label."
+                : "No character ID in the game yet, so it's listed only under All saves.",
             sheathed = sheathed ? "A weapon or spell was out: it was sheathed first so the game would save (draw it again yourself)." : null,
         };
     }
@@ -634,6 +658,10 @@ public class UtilityTools : ToolBase
         // MO2 profiles with local saves keep them in the profile's own saves folder.
         var (mo2, profile) = SkyLinkSettings.Mo2Instance();
         var profileSaves = mo2 != null ? Path.Combine(mo2, "profiles", profile ?? "Default", "saves") : null;
+        // BUG-122: SkyLink's saves are named the game's way with the label inside; take the label.
+        string? myIdForLabel = null;
+        try { myIdForLabel = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
+        if (SaveTools.FileForLabel(folder, bare, myIdForLabel) is string labelled) bare = Path.GetFileNameWithoutExtension(labelled);
         if (Directory.Exists(folder) && !File.Exists(Path.Combine(folder, bare + ".ess")) &&
             !(profileSaves != null && File.Exists(Path.Combine(profileSaves, bare + ".ess"))))
         {
@@ -660,7 +688,8 @@ public class UtilityTools : ToolBase
                     var (id, name) = SaveTools.CharacterOf(file);
                     var myId = me?["characterId"]?.ToString()?.ToUpperInvariant();
                     var myName = me?["name"]?.ToString();
-                    var different = id != null && !string.IsNullOrEmpty(myId) ? id != myId : name != null && myName != null && !name.Equals(myName, StringComparison.Ordinal);
+                    // BUG-149: the race menu gives the character a new ID; IDs known to be one character aren't different.
+                    var different = id != null && !string.IsNullOrEmpty(myId) ? !SkyrimMCP.Characters.CharacterIds.Same(id, myId) : name != null && myName != null && !name.Equals(myName, StringComparison.Ordinal);
                     if (different)
                         return new
                         {
@@ -673,7 +702,7 @@ public class UtilityTools : ToolBase
             }
             catch (Exception) { /* not connected, or no answer: load as asked */ }
         }
-        var data = await _pipe.SendRequestAsync("load_save", new JsonObject { ["saveName"] = saveName });
+        var data = await _pipe.SendRequestAsync("load_save", new JsonObject { ["saveName"] = bare });
         return DeserializeResponse(data);
     }
 

@@ -142,7 +142,19 @@ public class PipeClient : IPipeClient
                 throw new McpException(error);
             }
 
-            return response["data"];
+            var data = response["data"];
+            // BUG-149: notice the race menu giving the player a new character ID (needs the load count: asked after this
+            // request has let go of the pipe).
+            if (action == "get_appearance" && data?["characterId"] != null)
+            {
+                var seen = data.DeepClone();
+                _ = Task.Run(async () =>
+                {
+                    try { CharacterIds.Observe(seen, (await SendRequestAsync("ping"))?["gameLoads"]?.GetValue<long>()); }
+                    catch (Exception) { /* no answer: nothing learned */ }
+                });
+            }
+            return data;
         }
         catch (OperationCanceledException)
         {

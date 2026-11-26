@@ -6826,7 +6826,7 @@
         {
           "id": "BUG-122",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "medium",
           "title": "SkyLink saves don't show in the game's Load menu under their character",
           "description": "Cory, 2026-11-25: SkyLink_16_Start wasn't in the Load menu. The game takes a save's character ID from its file name (the .ess header has none); SkyLink saves are plain labels. Proposed: name them in the game's pattern with the current character's ID, every field built fresh, the label in the location field; check the menu lists them and ListSaves still shows the label.",
@@ -6834,6 +6834,14 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-26T00:20",
+              "note": "Probe (Cory's screenshots): her own Load menu list shows only game-style names; a console save named Save0_<ID>_..._SkyLinkProbe_... is listed there, shown as its location ('[M]Vlindrel Hall'). Fixed: SaveGame and every SkyLink save (check, way-back, restart) are named Save<n>_<ID>_1_<hex name>_<label>_000000_<UTC>_<level>_<sex>; LoadSave, CheckSave, LinkCharacterIds and ListSaves (label column) take the label; overwrite removes the save it replaces. Plain label when the game has no ID."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Overnight self-test, GOG and Steam: SaveGame wrote Save2/Save3_DB5A9A2C_..._SkyLink-16-Night-Label2_... (GOG) and Save128_0369832C_..._SkyLink-16-Steam-Night_... (Steam); ListSaves shows the label; LoadSave by label loaded it. Label underscores become dashes in the file name (the game splits that name on '_'). Menu listing proved by the probe in Cory's screenshot."
             }
           ],
           "targetRelease": "1.6",
@@ -6890,7 +6898,7 @@
         {
           "id": "BUG-125",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "low",
           "title": "FamilyStory's 'relatives to make' still lists relatives already made",
           "description": "Desktop 1.6 test: after Eilonwy (Sister) was made, she was listed as made and still in the 'to make' text (the player's living list repeated as written).",
@@ -6902,6 +6910,10 @@
             {
               "datetime": "2026-11-25T18:30",
               "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Confirmed by the overnight self-test on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -6942,7 +6954,7 @@
         {
           "id": "BUG-126",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "high",
           "title": "RestartGame under MO2 said 'launched' but no game came back, then couldn't find MO2",
           "description": "Desktop 1.6 test, GOG 2026-11-25: RestartGame quit the game and replied launched through MO2, but no game started; a second call said MO2's program wasn't found. MO2 had been started with a moshortcut (it runs headless and exits when the game exits): the relaunch most likely went to that instance while it was closing, and once it was gone FindLauncher only looked for a running ModOrganizer.exe or one in the instance folder, which a global instance (AppData\\Local\\ModOrganizer\\<game>) doesn't have. Fix: remember MO2's exe whenever it's seen running (settings), wait for a closing MO2 to exit before relaunching, and check that SkyrimSE starts before saying launched.",
@@ -6954,6 +6966,10 @@
             {
               "datetime": "2026-11-25T18:30",
               "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Confirmed by the overnight self-test on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7010,7 +7026,7 @@
         {
           "id": "BUG-129",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "low",
           "title": "No hint that the Amulet of Mara talk needs The Bonds of Matrimony started",
           "description": "Desktop 1.6 test: on a direct-cell start no proposal line appeared until RelationshipMarriage was set to stage 10 by hand (normally Maramal in Riften starts it). SpawnNpc's marryable reply could say when the quest hasn't reached stage 10 (talk to Maramal first) rather than set it.",
@@ -7022,6 +7038,10 @@
             {
               "datetime": "2026-11-25T18:30",
               "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Confirmed by the overnight self-test on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7226,7 +7246,7 @@
         {
           "id": "BUG-138",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "low",
           "title": "SetSpouseHome with no spouse gives a raw script error",
           "description": "Desktop 1.6 test (BUG P): before any wedding, SetSpouseHome replied \"Argument 'param1': no form with ID object...\" instead of 'the player isn't married'. The empty LoveInterest alias comes back as something not empty.",
@@ -7238,6 +7258,10 @@
             {
               "datetime": "2026-11-25T18:30",
               "note": "Fixed on bugfix/1.6-test-round (compiles; logic DLL and server built). To retest in game."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Confirmed by the overnight self-test on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7326,7 +7350,7 @@
         {
           "id": "BUG-143",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "low",
           "title": "StartNewGame's direct-cell start leaves start-up quests unstarted, with no warning",
           "description": "Desktop 1.6 test: after a coc start the house-buying quest was stopped with empty aliases, the marriage quest needed its stage set by hand, and guards in Solitude and Markarth were hostile with no bounty. Likely one cause (the opening never ran). StartNewGame's note should say so (an alternate-start mod or the normal opening avoids it).",
@@ -7334,6 +7358,10 @@
             {
               "datetime": "2026-11-25T18:00",
               "note": "From the Desktop 1.6 final report."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Confirmed by the overnight self-test on GOG."
             }
           ],
           "targetRelease": "1.6",
@@ -7418,6 +7446,10 @@
             {
               "datetime": "2026-11-25T23:45",
               "note": "Desktop: warning, RepairFace (32 of 32 put back), lower lip rose (ScreenShot68), and it lasts through a save, full game restart and load (SkyLink_16_Layers_Fixed)."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Steam self-test caught a false alarm: RaceMenu writes a preset's own makeup files into the race too (Arya: eyeshadow_19, Anime Blush 3, Cat Eyeliner, Nord lips on a Breton), so any difference from the plugin isn't damage; a face edit would have reverted 8 of them. Now only a layer of the other sex's set (Male... on a woman) is put back. Steam: no warning; GOG Face_Before: 32 found and fixed."
             }
           ],
           "targetRelease": "1.6",
@@ -7466,7 +7498,7 @@
         {
           "id": "BUG-149",
           "type": "bug",
-          "status": "open",
+          "status": "complete",
           "priority": "high",
           "title": "Leaving the race menu gives the player a new character ID, so BUG-121's check refuses her own saves",
           "description": "GOG, 2026-11-25: the Adventurer was 0698A672 through the 1.6 tests; after the race menu today her saves are DB5A9A2C (the game gives a new character ID when the race menu closes). Her 22:17 save (Save1_DB5A9A2C, Vlindrel Hall) is reported currentCharacter:false from the 0698A672 game, and LoadSave refuses it as another character's save. Data keyed by character ID (family story, family homes, face state such as the brow colour) is split the same way. Proposed: when the ID changes in a running game with the same player, record the old ID as the same character and treat both as one.",
@@ -7474,6 +7506,14 @@
             {
               "datetime": "2026-11-25T23:00",
               "note": "Found by Desktop after Cory's 22:17 save; awaiting Cory's go."
+            },
+            {
+              "datetime": "2026-11-26T00:20",
+              "note": "Fixed: CharacterIds (character_ids.json) links IDs of one character: learned from get_appearance when the ID changes in the same game process and load (both settled 30 s after the load, same name), or told with the new LinkCharacterIds(saveName) after the player confirms. LoadSave's other-character check, ListSaves' currentCharacter, family homes and story, face state and slot/home ownership compare through it; data under the newer ID is merged into the first."
+            },
+            {
+              "datetime": "2026-11-26T00:05",
+              "note": "Overnight self-test, GOG: LinkCharacterIds(Save1_0698A672...) linked DB5A9A2C to 0698A672 (Cory and Desktop had said it's her); ListSaves marks the 0698A672 saves currentCharacter and LoadSave loaded one with no refusal; SkyLink_FamilyStory2 (another Adventurer) is still refused. The automatic link (ID change with no load) isn't exercised: the race menu needs keyboard input."
             }
           ],
           "targetRelease": "1.6",
