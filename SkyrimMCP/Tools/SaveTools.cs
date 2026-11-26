@@ -64,8 +64,68 @@ public class SaveTools : ToolBase
         return null;
     }
 
-    static bool IsSkyLinkSave(string file) =>
-        file.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
+    static bool IsSkyLinkSave(string file)
+    {
+        var label = LabelOf(Path.GetFileNameWithoutExtension(file));
+        return label.StartsWith("SkyLink", StringComparison.OrdinalIgnoreCase) || file.Contains("cleaned", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // BUG-122: the Load menu lists a character's saves by the character ID in the file name, so SkyLink names its saves the
+    // game's way with the label in the location field: Save<n>_<ID>_1_<name in hex>_<label>_000000_<UTC yyyyMMddHHmmss>_<level>_<sex>.
+    // The menu shows the location and date from inside the save, not the label; SkyLink's tools find saves by label. The play
+    // time field 000000 tells SkyLink's from the game's own (whose field there is the location).
+    static readonly Regex GameStyleName = new(@"^Save\d*_[0-9A-F]{8}_\d+_[0-9A-F]*_(?<label>.+)_000000_\d{14}_\d+_\d+$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>A save's label: the label field of a name SkyLink made the game's way, else the name itself.</summary>
+    internal static string LabelOf(string bareName) =>
+        GameStyleName.Match(bareName) is { Success: true } m ? m.Groups["label"].Value : bareName;
+
+    /// <summary>
+    /// The save a name or label means: the file of that exact name, else the newest game-style save with that label, the current
+    /// character's first when characterId is given. Null when none.
+    /// </summary>
+    internal static string? FileForLabel(string folder, string name, string? characterId = null)
+    {
+        if (!Directory.Exists(folder)) return null;
+        var bare = name.EndsWith(".ess", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
+        var exact = Path.Combine(folder, bare + ".ess");
+        if (File.Exists(exact)) return exact;
+        var ids = SkyrimMCP.Characters.CharacterIds.All(characterId);
+        return new DirectoryInfo(folder).EnumerateFiles("*.ess")
+            .Where(f => LabelOf(Path.GetFileNameWithoutExtension(f.Name)).Equals(bare, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => ids.Any(i => f.Name.Contains("_" + i + "_", StringComparison.OrdinalIgnoreCase)))
+            .ThenByDescending(f => f.LastWriteTimeUtc).FirstOrDefault()?.FullName;
+    }
+
+    /// <summary>The file a save just asked for under this label was written to (the newest with that label).</summary>
+    internal static string SavedFile(string label) => FileForLabel(SaveFolder(), label) ?? Path.Combine(SaveFolder(), label + ".ess");
+
+    /// <summary>The game-style file name for a save labelled label, or null when the game has no character ID to put in it.</summary>
+    internal static async Task<string?> GameStyleFileName(IPipeClient pipe, string label)
+    {
+        try
+        {
+            var me = await pipe.SendRequestAsync("get_appearance");
+            var id = me?["characterId"]?.ToString()?.ToUpperInvariant();
+            if (string.IsNullOrEmpty(id) || id == "00000000" || me?["characterIdLost"]?.GetValue<bool>() == true) return null;
+            var name = me?["name"]?.ToString() ?? "";
+            var female = me?["sex"]?.ToString() == "female";
+            var level = 1;
+            try { level = (await pipe.SendRequestAsync("get_player_info"))?["level"]?.GetValue<int>() ?? 1; } catch (Exception) { }
+            // The number the menu shows: one more than this character's highest.
+            var ids = SkyrimMCP.Characters.CharacterIds.All(id);
+            var number = 0;
+            if (Directory.Exists(SaveFolder()))
+                foreach (var f in Directory.EnumerateFiles(SaveFolder(), "Save*.ess"))
+                    if (Regex.Match(Path.GetFileName(f), @"^Save(\d+)_([0-9A-F]{8})_", RegexOptions.IgnoreCase) is { Success: true } m &&
+                        ids.Contains(m.Groups[2].Value.ToUpperInvariant()) && int.TryParse(m.Groups[1].Value, out var n))
+                        number = Math.Max(number, n + 1);
+            var hexName = Convert.ToHexString(System.Text.Encoding.Latin1.GetBytes(name));
+            return $"Save{number}_{id}_1_{hexName}_{label}_000000_{DateTime.UtcNow:yyyyMMddHHmmss}_{level}_{(female ? 1 : 0)}";
+        }
+        catch (Exception) { return null; }
+    }
 
     static readonly Regex GameMadeName = new(@"^(Save|Autosave|Quicksave)\d*_([0-9A-F]{8})_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -79,7 +139,9 @@ public class SaveTools : ToolBase
     /// <summary>As RequestSave, also saying whether a drawn weapon or spell was sheathed first.</summary>
     internal static async Task<(string? error, bool sheathed)> RequestSaveEx(IPipeClient pipe, string name)
     {
-        var file = Path.Combine(SaveFolder(), name + ".ess");
+        // BUG-122: named the game's way so the Load menu lists it under the character; plain label when there's no ID.
+        var fileName = await GameStyleFileName(pipe, name) ?? name;
+        var file = Path.Combine(SaveFolder(), fileName + ".ess");
         // BUG-103: an older save of that name isn't this one (2026-11-22: a refused save over an existing name was reported as done).
         var before = File.Exists(file) ? File.GetLastWriteTimeUtc(file) : DateTime.MinValue;
         // A drawn weapon or spell is enough for some load orders to refuse the save (seen in game): sheathe first and wait for it.
@@ -102,7 +164,7 @@ public class SaveTools : ToolBase
         catch (Exception) { }
         for (var attempt = 1; attempt <= 2; attempt++)
         {
-            var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = name });
+            var started = await pipe.SendRequestAsync("save_game", new JsonObject { ["saveName"] = fileName });
             if (started?["error"] != null) return (started["error"]!.ToString(), sheathed);
             for (var waited = 0; waited < 6_000; waited += 500)
             {
@@ -149,7 +211,7 @@ public class SaveTools : ToolBase
             if (await RequestSave(_pipe, name) is string refused) note = "Couldn't save for the stages: " + refused;
             else
             {
-                path = await WaitForCompleteSave(Path.Combine(SaveFolder(), name + ".ess"), TimeSpan.FromSeconds(45));
+                path = await WaitForCompleteSave(SavedFile(name), TimeSpan.FromSeconds(45));
                 if (path == null) note = $"The save {name} wasn't complete in time.";
             }
         }
@@ -159,7 +221,7 @@ public class SaveTools : ToolBase
             try { currentId = (await _pipe.SendRequestAsync("get_appearance"))?["characterId"]?.ToString(); } catch (Exception) { }
             var newest = Directory.Exists(SaveFolder())
                 ? new DirectoryInfo(SaveFolder()).EnumerateFiles("*.ess").OrderByDescending(f => f.LastWriteTimeUtc)
-                    .FirstOrDefault(f => currentId == null || f.Name.Contains(currentId, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(f => currentId == null || SkyrimMCP.Characters.CharacterIds.All(currentId).Any(i => f.Name.Contains(i, StringComparison.OrdinalIgnoreCase)))
                 : null;
             if (newest == null) return (null, null, (note ?? "") + " No save of this character to read stages from.");
             path = newest.FullName;
@@ -248,8 +310,7 @@ public class SaveTools : ToolBase
         var folder = SaveFolder();
         if (!Directory.Exists(folder)) return null;
         var bare = name.EndsWith(".ess", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
-        var exact = Path.Combine(folder, bare + ".ess");
-        if (File.Exists(exact)) return exact;
+        if (FileForLabel(folder, bare) is string byLabel) return byLabel;
         return new DirectoryInfo(folder).EnumerateFiles("*.ess")
             .Where(f => f.Name.Contains(bare, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault()?.FullName;
@@ -280,6 +341,7 @@ public class SaveTools : ToolBase
             rows.Add(new
             {
                 save = Path.GetFileNameWithoutExtension(f.Name),
+                label = LabelOf(Path.GetFileNameWithoutExtension(f.Name)) is var lb && lb != Path.GetFileNameWithoutExtension(f.Name) ? lb : null,
                 character = h?.PlayerName,
                 level = h?.Level,
                 location = h?.Location,
@@ -287,7 +349,7 @@ public class SaveTools : ToolBase
                 saved = f.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
                 sizeMB = Math.Round(f.Length / 1048576.0, 1),
                 characterId = id,
-                currentCharacter = currentId != null && id != null ? string.Equals(id, currentId, StringComparison.OrdinalIgnoreCase) : (bool?)null,
+                currentCharacter = currentId != null && id != null ? SkyrimMCP.Characters.CharacterIds.Same(id, currentId) : (bool?)null,
                 unreadable = h == null ? true : (bool?)null,
                 madeBySkyLink = IsSkyLinkSave(f.Name) ? true : (bool?)null,
                 stacks = scan ? QuickStacks(f.FullName) : null,
@@ -313,7 +375,7 @@ public class SaveTools : ToolBase
             made = $"SkyLink_Check_{DateTime.Now:yyyyMMdd-HHmmss}";
             if (await RequestSave(_pipe, made) is string notStarted) return new { error = $"Couldn't save for the check: {notStarted}" };
             // Under the bridge's 80-second limit: a long save is reported, not waited out.
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(50));
+            path = await WaitForCompleteSave(SavedFile(made), TimeSpan.FromSeconds(50));
             if (path == null)
                 return new { error = $"Saving as {made}: the file wasn't complete after a minute (a big save, or the save didn't start). Try CheckSave(\"{made}\") in a moment; if the file never appears, save again." };
         }
@@ -635,7 +697,7 @@ public class SaveTools : ToolBase
         {
             made = $"SkyLink_BeforeClean_{DateTime.Now:yyyyMMdd-HHmmss}";
             if (await RequestSave(_pipe, made) is string notStarted) return new { error = $"Couldn't make the way-back save: {notStarted} Nothing was cleaned." };
-            path = await WaitForCompleteSave(Path.Combine(SaveFolder(), made + ".ess"), TimeSpan.FromSeconds(50));
+            path = await WaitForCompleteSave(SavedFile(made), TimeSpan.FromSeconds(50));
             if (path == null) return new { error = $"Saving as {made}: the file wasn't complete after 55 seconds; nothing was cleaned. Run CleanAndReload again with previewSave=\"{made}\" once it exists." };
         }
 
@@ -698,6 +760,43 @@ public class SaveTools : ToolBase
             regrowth,
             result,
             next = "Run StackReport in a minute to check the pile-up is gone and isn't coming back. If anything seems wrong, load the way-back save.",
+        };
+    }
+
+    [McpServerTool]
+    [Description("Tell SkyLink that a save under another character ID is the character in the game (BUG-149): the game gives the " +
+        "player a new character ID each time the race menu closes, so one character's older saves carry an older ID, are listed " +
+        "as another character's, and LoadSave refuses them at first. SkyLink links the IDs by itself when it sees the change " +
+        "happen; this is for a change it didn't see. Ask the player first: two characters with the same name are not the same " +
+        "character (both called Adventurer, BUG-121). saveName: a save of the other ID. Links only saves of the same player " +
+        "name; per-character data (family story, family homes, face settings) kept under the other ID is merged.")]
+    public async Task<object> LinkCharacterIds(string saveName)
+    {
+        var folder = SaveFolder();
+        var bare = saveName.EndsWith(".ess", StringComparison.OrdinalIgnoreCase) ? saveName[..^4] : saveName;
+        var file = FileForLabel(folder, bare);
+        if (file == null) return new { error = $"No save named \"{bare}\" in {folder}." };
+        var me = await _pipe.SendRequestAsync("get_appearance");
+        var myId = me?["characterId"]?.ToString()?.ToUpperInvariant();
+        var myName = me?["name"]?.ToString();
+        if (string.IsNullOrEmpty(myId) || myId == "00000000") return new { error = SkyrimMCP.Face.FaceState.NoCharacterId };
+        var (id, name) = CharacterOf(file);
+        if (id == null) return new { error = $"{bare} has no character ID (not in its name nor in SkyLink's co-save record)." };
+        if (!string.Equals(name, myName, StringComparison.Ordinal))
+            return new { error = $"{bare} is {name ?? "an unnamed character"}'s save and {myName} is in the game: only saves of the same player name are linked." };
+        if (SkyrimMCP.Characters.CharacterIds.Same(id, myId))
+            return new { linked = false, note = $"{id} and {myId} are already the same character." };
+        // The older ID stays the character's key, so data first kept under it isn't moved.
+        var older = File.GetLastWriteTimeUtc(file) < DateTime.UtcNow ? id : myId;
+        var newer = older == id ? myId : id;
+        SkyrimMCP.Characters.CharacterIds.Link(newer, older, myName ?? "", $"LinkCharacterIds({bare}), confirmed by the player");
+        return new
+        {
+            linked = true,
+            character = myName,
+            ids = SkyrimMCP.Characters.CharacterIds.All(myId),
+            note = "Saves under any of these IDs are now this character's: ListSaves marks them currentCharacter and LoadSave loads them " +
+                   "without the other-character refusal. Per-character data was merged under the first ID.",
         };
     }
 

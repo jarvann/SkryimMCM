@@ -26,6 +26,7 @@ public static class FaceState
     {
         var id = appearance?["characterId"]?.GetValue<string>();
         if (string.IsNullOrEmpty(id)) return null;
+        id = SkyrimMCP.Characters.CharacterIds.Root(id)!;   // BUG-149: one key for every ID the character has had
         var key = "id:" + id;
         var name = appearance?["name"]?.GetValue<string>();
         var race = appearance?["race"]?.GetValue<string>();
@@ -50,6 +51,23 @@ public static class FaceState
     public const string NoCharacterId = "No character ID: per-character settings are kept by character ID. At the main menu, " +
         "load or start a game first. With a game loaded, the game has lost its character ID (00000000, from loading a save made " +
         "with the console save command): RepairCharacterId puts it back.";
+
+    /// <summary>BUG-149: moves the settings kept under other's ID to root's where root has none.</summary>
+    public static void MergeInto(string root, string other)
+    {
+        lock (Lock)
+        {
+            var all = Load();
+            if (all["id:" + other] is not JsonObject theirs) return;
+            var mine = all["id:" + root] as JsonObject ?? new JsonObject();
+            foreach (var (k, v) in theirs.ToList())
+                if (mine[k] == null && v != null) mine[k] = v.DeepClone();
+            all["id:" + root] = mine;
+            all.Remove("id:" + other);
+            Directory.CreateDirectory(SkyLinkSettings.Folder);
+            File.WriteAllText(FilePath, all.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+    }
 
     public static string? GetBrowColor(string? key)
     {

@@ -6826,7 +6826,7 @@
         {
           "id": "BUG-122",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "medium",
           "title": "SkyLink saves don't show in the game's Load menu under their character",
           "description": "Cory, 2026-11-25: SkyLink_16_Start wasn't in the Load menu. The game takes a save's character ID from its file name (the .ess header has none); SkyLink saves are plain labels. Proposed: name them in the game's pattern with the current character's ID, every field built fresh, the label in the location field; check the menu lists them and ListSaves still shows the label.",
@@ -6834,6 +6834,10 @@
             {
               "datetime": "2026-11-25T14:30",
               "note": "Found in the Desktop 1.6 test round."
+            },
+            {
+              "datetime": "2026-11-26T00:20",
+              "note": "Probe (Cory's screenshots): her own Load menu list shows only game-style names; a console save named Save0_<ID>_..._SkyLinkProbe_... is listed there, shown as its location ('[M]Vlindrel Hall'). Fixed: SaveGame and every SkyLink save (check, way-back, restart) are named Save<n>_<ID>_1_<hex name>_<label>_000000_<UTC>_<level>_<sex>; LoadSave, CheckSave, LinkCharacterIds and ListSaves (label column) take the label; overwrite removes the save it replaces. Plain label when the game has no ID."
             }
           ],
           "targetRelease": "1.6",
@@ -7466,7 +7470,7 @@
         {
           "id": "BUG-149",
           "type": "bug",
-          "status": "open",
+          "status": "fixed",
           "priority": "high",
           "title": "Leaving the race menu gives the player a new character ID, so BUG-121's check refuses her own saves",
           "description": "GOG, 2026-11-25: the Adventurer was 0698A672 through the 1.6 tests; after the race menu today her saves are DB5A9A2C (the game gives a new character ID when the race menu closes). Her 22:17 save (Save1_DB5A9A2C, Vlindrel Hall) is reported currentCharacter:false from the 0698A672 game, and LoadSave refuses it as another character's save. Data keyed by character ID (family story, family homes, face state such as the brow colour) is split the same way. Proposed: when the ID changes in a running game with the same player, record the old ID as the same character and treat both as one.",
@@ -7474,6 +7478,10 @@
             {
               "datetime": "2026-11-25T23:00",
               "note": "Found by Desktop after Cory's 22:17 save; awaiting Cory's go."
+            },
+            {
+              "datetime": "2026-11-26T00:20",
+              "note": "Fixed: CharacterIds (character_ids.json) links IDs of one character: learned from get_appearance when the ID changes in the same game process and load (both settled 30 s after the load, same name), or told with the new LinkCharacterIds(saveName) after the player confirms. LoadSave's other-character check, ListSaves' currentCharacter, family homes and story, face state and slot/home ownership compare through it; data under the newer ID is merged into the first."
             }
           ],
           "targetRelease": "1.6",

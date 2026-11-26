@@ -33,10 +33,11 @@ public static class FamilyHomes
 
     /// <summary>The family homes of this player character, first is the main one.</summary>
     public static List<JsonObject> Of(string? characterId) =>
-        characterId != null && Load()[characterId]?["homes"] is JsonArray a ? a.OfType<JsonObject>().Select(h => h.DeepClone().AsObject()).ToList() : [];
+        (characterId = CharacterIds.Root(characterId)) != null && Load()[characterId]?["homes"] is JsonArray a ? a.OfType<JsonObject>().Select(h => h.DeepClone().AsObject()).ToList() : [];
 
     public static void Add(string characterId, JsonObject home, bool main)
     {
+        characterId = CharacterIds.Root(characterId)!;
         var all = Load();
         var mine = all[characterId] as JsonObject ?? new JsonObject();
         var homes = (mine["homes"] as JsonArray)?.OfType<JsonObject>().Where(h => h["ref"]?.ToString() != home["ref"]?.ToString())
@@ -49,15 +50,32 @@ public static class FamilyHomes
 
     /// <summary>FEAT-308: the family story this player character told (homeland, standing, wealth...), empty when none yet.</summary>
     public static JsonObject Story(string? characterId) =>
-        characterId != null && Load()[characterId]?["story"] is JsonObject s ? s.DeepClone().AsObject() : new JsonObject();
+        (characterId = CharacterIds.Root(characterId)) != null && Load()[characterId]?["story"] is JsonObject s ? s.DeepClone().AsObject() : new JsonObject();
 
     /// <summary>Replaces the family story (null clears it).</summary>
     public static void SetStory(string characterId, JsonObject? story)
     {
+        characterId = CharacterIds.Root(characterId)!;
         var all = Load();
         var mine = all[characterId] as JsonObject ?? new JsonObject();
         if (story == null) mine.Remove("story"); else mine["story"] = story;
         all[characterId] = mine;
+        Save(all);
+    }
+
+    /// <summary>
+    /// BUG-149: one character under two IDs. Moves the homes and story kept under other into root where root has none, and
+    /// drops other's entry.
+    /// </summary>
+    public static void MergeInto(string root, string other)
+    {
+        var all = Load();
+        if (all[other] is not JsonObject theirs) return;
+        var mine = all[root] as JsonObject ?? new JsonObject();
+        foreach (var key in new[] { "homes", "story" })
+            if (mine[key] == null && theirs[key] != null) mine[key] = theirs[key]!.DeepClone();
+        all[root] = mine;
+        all.Remove(other);
         Save(all);
     }
 
@@ -81,6 +99,7 @@ public static class FamilyHomes
 
     public static bool Remove(string characterId, string refOrName)
     {
+        characterId = CharacterIds.Root(characterId)!;
         var all = Load();
         if (all[characterId]?["homes"] is not JsonArray homes) return false;
         var keep = homes.OfType<JsonObject>().Where(h => !string.Equals(h["ref"]?.ToString(), refOrName, StringComparison.OrdinalIgnoreCase)
