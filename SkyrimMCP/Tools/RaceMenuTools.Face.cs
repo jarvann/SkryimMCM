@@ -237,9 +237,25 @@ public partial class RaceMenuTools
         catch (McpException ex) { said.Add("couldn't check the makeup layers' set: " + ex.Message); }
 
         var (differ, put, why) = await RaceTintCheck(fix: true);
-        if (differ > 0) said.Add($"{put} of {differ} makeup layer files differed from what the race's plugin gives this sex and were put back");
+        if (differ > 0) said.Add($"{put} of {differ} makeup layer files were the other sex's and were put back to what the race's plugin gives this sex");
         else if (why != null && said.Count > 0) said.Add("the race's plugin couldn't be read: " + why);
         return said.Count == 0 ? null : "Makeup layers: " + string.Join("; ", said) + ", colours kept.";
+    }
+
+    /// <summary>
+    /// Whether a layer file in memory is the other sex's version where the race's plugin has one for the player's sex: a
+    /// "Male..." file on a woman (GOG, BUG-147) or a "Female..." file on a man. Files with no sex in their name (makeup from
+    /// mods) and same-sex choices are not.
+    /// </summary>
+    internal static bool OtherSexFile(string now, string want, bool female)
+    {
+        static string File(string p) => Path.GetFileName(p.Replace('\\', '/')).ToLowerInvariant();
+        static bool MaleOnly(string f) => f.Contains("male") && !f.Contains("female");
+        static bool Female(string f) => f.Contains("female");
+        var n = File(now);
+        var w = File(want);
+        if (n == w) return false;
+        return female ? MaleOnly(n) && !MaleOnly(w) : Female(n) && !Female(w);
     }
 
     /// <summary>
@@ -261,7 +277,9 @@ public partial class RaceMenuTools
             {
                 var tini = layer["tini"]?.GetValue<int>() ?? -1;
                 var now = layer["texture"]?.GetValue<string>() ?? "";
-                if (disk.TryGetValue(tini, out var want) && !want.Equals(now, StringComparison.OrdinalIgnoreCase))
+                // Only a layer of the other sex's set: RaceMenu writes a preset's own makeup files into the race too (Steam,
+                // 2026-11-26: eyeshadow_19, Anime Blush 3, Nord lips on a Breton), and those are the player's choice.
+                if (disk.TryGetValue(tini, out var want) && OtherSexFile(now, want, female))
                     set[tini.ToString()] = want;
             }
             if (set.Count == 0 || !fix) return (set.Count, 0, null);
@@ -405,8 +423,8 @@ public partial class RaceMenuTools
                 var (differ, _, _) = await RaceTintCheck(fix: false);
                 if ((wrong > 0 || differ > 0) && System.Text.Json.JsonSerializer.SerializeToNode(described) is JsonObject withWarning)
                 {
-                    withWarning["makeupLayersWarning"] = $"{Math.Max(wrong, differ)} makeup layers use files the race's plugin doesn't " +
-                        "give this sex (as after a character made with the other sex and switched): lip colour reaches only part of the " +
+                    withWarning["makeupLayersWarning"] = $"{Math.Max(wrong, differ)} makeup layers use the other sex's files where the race's " +
+                        "plugin has this sex's (as after a character made with the other sex and switched): lip colour reaches only part of the " +
                         "lips and other colours land in the wrong place. RepairFace (or any face edit) puts the right files back, keeping " +
                         "the colours.";
                     return withWarning;

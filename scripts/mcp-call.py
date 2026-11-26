@@ -8,6 +8,7 @@ order and prints each result. The server is a second pipe client next to Claude 
     scripts/mcp-call.py --manifest > tools.json                  # names, descriptions and input schemas
     scripts/mcp-call.py check_connection
     scripts/mcp-call.py find_hairstyles '{"sheet":true}' get_crash_log '{"index":0}'
+    scripts/mcp-call.py get_appearance --sleep 35 get_appearance   # pause between calls, same server process
 
 Each tool name may be followed by a JSON object of arguments. Tools act on the game for real.
 SKYLINK_MCP_LOG=<file> keeps the server's log; images in replies are saved to SKYLINK_MCP_IMAGES (default: the current
@@ -30,6 +31,10 @@ def main(argv):
     while i < len(argv):
         name = argv[i]
         args = {}
+        if name == "--sleep" and i + 1 < len(argv):
+            calls.append((name, {"seconds": float(argv[i + 1])}))
+            i += 2
+            continue
         if i + 1 < len(argv) and argv[i + 1].lstrip().startswith("{"):
             args = json.loads(argv[i + 1])
             i += 1
@@ -70,6 +75,10 @@ def main(argv):
         proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
         proc.stdin.flush()
         for name, args in calls:
+            if name == "--sleep":
+                import time
+                time.sleep(float(args.get("seconds", 0)) if isinstance(args, dict) else 0)
+                continue
             if name == "--list":
                 tools = request("tools/list", {}).get("result", {}).get("tools", [])
                 print("\n".join(sorted(t["name"] for t in tools)))
