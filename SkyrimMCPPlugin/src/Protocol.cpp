@@ -600,6 +600,10 @@ namespace SkyrimMCP::Protocol {
                 return result;
             });
         };
+        registry["player_race_tints"] = [](const std::string& id, const json& params) {
+            json set = params.contains("set") ? params["set"] : json::object();
+            return GameThread(id, [set]() { return AppearanceManager::PlayerRaceTints(set); });
+        };
         registry["player_tint_sex"] = [](const std::string& id, const json& params) {
             bool fix = params.value("fix", false);
             return GameThread(id, [fix]() { return AppearanceManager::PlayerTintSex(fix); });

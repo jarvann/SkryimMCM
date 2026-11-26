@@ -71,6 +71,12 @@ namespace SkyrimMCP {
         // Reports them; with fix, points each at the matching layer of the player's own sex (same file name without
         // "Male"/"Female", else the only layer of that kind), keeping its colour. The caller rebuilds the face tint.
         json PlayerTintSex(bool fix);
+
+        // BUG-147: the race's makeup layer files for the player's sex as they are in memory now ({tini, texture}), with the
+        // race's form ID and the plugins that edit it, so the server can compare them with the plugin on disk. With set
+        // ({"<tini>": "path"}), puts those paths back on the race's layers (and on any player layer that is a copy of one).
+        // Seen on GOG: the race's female set read the male files in memory while Skyrim.esm has the female ones.
+        json PlayerRaceTints(const json& set);
     }
 
 }

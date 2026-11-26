@@ -261,6 +261,49 @@ namespace SkyrimMCP::AppearanceManager {
         return result;
     }
 
+    json PlayerRaceTints(const json& set) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* base = player ? player->GetActorBase() : nullptr;
+        auto* race = player ? player->GetRace() : nullptr;
+        if (!base || !race) return {{"error", "Player not loaded"}};
+        const bool female = base->GetSex() == RE::SEX::kFemale;
+        auto* data = race->faceRelatedData[female ? RE::SEX::kFemale : RE::SEX::kMale];
+        auto* own = data ? data->tintMasks : nullptr;
+        if (!own) return {{"error", "The player's race has no makeup layers for this sex"}};
+
+        int changed = 0, playerCopies = 0;
+        json layers = json::array();
+        for (auto* asset : *own) {
+            if (!asset) continue;
+            auto& file = asset->texture.file;
+            const auto key = std::to_string(asset->texture.index);
+            if (set.is_object() && set.contains(key) && set[key].is_string()) {
+                const std::string want = set[key].get<std::string>();
+                const std::string was = file.textureName.c_str();
+                if (_stricmp(was.c_str(), want.c_str()) != 0) {
+                    // A player layer holding its own copy of the old name gets the new one too.
+                    for (auto* mask : player->GetPlayerRuntimeData().tintMasks) {
+                        if (mask && mask->texture && mask->texture != &file && _stricmp(mask->texture->textureName.c_str(), was.c_str()) == 0) {
+                            mask->texture->textureName = want.c_str();
+                            ++playerCopies;
+                        }
+                    }
+                    file.textureName = want.c_str();
+                    ++changed;
+                }
+            }
+            layers.push_back({{"tini", asset->texture.index}, {"texture", file.textureName.c_str()}});
+        }
+        if (changed > 0) base->AddChange(RE::TESNPC::ChangeFlags::kFace);
+
+        json edits = json::array();
+        if (race->sourceFiles.array) {
+            for (auto* f : *race->sourceFiles.array) if (f) edits.push_back(f->fileName);
+        }
+        return {{"race", std::format("{:08X}", race->GetFormID())}, {"sex", female ? "female" : "male"}, {"editedBy", edits},
+                {"layers", layers}, {"changed", changed}, {"playerCopiesChanged", playerCopies}};
+    }
+
     json GetColors(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};

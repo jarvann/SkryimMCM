@@ -213,28 +213,63 @@ public partial class RaceMenuTools
     }
 
     /// <summary>
-    /// BUG-147: makeup layers (tint masks) of the other sex's set, as on a character made male and then switched to female, put
-    /// the lip colour on the upper lip only and other colours in the wrong place. Points each at the player's own set, keeping
-    /// its colour; a preset saved after this keeps the right set. Null when nothing needed it; a sentence when something was
-    /// changed or couldn't be.
+    /// BUG-147: wrong makeup layer files (tint masks) put the lip colour on the upper lip only and other colours in the wrong
+    /// place. Seen on GOG: a female Nord's layers, and the race's own female set in memory, named the male files while
+    /// Skyrim.esm has the female ones (she was made male first). Puts back the files the plugin on disk gives the race for the
+    /// player's sex, and moves any layer of the other sex's set to the player's own; colours are kept. Null when nothing needed
+    /// it; a sentence when something was changed or couldn't be.
     /// </summary>
     private async Task<string?> FixMakeupLayerSex()
     {
+        var said = new List<string>();
         try
         {
             var r = await _pipe.SendRequestAsync("player_tint_sex", new JsonObject { ["fix"] = true });
             var wrong = r?["otherSexSet"]?.GetValue<int>() ?? 0;
-            if (wrong == 0) return null;
-            var fixedCount = r?["fixed"]?.GetValue<int>() ?? 0;
-            var sex = r?["sex"]?.GetValue<string>();
-            var left = (r?["unmatched"] as JsonArray)?.Count ?? 0;
-            return $"Makeup layers: {wrong} were from the {(sex == "female" ? "male" : "female")} set; {fixedCount} now use the {sex} set " +
-                   "with their colours kept" + (left > 0 ? $", {left} had no {sex} match and were left as they were" : "") + ".";
+            if (wrong > 0)
+            {
+                var sex = r?["sex"]?.GetValue<string>();
+                var left = (r?["unmatched"] as JsonArray)?.Count ?? 0;
+                said.Add($"{wrong} makeup layers were from the {(sex == "female" ? "male" : "female")} set; " +
+                         $"{r?["fixed"]?.GetValue<int>() ?? 0} now use the {sex} set" + (left > 0 ? $", {left} had no {sex} match" : ""));
+            }
         }
-        catch (McpException ex)
+        catch (McpException ex) { said.Add("couldn't check the makeup layers' set: " + ex.Message); }
+
+        var (differ, put, why) = await RaceTintCheck(fix: true);
+        if (differ > 0) said.Add($"{put} of {differ} makeup layer files differed from what the race's plugin gives this sex and were put back");
+        else if (why != null && said.Count > 0) said.Add("the race's plugin couldn't be read: " + why);
+        return said.Count == 0 ? null : "Makeup layers: " + string.Join("; ", said) + ", colours kept.";
+    }
+
+    /// <summary>
+    /// The race's makeup layer files for the player's sex in memory, against the plugin on disk that last edits the race
+    /// (BUG-147). Returns how many differ and, with fix, how many were put back; Why says why the plugin couldn't be read.
+    /// </summary>
+    private async Task<(int Differ, int Put, string? Why)> RaceTintCheck(bool fix)
+    {
+        try
         {
-            return "Couldn't check the makeup layers' set: " + ex.Message + ".";
+            var r = await _pipe.SendRequestAsync("player_race_tints");
+            var raceId = r?["race"]?.GetValue<string>() ?? "";
+            var female = r?["sex"]?.GetValue<string>() == "female";
+            var edits = (r?["editedBy"] as JsonArray ?? new JsonArray()).Select(x => x?.GetValue<string>() ?? "").ToList();
+            var (disk, why) = SkyrimMCP.Plugins.RaceTints.FromDisk(raceId, edits, female);
+            if (disk == null) return (0, 0, why);
+            var set = new JsonObject();
+            foreach (var layer in (r?["layers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+            {
+                var tini = layer["tini"]?.GetValue<int>() ?? -1;
+                var now = layer["texture"]?.GetValue<string>() ?? "";
+                if (disk.TryGetValue(tini, out var want) && !want.Equals(now, StringComparison.OrdinalIgnoreCase))
+                    set[tini.ToString()] = want;
+            }
+            if (set.Count == 0 || !fix) return (set.Count, 0, null);
+            var done = await _pipe.SendRequestAsync("player_race_tints", new JsonObject { ["set"] = set });
+            return (set.Count, done?["changed"]?.GetValue<int>() ?? 0, null);
         }
+        catch (McpException ex) { return (0, 0, ex.Message); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { return (0, 0, ex.Message); }
     }
 
     /// <summary>Saves the live face once per session before the first change or load, so it can be put back.</summary>
@@ -362,16 +397,18 @@ public partial class RaceMenuTools
             if (await RaceMenuOpenError() is string open) return new { error = open };
             var live = await SaveLivePreset($"{WorkFolder}/_current");
             var described = Describe(live, ReadJslot(live.Path), allSliders, minValue);
-            // BUG-147: say when the live face's makeup layers are the other sex's set (RepairFace puts them right).
+            // BUG-147: say when the live face's makeup layers aren't the files the race gives this sex (RepairFace puts them back).
             try
             {
                 var check = await _pipe.SendRequestAsync("player_tint_sex", new JsonObject { ["fix"] = false });
                 var wrong = check?["otherSexSet"]?.GetValue<int>() ?? 0;
-                if (wrong > 0 && System.Text.Json.JsonSerializer.SerializeToNode(described) is JsonObject withWarning)
+                var (differ, _, _) = await RaceTintCheck(fix: false);
+                if ((wrong > 0 || differ > 0) && System.Text.Json.JsonSerializer.SerializeToNode(described) is JsonObject withWarning)
                 {
-                    withWarning["makeupLayersWarning"] = $"{wrong} makeup layers are from the other sex's set (as after a character " +
-                        "made with the other sex and switched): lip colour reaches only part of the lips and other colours land in the " +
-                        "wrong place. RepairFace (or any face edit) puts them on the right set, keeping their colours.";
+                    withWarning["makeupLayersWarning"] = $"{Math.Max(wrong, differ)} makeup layers use files the race's plugin doesn't " +
+                        "give this sex (as after a character made with the other sex and switched): lip colour reaches only part of the " +
+                        "lips and other colours land in the wrong place. RepairFace (or any face edit) puts the right files back, keeping " +
+                        "the colours.";
                     return withWarning;
                 }
             }
