@@ -241,8 +241,16 @@ namespace SkyrimMCP::AppearanceManager {
             if (female ? male : femaleName) ++ownNamedOther;
             if (ownSample.size() < 8) ownSample.push_back(name);
         }
+        json otherSample = json::array();
+        if (other) {
+            for (auto* asset : *other) {
+                if (asset && otherSample.size() < 8) otherSample.push_back(LowerFileName(asset->texture.file.textureName.c_str()));
+            }
+        }
         result["race"] = {{"editedBy", edits}, {"ownSetSize", own->size()}, {"ownSetNamedForOtherSex", ownNamedOther},
-                          {"ownSetSample", ownSample}};
+                          {"ownSetSample", ownSample}, {"otherSetSize", other ? json(other->size()) : json(nullptr)},
+                          {"otherSetSample", otherSample}, {"sameFaceData", ownData == otherData},
+                          {"sameTintList", own == other}};
         result["sex"] = female ? "female" : "male";
         result["layers"] = layers;
         result["ownSet"] = right;
