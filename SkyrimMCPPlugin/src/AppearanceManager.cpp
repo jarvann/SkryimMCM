@@ -225,6 +225,24 @@ namespace SkyrimMCP::AppearanceManager {
         if (fixed > 0) base->AddChange(RE::TESNPC::ChangeFlags::kFace);
 
         json result;
+        // Which plugins edit the race, and how the race's own set for this sex is named: a mod that gave women the male
+        // files puts them in the "own" set, where nothing above can tell them apart (seen on GOG: 33 of 33 "own").
+        json edits = json::array();
+        if (race->sourceFiles.array) {
+            for (auto* file : *race->sourceFiles.array) if (file) edits.push_back(file->fileName);
+        }
+        int ownNamedOther = 0;
+        json ownSample = json::array();
+        for (auto* asset : *own) {
+            if (!asset) continue;
+            auto name = LowerFileName(asset->texture.file.textureName.c_str());
+            const bool male = name.find("female") == std::string::npos && name.find("male") != std::string::npos;
+            const bool femaleName = name.find("female") != std::string::npos;
+            if (female ? male : femaleName) ++ownNamedOther;
+            if (ownSample.size() < 8) ownSample.push_back(name);
+        }
+        result["race"] = {{"editedBy", edits}, {"ownSetSize", own->size()}, {"ownSetNamedForOtherSex", ownNamedOther},
+                          {"ownSetSample", ownSample}};
         result["sex"] = female ? "female" : "male";
         result["layers"] = layers;
         result["ownSet"] = right;
