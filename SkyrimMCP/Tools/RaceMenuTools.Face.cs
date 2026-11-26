@@ -423,7 +423,11 @@ public partial class RaceMenuTools
         var preset = ReadJslot(live.Path);
         if (!edit(preset) || dryRun) return (null, backupMade, live.Path);
 
+        // BUG-146 (GOG/MO2, 2026-11-25): RaceMenu refused every edit ("LoadCharacterPreset returned false") while the game's own save
+        // loaded. Under MO2 the game only sees files it wrote itself or that existed when it started; a file SkyLink writes from
+        // outside is invisible to it (as for face files, BUG-106). The game writes _edit first, then SkyLink changes its contents.
         var editedPath = Path.Combine(Path.GetDirectoryName(live.Path)!, "_edit.jslot");
+        if (SkyLinkSettings.Mo2Instance().Folder != null) await SaveLivePreset($"{WorkFolder}/_edit");
         WriteJslot(editedPath, preset);
         var outcome = await LoadPresetsTabPreset($"{WorkFolder}/_edit", editedPath);
         Interlocked.Increment(ref SkyrimMCP.Face.FaceState.FaceEdits);
