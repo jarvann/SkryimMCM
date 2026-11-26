@@ -7446,6 +7446,22 @@
           ],
           "targetRelease": "1.6",
           "dependsOn": []
+        },
+        {
+          "id": "BUG-149",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "Leaving the race menu gives the player a new character ID, so BUG-121's check refuses her own saves",
+          "description": "GOG, 2026-11-25: the Adventurer was 0698A672 through the 1.6 tests; after the race menu today her saves are DB5A9A2C (the game gives a new character ID when the race menu closes). Her 22:17 save (Save1_DB5A9A2C, Vlindrel Hall) is reported currentCharacter:false from the 0698A672 game, and LoadSave refuses it as another character's save. Data keyed by character ID (family story, family homes, face state such as the brow colour) is split the same way. Proposed: when the ID changes in a running game with the same player, record the old ID as the same character and treat both as one.",
+          "history": [
+            {
+              "datetime": "2026-11-25T23:00",
+              "note": "Found by Desktop after Cory's 22:17 save; awaiting Cory's go."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
         }
       ]
     },
