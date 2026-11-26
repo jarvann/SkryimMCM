@@ -8407,7 +8407,7 @@
     {
       "version": "1.6.0",
       "date": "2026-11-26",
-      "notes": "Characters: SpawnNpc (lasting characters, NPC slots in the optional SkyLinkAI.esp), followers, marriage, attraction, Player Family, FamilyStory, homes and homestead layouts, CharacterRequirements, ExportCharacter, FinalizeCharacter, ListFaceSliders, message boxes, GetGameEnvironment; saves listed under the character in the Load menu; one character across race-menu IDs. Tested on Steam 1.7.104 and GOG 1.6.1179 (MO2), last pass by the overnight self-test. GitHub v1.6.0 (SkyLinkAI-v1.6.0.zip, 21.8 MB). Nexus upload pending: Chrome tabs unavailable overnight (standalone sidebar mode); text in docs/nexus-1.6.0.md, zip in Downloads."
+      "notes": "Characters: SpawnNpc (lasting characters, NPC slots in the optional SkyLinkAI.esp), followers, marriage, attraction, Player Family, FamilyStory, homes and homestead layouts, CharacterRequirements, ExportCharacter, FinalizeCharacter, ListFaceSliders, message boxes, GetGameEnvironment; saves listed under the character in the Load menu; one character across race-menu IDs. Tested on Steam 1.7.104 and GOG 1.6.1179 (MO2), last pass by the overnight self-test. GitHub v1.6.0 (SkyLinkAI-v1.6.0.zip, 21.8 MB). Nexus 1.6.0 published 2026-11-26 (file over 1.5.0, changelog, sticky, summary and long description with Characters and Face, hair and body sections)."
     }
   ],
   "releasePlan": {
