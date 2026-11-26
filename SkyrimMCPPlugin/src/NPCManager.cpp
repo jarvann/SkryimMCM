@@ -1320,7 +1320,7 @@ namespace SkyrimMCP::NPCManager {
         auto* race = ResolveRace(text);
         if (!race) return {{"error", "No race called '" + text + "': give the name the game shows (Nord, High Elf, Khajiit...), an editor ID (NordRace) or a form ID."}};
         return {{"race", std::format("{:08X}", race->GetFormID())}, {"name", race->GetName()}, {"raceId", StableId(race)},
-                {"child", race->IsChildRace()}};
+                {"editorId", race->GetFormEditorID() ? race->GetFormEditorID() : ""}, {"child", race->IsChildRace()}};
     }
 
     json VoiceInfo(const std::string& voice) {

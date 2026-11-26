@@ -7382,7 +7382,7 @@
         {
           "id": "BUG-146",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "high",
           "title": "Under MO2 every face edit is refused (LoadCharacterPreset returned false)",
           "description": "GOG/MO2, 2026-11-25 (Desktop face work): SetFaceSliders, ResetFace, SetFaceTint and SetFace all failed with 'CharGen.LoadCharacterPreset returned false: the face is unchanged', while the game's own _current preset loaded. _edit.jslot was first created by SkyLink (18:34:50) after the game started (18:16): under MO2 the game doesn't see a file another program creates (as BUG-106 for face files). Proved: a byte-for-byte copy of a game-saved preset, created from outside, loaded false. Fixed: under MO2 the game saves _edit itself first, then SkyLink rewrites its contents and loads it.",
@@ -7390,6 +7390,58 @@
             {
               "datetime": "2026-11-25T18:45",
               "note": "Found in Desktop's face session on GOG; cause proved with a probe copy; fixed on bugfix/BUG-146-mo2-face-edit."
+            },
+            {
+              "datetime": "2026-11-25T22:10",
+              "note": "Confirmed by Desktop (SetFaceSliders, SetFace and SetFaceTint applied); merged to develop."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-147",
+          "type": "bug",
+          "status": "fixed",
+          "priority": "high",
+          "title": "A female player with the male makeup layers: pale lower lip, colours in the wrong place",
+          "description": "GOG, Desktop face session: every makeup layer (tint mask) of the female Adventurer was the male set (MaleHeadNord_Lips, MaleUpperEyeSocket...), already in her preset from before any SkyLink face edit (likely made male in character creation and switched). The male lip layer covers only the female upper lip; no tool could change the set. Fixed: new logic action player_tint_sex points each wrong-sex layer at the player's own set (same file name without Male/Female, else the only layer of that kind), keeping its colour; every face edit and RepairFace runs it before rebuilding the tint, and GetFacePreset (live) warns.",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "From Cory's screenshots and Desktop's v1/v2 face reports; fixed on bugfix/BUG-147-face-layers."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-148",
+          "type": "bug",
+          "status": "fixed",
+          "priority": "medium",
+          "title": "SetFaceSliders' example slider may not exist; known slider names missed MO2 and archives",
+          "description": "Desktop tried SetFaceSliders' description example NSK_EyelidOpen, which this GOG install may not have; it was written into the preset with only a vague note. KnownSliderNames read loose slider files from the game's Data folder only, so under MO2 and for sliders packed in archives it knew none. Fixed: the example is vanilla; known names come from every slider file (MO2 mods and archives included) and every preset in every game folder; the unknown-name note points to ListFaceSliders. Unknown names are still written, as before (Cory: keep the Steam slider work as it is).",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "From Desktop's v2 face report; fixed on bugfix/BUG-147-face-layers."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-314",
+          "type": "feature",
+          "status": "complete",
+          "priority": "medium",
+          "title": "ListFaceSliders: the extended face sliders an install has",
+          "description": "No tool listed the RaceMenu extended sliders on an install; GetFacePreset shows only those set, so Desktop concluded the GOG install had none. ListFaceSliders reads every FaceGenMorphs\\<plugin>\\sliders\\*.ini and races.ini (loose, MO2 mods, archives), filters to the player's race (or a given race), by category or part of the name, and gives name, category, type, mod and source.",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "Cory: all three for 1.6. Built on bugfix/BUG-147-face-layers."
             }
           ],
           "targetRelease": "1.6",

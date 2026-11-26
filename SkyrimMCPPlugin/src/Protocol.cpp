@@ -600,6 +600,10 @@ namespace SkyrimMCP::Protocol {
                 return result;
             });
         };
+        registry["player_tint_sex"] = [](const std::string& id, const json& params) {
+            bool fix = params.value("fix", false);
+            return GameThread(id, [fix]() { return AppearanceManager::PlayerTintSex(fix); });
+        };
         registry["head_part_tint"] = [](const std::string& id, const json& params) {
             int type = params.value("type", 6);
             std::string color = params.value("color", "");
