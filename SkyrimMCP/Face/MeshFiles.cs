@@ -41,6 +41,19 @@ public static class MeshFiles
     }
 
     /// <summary>
+    /// Every file in the archives SkyLink reads whose path (relative to Data, lower case) starts with prefix, with the archive
+    /// it's in, highest-priority archive first. A path in several archives is given once, from the first.
+    /// </summary>
+    public static IEnumerable<(string Path, BsaArchive Archive)> ArchiveFilesUnder(string prefix)
+    {
+        var p = prefix.Replace('/', '\\').TrimStart('\\').ToLowerInvariant();
+        var seen = new HashSet<string>();
+        foreach (var bsa in Archives())
+            foreach (var name in bsa.Names)
+                if (name.StartsWith(p, StringComparison.Ordinal) && seen.Add(name)) yield return (name, bsa);
+    }
+
+    /// <summary>
     /// A texture by its path relative to Data: loose first, then the archives of the plugin it belongs to (its own "... - Textures"
     /// archives, or the base game's). Only those archives are opened: a big load order has hundreds.
     /// </summary>

@@ -188,6 +188,7 @@ public partial class RaceMenuTools
     /// <summary>SKSE's Game.UpdateTintMaskColors rebuilds the player's face-tint texture from the tint layers.</summary>
     private async Task<string> RefreshTints()
     {
+        var layers = await FixMakeupLayerSex();
         try
         {
             await Papyrus("Game", "UpdateTintMaskColors");
@@ -202,12 +203,73 @@ public partial class RaceMenuTools
             await _pipe.SendRequestAsync("head_part_tint", new JsonObject { ["type"] = 6, ["fromHairColor"] = true });
             await ReapplyBrowColor();
             var store = await SkyrimMCP.Face.FaceState.RaceMenuSaveTints(_pipe);
-            return "Face tint rebuilt (Game.UpdateTintMaskColors; hair and brow shaders set as the game draws them). " + store + ".";
+            return (layers == null ? "" : layers + " ") +
+                   "Face tint rebuilt (Game.UpdateTintMaskColors; hair and brow shaders set as the game draws them). " + store + ".";
         }
         catch (McpException ex)
         {
             return "Couldn't rebuild the face tint: " + ex.Message + ". If the face is purple, reload the preset from RaceMenu's Presets tab.";
         }
+    }
+
+    /// <summary>
+    /// BUG-147: wrong makeup layer files (tint masks) put the lip colour on the upper lip only and other colours in the wrong
+    /// place. Seen on GOG: a female Nord's layers, and the race's own female set in memory, named the male files while
+    /// Skyrim.esm has the female ones (she was made male first). Puts back the files the plugin on disk gives the race for the
+    /// player's sex, and moves any layer of the other sex's set to the player's own; colours are kept. Null when nothing needed
+    /// it; a sentence when something was changed or couldn't be.
+    /// </summary>
+    private async Task<string?> FixMakeupLayerSex()
+    {
+        var said = new List<string>();
+        try
+        {
+            var r = await _pipe.SendRequestAsync("player_tint_sex", new JsonObject { ["fix"] = true });
+            var wrong = r?["otherSexSet"]?.GetValue<int>() ?? 0;
+            if (wrong > 0)
+            {
+                var sex = r?["sex"]?.GetValue<string>();
+                var left = (r?["unmatched"] as JsonArray)?.Count ?? 0;
+                said.Add($"{wrong} makeup layers were from the {(sex == "female" ? "male" : "female")} set; " +
+                         $"{r?["fixed"]?.GetValue<int>() ?? 0} now use the {sex} set" + (left > 0 ? $", {left} had no {sex} match" : ""));
+            }
+        }
+        catch (McpException ex) { said.Add("couldn't check the makeup layers' set: " + ex.Message); }
+
+        var (differ, put, why) = await RaceTintCheck(fix: true);
+        if (differ > 0) said.Add($"{put} of {differ} makeup layer files differed from what the race's plugin gives this sex and were put back");
+        else if (why != null && said.Count > 0) said.Add("the race's plugin couldn't be read: " + why);
+        return said.Count == 0 ? null : "Makeup layers: " + string.Join("; ", said) + ", colours kept.";
+    }
+
+    /// <summary>
+    /// The race's makeup layer files for the player's sex in memory, against the plugin on disk that last edits the race
+    /// (BUG-147). Returns how many differ and, with fix, how many were put back; Why says why the plugin couldn't be read.
+    /// </summary>
+    private async Task<(int Differ, int Put, string? Why)> RaceTintCheck(bool fix)
+    {
+        try
+        {
+            var r = await _pipe.SendRequestAsync("player_race_tints");
+            var raceId = r?["race"]?.GetValue<string>() ?? "";
+            var female = r?["sex"]?.GetValue<string>() == "female";
+            var edits = (r?["editedBy"] as JsonArray ?? new JsonArray()).Select(x => x?.GetValue<string>() ?? "").ToList();
+            var (disk, why) = SkyrimMCP.Plugins.RaceTints.FromDisk(raceId, edits, female);
+            if (disk == null) return (0, 0, why);
+            var set = new JsonObject();
+            foreach (var layer in (r?["layers"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+            {
+                var tini = layer["tini"]?.GetValue<int>() ?? -1;
+                var now = layer["texture"]?.GetValue<string>() ?? "";
+                if (disk.TryGetValue(tini, out var want) && !want.Equals(now, StringComparison.OrdinalIgnoreCase))
+                    set[tini.ToString()] = want;
+            }
+            if (set.Count == 0 || !fix) return (set.Count, 0, null);
+            var done = await _pipe.SendRequestAsync("player_race_tints", new JsonObject { ["set"] = set });
+            return (set.Count, done?["changed"]?.GetValue<int>() ?? 0, null);
+        }
+        catch (McpException ex) { return (0, 0, ex.Message); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { return (0, 0, ex.Message); }
     }
 
     /// <summary>Saves the live face once per session before the first change or load, so it can be put back.</summary>
@@ -334,7 +396,24 @@ public partial class RaceMenuTools
         {
             if (await RaceMenuOpenError() is string open) return new { error = open };
             var live = await SaveLivePreset($"{WorkFolder}/_current");
-            return Describe(live, ReadJslot(live.Path), allSliders, minValue);
+            var described = Describe(live, ReadJslot(live.Path), allSliders, minValue);
+            // BUG-147: say when the live face's makeup layers aren't the files the race gives this sex (RepairFace puts them back).
+            try
+            {
+                var check = await _pipe.SendRequestAsync("player_tint_sex", new JsonObject { ["fix"] = false });
+                var wrong = check?["otherSexSet"]?.GetValue<int>() ?? 0;
+                var (differ, _, _) = await RaceTintCheck(fix: false);
+                if ((wrong > 0 || differ > 0) && System.Text.Json.JsonSerializer.SerializeToNode(described) is JsonObject withWarning)
+                {
+                    withWarning["makeupLayersWarning"] = $"{Math.Max(wrong, differ)} makeup layers use files the race's plugin doesn't " +
+                        "give this sex (as after a character made with the other sex and switched): lip colour reaches only part of the " +
+                        "lips and other colours land in the wrong place. RepairFace (or any face edit) puts the right files back, keeping " +
+                        "the colours.";
+                    return withWarning;
+                }
+            }
+            catch (McpException) { /* an older plugin without the check: no warning */ }
+            return described;
         }
         var file = ResolvePreset(name);
         return Describe(file, ReadJslot(file.Path), allSliders, minValue);
@@ -437,40 +516,24 @@ public partial class RaceMenuTools
     private static HashSet<string>? _knownSliders;
 
     /// <summary>
-    /// Slider names the loose RaceMenu slider files define (meshes\actors\character\FaceGenMorphs\*\sliders\*.ini:
-    /// "Name = 128, Slider, MorphDown, MorphUp"), plus every extended-slider name saved in a CharGen preset.
+    /// Slider names RaceMenu's slider files define (FaceGenMorphs\*\sliders\*.ini, loose or in an archive: SliderFiles), plus
+    /// every extended-slider name saved in a CharGen preset.
     /// </summary>
     private static HashSet<string> KnownSliderNames()
     {
         if (_knownSliders != null) return _knownSliders;
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var (game, _) = SkyLinkSettings.SkyrimPath();
-        var root = game == null ? null : Path.Combine(game, "Data", "meshes", "actors", "character", "FaceGenMorphs");
-        try
-        {
-            if (root != null && Directory.Exists(root))
-            {
-                foreach (var ini in Directory.EnumerateFiles(root, "*.ini", SearchOption.AllDirectories))
-                {
-                    if (!Path.GetDirectoryName(ini)!.EndsWith("sliders", StringComparison.OrdinalIgnoreCase)) continue;
-                    foreach (var line in File.ReadLines(ini))
-                    {
-                        var eq = line.IndexOf('=');
-                        if (eq <= 0 || line.TrimStart().StartsWith('#') || line.TrimStart().StartsWith(';')) continue;
-                        var name = line[..eq].Trim();
-                        if (name.Length > 0 && name.All(c => char.IsLetterOrDigit(c) || c == '_')) names.Add(name);
-                    }
-                }
-            }
-        }
-        catch { /* unreadable folder: fewer known names */ }
+        // BUG-148: this read only loose files in the game's own Data folder, so under MO2 (files in mod folders) and for
+        // sliders packed in an archive it knew none of them.
+        try { foreach (var slider in SkyrimMCP.Face.SliderFiles.Read().Sliders) names.Add(slider.Name); }
+        catch { /* unreadable files: fewer known names */ }
 
-        // Sliders packed in BSAs (CME_, NSK_...) have no loose ini, but every preset that set one names it
-        // (BUG-031): collect the extended-slider names from all .jslot files under CharGen.
-        var chargen = game == null ? null : Path.Combine(game, "Data", "SKSE", "Plugins", "CharGen");
+        // A slider some mod defines in a way not read above is still known once a preset has set it (BUG-031): collect the
+        // extended-slider names from all .jslot files under CharGen, in every game folder (MO2's overwrite holds the presets).
+        foreach (var chargen in SkyLinkSettings.GameFileFolders().Select(f => Path.Combine(f, "SKSE", "Plugins", "CharGen")))
         try
         {
-            if (chargen != null && Directory.Exists(chargen))
+            if (Directory.Exists(chargen))
             {
                 var work = Path.DirectorySeparatorChar + WorkFolder + Path.DirectorySeparatorChar;
                 foreach (var jslot in Directory.EnumerateFiles(chargen, "*.jslot", SearchOption.AllDirectories).Take(2000))
@@ -492,9 +555,64 @@ public partial class RaceMenuTools
     }
 
     [McpServerTool]
+    [Description("List the RaceMenu extended face sliders this install has (FEAT-314), read from the slider files every slider mod " +
+        "installs (loose or packed in an archive, MO2 mods included). By default only those for the player's race (or race: a name, " +
+        "editor ID or form ID), as each mod's races.ini assigns them. Each has its name (as SetFaceSliders takes it), category (Face, " +
+        "Eyes, Brow, Mouth, Head, Body, Hair, Extra), type (Slider: a value; Preset and HeadPart: a menu choice), the mod that adds it " +
+        "and where it was read. category filters by category; contains by part of the name. Values set on a face: GetFacePreset.")]
+    public async Task<object> ListFaceSliders(string? race = null, string? category = null, string? contains = null)
+    {
+        var defs = SkyrimMCP.Face.SliderFiles.Read();
+        string? raceText = race;
+        if (string.IsNullOrWhiteSpace(raceText))
+            raceText = (await _pipe.SendRequestAsync("get_appearance"))?["raceFormId"]?.GetValue<string>();
+        string? editorId = null, raceName = null;
+        if (!string.IsNullOrWhiteSpace(raceText))
+        {
+            try
+            {
+                var r = await _pipe.SendRequestAsync("resolve_race", new JsonObject { ["race"] = raceText });
+                editorId = r?["editorId"]?.GetValue<string>();
+                raceName = r?["name"]?.GetValue<string>();
+            }
+            catch (McpException ex) when (!string.IsNullOrWhiteSpace(race)) { return new { error = ex.Message }; }
+            catch (McpException) { /* the player's race not resolved: list every slider */ }
+        }
+
+        HashSet<string>? files = null;
+        if (!string.IsNullOrEmpty(editorId) && defs.RaceFiles.TryGetValue(editorId, out var forRace))
+            files = forRace.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var list = defs.Sliders
+            .Where(sl => files == null || files.Contains(sl.File))
+            .Where(sl => string.IsNullOrWhiteSpace(category) ||
+                         SkyrimMCP.Face.SliderFiles.CategoryName(sl.Category).Equals(category.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(sl => string.IsNullOrWhiteSpace(contains) || sl.Name.Contains(contains.Trim(), StringComparison.OrdinalIgnoreCase))
+            .GroupBy(sl => sl.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
+            .OrderBy(sl => SkyrimMCP.Face.SliderFiles.CategoryName(sl.Category)).ThenBy(sl => sl.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(sl => new { name = sl.Name, category = SkyrimMCP.Face.SliderFiles.CategoryName(sl.Category), type = sl.Type,
+                                mod = sl.Plugin, source = sl.Source })
+            .ToList();
+        return new
+        {
+            race = raceName ?? raceText,
+            raceEditorId = editorId,
+            filteredByRace = files != null,
+            count = list.Count,
+            byCategory = list.GroupBy(x => x.category).ToDictionary(g => g.Key, g => g.Count()),
+            sliders = list,
+            note = defs.Sliders.Count == 0
+                ? "No RaceMenu slider files found: only the 18 vanilla morphs and 3 vanilla presets can be set on this install."
+                : files == null
+                    ? "No races.ini assigns sliders to this race by editor ID, so every slider on the install is listed; some may not apply."
+                    : "The sliders this race gets. Vanilla morphs (noseLongShort ... eyesForwardBack) and presetNose/Eyes/Mouth are always there and not listed.",
+        };
+    }
+
+    [McpServerTool]
     [Description("Change face sliders on the player's live face, several at once: sliders is a map of slider name to value, " +
-        "e.g. {\"NSK_EyelidOpen\": -0.3, \"eyesInOut\": 0.2}. Names: the vanilla morphs (noseLongShort ... eyesForwardBack, -1 to 1), " +
-        "presetNose/presetEyes/presetMouth (whole numbers), or any RaceMenu extended slider by its name as GetFacePreset lists it. " +
+        "e.g. {\"jawNarrowWide\": 0.2, \"eyesInOut\": -0.1}. Names: the vanilla morphs (noseLongShort ... eyesForwardBack, -1 to 1), " +
+        "presetNose/presetEyes/presetMouth (whole numbers), or a RaceMenu extended slider by its name. Which extended sliders exist " +
+        "depends on the mods installed: ListFaceSliders lists them (GetFacePreset shows only those set on a face). " +
         "Values beyond a slider's menu range are accepted. How it works: RaceMenu has no script call for one slider, so the live face " +
         "is saved as a preset, edited, and loaded back with RaceMenu's preset loader (about a second; the face can flash purple for a " +
         "moment before its tint is rebuilt, which is normal). The first change in a session " +
@@ -681,9 +799,9 @@ public partial class RaceMenuTools
                 if (!defined && known.Count > 0) unknown.Add(name);
                 changes.Add(new { slider = name, kind = "extended", previous = 0.0, value,
                                   note = defined ? null
-                                       : (string?)"Unknown name: no loose slider file and no saved RaceMenu preset has it. It may still " +
-                                         "be a real slider at 0 from a BSA that no preset has used yet; RaceMenu ignores names it doesn't " +
-                                         "know, so check the spelling if nothing changes." });
+                                       : (string?)"Unknown name: no slider file on this install (loose or in an archive) and no saved " +
+                                         "RaceMenu preset has it, so it most likely does nothing here. ListFaceSliders lists the sliders " +
+                                         "this install has. It was still written, in case a mod defines it in a way SkyLink doesn't read." });
             }
             else
             {
@@ -766,7 +884,9 @@ public partial class RaceMenuTools
     }
 
     [McpServerTool]
-    [Description("Repair the player's face after a preset load went wrong: rebuilds the face-tint texture (fixes a purple face) and, " +
+    [Description("Repair the player's face after a preset load went wrong: puts makeup layers of the other sex's set on the " +
+        "player's own set, keeping their colours (a character made with the other sex and switched keeps the old set: a pale lower " +
+        "lip, colours in the wrong place); rebuilds the face-tint texture (fixes a purple face) and, " +
         "given a preset name, puts back any head parts from that preset the player is missing (RaceMenu's script loader drops parts " +
         "with no sex flag or valid-race list, such as some ears). Refused while RaceMenu is open.")]
     public async Task<object> RepairFace(string? preset = null)

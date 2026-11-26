@@ -7382,7 +7382,7 @@
         {
           "id": "BUG-146",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "high",
           "title": "Under MO2 every face edit is refused (LoadCharacterPreset returned false)",
           "description": "GOG/MO2, 2026-11-25 (Desktop face work): SetFaceSliders, ResetFace, SetFaceTint and SetFace all failed with 'CharGen.LoadCharacterPreset returned false: the face is unchanged', while the game's own _current preset loaded. _edit.jslot was first created by SkyLink (18:34:50) after the game started (18:16): under MO2 the game doesn't see a file another program creates (as BUG-106 for face files). Proved: a byte-for-byte copy of a game-saved preset, created from outside, loaded false. Fixed: under MO2 the game saves _edit itself first, then SkyLink rewrites its contents and loads it.",
@@ -7390,6 +7390,90 @@
             {
               "datetime": "2026-11-25T18:45",
               "note": "Found in Desktop's face session on GOG; cause proved with a probe copy; fixed on bugfix/BUG-146-mo2-face-edit."
+            },
+            {
+              "datetime": "2026-11-25T22:10",
+              "note": "Confirmed by Desktop (SetFaceSliders, SetFace and SetFaceTint applied); merged to develop."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-147",
+          "type": "bug",
+          "status": "complete",
+          "priority": "high",
+          "title": "A female player's makeup layers use the male files: pale lower lip, colours in the wrong place",
+          "description": "GOG, Desktop face session: every makeup layer (tint mask) of the female Nord Adventurer named the male file (MaleHeadNord_Lips...). The male lip layer covers only the female upper lip. Cause: she was made male first; in memory the Nord race's own female set also named the male files (her layers point into the race's data), while Skyrim.esm and Update.esm give women the female files. Fixed: RaceTints reads the race's layer files for the player's sex from the plugin that last edits it, and the logic action player_race_tints puts back any that differ (colours kept). Every face edit and RepairFace run it; GetFacePreset (live) warns. player_tint_sex also moves any layer of the other sex's set to the player's own.",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "From Cory's screenshots and Desktop's v1/v2 face reports; fixed on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:20",
+              "note": "Round 1 found nothing: the race's female set in memory held the male names. Cory disagreed that the race ships that way; Skyrim.esm on disk confirmed him. Round 2 reads the plugin."
+            },
+            {
+              "datetime": "2026-11-25T23:45",
+              "note": "Desktop: warning, RepairFace (32 of 32 put back), lower lip rose (ScreenShot68), and it lasts through a save, full game restart and load (SkyLink_16_Layers_Fixed)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-148",
+          "type": "bug",
+          "status": "complete",
+          "priority": "medium",
+          "title": "SetFaceSliders' example slider may not exist; known slider names missed MO2 and archives",
+          "description": "Desktop tried SetFaceSliders' description example NSK_EyelidOpen, which this GOG install may not have; it was written into the preset with only a vague note. KnownSliderNames read loose slider files from the game's Data folder only, so under MO2 and for sliders packed in archives it knew none. Fixed: the example is vanilla; known names come from every slider file (MO2 mods and archives included) and every preset in every game folder; the unknown-name note points to ListFaceSliders. Unknown names are still written, as before (Cory: keep the Steam slider work as it is).",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "From Desktop's v2 face report; fixed on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:10",
+              "note": "Desktop: the unknown-name note is clear; ListFaceSliders shows NSK_EyelidOpen exists on GOG (17 eye sliders from RaceMenu.bsa)."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "FEAT-314",
+          "type": "feature",
+          "status": "complete",
+          "priority": "medium",
+          "title": "ListFaceSliders: the extended face sliders an install has",
+          "description": "No tool listed the RaceMenu extended sliders on an install; GetFacePreset shows only those set, so Desktop concluded the GOG install had none. ListFaceSliders reads every FaceGenMorphs\\<plugin>\\sliders\\*.ini and races.ini (loose, MO2 mods, archives), filters to the player's race (or a given race), by category or part of the name, and gives name, category, type, mod and source.",
+          "history": [
+            {
+              "datetime": "2026-11-25T22:30",
+              "note": "Cory: all three for 1.6. Built on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:10",
+              "note": "Desktop: ListFaceSliders filtered to Nord returned 17 eye sliders from bsa:RaceMenu.bsa."
+            }
+          ],
+          "targetRelease": "1.6",
+          "dependsOn": []
+        },
+        {
+          "id": "BUG-149",
+          "type": "bug",
+          "status": "open",
+          "priority": "high",
+          "title": "Leaving the race menu gives the player a new character ID, so BUG-121's check refuses her own saves",
+          "description": "GOG, 2026-11-25: the Adventurer was 0698A672 through the 1.6 tests; after the race menu today her saves are DB5A9A2C (the game gives a new character ID when the race menu closes). Her 22:17 save (Save1_DB5A9A2C, Vlindrel Hall) is reported currentCharacter:false from the 0698A672 game, and LoadSave refuses it as another character's save. Data keyed by character ID (family story, family homes, face state such as the brow colour) is split the same way. Proposed: when the ID changes in a running game with the same player, record the old ID as the same character and treat both as one.",
+          "history": [
+            {
+              "datetime": "2026-11-25T23:00",
+              "note": "Found by Desktop after Cory's 22:17 save; awaiting Cory's go."
             }
           ],
           "targetRelease": "1.6",

@@ -65,6 +65,18 @@ namespace SkyrimMCP {
         // hair colour; setting it directly colours the brows alone. Not saved: the caller re-applies it.
         // fromHairColor: set it to what the game itself renders, twice the stored hair colour (BUG-034).
         json HeadPartTint(int partType, const std::string& color, bool fromHairColor);
+
+        // BUG-147: the player's face makeup layers (tint masks) of the other sex's set, as after a character made male and
+        // switched to female: the male lip layer covers only the female upper lip, and other layers land in the wrong place.
+        // Reports them; with fix, points each at the matching layer of the player's own sex (same file name without
+        // "Male"/"Female", else the only layer of that kind), keeping its colour. The caller rebuilds the face tint.
+        json PlayerTintSex(bool fix);
+
+        // BUG-147: the race's makeup layer files for the player's sex as they are in memory now ({tini, texture}), with the
+        // race's form ID and the plugins that edit it, so the server can compare them with the plugin on disk. With set
+        // ({"<tini>": "path"}), puts those paths back on the race's layers (and on any player layer that is a copy of one).
+        // Seen on GOG: the race's female set read the male files in memory while Skyrim.esm has the female ones.
+        json PlayerRaceTints(const json& set);
     }
 
 }

@@ -128,6 +128,182 @@ namespace SkyrimMCP::AppearanceManager {
         }
     }
 
+    namespace {
+        std::string LowerFileName(std::string_view path) {
+            auto slash = path.find_last_of("\\/");
+            std::string name(slash == std::string_view::npos ? path : path.substr(slash + 1));
+            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return name;
+        }
+
+        // "MaleHeadNord_Lips.dds" and "FemaleHeadNord_Lips.dds" both become "headnord_lips.dds".
+        std::string SexlessName(std::string_view path) {
+            auto name = LowerFileName(path);
+            for (std::string_view word : { std::string_view("female"), std::string_view("male") }) {
+                for (auto at = name.find(word); at != std::string::npos; at = name.find(word)) name.erase(at, word.size());
+            }
+            return name;
+        }
+
+        using TintAsset = RE::TESRace::FaceRelatedData::TintAsset;
+
+        const TintAsset* FindAsset(RE::BSTArray<TintAsset*>* list, const RE::TintMask* mask) {
+            if (!list || !mask->texture) return nullptr;
+            const auto file = LowerFileName(mask->texture->textureName.c_str());
+            for (auto* asset : *list) {
+                if (!asset) continue;
+                if (&asset->texture.file == mask->texture) return asset;
+                if (LowerFileName(asset->texture.file.textureName.c_str()) == file) return asset;
+            }
+            return nullptr;
+        }
+
+        const TintAsset* MatchInOwnSet(RE::BSTArray<TintAsset*>* own, const TintAsset* other, const RE::TintMask* mask) {
+            const auto key = SexlessName(mask->texture->textureName.c_str());
+            for (auto* asset : *own) {
+                if (asset && SexlessName(asset->texture.file.textureName.c_str()) == key) return asset;
+            }
+            // Different file names: the only layer of the same kind (lips, cheeks...), never paint or dirt, which come in many.
+            if (!other) return nullptr;
+            const auto kind = other->texture.skinTone.get();
+            using K = TintAsset::TintLayer::SkinTone;
+            if (kind == K::kPaint || kind == K::kDirt || kind == K::kNone) return nullptr;
+            const TintAsset* only = nullptr;
+            for (auto* asset : *own) {
+                if (!asset || asset->texture.skinTone.get() != kind) continue;
+                if (only) return nullptr;
+                only = asset;
+            }
+            return only;
+        }
+    }
+
+    json PlayerTintSex(bool fix) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* base = player ? player->GetActorBase() : nullptr;
+        auto* race = player ? player->GetRace() : nullptr;
+        if (!base || !race) return {{"error", "Player not loaded"}};
+        const bool female = base->GetSex() == RE::SEX::kFemale;
+        auto* ownData = race->faceRelatedData[female ? RE::SEX::kFemale : RE::SEX::kMale];
+        auto* otherData = race->faceRelatedData[female ? RE::SEX::kMale : RE::SEX::kFemale];
+        auto* own = ownData ? ownData->tintMasks : nullptr;
+        auto* other = otherData ? otherData->tintMasks : nullptr;
+        if (!own || own->empty()) return {{"error", std::string("The player's race has no ") + (female ? "female" : "male") + " makeup layers"}};
+
+        int layers = 0, right = 0, wrongSex = 0, fixed = 0;
+        json unmatched = json::array();
+        json changes = json::array();
+        auto visit = [&](RE::BSTArray<RE::TintMask*>& masks) {
+            for (auto* mask : masks) {
+                if (!mask || !mask->texture) continue;
+                ++layers;
+                if (FindAsset(own, mask)) { ++right; continue; }
+                const auto* otherAsset = FindAsset(other, mask);
+                if (!otherAsset) continue;  // from neither set (another mod's layer): left alone
+                ++wrongSex;
+                const std::string was = mask->texture->textureName.c_str();
+                const auto* match = MatchInOwnSet(own, otherAsset, mask);
+                if (!match) {
+                    unmatched.push_back({{"texture", was}, {"visible", mask->alpha > 0.0f}});
+                    continue;
+                }
+                if (fix) {
+                    if (mask->texture == &otherAsset->texture.file) {
+                        // Points into the race record: point it at the right one instead (never edit the race's own data).
+                        mask->texture = const_cast<RE::TESTexture*>(&match->texture.file);
+                    } else {
+                        mask->texture->textureName = match->texture.file.textureName;  // the player's own copy
+                    }
+                    ++fixed;
+                }
+                if (changes.size() < 40) changes.push_back({{"from", LowerFileName(was)}, {"to", LowerFileName(match->texture.file.textureName.c_str())},
+                                                            {"visible", mask->alpha > 0.0f}});
+            }
+        };
+        visit(player->GetPlayerRuntimeData().tintMasks);
+        if (auto* overlay = player->GetPlayerRuntimeData().overlayTintMasks) visit(*overlay);
+        if (fixed > 0) base->AddChange(RE::TESNPC::ChangeFlags::kFace);
+
+        json result;
+        // Which plugins edit the race, and how the race's own set for this sex is named: a mod that gave women the male
+        // files puts them in the "own" set, where nothing above can tell them apart (seen on GOG: 33 of 33 "own").
+        json edits = json::array();
+        if (race->sourceFiles.array) {
+            for (auto* file : *race->sourceFiles.array) if (file) edits.push_back(file->fileName);
+        }
+        int ownNamedOther = 0;
+        json ownSample = json::array();
+        for (auto* asset : *own) {
+            if (!asset) continue;
+            auto name = LowerFileName(asset->texture.file.textureName.c_str());
+            const bool male = name.find("female") == std::string::npos && name.find("male") != std::string::npos;
+            const bool femaleName = name.find("female") != std::string::npos;
+            if (female ? male : femaleName) ++ownNamedOther;
+            if (ownSample.size() < 8) ownSample.push_back(name);
+        }
+        json otherSample = json::array();
+        if (other) {
+            for (auto* asset : *other) {
+                if (asset && otherSample.size() < 8) otherSample.push_back(LowerFileName(asset->texture.file.textureName.c_str()));
+            }
+        }
+        result["race"] = {{"editedBy", edits}, {"ownSetSize", own->size()}, {"ownSetNamedForOtherSex", ownNamedOther},
+                          {"ownSetSample", ownSample}, {"otherSetSize", other ? json(other->size()) : json(nullptr)},
+                          {"otherSetSample", otherSample}, {"sameFaceData", ownData == otherData},
+                          {"sameTintList", own == other}};
+        result["sex"] = female ? "female" : "male";
+        result["layers"] = layers;
+        result["ownSet"] = right;
+        result["otherSexSet"] = wrongSex;
+        result["fixed"] = fixed;
+        result["changes"] = changes;
+        if (!unmatched.empty()) result["unmatched"] = unmatched;
+        return result;
+    }
+
+    json PlayerRaceTints(const json& set) {
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* base = player ? player->GetActorBase() : nullptr;
+        auto* race = player ? player->GetRace() : nullptr;
+        if (!base || !race) return {{"error", "Player not loaded"}};
+        const bool female = base->GetSex() == RE::SEX::kFemale;
+        auto* data = race->faceRelatedData[female ? RE::SEX::kFemale : RE::SEX::kMale];
+        auto* own = data ? data->tintMasks : nullptr;
+        if (!own) return {{"error", "The player's race has no makeup layers for this sex"}};
+
+        int changed = 0, playerCopies = 0;
+        json layers = json::array();
+        for (auto* asset : *own) {
+            if (!asset) continue;
+            auto& file = asset->texture.file;
+            const auto key = std::to_string(asset->texture.index);
+            if (set.is_object() && set.contains(key) && set[key].is_string()) {
+                const std::string want = set[key].get<std::string>();
+                const std::string was = file.textureName.c_str();
+                if (_stricmp(was.c_str(), want.c_str()) != 0) {
+                    // A player layer holding its own copy of the old name gets the new one too.
+                    for (auto* mask : player->GetPlayerRuntimeData().tintMasks) {
+                        if (mask && mask->texture && mask->texture != &file && _stricmp(mask->texture->textureName.c_str(), was.c_str()) == 0) {
+                            mask->texture->textureName = want.c_str();
+                            ++playerCopies;
+                        }
+                    }
+                    file.textureName = want.c_str();
+                    ++changed;
+                }
+            }
+            layers.push_back({{"tini", asset->texture.index}, {"texture", file.textureName.c_str()}});
+        }
+        if (changed > 0) base->AddChange(RE::TESNPC::ChangeFlags::kFace);
+
+        json edits = json::array();
+        if (race->sourceFiles.array) {
+            for (auto* f : *race->sourceFiles.array) if (f) edits.push_back(f->fileName);
+        }
+        return {{"race", std::format("{:08X}", race->GetFormID())}, {"sex", female ? "female" : "male"}, {"editedBy", edits},
+                {"layers", layers}, {"changed", changed}, {"playerCopiesChanged", playerCopies}};
+    }
+
     json GetColors(const std::string& refId) {
         auto* actor = Helpers::ResolveActor(refId);
         if (!actor) return {{"error", "Actor not found: " + refId}};
