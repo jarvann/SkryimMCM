@@ -7402,14 +7402,22 @@
         {
           "id": "BUG-147",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "high",
-          "title": "A female player with the male makeup layers: pale lower lip, colours in the wrong place",
-          "description": "GOG, Desktop face session: every makeup layer (tint mask) of the female Adventurer was the male set (MaleHeadNord_Lips, MaleUpperEyeSocket...), already in her preset from before any SkyLink face edit (likely made male in character creation and switched). The male lip layer covers only the female upper lip; no tool could change the set. Fixed: new logic action player_tint_sex points each wrong-sex layer at the player's own set (same file name without Male/Female, else the only layer of that kind), keeping its colour; every face edit and RepairFace runs it before rebuilding the tint, and GetFacePreset (live) warns.",
+          "title": "A female player's makeup layers use the male files: pale lower lip, colours in the wrong place",
+          "description": "GOG, Desktop face session: every makeup layer (tint mask) of the female Nord Adventurer named the male file (MaleHeadNord_Lips...). The male lip layer covers only the female upper lip. Cause: she was made male first; in memory the Nord race's own female set also named the male files (her layers point into the race's data), while Skyrim.esm and Update.esm give women the female files. Fixed: RaceTints reads the race's layer files for the player's sex from the plugin that last edits it, and the logic action player_race_tints puts back any that differ (colours kept). Every face edit and RepairFace run it; GetFacePreset (live) warns. player_tint_sex also moves any layer of the other sex's set to the player's own.",
           "history": [
             {
               "datetime": "2026-11-25T22:30",
               "note": "From Cory's screenshots and Desktop's v1/v2 face reports; fixed on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:20",
+              "note": "Round 1 found nothing: the race's female set in memory held the male names. Cory disagreed that the race ships that way; Skyrim.esm on disk confirmed him. Round 2 reads the plugin."
+            },
+            {
+              "datetime": "2026-11-25T23:45",
+              "note": "Desktop: warning, RepairFace (32 of 32 put back), lower lip rose (ScreenShot68), and it lasts through a save, full game restart and load (SkyLink_16_Layers_Fixed)."
             }
           ],
           "targetRelease": "1.6",
@@ -7418,7 +7426,7 @@
         {
           "id": "BUG-148",
           "type": "bug",
-          "status": "fixed",
+          "status": "complete",
           "priority": "medium",
           "title": "SetFaceSliders' example slider may not exist; known slider names missed MO2 and archives",
           "description": "Desktop tried SetFaceSliders' description example NSK_EyelidOpen, which this GOG install may not have; it was written into the preset with only a vague note. KnownSliderNames read loose slider files from the game's Data folder only, so under MO2 and for sliders packed in archives it knew none. Fixed: the example is vanilla; known names come from every slider file (MO2 mods and archives included) and every preset in every game folder; the unknown-name note points to ListFaceSliders. Unknown names are still written, as before (Cory: keep the Steam slider work as it is).",
@@ -7426,6 +7434,10 @@
             {
               "datetime": "2026-11-25T22:30",
               "note": "From Desktop's v2 face report; fixed on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:10",
+              "note": "Desktop: the unknown-name note is clear; ListFaceSliders shows NSK_EyelidOpen exists on GOG (17 eye sliders from RaceMenu.bsa)."
             }
           ],
           "targetRelease": "1.6",
@@ -7442,6 +7454,10 @@
             {
               "datetime": "2026-11-25T22:30",
               "note": "Cory: all three for 1.6. Built on bugfix/BUG-147-face-layers."
+            },
+            {
+              "datetime": "2026-11-25T23:10",
+              "note": "Desktop: ListFaceSliders filtered to Nord returned 17 eye sliders from bsa:RaceMenu.bsa."
             }
           ],
           "targetRelease": "1.6",
