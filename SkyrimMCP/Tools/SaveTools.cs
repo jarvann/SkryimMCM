@@ -93,10 +93,14 @@ public class SaveTools : ToolBase
         if (File.Exists(exact)) return exact;
         var ids = SkyrimMCP.Characters.CharacterIds.All(characterId);
         return new DirectoryInfo(folder).EnumerateFiles("*.ess")
-            .Where(f => LabelOf(Path.GetFileNameWithoutExtension(f.Name)).Equals(bare, StringComparison.OrdinalIgnoreCase))
+            .Where(f => LabelMatches(LabelOf(Path.GetFileNameWithoutExtension(f.Name)), bare))
             .OrderByDescending(f => ids.Any(i => f.Name.Contains("_" + i + "_", StringComparison.OrdinalIgnoreCase)))
             .ThenByDescending(f => f.LastWriteTimeUtc).FirstOrDefault()?.FullName;
     }
+
+    /// <summary>Labels compare without case, with '_' and '-' alike (the file name holds '-' for '_').</summary>
+    internal static bool LabelMatches(string a, string b) =>
+        string.Equals(a.Replace('_', '-'), b.Replace('_', '-'), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The file a save just asked for under this label was written to (the newest with that label).</summary>
     internal static string SavedFile(string label) => FileForLabel(SaveFolder(), label) ?? Path.Combine(SaveFolder(), label + ".ess");
@@ -122,7 +126,8 @@ public class SaveTools : ToolBase
                         ids.Contains(m.Groups[2].Value.ToUpperInvariant()) && int.TryParse(m.Groups[1].Value, out var n))
                         number = Math.Max(number, n + 1);
             var hexName = Convert.ToHexString(System.Text.Encoding.Latin1.GetBytes(name));
-            return $"Save{number}_{id}_1_{hexName}_{label}_000000_{DateTime.UtcNow:yyyyMMddHHmmss}_{level}_{(female ? 1 : 0)}";
+            // No extra underscores in a field the game splits on: the label's become dashes (LabelMatches treats them alike).
+            return $"Save{number}_{id}_1_{hexName}_{label.Replace('_', '-')}_000000_{DateTime.UtcNow:yyyyMMddHHmmss}_{level}_{(female ? 1 : 0)}";
         }
         catch (Exception) { return null; }
     }
